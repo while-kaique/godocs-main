@@ -137,4 +137,46 @@ describe('prompt do juiz', () => {
     expect(t).toMatch(/j[áa] est[áa] descontada/i);
     expect(t).toMatch(/dúvida, responda que N[ÃA]O/i);
   });
+
+  it('⚠️ manda decidir pela DOCUMENTAÇÃO, não pelo nome — e entrega a doc dos dois lados', () => {
+    const t = montarPromptAglutinacao(
+      p('novo', 2000, { documentacao: 'acrescenta a etapa de aprovação ao fluxo do produto X' }),
+      [p('velho', 1000, { documentacao: 'o produto X, que recebe pedidos e os despacha' })],
+    );
+    expect(t).toMatch(/N[ÃA]O PELO NOME/i);
+    expect(t).toContain('acrescenta a etapa de aprovação');
+    expect(t).toContain('o produto X, que recebe pedidos');
+  });
+});
+
+describe('⚠️ falha de chamada NÃO é "não é feature"', () => {
+  it('resposta não interpretável vira ERRO reportado, não silêncio', async () => {
+    // Uma rajada de 502 do proxy (aconteceu em 03/09/2026, 40 seguidos) não pode terminar
+    // com a varredura anunciando "nenhuma sugestão" sobre uma base que ninguém analisou.
+    const { interpretarVeredito } = await import('@/lib/agents/aglutinador');
+    expect(interpretarVeredito('<html>502 Bad gateway</html>')).toBeNull();
+  });
+});
+
+describe('o NOME não decide sozinho (decisão do Luis, 03/09/2026)', () => {
+  it('nome contido é BÔNUS: não cria candidato sobre conteúdo sem nada em comum', async () => {
+    const { similaridadeFinal, BONUS_NOME_CONTIDO } = await import('@/lib/similaridade-lexical');
+    // Dois projetos cujos textos não têm NADA em comum, mas um nome cabe no outro.
+    expect(similaridadeFinal(0, true)).toBe(BONUS_NOME_CONTIDO);
+    expect(similaridadeFinal(0, true)).toBeLessThan(PISO_SIMILARIDADE_AGLUTINACAO);
+  });
+
+  it('mas reforça o par que o CONTEÚDO já sugeriu', async () => {
+    const { similaridadeFinal } = await import('@/lib/similaridade-lexical');
+    expect(similaridadeFinal(0.3, true)).toBeCloseTo(0.45, 5);
+    expect(similaridadeFinal(0.3, false)).toBe(0.3);
+    expect(similaridadeFinal(0.95, true)).toBe(1);
+  });
+
+  it('a documentação entra no vocabulário do projeto', async () => {
+    const { tokensPesados } = await import('@/lib/similaridade-lexical');
+    const t = tokensPesados({ nome: 'Alpha', descricao: null, documentacao: 'despacha pedidos no protheus' });
+    expect(t.has('protheus')).toBe(true);
+    expect(t.has('despacha')).toBe(true);
+  });
 });

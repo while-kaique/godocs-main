@@ -1,13 +1,16 @@
 // Varredura de aglutinação sobre a aba alvo. SEMPRE read-only na planilha: escreve no
 // máximo o relatório em JSON. PARES=1 pára antes do LLM (só a vizinhança vetorial).
 import { getAccessToken } from '../../src/lib/google/auth';
-import { gerarEmbeddingsLote, cosseno } from '../../src/lib/embeddings';
-import { textoParaEmbedding } from '../../src/lib/especial-corpus';
+import {
+  calcularIdf, tokenizar, tokensPesados, similaridade, tokensEmComum, nomeContido,
+  similaridadeFinal,
+} from '../../src/lib/similaridade-lexical';
 import {
   candidatosDe, consolidarSugestoes, PISO_SIMILARIDADE_AGLUTINACAO,
   type ProjetoAglutinavel, type Sugestao,
 } from '../../src/lib/aglutinacao';
 import { julgarAglutinacao } from '../../src/lib/agents/aglutinador';
+import { ehProjetoTesteE2E } from '../../src/lib/google/chat';
 
 const SPREADSHEET = process.env.GOOGLE_SHEETS_ID || '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
 const TAB = process.env.GOOGLE_SHEETS_TAB!;
@@ -36,60 +39,99 @@ const dataMs = (s?: string) => {
 };
 
 const projetos: ProjetoAglutinavel[] = [];
-const textos: string[] = [];
 for (const l of linhas) {
   const id = (l[iId] ?? '').trim(), nome = (l[iNome] ?? '').trim();
   if (!id || !nome) continue;
   if ((l[iStatus] ?? '').trim().toLowerCase() === 'rascunho') continue;
+  // ⚠️ Fixtures do harness E2E ficam FORA: são cópias quase idênticas umas das outras
+  // (é para isso que existem) e sozinhas dominariam o ranking de pares parecidos.
+  if (ehProjetoTesteE2E(nome)) continue;
   projetos.push({
     id, nome, descricao: l[iDesc],
     dataMs: dataMs(l[iData]),
     jaVinculado: !!(l[iPai] ?? '').trim() && (l[iPai] ?? '').trim() !== '—',
   });
-  textos.push(textoParaEmbedding({ nome, descricao: l[iDesc] }));
 }
 console.log(`${TAB}: ${projetos.length} projetos · piso ${PISO}`);
 
-const vetores: (number[] | null)[] = [];
-for (let i = 0; i < textos.length; i += 100) {
-  const r = await gerarEmbeddingsLote(textos.slice(i, i + 100));
-  vetores.push(...r.map((x) => x?.vetor ?? null));
-  process.stdout.write(`  embeddings ${Math.min(i + 100, textos.length)}/${textos.length}\r`);
-}
-const semVetor = vetores.filter((v) => !v).length;
-console.log(`\nembeddings: ${vetores.length - semVetor} ok · ${semVetor} sem vetor`);
-if (semVetor === vetores.length) throw new Error('nenhum embedding gerado — confira LLM_EMBEDDINGS_KEY/LLM_FALLBACK');
-projetos.forEach((p, i) => (p.vetor = vetores[i]));
+// ⚠️ Candidatos por LÉXICO, não por embedding (ver src/lib/similaridade-lexical.ts):
+// embedding aproxima por TEMA, e tema é o falso positivo que o juiz existe para recusar.
+// O sinal de "feature de" é o NOME DO PRODUTO reaparecendo — TF-IDF sobre o próprio corpus.
+// ⚠️ A DOCUMENTAÇÃO entra no vocabulário (decisão do Luis) — mas ela mora no SQLite, não na
+// planilha. Rodando por script contra a planilha, `documentacao` vem vazia e o sinal é só
+// nome+descrição; a varredura COMPLETA precisa rodar dentro do app (rota admin).
+const textosProjeto = projetos.map((p) => ({
+  nome: p.nome, descricao: p.descricao, documentacao: p.documentacao,
+}));
+const idf = calcularIdf(
+  textosProjeto.map((t) => [
+    ...tokenizar(t.nome), ...tokenizar(t.descricao ?? ''), ...tokenizar(t.documentacao ?? ''),
+  ]),
+);
+if (textosProjeto.every((t) => !t.documentacao))
+  console.log('⚠️ sem documentação nesta fonte — o sinal é só nome + descrição');
+const pesos = textosProjeto.map((t) => tokensPesados(t));
+console.log(`vocabulário: ${idf.size} tokens`);
+
 const universo = new Map(projetos.map((p) => [p.id, p]));
 
 // Vizinhança por cosseno (581² = ~337k comparações, instantâneo em JS).
 const comCandidatos: Array<{ p: ProjetoAglutinavel; cands: ReturnType<typeof candidatosDe> }> = [];
-for (const p of projetos) {
-  if (!p.vetor) continue;
+const porque = new Map<string, string>();
+projetos.forEach((p, i) => {
   const viz = projetos
-    .filter((o) => o.id !== p.id && o.vetor)
-    .map((o) => ({ id: o.id, similaridade: cosseno(p.vetor!, o.vetor!) }));
+    .map((o, j) => {
+      if (o.id === p.id) return null;
+      const sim = similaridade(pesos[i], pesos[j], idf);
+      // Nome contido vale mais que a soma de tokens — é a assinatura de família.
+      const contido = nomeContido(textosProjeto[i], textosProjeto[j], idf);
+      const ajustada = similaridadeFinal(sim, contido);
+      if (ajustada >= PISO)
+        porque.set(
+          `${p.id}|${o.id}`,
+          [
+            contido ? 'nome contido' : '',
+            tokensEmComum(pesos[i], pesos[j], idf).join(', '),
+          ].filter(Boolean).join(' · '),
+        );
+      return { id: o.id, similaridade: ajustada };
+    })
+    .filter((x): x is { id: string; similaridade: number } => !!x);
   const cands = candidatosDe(p, viz, universo, { piso: PISO });
   if (cands.length) comCandidatos.push({ p, cands });
-}
+});
 const paresUnicos = new Set(comCandidatos.flatMap(({ cands }) => cands.map((c) => `${c.filhoId}>${c.paiId}`)));
 console.log(`projetos com ≥1 candidato: ${comCandidatos.length} · pares únicos: ${paresUnicos.size}`);
-const top = comCandidatos.flatMap(({ cands }) => cands).sort((a, b) => b.similaridade - a.similaridade).slice(0, 15);
+const vistos = new Set<string>();
+const top = comCandidatos
+  .flatMap(({ cands }) => cands)
+  .filter((c) => { const k = `${c.filhoId}>${c.paiId}`; if (vistos.has(k)) return false; vistos.add(k); return true; })
+  .sort((a, b) => b.similaridade - a.similaridade)
+  .slice(0, 15);
 console.log('\n15 pares mais parecidos (ANTES do julgamento):');
 for (const t of top)
-  console.log(`  ${t.similaridade.toFixed(3)}  ${universo.get(t.filhoId)?.nome.slice(0, 42)}  ⟵ filho de ⟶  ${universo.get(t.paiId)?.nome.slice(0, 42)}`);
+  console.log(
+    `  ${t.similaridade.toFixed(3)}  ${universo.get(t.filhoId)?.nome.slice(0, 40)}\n` +
+    `         filho de  ${universo.get(t.paiId)?.nome.slice(0, 40)}   [${porque.get(`${t.filhoId}|${t.paiId}`) ?? porque.get(`${t.paiId}|${t.filhoId}`) ?? ''}]`,
+  );
 
 if (SO_PARES) { console.log('\nPARES=1 — parando antes do LLM.'); process.exit(0); }
 
 const aJulgar = comCandidatos.slice(0, MAX_JULGAMENTOS);
 console.log(`\njulgando ${aJulgar.length} projetos...`);
 const brutas: Sugestao[] = [];
+const erros: string[] = [];
 let t0 = Date.now();
 for (const [n, { p, cands }] of aJulgar.entries()) {
-  const s = await julgarAglutinacao(p, cands, universo);
-  if (s) brutas.push(s);
-  process.stdout.write(`  ${n + 1}/${aJulgar.length} · ${brutas.length} sugestões (${Math.round((Date.now() - t0) / 1000)}s)\r`);
+  const { sugestao, erro } = await julgarAglutinacao(p, cands, universo);
+  if (sugestao) brutas.push(sugestao);
+  if (erro) erros.push(`${p.id}: ${erro}`);
+  process.stdout.write(`  ${n + 1}/${aJulgar.length} · ${brutas.length} sugestões · ${erros.length} falhas (${Math.round((Date.now() - t0) / 1000)}s)\r`);
 }
+// ⚠️ Falha de chamada NÃO é "não é feature" — sem esta linha, uma rajada de 502 do proxy
+// faria a varredura anunciar "nenhuma sugestão" para uma base que nunca foi analisada.
+if (erros.length)
+  console.log(`\n⚠️ ${erros.length} de ${aJulgar.length} julgamentos FALHARAM (não foram analisados): ${erros.slice(0, 3).join(' · ')}${erros.length > 3 ? ' …' : ''}`);
 const sugestoes = consolidarSugestoes(brutas);
 console.log(`\n\n${sugestoes.length} sugestões após consolidar (de ${brutas.length} brutas):\n`);
 for (const s of sugestoes)

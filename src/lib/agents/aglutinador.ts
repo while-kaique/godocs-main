@@ -22,11 +22,24 @@ import {
   type VereditoAglutinacao,
 } from '@/lib/aglutinacao';
 
-const TETO_TEXTO = 500;
+const TETO_DESCRICAO = 500;
+/**
+ * Teto da documentação por projeto. Com 1 filho + até 5 pais, 1.500 × 6 cabe folgado — e a
+ * documentação é o que permite reconhecer a feature REBATIZADA, que o nome nunca entrega.
+ */
+const TETO_DOC = 1500;
 
 function descrever(p: ProjetoAglutinavel): string {
-  const d = (p.descricao ?? '').trim().slice(0, TETO_TEXTO);
-  return `id: ${p.id}\nnome: ${p.nome}${d ? `\ndescrição: ${d}` : ''}`;
+  const d = (p.descricao ?? '').trim().slice(0, TETO_DESCRICAO);
+  const doc = (p.documentacao ?? '').trim().slice(0, TETO_DOC);
+  return [
+    `id: ${p.id}`,
+    `nome: ${p.nome}`,
+    d ? `descrição: ${d}` : '',
+    doc ? `documentação: ${doc}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 export function montarPromptAglutinacao(
@@ -40,6 +53,8 @@ ${descrever(filho)}
 
 PROJETOS ANTERIORES CANDIDATOS A "PRODUTO PAI":
 ${pais.map(descrever).join('\n\n')}
+
+⚠️ DECIDA PELO QUE OS PROJETOS FAZEM (documentação e descrição), NÃO PELO NOME. Nomes parecidos podem ser de projetos independentes, e uma feature pode ter sido rebatizada e não carregar mais o nome do produto. O nome é pista fraca; o que a documentação descreve é a evidência.
 
 É FEATURE quando o projeto novo:
 - acrescenta uma capacidade DENTRO do produto anterior (nova tela, novo fluxo, nova etapa do MESMO processo);
@@ -81,19 +96,31 @@ export function interpretarVeredito(texto: string): VereditoAglutinacao | null {
   }
 }
 
+export type ResultadoJulgamento = {
+  sugestao: Sugestao | null;
+  /** `null` = o LLM respondeu. Preenchido = a chamada falhou e NADA foi julgado. */
+  erro: string | null;
+};
+
 /**
- * Julga UM projeto contra seus candidatos. Nunca lança: falha de proxy → nenhuma sugestão
- * (o silêncio é o default seguro; a corrida em lote não pode morrer por uma chamada).
+ * Julga UM projeto contra seus candidatos. Nunca lança — a corrida em lote não pode morrer
+ * por causa de uma chamada.
+ *
+ * ⚠️ **Falha de chamada NÃO é "não é feature".** O ai-proxy devolve 502 em rajada (aconteceu
+ * de verdade em 03/09/2026: 40 julgamentos seguidos, nenhum passou), e se o erro virasse
+ * `null` silencioso a varredura terminaria anunciando "nenhuma sugestão" para uma base que
+ * nunca foi analisada — a mentira mais cara que este script pode contar. Por isso o erro sobe
+ * junto e o relatório o CONTA.
  */
 export async function julgarAglutinacao(
   filho: ProjetoAglutinavel,
   candidatos: ParCandidato[],
   universo: Map<string, ProjetoAglutinavel>,
-): Promise<Sugestao | null> {
+): Promise<ResultadoJulgamento> {
   const pais = candidatos
     .map((c) => universo.get(c.paiId))
     .filter((p): p is ProjetoAglutinavel => !!p);
-  if (pais.length === 0) return null;
+  if (pais.length === 0) return { sugestao: null, erro: null };
   try {
     const resposta = await llmChat([{ role: 'user', content: montarPromptAglutinacao(filho, pais) }], {
       jsonMode: true,
@@ -101,8 +128,12 @@ export async function julgarAglutinacao(
       reasoningEffort: process.env.LLM_REASONING_EFFORT_FAST || 'low',
       maxTokens: 700,
     });
-    return aplicarVeredito(candidatos, interpretarVeredito(resposta));
-  } catch {
-    return null;
+    const veredito = interpretarVeredito(resposta);
+    // Resposta que chegou mas não é JSON interpretável também é FALHA, não um "não":
+    // o modelo pode ter devolvido uma recusa ou um texto solto.
+    if (!veredito) return { sugestao: null, erro: 'resposta não interpretável' };
+    return { sugestao: aplicarVeredito(candidatos, veredito), erro: null };
+  } catch (e) {
+    return { sugestao: null, erro: (e as Error)?.message?.slice(0, 120) || 'falha na chamada' };
   }
 }

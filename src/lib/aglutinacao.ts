@@ -15,8 +15,16 @@
  * projetos. Sem data nos dois lados, o par simplesmente não é sugerido.
  */
 
-/** Piso de similaridade para um par ser sequer considerado. */
-export const PISO_SIMILARIDADE_AGLUTINACAO = 0.55;
+/**
+ * Piso de similaridade léxica para um par ser sequer considerado.
+ *
+ * ⚠️ Calibrado contra a base real (03/09/2026, 560 projetos = 156.520 pares): a distribuição
+ * do TF-IDF é quase toda zero (154.645 pares abaixo de 0,1) e só ~160 passam de 0,3. Em
+ * **0,35** sobram 100 pares únicos — número que uma pessoa consegue validar. Baixar para 0,30
+ * traz 60 pares a mais e quase nenhum sinal; subir para 0,45 corta pela metade e começa a
+ * perder par legítimo de nome parafraseado.
+ */
+export const PISO_SIMILARIDADE_AGLUTINACAO = 0.35;
 
 /**
  * Quantos candidatos por projeto vão ao LLM. Poucos de propósito: o julgamento é caro e a
@@ -31,6 +39,8 @@ export type ProjetoAglutinavel = {
   id: string;
   nome: string;
   descricao?: string | null;
+  /** O que a documentação diz que o projeto faz — a fonte que o juiz de fato lê. */
+  documentacao?: string | null;
   /** Epoch ms da submissão — é o que define quem é PAI. Sem ele o par não é sugerido. */
   dataMs?: number | null;
   /** Já declarado como feature de outro (coluna `ID Pai` preenchida) → fora, como FILHO. */
