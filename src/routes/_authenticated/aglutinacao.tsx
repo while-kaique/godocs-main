@@ -15,7 +15,7 @@
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, X, Link2, Loader2, RefreshCw, Search, AlertTriangle, CornerDownRight } from 'lucide-react';
+import { Check, X, Link2, Loader2, RefreshCw, Search, AlertTriangle, CornerDownRight, Radar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HistoricoButton } from '@/components/historico/historico-button';
 import { apiFetch } from '@/lib/api-client';
@@ -142,6 +142,8 @@ function AglutinacaoPage() {
   const [gravandoId, setGravandoId] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [verDecididos, setVerDecididos] = useState(false);
+  const [varrendo, setVarrendo] = useState(false);
+  const [resultado, setResultado] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -158,6 +160,43 @@ function AglutinacaoPage() {
 
   useEffect(() => {
     void carregar();
+  }, [carregar]);
+
+  /**
+   * Dispara a varredura. Sem este botão o painel é uma tela morta: as sugestões nascem da
+   * rota, e não havia caminho para chamá-la pela interface.
+   *
+   * ⚠️ Manda `dry: false` — nesta tela o propósito É gravar. O `dry` continua sendo o default
+   * da ROTA, para quem a chama por fora (script, cron) não gravar sem querer.
+   */
+  const varrer = useCallback(async () => {
+    setVarrendo(true);
+    setErro(null);
+    setResultado(null);
+    try {
+      const r = await apiFetch<{
+        projetos: number;
+        julgados: number;
+        falhas: number;
+        com_vetor: number;
+        sugestoes: unknown[];
+      }>('/api/admin/aglutinacao/varredura', {
+        method: 'POST',
+        body: JSON.stringify({ dry: false }),
+      });
+      // ⚠️ As falhas aparecem SEMPRE que existem: uma rajada de erro do proxy não pode se
+      // parecer com "não achei nada".
+      setResultado(
+        `${r.sugestoes?.length ?? 0} ${(r.sugestoes?.length ?? 0) === 1 ? 'sugestão' : 'sugestões'} · ` +
+          `${r.julgados} pares analisados de ${r.projetos} projetos` +
+          (r.falhas ? ` · ⚠️ ${r.falhas} não foram analisados (falha na chamada)` : ''),
+      );
+      await carregar();
+    } catch (e) {
+      setErro((e as Error)?.message ?? 'a varredura não completou');
+    } finally {
+      setVarrendo(false);
+    }
   }, [carregar]);
 
   const decidir = useCallback(async (s: Sugestao, aceitar: boolean) => {
@@ -203,11 +242,31 @@ function AglutinacaoPage() {
           </p>
         </div>
         <HistoricoButton />
-        <Button size="sm" variant="outline" onClick={() => void carregar()} disabled={carregando}>
+        <Button size="sm" variant="outline" onClick={() => void carregar()} disabled={carregando || varrendo}>
           <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${carregando ? 'animate-spin' : ''}`} aria-hidden />
           Atualizar
         </Button>
+        <Button size="sm" onClick={() => void varrer()} disabled={varrendo}>
+          {varrendo ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />
+          ) : (
+            <Radar className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+          )}
+          {varrendo ? 'Procurando…' : 'Procurar features'}
+        </Button>
       </header>
+
+      {varrendo ? (
+        <p className="mb-4 rounded-md border bg-muted/40 p-3 text-[12.5px] text-muted-foreground">
+          Comparando os projetos e pedindo o parecer do agente para cada par candidato. Leva
+          alguns minutos — dá para sair desta tela e voltar.
+        </p>
+      ) : null}
+      {resultado ? (
+        <p className="mb-4 rounded-md border p-3 text-[12.5px]" style={{ borderColor: 'var(--go-lime)' }}>
+          {resultado}
+        </p>
+      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
@@ -237,7 +296,8 @@ function AglutinacaoPage() {
         <div className="rounded-lg border border-dashed p-10 text-center">
           <p className="text-[14px] font-medium">Nenhuma sugestão para revisar</p>
           <p className="mt-1 text-[12.5px] text-muted-foreground">
-            Rode a varredura para procurar features registradas como projeto próprio.
+            Use <span className="font-medium">Procurar features</span> para varrer a base atrás de
+            projetos registrados por engano como próprios.
           </p>
         </div>
       ) : (
