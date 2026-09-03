@@ -76,6 +76,12 @@ export function buildPromptEstrela(args: {
   dossieTexto: string;
   vizinhos: VizinhoTexto[];
   ferramentasTexto?: string | null;
+  /**
+   * A objeção do CÉTICO DA ESTRELA, na segunda volta. ⚠️ É uma objeção a RESPONDER, não uma
+   * ordem: o cérebro pode manter a nota se tiver evidência — o que ele não pode é ignorá-la.
+   * Sem isto, a "volta" seria a mesma pergunta ao mesmo modelo e daria a mesma resposta.
+   */
+  objecaoDoCetico?: string | null;
 }): Mensagem[] {
   const system = [
     'Você é o avaliador de ESTRELAS do GoDocs: lê o dossiê de um projeto de automação/IA do Gogroup e recomenda a estrela (0 a 5) pela régua abaixo, com evidência citada. A estrela paga o impacto que a fórmula financeira não vê.',
@@ -107,6 +113,14 @@ export function buildPromptEstrela(args: {
     '',
     'DOSSIÊ DO PROJETO:',
     args.dossieTexto,
+    ...(args.objecaoDoCetico
+      ? [
+          '',
+          'OBJEÇÃO DO CÉTICO À SUA NOTA ANTERIOR — responda a ela:',
+          args.objecaoDoCetico,
+          'Se a objeção procede, corrija a nota. Se não procede, MANTENHA a nota e diga no racional qual evidência do dossiê a derruba. Concordar sem evidência é pior que discordar com ela.',
+        ]
+      : []),
     '',
     'Recomende a estrela deste projeto no formato pedido.',
   ].join('\n');

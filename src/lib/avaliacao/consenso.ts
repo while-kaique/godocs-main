@@ -96,13 +96,33 @@ function frase(s: string): string {
 export function conciliar(
   a: SaidaMerito,
   b: SaidaEstrela,
-  ctx: { debateFechou: boolean; ceticoRefuta: boolean; liberacao: Liberacao },
+  ctx: {
+    debateFechou: boolean;
+    ceticoRefuta: boolean;
+    liberacao: Liberacao;
+    /**
+     * O SEGUNDO cético (o da estrela) sustentou a objeção depois da volta? Campo OPCIONAL de
+     * propósito: os chamadores antigos (testes, retroativo) seguem compilando e o comportamento
+     * deles não muda — ausente é `false`, que é o que valia antes de o cético da estrela existir.
+     */
+    ceticoEstrelaRefuta?: boolean;
+    /** O que ele disse, para virar divergência legível em vez de um booleano mudo. */
+    ceticoEstrelaMotivo?: string | null;
+  },
 ): Consenso {
   const divergencias: string[] = [];
   const motivos: string[] = [];
 
   if (ctx.ceticoRefuta && a.veredito === 'aprovar') {
     divergencias.push(frase('O cético refuta a aprovação do mérito'));
+  }
+  // ⚠️ A objeção do cético da ESTRELA que SOBREVIVE à volta é divergência entre os dois cérebros:
+  // ela não muda o mérito (aprovar ou não), muda a confiança na NOTA — e nota é o que o comitê
+  // humano usa. Não vira ajuste ao autor: a altura da estrela não é pergunta que o autor responda.
+  if (ctx.ceticoEstrelaRefuta) {
+    divergencias.push(
+      frase(`O cético da estrela sustenta a objeção à nota: ${ctx.ceticoEstrelaMotivo ?? 'sem motivo nomeado'}`),
+    );
   }
   if (a.veredito === 'aprovar' && b.nota === 0 && b.desqualificador && ROTULO_DESQ[b.desqualificador]) {
     divergencias.push(frase(`O mérito aprova, mas a estrela desqualifica o projeto por ${ROTULO_DESQ[b.desqualificador]}`));
