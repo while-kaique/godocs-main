@@ -89,14 +89,24 @@ export function filtrarProjetosPorNome(
 ): ProjetoBusca[] {
   const alvo = normalizarBusca(q);
   if (alvo.length < 2) return [];
-  const out: ProjetoBusca[] = [];
+  // ⚠️ Busca por TERMOS, não substring única (03/09/2026). A 1ª versão usava
+  // `nome.includes(q)`, então "hub cx" não achava «CX Hub — Plataforma Central»: quem
+  // digita raramente acerta a ordem exata das palavras. Agora cada palavra da busca vale
+  // um `%termo%` e TODAS precisam aparecer — o mesmo efeito de um `ILIKE` por termo.
+  const termos = alvo.split(/\s+/).filter((t) => t.length >= 2);
+  if (termos.length === 0) return [];
+
+  const pontuados: Array<{ p: ProjetoBusca; peso: number }> = [];
   for (const p of projetos) {
-    if (normalizarBusca(p.nome).includes(alvo)) {
-      out.push(p);
-      if (out.length >= limite) break;
-    }
+    const nome = normalizarBusca(p.nome);
+    if (!termos.every((t) => nome.includes(t))) continue;
+    // Ordena por RELEVÂNCIA, não pela ordem da planilha: quem começa com o que a pessoa
+    // digitou vem primeiro, depois o nome mais curto (mais específico ao termo).
+    const peso =
+      (nome.startsWith(alvo) ? 0 : nome.startsWith(termos[0]) ? 1 : 2) * 1000 + nome.length;
+    pontuados.push({ p, peso });
   }
-  return out;
+  return pontuados.sort((a, b) => a.peso - b.peso).slice(0, limite).map((x) => x.p);
 }
 
 function normalizarIds(ids: string[]): string[] {

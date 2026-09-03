@@ -1597,7 +1597,11 @@ export function ProjetoPaiInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const { resultados, loading } = useBuscaProjetos(query);
 
-  const open = focused && !dismissed && query.trim().length >= 2 && (resultados.length > 0 || loading);
+  // ⚠️ NÃO exigir `resultados.length > 0` aqui: a lista abaixo tem um estado "Nenhum
+  // projeto encontrado" que, com essa condição, era CÓDIGO MORTO — busca sem resultado
+  // não abria nada e a pessoa ficava sem saber se o campo estava quebrado ou se o projeto
+  // não existe. Com 2+ caracteres e foco, a lista abre SEMPRE e diz o que aconteceu.
+  const open = focused && !dismissed && query.trim().length >= 2;
 
   useEffect(() => { setActiveIndex(0); }, [resultados.length]);
 

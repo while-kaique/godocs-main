@@ -449,9 +449,6 @@ export function Step1({
   // ── Modo SUBMISSÃO NOVA: formulário completo editável (comportamento inalterado) ──
   return (
     <div>
-      {/* ── Vínculo: projeto novo × feature de um projeto existente ── */}
-      {blocoVinculo}
-
       {/* ── Gate de Escopo ── */}
       <div
         className="relative mb-6 rounded-xl p-4"
@@ -559,6 +556,14 @@ export function Step1({
               </div>
             )}
           </div>
+
+          {/* ── Vínculo: projeto novo × feature de um projeto existente ──
+              ⚠️ Vem DEPOIS do gate de produção de propósito. Estando antes, quem
+              escolhia "Projeto novo" não via pergunta nenhuma sobre produção logo em
+              seguida — só bem mais abaixo, depois do escopo —, enquanto quem escolhia
+              "Feature" era perguntado na hora sobre o PAI. A ordem certa é: este
+              projeto está em produção? → é novo ou feature? → (se feature) e o pai? */}
+          {blocoVinculo}
 
           <SectionTitle icon="👤">Dados do Responsável</SectionTitle>
 

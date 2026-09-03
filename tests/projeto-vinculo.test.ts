@@ -89,3 +89,34 @@ describe('filtrarProjetosPorNome (autocomplete do pai)', () => {
     expect(normalizarBusca('  Automação   Fiscal ')).toBe('automacao fiscal');
   });
 });
+
+describe('busca do projeto pai — por TERMOS (03/09/2026)', () => {
+  const base = [
+    { id: '1', nome: 'CX Hub — Plataforma Central de Operações', autor: 'a' },
+    { id: '2', nome: 'Portal de Reembolsos (Gobeaute)', autor: 'b' },
+    { id: '3', nome: 'CX Transporte BI', autor: 'c' },
+    { id: '4', nome: 'Hub Criativo', autor: 'd' },
+  ];
+
+  it('acha com as palavras em QUALQUER ordem', () => {
+    // A 1ª versão usava `nome.includes(q)`, então "hub cx" não achava nada — e quem
+    // digita raramente acerta a ordem exata das palavras.
+    expect(filtrarProjetosPorNome(base, 'hub cx').map((p) => p.id)).toEqual(['1']);
+    expect(filtrarProjetosPorNome(base, 'cx hub').map((p) => p.id)).toEqual(['1']);
+  });
+
+  it('exige TODAS as palavras, não qualquer uma', () => {
+    expect(filtrarProjetosPorNome(base, 'reembolso gobeaute').map((p) => p.id)).toEqual(['2']);
+    expect(filtrarProjetosPorNome(base, 'reembolso inexistente')).toEqual([]);
+  });
+
+  it('ordena por relevância: quem COMEÇA com o termo vem primeiro', () => {
+    const r = filtrarProjetosPorNome(base, 'hub');
+    expect(r[0].id).toBe('4'); // "Hub Criativo" começa com o termo e é o nome mais curto
+  });
+
+  it('ignora acento e caixa', () => {
+    expect(filtrarProjetosPorNome(base, 'OPERAÇÕES').map((p) => p.id)).toEqual(['1']);
+    expect(filtrarProjetosPorNome(base, 'operacoes').map((p) => p.id)).toEqual(['1']);
+  });
+});
