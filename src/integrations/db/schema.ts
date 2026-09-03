@@ -446,6 +446,28 @@ const SCHEMA_SQL = `
   -- ⚠️ Um nível pode ter MAIS DE UMA âncora (o topo da base é PIAPP e companhia), por isso a
   -- chave é o projeto e não a nota.
   -- ⚠️ NUNCA use ponto-e-vírgula nos comentários deste arquivo (ver o aviso do FAQ acima).
+  -- Sugestões de AGLUTINAÇÃO (item 5.3): "este projeto é, na verdade, uma feature daquele".
+  -- ⚠️ Tabela INTERNA e a sugestão NUNCA é o vínculo: as colunas "ID Pai"/"ID Feature" da
+  -- planilha só são escritas quando um humano ACEITA no painel. Palpite de agente gravado na
+  -- planilha é indistinguível de fato declarado para quem lê depois (o Gomoon inclusive).
+  -- ⚠️ Fora de SAFE_UPDATE_FIELDS, sem sync reverso -- apagar a tabela só perde histórico.
+  -- O par (filho, pai) é a chave: um mesmo filho pode ter sido sugerido para pais diferentes
+  -- em varreduras distintas, e rejeitar um não pode apagar a decisão sobre o outro.
+  CREATE TABLE IF NOT EXISTS projeto_aglutinacao (
+    filho_id      TEXT NOT NULL,
+    pai_id        TEXT NOT NULL,
+    similaridade  REAL,
+    confianca     REAL,
+    justificativa TEXT,
+    origem        TEXT,
+    estado        TEXT NOT NULL DEFAULT 'sugerido',
+    decidido_por  TEXT,
+    decidido_em   TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (filho_id, pai_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_projeto_aglutinacao_estado ON projeto_aglutinacao(estado);
+
   CREATE TABLE IF NOT EXISTS especial_referencia (
     projeto_id   TEXT PRIMARY KEY,
     nota         INTEGER NOT NULL,

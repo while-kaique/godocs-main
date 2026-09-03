@@ -2882,6 +2882,116 @@ export type EspecialAvaliacaoRow = {
   criado_em: string | null;
 };
 
+// ─── Aglutinação (item 5.3) — sugestões "X é feature de Y" ───────────────────
+
+export type AglutinacaoRow = {
+  filho_id: string;
+  pai_id: string;
+  similaridade: number | null;
+  confianca: number | null;
+  justificativa: string | null;
+  origem: string | null;
+  estado: string;
+  decidido_por: string | null;
+  decidido_em: string | null;
+  created_at: string | null;
+};
+
+/** Todas as sugestões, ou só as de um estado. */
+export async function getAglutinacoes(estado?: string): Promise<AglutinacaoRow[]> {
+  return estado
+    ? queryAll<AglutinacaoRow>(
+        'SELECT * FROM projeto_aglutinacao WHERE estado = ? ORDER BY confianca DESC, similaridade DESC',
+        [estado],
+      )
+    : queryAll<AglutinacaoRow>(
+        'SELECT * FROM projeto_aglutinacao ORDER BY confianca DESC, similaridade DESC',
+        [],
+      );
+}
+
+/**
+ * Grava uma sugestão. ⚠️ **Nunca sobrescreve uma decisão humana**: o `WHERE estado =
+ * 'sugerido'` do UPDATE faz uma varredura nova atualizar só o que ainda não foi julgado —
+ * senão re-rodar a varredura ressuscitaria pares que alguém já rejeitou, e o painel viraria
+ * uma fila que nunca esvazia.
+ */
+export async function upsertAglutinacao(dados: {
+  filho_id: string;
+  pai_id: string;
+  similaridade: number | null;
+  confianca: number | null;
+  justificativa: string | null;
+  origem: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO projeto_aglutinacao
+       (filho_id, pai_id, similaridade, confianca, justificativa, origem, estado, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'sugerido', datetime('now'))
+     ON CONFLICT(filho_id, pai_id) DO UPDATE SET
+       similaridade = excluded.similaridade,
+       confianca = excluded.confianca,
+       justificativa = excluded.justificativa,
+       origem = excluded.origem
+     WHERE projeto_aglutinacao.estado = 'sugerido'`,
+    [
+      dados.filho_id,
+      dados.pai_id,
+      dados.similaridade,
+      dados.confianca,
+      dados.justificativa,
+      dados.origem,
+    ],
+  );
+}
+
+/** Registra a decisão humana. Só sai de 'sugerido' por aqui. */
+export async function decidirAglutinacao(
+  filho_id: string,
+  pai_id: string,
+  estado: 'aceito' | 'rejeitado',
+  adminEmail: string,
+): Promise<void> {
+  await exec(
+    `UPDATE projeto_aglutinacao
+        SET estado = ?, decidido_por = ?, decidido_em = datetime('now')
+      WHERE filho_id = ? AND pai_id = ?`,
+    [estado, adminEmail, filho_id, pai_id],
+  );
+}
+
+/**
+ * Projetos para a varredura de aglutinação: os campos de TEXTO que descrevem o que o projeto
+ * faz, mais a data (que decide quem é pai). ⚠️ A documentação vem do `o_que_faz` da doc, não
+ * do blob inteiro: puxar `documentacao.conteudo` de ~600 projetos numa consulta é o gotcha
+ * dos 32 MiB de RPC que já derrubou o Investigador e o `/edicoes`.
+ */
+export async function getProjetosParaAglutinacao(): Promise<
+  Array<{
+    id: string;
+    nome: string | null;
+    descricao_breve: string | null;
+    submitted_at: string | null;
+    o_que_faz: string | null;
+  }>
+> {
+  return queryAll(
+    `SELECT p.id,
+            p.nome,
+            p.descricao_breve,
+            p.submitted_at,
+            CASE
+              WHEN d.conteudo IS NOT NULL AND json_valid(d.conteudo)
+              THEN json_extract(d.conteudo, '$.documentacao.o_que_faz')
+              ELSE NULL
+            END AS o_que_faz
+       FROM projetos p
+       LEFT JOIN documentacao d ON d.projeto_id = p.id
+      WHERE p.status != 'rascunho'`,
+    [],
+  );
+}
+
 export async function getAvaliacoesEspeciais(): Promise<EspecialAvaliacaoRow[]> {
   return queryAll<EspecialAvaliacaoRow>('SELECT * FROM especial_avaliacao', []);
 }

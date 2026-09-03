@@ -135,6 +135,13 @@ export const SHEET_COLUMNS = [
   // EFETIVADO da v2, e o saving por HORAS da v1 é o CUSTO EVITADO da v2). Renomear
   // cabeçalho não move célula e o casamento é por NOME, então as 578 linhas antigas
   // seguem legíveis sob o nome novo.
+  // ─── Vínculo entre projetos (aglutinação, item 5.3) ─────────────────────────
+  // Já existiam no cabeçalho da STAGING-V2 (BC/BD) antes deste código: o `ID Pai` fica na
+  // linha do FILHO e o `ID Feature` na linha do PAI. ⚠️ Escritas SÓ pelo ACEITE humano no
+  // painel de aglutinação — a sugestão do agente mora numa tabela INTERNA, porque palpite
+  // gravado na planilha é indistinguível de fato declarado para quem lê depois.
+  'ID Pai',
+  'ID Feature',
   'Saving Efetivado Agora',         // BE (a 2ª ponta do par; o saving é a DIFERENÇA)
   'Custo Evitado Não Contratado',   // BF (a vaga não aberta, a consultoria não contratada)
   'Impacto Líquido Mensal',         // BG (o líquido normalizado no tempo — vai ao Gomoon)

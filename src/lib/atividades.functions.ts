@@ -23,7 +23,8 @@ export type AcaoAdmin =
   | 'estrelas' // nota do comparador de especiais
   | 'dono_area' // divisão da validação por área
   | 'lider_decisao' // pré-aprovação do líder feita em modo admin (?como=)
-  | 'reabrir_fila'; // reabertura da fila de pré-aprovação
+  | 'reabrir_fila' // reabertura da fila de pré-aprovação
+  | 'aglutinacao'; // aceite/rejeição de "X é feature de Y" no painel de aglutinação
 
 export type RegistroAtividade = {
   ator_email: string;

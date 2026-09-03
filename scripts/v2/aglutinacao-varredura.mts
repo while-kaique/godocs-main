@@ -26,7 +26,14 @@ const { values = [] } = (await (await fetch(`${base}/values/${encodeURIComponent
 const [header, ...linhas] = values;
 const col = (n: string) => header.indexOf(n);
 const iId = col('ID Projeto'), iNome = col('Projeto'), iDesc = col('Descrição');
-const iData = col('Data Submissão'), iPai = col('ID Pai'), iStatus = col('Status');
+const iData = col('Data Submissão'), iStatus = col('Status');
+const iPai = header.indexOf('ID Pai'); // pode não existir na aba de prod ainda
+// ⚠️ A documentação de verdade mora no SQLite. Rodando contra a PLANILHA, o melhor
+// substituto é o MEMORIAL: ele descreve o processo em detalhe e é o texto mais rico que a
+// aba tem. Rotulado como aproximação de propósito — a varredura completa é a rota admin.
+const iMem = header.indexOf('Memorial de Saving');
+const iRec = header.indexOf('Racional Receita');
+const iEsp = header.indexOf('Ganho Imensurável');
 
 /** pt-BR "12/05/2026" ou ISO. Sem data → null (o par não é sugerido). */
 const dataMs = (s?: string) => {
@@ -48,8 +55,14 @@ for (const l of linhas) {
   if (ehProjetoTesteE2E(nome)) continue;
   projetos.push({
     id, nome, descricao: l[iDesc],
+    documentacao: [iMem, iRec, iEsp]
+      .filter((i) => i >= 0)
+      .map((i) => (l[i] ?? '').trim())
+      .filter((t) => t && t !== '—')
+      .join('\n')
+      .slice(0, 4000),
     dataMs: dataMs(l[iData]),
-    jaVinculado: !!(l[iPai] ?? '').trim() && (l[iPai] ?? '').trim() !== '—',
+    jaVinculado: iPai >= 0 && !!(l[iPai] ?? '').trim() && (l[iPai] ?? '').trim() !== '—',
   });
 }
 console.log(`${TAB}: ${projetos.length} projetos · piso ${PISO}`);

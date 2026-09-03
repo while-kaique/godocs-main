@@ -65,6 +65,11 @@ import {
   importarAvaliacoesEspeciais,
 } from "@/lib/especiais.functions";
 import {
+  varrerAglutinacao,
+  listarAglutinacoes,
+  decidirSugestaoAglutinacao,
+} from "@/lib/aglutinacao.functions";
+import {
   classificarEspecialProjeto,
   classificarEspeciaisPendentes,
   classificarEspecialEmBackground,
@@ -910,6 +915,25 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // Ver src/lib/especiais.functions.ts: lê o MESMO espelho da triagem, só que agrupado por
     // NÍVEL, com a recomendação da auditoria por projeto. A nota segue na
     // coluna manual "Estrelas" da planilha — a rota de estrelas escreve SÓ ela.
+    // ── Aglutinação (item 5.3): "este projeto é feature daquele?" ──────────
+    // Ver src/lib/aglutinacao.functions.ts. A varredura NÃO escreve na planilha e `dry` é o
+    // DEFAULT; quem grava o vínculo (`ID Pai`/`ID Feature`) é o ACEITE humano, mais nada.
+    if (pathname === "/api/admin/aglutinacao/varredura" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody(request);
+      return json(await varrerAglutinacao(body));
+    }
+    if (pathname === "/api/admin/aglutinacao" && method === "GET") {
+      await requireAdmin(request);
+      const estado = url.searchParams.get("estado") ?? undefined;
+      return json(await listarAglutinacoes(estado));
+    }
+    if (pathname === "/api/admin/aglutinacao/decidir" && method === "POST") {
+      const { email: adminEmail } = await requireAdmin(request);
+      const body = await readBody(request);
+      return json(await decidirSugestaoAglutinacao(body, adminEmail));
+    }
+
     if (pathname === "/api/admin/especiais" && method === "GET") {
       await requireAdmin(request);
       return json(await listarEspeciais());
