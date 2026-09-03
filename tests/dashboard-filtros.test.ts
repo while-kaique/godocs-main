@@ -53,6 +53,7 @@ function proj(over: Partial<ProjetoDashboardResumo> = {}): ProjetoDashboardResum
     savingReais: 1000,
     receitaMensal: null,
     complexidade: 'Média',
+  tipoProjeto: null,
     tipos: 'Saving',
     especial: false,
     aprovacaoLider: null,
@@ -319,6 +320,10 @@ describe('peso do payload da listagem', () => {
         'savingReais',
         'status',
         'statusChave',
+        // Rótulo CURTO ("Agente", "Dashboard") e DESENHADO — divide a célula "Tipo · Nível"
+        // com a complexidade, que é o outro eixo da mesma categorização (item 5.4). Entrou
+        // sem coluna nova justamente porque a tabela já é densa.
+        'tipoProjeto',
         'tipos',
       ].sort(),
     );

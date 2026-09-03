@@ -261,6 +261,8 @@ const SAFE_UPDATE_FIELDS: ReadonlyArray<{
   col: SheetColumn;
   field: keyof ProjetoRow;
   kind: 'text' | 'num';
+  /** Coluna cujo significado mudou na v2: só sincroniza de volta em linha v1 (ver laço abaixo). */
+  soV1?: true;
 }> = [
   { col: 'Projeto', field: 'nome', kind: 'text' },
   { col: 'Email', field: 'responsavel_email', kind: 'text' },
@@ -271,17 +273,17 @@ const SAFE_UPDATE_FIELDS: ReadonlyArray<{
   { col: 'Escopo', field: 'escopo', kind: 'text' },
   { col: 'Alguém Fazia?', field: 'alguem_fazia', kind: 'text' },
   { col: 'Custo Evitado Horas', field: 'saving_horas', kind: 'num' },
-  { col: 'Impacto Bruto', field: 'saving_reais', kind: 'num' },
-  { col: 'Freq. Custo Evitado', field: 'tipo_saving', kind: 'text' },
+  { col: 'Impacto Bruto', field: 'saving_reais', kind: 'num' , soV1: true },
+  { col: 'Freq. Custo Evitado', field: 'tipo_saving', kind: 'text' , soV1: true },
   { col: 'Memorial de Saving', field: 'memorial_calculo', kind: 'text' },
   { col: 'Custo Externo Mensal', field: 'custo_externo_mensal', kind: 'num' },
-  { col: 'Impacto Líquido', field: 'ganho_total_mensal', kind: 'num' },
+  { col: 'Impacto Líquido', field: 'ganho_total_mensal', kind: 'num' , soV1: true },
   { col: 'Complexidade', field: 'complexidade', kind: 'text' },
   { col: 'Observações', field: 'observacoes', kind: 'text' },
   // "Saving Efetivado" guarda o VALOR R$ (não 'sim/não') e não tem coluna própria no
   // SQLite — não é sincronizado de volta para não gravar número no campo flag.
-  { col: 'Evidência Saving Efetivado', field: 'custo_evitado_justificativa', kind: 'text' },
-  { col: 'Ganho Imensurável', field: 'contexto_especial', kind: 'text' },
+  { col: 'Evidência Saving Efetivado', field: 'custo_evitado_justificativa', kind: 'text' , soV1: true },
+  { col: 'Ganho Imensurável', field: 'contexto_especial', kind: 'text' , soV1: true },
   // Mantém o espelho do "Atualizado Em" fresco no SQLite (alimenta o selo de pendentes).
   { col: 'Atualizado Em', field: 'atualizado_em', kind: 'text' },
 ];
@@ -315,7 +317,12 @@ async function atualizarExistente(
   if (!current) return false;
 
   const updates: Record<string, unknown> = {};
-  for (const { col, field, kind } of SAFE_UPDATE_FIELDS) {
+  // Linha v2 (tem "Impacto Líquido Mensal") — as colunas renomeadas têm significado v2
+  // (Impacto Bruto = S+CE+R, Ganho Imensurável ≠ contexto de especial): gravá-las nos campos v1
+  // do SQLite dava coluna com dois significados (achado da revisão de qualidade). Pula-as.
+  const linhaV2 = txt(row['Impacto Líquido Mensal']) != null;
+  for (const { col, field, kind, soV1 } of SAFE_UPDATE_FIELDS) {
+    if (soV1 && linhaV2) continue;
     const raw = row[col];
     const newVal = kind === 'num' ? parseNum(raw) : txt(raw);
     if (newVal == null) continue; // célula vazia não apaga dado existente

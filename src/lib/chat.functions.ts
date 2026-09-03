@@ -113,7 +113,7 @@ import {
   mergeDocCompilada,
   soCamposDaDoc,
 } from "@/lib/agents/doc-async";
-import { docCompiladorLLMOpts, docCompiladorSubmitLLMOpts } from "@/lib/agents/doc-modelo";
+import { docCompiladorLLMOpts } from "@/lib/agents/doc-modelo";
 import type { LLMOptions } from "@/lib/llm";
 import { validarDocumentacao } from "@/lib/agents/validator";
 import {
@@ -3735,6 +3735,9 @@ export async function recompilarDocsPendentes(
         // `reconciliarExclusoes` depois da carência de 1h. Todos os outros disparos de análise
         // já são escopados a submetidos.
         if (!projeto.submitted_at) continue;
+        // O submit seguiu sem esperar a doc (D6) e por isso NÃO gravou o resumo no Drive:
+        // agora que a doc existe, o resumo é gravado/atualizado in-place (não lança).
+        await salvarResumoDocNoDrive(projeto_id, projeto, reconc, projeto.area ?? null);
         // A análise daquele projeto foi ADIADA quando
         // ele foi submetido (o guard em `analisarProjetoFn`). Sem este redisparo o projeto
         // ficaria PARA SEMPRE sem parecer: `reconciliarComplexidade` só repõe campo vazio,
@@ -3764,6 +3767,50 @@ export async function recompilarDocsPendentes(
   return { verificados: pend.length, recompilados, pendentes };
 }
 
+// Salva/atualiza o RESUMO da documentação como UM doc no Drive (link único na coluna "URL").
+// Em edição atualiza o MESMO doc in-place — N edições não geram N arquivos. NUNCA lança: o Drive
+// falhando não pode derrubar submissão nem cron. Usado pelo submit (doc já compilada) e pelo cron
+// `recompilarDocsPendentes` (doc compilada depois de o submit ter seguido sem esperar — D6).
+export async function salvarResumoDocNoDrive(
+  projeto_id: string,
+  projeto: NonNullable<Awaited<ReturnType<typeof getProjetoById>>>,
+  conteudo: Record<string, unknown>,
+  areaFinal: string | null,
+  now: string = new Date().toISOString(),
+): Promise<string | null> {
+  try {
+    const linkExistente = parseJson<string[]>(projeto.arquivos_links)?.[0] ?? null;
+    // Doc completa de ponta a ponta: resumo do agente + texto dos arquivos do usuário.
+    const msgsResumo = await getChatMessagesExcludeRole(projeto_id, "doc");
+    const docUsuarioMsg = await getDocMessage(projeto_id);
+    const md = renderResumoDocumentacao(projeto, conteudo, {
+      resumoProjeto: extrairResumoProjeto(msgsResumo),
+      docUsuario: docUsuarioMsg?.content ?? null,
+      arquivosNomes: parseJson<string[]>(projeto.arquivos_nomes) ?? [],
+    });
+    const sanit = (x: string) =>
+      (x || "")
+        .replace(/[|/\\]+/g, "-")
+        .replace(/->|→|<>/g, "-")
+        .replace(/\s+/g, " ")
+        .replace(/[^\w\sÀ-ÿ.\-]/g, "")
+        .trim()
+        .replace(/\s/g, "_")
+        .slice(0, 80);
+    const filename = `${now.slice(0, 10)}_${now.slice(11, 19).replace(/:/g, "")}_${sanit(projeto.nome ?? "projeto")}_${sanit(areaFinal ?? projeto.area ?? "")}.md`;
+    const link = await upsertResumoDoc(filename, md, linkExistente);
+    if (link) {
+      await updateProjeto(projeto_id, { arquivos_links: [link] });
+      (projeto as { arquivos_links?: string | null }).arquivos_links = JSON.stringify([link]);
+      log("salvarResumoDocNoDrive", `Resumo da doc salvo no Drive: ${link}`);
+    }
+    return link;
+  } catch (driveErr) {
+    err("salvarResumoDocNoDrive", "Falha ao salvar resumo no Drive (não bloqueante):", driveErr);
+    return null;
+  }
+}
+
 export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {
   const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
   log("submeterParaValidacao", `projeto=${projeto_id}`);
@@ -3781,16 +3828,15 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 
   if (!projeto) throw new Error("Projeto não encontrado.");
 
-  // Reconciliação da doc ASSÍNCRONA: garante a doc compilada ANTES do Drive/analisador,
-  // preservando saving/receita; bloqueia se a compilação falhar. Ver reconciliarDocSePendente.
-  // Submit é AWAITED no clique "Enviar" → perfil FAIL-FAST (0 retries, timeout limitado): sob
-  // proxy degradado defere rápido em vez de pendurar a requisição; o cron recompila no folgado.
-  conteudo = await reconciliarDocSePendente(
-    projeto_id,
-    conteudo,
-    projeto,
-    docCompiladorSubmitLLMOpts(),
-  );
+  // D6 (v2) — "a submissão NÃO espera": se a doc ainda está em compilação (placeholder), o
+  // submit segue SEM nenhuma chamada de LLM no caminho crítico. Quem fecha a doc é o cron
+  // (`recompilarDocsPendentes`), que ao compilar redispara a análise E refaz o resumo no Drive.
+  // (Antes havia um `await reconciliarDocSePendente(...)` aqui — o achado ALTO da revisão de
+  // conformidade da v2: contradizia D6 e o critério 1 do plano.)
+  const docPendenteNoSubmit = precisaCompilarDoc(conteudo);
+  if (docPendenteNoSubmit) {
+    log("submeterParaValidacao", `Doc ainda pendente — submissão segue sem esperar (D6); o cron recompila (projeto ${projeto_id}).`);
+  }
 
   // Rede de segurança: re-deriva R$ das horas antes de popular colunas/planilha.
   // Garante saving_reais correto mesmo que doc.saving tenha sido salvo com R$ zerado
@@ -4094,37 +4140,11 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   }
 
   // ── Resumo da documentação → UM doc no Drive (link único na coluna "URL") ──
-  // Salva o RESUMO da documentação gerada pelo agente como UM documento no Drive
-  // (NÃO os arquivos crus enviados). Em edição, atualiza o MESMO doc in-place — N
-  // edições não geram N arquivos. Não bloqueia a submissão se o Drive falhar.
-  try {
-    const linkExistente = parseJson<string[]>(projeto.arquivos_links)?.[0] ?? null;
-    // Doc completa de ponta a ponta: resumo do agente + texto dos arquivos do usuário.
-    const msgsResumo = await getChatMessagesExcludeRole(projeto_id, "doc");
-    const docUsuarioMsg = await getDocMessage(projeto_id);
-    const md = renderResumoDocumentacao(projeto, conteudo, {
-      resumoProjeto: extrairResumoProjeto(msgsResumo),
-      docUsuario: docUsuarioMsg?.content ?? null,
-      arquivosNomes: parseJson<string[]>(projeto.arquivos_nomes) ?? [],
-    });
-    const sanit = (x: string) =>
-      (x || "")
-        .replace(/[|/\\]+/g, "-")
-        .replace(/->|→|<>/g, "-")
-        .replace(/\s+/g, " ")
-        .replace(/[^\w\sÀ-ÿ.\-]/g, "")
-        .trim()
-        .replace(/\s/g, "_")
-        .slice(0, 80);
-    const filename = `${now.slice(0, 10)}_${now.slice(11, 19).replace(/:/g, "")}_${sanit(projeto.nome ?? "projeto")}_${sanit(areaFinal ?? "")}.md`;
-    const link = await upsertResumoDoc(filename, md, linkExistente);
-    if (link) {
-      await updateProjeto(projeto_id, { arquivos_links: [link] });
-      (projeto as { arquivos_links?: string | null }).arquivos_links = JSON.stringify([link]);
-      log("submeterParaValidacao", `Resumo da doc salvo no Drive: ${link}`);
-    }
-  } catch (driveErr) {
-    err("submeterParaValidacao", "Falha ao salvar resumo no Drive (não bloqueante):", driveErr);
+  // Só com a doc COMPILADA: gravar o resumo do placeholder deixaria "(não preenchido)" no
+  // Drive até uma edição futura (achado ALTO da revisão de qualidade). Doc pendente → o cron
+  // grava o resumo quando compilar (`salvarResumoDocNoDrive`, chamado em recompilarDocsPendentes).
+  if (!docPendenteNoSubmit) {
+    await salvarResumoDocNoDrive(projeto_id, projeto, conteudo, areaFinal ?? null, now);
   }
 
   // Evento de timeline: submissão/reenvio finalizado (fecha o histórico).

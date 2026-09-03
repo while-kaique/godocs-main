@@ -3614,3 +3614,180 @@ export async function upsertDonoDeArea(dados: {
 export async function deleteDonoDeArea(area: string): Promise<void> {
   await exec('DELETE FROM especial_area_dono WHERE area = ?', [area]);
 }
+
+// ─── Memória e LOG dos agentes em ÁRVORE (T21) ─────────────────────────────────────────
+// Ver `src/lib/agentes-log.ts` (regras puras) e `agentes-log.functions.ts` (nunca lança).
+// Mesmo par insert/keyset de `admin_activity_log`; `IN` nunca acima de MAX_VARS_IN.
+
+export type AvaliacaoCicloRow = {
+  id: string;
+  gatilho: string;
+  status: string;
+  amostra: string | null;
+  modelos: string | null;
+  variante: string | null;
+  metricas: string | null;
+  relatorio_path: string | null;
+  created_at: string | null;
+  finalizado_em: string | null;
+};
+
+export type AgenteLogRow = {
+  id: string;
+  ciclo_id: string;
+  pai_id: string | null;
+  caminho: string;
+  profundidade: number;
+  projeto_id: string;
+  agente: string;
+  tipo: string;
+  rodada: number | null;
+  entrada: string | null;
+  saida: string | null;
+  tools_chamadas: string | null;
+  confianca: string | null;
+  veredito: string | null;
+  modelo: string | null;
+  tokens_in: number | null;
+  tokens_out: number | null;
+  custo_usd: number | null;
+  duracao_ms: number | null;
+  erro: string | null;
+  created_at: string | null;
+};
+
+export async function insertAvaliacaoCiclo(reg: {
+  id: string;
+  gatilho: string;
+  status: string;
+  amostra?: string | null;
+  modelos?: string | null;
+  variante?: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO avaliacao_ciclos (id, gatilho, status, amostra, modelos, variante, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+    [reg.id, reg.gatilho, reg.status, reg.amostra ?? null, reg.modelos ?? null, reg.variante ?? null],
+  );
+}
+
+export async function updateAvaliacaoCiclo(
+  id: string,
+  patch: { status: string; metricas?: string | null; relatorio_path?: string | null },
+): Promise<number | null> {
+  return execContando(
+    `UPDATE avaliacao_ciclos
+        SET status = ?, metricas = COALESCE(?, metricas), relatorio_path = COALESCE(?, relatorio_path),
+            finalizado_em = datetime('now')
+      WHERE id = ?`,
+    [patch.status, patch.metricas ?? null, patch.relatorio_path ?? null, id],
+  );
+}
+
+export async function getAvaliacaoCiclo(id: string): Promise<AvaliacaoCicloRow | undefined> {
+  return queryOne<AvaliacaoCicloRow>(`SELECT * FROM avaliacao_ciclos WHERE id = ?`, [id]);
+}
+
+export async function queryAvaliacaoCiclos(filtros: {
+  limit: number;
+  cursor_created_at?: string | null;
+  cursor_id?: string | null;
+}): Promise<AvaliacaoCicloRow[]> {
+  if (filtros.cursor_created_at && filtros.cursor_id) {
+    return queryAll<AvaliacaoCicloRow>(
+      `SELECT * FROM avaliacao_ciclos
+        WHERE created_at < ? OR (created_at = ? AND id < ?)
+        ORDER BY created_at DESC, id DESC LIMIT ?`,
+      [filtros.cursor_created_at, filtros.cursor_created_at, filtros.cursor_id, filtros.limit],
+    );
+  }
+  return queryAll<AvaliacaoCicloRow>(
+    `SELECT * FROM avaliacao_ciclos ORDER BY created_at DESC, id DESC LIMIT ?`,
+    [filtros.limit],
+  );
+}
+
+export async function insertAgenteLog(reg: {
+  id: string;
+  ciclo_id: string;
+  pai_id: string | null;
+  caminho: string;
+  profundidade: number;
+  projeto_id: string;
+  agente: string;
+  tipo: string;
+  rodada?: number | null;
+  entrada?: string | null;
+  saida?: string | null;
+  tools_chamadas?: string | null;
+  confianca?: string | null;
+  veredito?: string | null;
+  modelo?: string | null;
+  tokens_in?: number | null;
+  tokens_out?: number | null;
+  custo_usd?: number | null;
+  duracao_ms?: number | null;
+  erro?: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO agente_log
+       (id, ciclo_id, pai_id, caminho, profundidade, projeto_id, agente, tipo, rodada, entrada, saida,
+        tools_chamadas, confianca, veredito, modelo, tokens_in, tokens_out, custo_usd, duracao_ms, erro, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))`,
+    [
+      reg.id, reg.ciclo_id, reg.pai_id, reg.caminho, reg.profundidade, reg.projeto_id, reg.agente, reg.tipo,
+      reg.rodada ?? null, reg.entrada ?? null, reg.saida ?? null, reg.tools_chamadas ?? null,
+      reg.confianca ?? null, reg.veredito ?? null, reg.modelo ?? null, reg.tokens_in ?? null,
+      reg.tokens_out ?? null, reg.custo_usd ?? null, reg.duracao_ms ?? null, reg.erro ?? null,
+    ],
+  );
+}
+
+/** Só o que a validação de árvore precisa do pai — nunca a `saida` (pode ser longa). */
+export async function getAgenteLogNo(
+  id: string,
+): Promise<{ id: string; ciclo_id: string; caminho: string; profundidade: number } | undefined> {
+  return queryOne(`SELECT id, ciclo_id, caminho, profundidade FROM agente_log WHERE id = ?`, [id]);
+}
+
+export async function queryAgenteLogPorCiclo(cicloId: string, projetoId?: string): Promise<AgenteLogRow[]> {
+  if (projetoId) {
+    return queryAll<AgenteLogRow>(
+      `SELECT * FROM agente_log WHERE ciclo_id = ? AND projeto_id = ? ORDER BY created_at, id LIMIT 2000`,
+      [cicloId, projetoId],
+    );
+  }
+  // Teto explícito: ciclo multi-projeto (cron/retroativo) sem LIMIT bateria no teto de 32 MiB de RPC.
+  return queryAll<AgenteLogRow>(`SELECT * FROM agente_log WHERE ciclo_id = ? ORDER BY created_at, id LIMIT 2000`, [
+    cicloId,
+  ]);
+}
+
+export async function queryAgenteLog(filtros: {
+  limit: number;
+  agente?: string | null;
+  desde?: string | null;
+  veredito?: string | null;
+  projeto?: string | null;
+  ciclo?: string | null;
+  cursor_created_at?: string | null;
+  cursor_id?: string | null;
+}): Promise<AgenteLogRow[]> {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (filtros.agente) { where.push(`agente = ?`); params.push(filtros.agente); }
+  if (filtros.desde) { where.push(`created_at >= ?`); params.push(filtros.desde); }
+  if (filtros.veredito) { where.push(`veredito = ?`); params.push(filtros.veredito); }
+  if (filtros.projeto) { where.push(`projeto_id = ?`); params.push(filtros.projeto); }
+  if (filtros.ciclo) { where.push(`ciclo_id = ?`); params.push(filtros.ciclo); }
+  if (filtros.cursor_created_at && filtros.cursor_id) {
+    where.push(`(created_at < ? OR (created_at = ? AND id < ?))`);
+    params.push(filtros.cursor_created_at, filtros.cursor_created_at, filtros.cursor_id);
+  }
+  params.push(filtros.limit);
+  return queryAll<AgenteLogRow>(
+    `SELECT * FROM agente_log ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY created_at DESC, id DESC LIMIT ?`,
+    params,
+  );
+}

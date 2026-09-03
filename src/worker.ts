@@ -151,6 +151,8 @@ import {
   reabrirPreAprovacoes,
 } from "@/lib/aprovacoes.functions";
 import { registrarAtividade, listarAtividades } from "@/lib/atividades.functions";
+import { listarCiclos, lerArvore, listarLog } from "@/lib/agentes-log.functions";
+import { avaliarProjetoComTime } from "@/lib/avaliacao/time.functions";
 import {
   notificarLideresPendentes,
   notificarLideresDoProjeto,
@@ -905,6 +907,60 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         await listarAtividades({
           cursor: url.searchParams.get("cursor") ?? undefined,
           limit: url.searchParams.get("limit") ?? undefined,
+        }),
+        200,
+        { "Cache-Control": "no-store" },
+      );
+    }
+
+    // ── Time de avaliação (T15/T20) — roda em SOMBRA sob demanda, só admin. Nada grava em
+    // "Estrelas"/"Status"; devolve o resultado e registra o log em árvore (agente_log).
+    if (pathname === "/api/admin/avaliacao/time" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await request.json().catch(() => ({}))) as { projetoId?: string; cicloId?: string | null; sincrono?: boolean };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório", 400);
+      // Default em BACKGROUND (até ~30 chamadas LLM; uma request cortada deixaria o ciclo 'aberto').
+      // Resultado sai em GET /api/admin/agentes/ciclos e /api/admin/agentes/arvore?ciclo=&projeto=.
+      if (body.sincrono === true) {
+        return json(await avaliarProjetoComTime(body.projetoId, { cicloId: body.cicloId ?? null, gatilho: "manual" }), 200, {
+          "Cache-Control": "no-store",
+        });
+      }
+      runBackground(
+        avaliarProjetoComTime(body.projetoId, { cicloId: body.cicloId ?? null, gatilho: "manual" }).then((r) =>
+          console.log("[avaliacao-time]", body.projetoId, r.ok ? `ok ciclo=${r.ciclo_id}` : `falhou: ${r.motivo}`),
+        ),
+      );
+      return json({ ok: true, agendado: true, projetoId: body.projetoId }, 202, { "Cache-Control": "no-store" });
+    }
+
+    // ── Memória e LOG dos agentes avaliadores (T21) — leitura em árvore, só admin ──
+    if (pathname === "/api/admin/agentes/ciclos" && method === "GET") {
+      await requireAdmin(request);
+      return json(
+        await listarCiclos({
+          cursor: url.searchParams.get("cursor") ?? undefined,
+          limit: url.searchParams.get("limit") ?? undefined,
+        }),
+        200,
+        { "Cache-Control": "no-store" },
+      );
+    }
+    if (pathname === "/api/admin/agentes/arvore" && method === "GET") {
+      await requireAdmin(request);
+      const ciclo = url.searchParams.get("ciclo");
+      if (!ciclo) return errorJson("Parâmetro 'ciclo' é obrigatório", 400);
+      return json(await lerArvore(ciclo, url.searchParams.get("projeto") ?? undefined), 200, {
+        "Cache-Control": "no-store",
+      });
+    }
+    if (pathname === "/api/admin/agentes/log" && method === "GET") {
+      await requireAdmin(request);
+      const q = (k: string) => url.searchParams.get(k) ?? undefined;
+      return json(
+        await listarLog({
+          agente: q("agente"), desde: q("desde"), veredito: q("veredito"), projeto: q("projeto"),
+          ciclo: q("ciclo"), cursor: q("cursor"), limit: q("limit"),
         }),
         200,
         { "Cache-Control": "no-store" },

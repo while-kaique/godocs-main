@@ -12,6 +12,11 @@
 import { getDriveAccessToken } from './auth';
 import { assertNaoEhDefaultDeProd } from '../env';
 
+// Timeout de cada chamada ao Drive: o resumo da doc passou a ser gravado também dentro do laço do
+// cron `recompilarDocsPendentes` (até 20 projetos por corrida) — um Drive pendurado não pode segurar
+// a corrida inteira. Falha cai no catch de quem chama (best-effort, nunca lança).
+const DRIVE_TIMEOUT_MS = 15_000;
+
 const DEFAULT_FOLDER_ID = '1e_Fk8EhFsv_W-3A3dRpMIa2Wg1pBHem_';
 const UPLOAD_URL =
   'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink';
@@ -85,7 +90,7 @@ export async function uploadFileToDrive(
   // incompatível com Uint8Array<ArrayBufferLike>. Em runtime é um BlobPart válido.
   const body = new Blob([pre, base64ToUint8Array(doc.base64) as unknown as BlobPart, post]);
 
-  const resp = await fetch(UPLOAD_URL, {
+  const resp = await fetch(UPLOAD_URL, { signal: AbortSignal.timeout(DRIVE_TIMEOUT_MS),
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -143,7 +148,7 @@ export async function upsertResumoDoc(
     // 1) Atualização in-place (conteúdo) de um doc já existente.
     if (fileId) {
       const patchUrl = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&supportsAllDrives=true&fields=id,webViewLink`;
-      const resp = await fetch(patchUrl, {
+      const resp = await fetch(patchUrl, { signal: AbortSignal.timeout(DRIVE_TIMEOUT_MS),
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'text/markdown; charset=UTF-8' },
         body: markdown,
@@ -162,7 +167,7 @@ export async function upsertResumoDoc(
     const body =
       `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
       `--${boundary}\r\nContent-Type: text/markdown; charset=UTF-8\r\n\r\n${markdown}\r\n--${boundary}--`;
-    const resp = await fetch(UPLOAD_URL, {
+    const resp = await fetch(UPLOAD_URL, { signal: AbortSignal.timeout(DRIVE_TIMEOUT_MS),
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
       body,

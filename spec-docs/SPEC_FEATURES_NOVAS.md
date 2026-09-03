@@ -1932,3 +1932,19 @@ similaridade das notas humanas dos vizinhos e devolve `inflada` · `deflada` · 
 **Onde:** agregador PURO `src/lib/rollup-financeiro.ts`; orquestração `src/lib/rollup-backfill.ts` (`recalcularRollupBackfill`, idempotente); tabela durável `rollup_saving_receita`; push `src/lib/rollup-push.functions.ts` (`enviarRollupParaJG`, `montarPayloadRollup`); rotas `POST /api/admin/rollup-backfill`, `GET /api/admin/rollup-mensal`, `POST /api/admin/rollup-push` (dry default), cron `POST /api/cron/rollup-push` (diário 07:00 UTC). "Tipo de Saving" em `COLUNAS_RESUMO` + bump `VERSAO_RECORTE_RESUMO` → 3 (re-espelha no sync).
 
 **Pendente:** `JG_INGEST_URL` (endpoint do Gabriel) — até setar, o push é inerte e diz por quê. Detalhe operacional no CLAUDE.md ("Rollup histórico…"). Testes: `tests/rollup-financeiro.test.ts`, `tests/rollup-backfill.test.ts`, `tests/rollup-push.test.ts`.
+
+
+## Feature — Time AUTÔNOMO de avaliação em sombra (03/09/2026)
+
+**Pedido do Luis:** aprovação de projetos autônoma, humano só na exceção; agentes que raciocinam como gente, com
+ferramentas e memória (log), críticos de verdade; retroativo em sombra sobre a base de prod para aprender e medir.
+**Decisões:** D13–D20 em `docs/plans/regua-estrelas-e-time-unificado.md §11` (D20: régua de estrelas é gate
+determinístico e nenhum critério muda). **Onde aterrissou:** `src/lib/avaliacao/*`, `src/lib/agentes-log*.ts`,
+tabelas internas `agente_log`/`avaliacao_ciclos`, rota admin `POST /api/admin/avaliacao/time`, harness
+`scripts/avaliacao-retro/`, relatórios em `docs/plans/retro-rodadas/`. **Fora de escopo nesta fatia:** T20 (painel
+sombra no `/dashboard`) e T10 (aglutinação de feature em projeto existente). **Medido (rodada 5, 100 projetos
+novos):** aprovar 20 · ajuste 79 · humano 1; 0 erro grave; aprovar 100% preciso; estrela 70% dentro de ±1, viés
+−0,07. **Decisões fechadas que NÃO podem ser corrigidas por engano:** (1) régua intacta (D20); (2) preocupação
+exige sinal concreto — ausência de anexo não é sinal (base legada só tem a planilha); (3) refutação sustentada do
+cético com pergunta vira `ajuste`, não `humano`; (4) nada grava "Estrelas"/"Status" até `politicaDeLiberacao`
+autorizar por veredito com acurácia medida.
