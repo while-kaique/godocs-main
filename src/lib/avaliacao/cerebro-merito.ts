@@ -50,6 +50,8 @@ export function buildPromptMerito(args: {
   vizinhos: VizinhoTexto[];
   ferramentasTexto?: string | null;
   outrosJulgamentos?: JulgamentoMerito[];
+  /** Motivo do cético na rodada anterior (entra na réplica como a voz que refutou). */
+  replicaDoCetico?: string | null;
 }): Mensagem[] {
   const system = [PERSONA[args.dimensao], ...(args.ferramentasTexto ? ['', args.ferramentasTexto] : []), '', FORMATO].join('\n');
   const vizinhosTxt = args.vizinhos.length
@@ -57,13 +59,15 @@ export function buildPromptMerito(args: {
         .map((v) => `- ${v.nome} (status ${v.status ?? '—'}, similaridade ${v.similaridade.toFixed(2)}): ${v.resumo}`)
         .join('\n')
     : 'Nenhum vizinho decidido por humanos foi encontrado (sem vizinhos).';
-  const outros = args.outrosJulgamentos?.length
+  const temReplica = (args.outrosJulgamentos?.length ?? 0) > 0 || !!args.replicaDoCetico;
+  const outros = temReplica
     ? [
         '',
         'RÉPLICA (debate): os outros especialistas já opinaram. Responda ao que discorda, com evidência; mude de ideia se o argumento for melhor que o seu.',
-        ...args.outrosJulgamentos.map(
+        ...(args.outrosJulgamentos ?? []).map(
           (j) => `- ${j.dimensao} (${j.preocupa ? 'PREOCUPA' : 'sem preocupação'}): ${j.argumento}`,
         ),
+        ...(args.replicaDoCetico ? [`- cético (REFUTA a aprovação): ${args.replicaDoCetico}`] : []),
       ]
     : [];
   const user = [
@@ -155,14 +159,18 @@ export function consolidarMerito(julgamentos: JulgamentoMerito[], ctx: { temVizi
   const sinais = { temEvidenciaCitada: validos.some((j) => j.evidencias.length > 0), temVizinhos: ctx.temVizinhos };
   const ressalvas: string[] = [];
 
-  if (julgamentos.length === 0) {
+  if (validos.length === 0) {
     return {
       veredito: 'humano',
       julgamentos,
       preocupacoes,
       perguntas_ao_autor,
       valor,
-      ressalvas: ['Nenhum julgamento disponível: sem julgamento não se aprova, encaminhar ao humano.'],
+      ressalvas: [
+        julgamentos.length === 0
+          ? 'Nenhum julgamento disponível: sem julgamento não se aprova, encaminhar ao humano.'
+          : 'Nenhum julgamento válido (todos em fallback): sem julgamento não se aprova, encaminhar ao humano.',
+      ],
       sinais,
     };
   }
