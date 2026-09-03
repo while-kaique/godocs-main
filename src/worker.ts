@@ -144,6 +144,7 @@ import {
 } from "@/lib/aprovacoes.functions";
 import { registrarAtividade, listarAtividades } from "@/lib/atividades.functions";
 import { listarCiclos, lerArvore, listarLog } from "@/lib/agentes-log.functions";
+import { avaliarProjetoComTime } from "@/lib/avaliacao/time.functions";
 import {
   notificarLideresPendentes,
   notificarLideresDoProjeto,
@@ -888,6 +889,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         200,
         { "Cache-Control": "no-store" },
       );
+    }
+
+    // ── Time de avaliação (T15/T20) — roda em SOMBRA sob demanda, só admin. Nada grava em
+    // "Estrelas"/"Status"; devolve o resultado e registra o log em árvore (agente_log).
+    if (pathname === "/api/admin/avaliacao/time" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await request.json().catch(() => ({}))) as { projetoId?: string; cicloId?: string | null };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório", 400);
+      return json(await avaliarProjetoComTime(body.projetoId, { cicloId: body.cicloId ?? null, gatilho: "manual" }), 200, {
+        "Cache-Control": "no-store",
+      });
     }
 
     // ── Memória e LOG dos agentes avaliadores (T21) — leitura em árvore, só admin ──
