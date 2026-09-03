@@ -52,25 +52,36 @@ régua nova, **procure a que existe**.
 **Escape (5):** CTR Machine Admaker 7★ · PIAPP 6★ · ecom-metrics-hub 6★ · Integração Life of
 Colour 6★ · Agente SDR Gobeaute 6★.
 
-### Como ler a concordância — e a armadilha
+### Como ler a concordância
 
-Contra as 486 linhas "com nota humana", o agente fica acima 200× e abaixo 59× → parece
-inflação. **É artefato:** 367 dessas 486 (76%) têm nota humana **0**, e 0 naquela coluna quase
-sempre significa "ninguém avaliou", não "avaliei e vale zero".
+⚠️ **`0` NÃO significa "não avaliado".** Sob a régua atual o zero é um NÍVEL — **0 Experimenta**
+(só o autor usa · é simples e local · está parado · é experimentação · impacto marginal). Uma
+nota humana 0 é um **veredito**, não uma célula esquecida.
 
-Contra os **119 que alguém de fato avaliou** (nota > 0):
+_(Correção do Luis, 03/09: numa primeira leitura eu tratei os 0 como "ninguém avaliou" e conclui
+que o viés de inflação era artefato. **Não é.** Ler o zero como ausência transformaria 173
+discordâncias reais em ruído estatístico — exatamente o material de calibragem que esta sessão
+precisa olhar.)_
+
+Contra as 486 linhas com nota humana:
 
 | | |
 |---|---:|
-| idêntica | 33 |
-| agente acima | 27 |
-| agente **abaixo** | **59** |
-| dentro de 1★ | 88 (74%) |
+| idêntica | 227 (47%) |
+| dentro de 1★ | 370 (76%) |
+| agente **acima** do humano | **200** |
+| agente abaixo | 59 |
 
-**O agente é conservador**, fica abaixo 2,2× mais do que acima. Use SEMPRE o recorte
-`humana > 0` para medir concordância; o outro engana.
+**O agente sobe a nota 3,4× mais do que desce.** Isso é a pergunta central da calibragem, não
+um artefato a descartar.
 
----
+O recorte mais denso: dos 367 com nota humana **0**, o agente deu **>0 em 173** — 88 em 1★,
+66 em 2★, 16 em 3★ e **3 em 5★**. Cada um é uma discordância explícita com um veredito humano.
+
+Contra os 119 com nota humana **> 0** o quadro é outro (33 idênticas · 27 acima · 59 abaixo):
+onde a nota humana é alta, o agente é conservador. **As duas leituras convivem** e provavelmente
+apontam para o mesmo lugar: o agente reconhece bem o que um projeto FAZ e erra na régua do que
+isso VALE — generoso no piso, tímido no topo.
 
 ## 3. O que a próxima sessão tem de investigar
 
@@ -82,11 +93,18 @@ O Luis apontou este exatamente. Havia um humano no meio e a nota era 0.
 - `IARA + Central RA: Autoatendimento e Gestão`
 - `Automação de subidas de vídeo nos canais das marcas`
 
-**A pergunta não é "quem está certo".** É: aquele 0 foi um veredito ou uma célula que ninguém
-tocou? Confira no `admin_activity_log` / `especial_avaliacao` se alguém gravou a nota, e em que
-data. Se ninguém gravou, o "0" não é contraprova e esses 3 não são erro do agente.
+Aquele 0 é um **veredito humano de "Experimenta"**. A pergunta é: o que o agente viu no dossiê
+que a pessoa não viu — ou o que ele leu como operação real e é só descrição de capacidade?
+Abra os três dossiês inteiros e a leitura do agente lado a lado. Estes três são o teste mais
+duro da régua do PISO (o que derruba para 0), que é onde a divergência se concentra.
 
-### 3.2 Os 7 casos de "humano > 0 e agente +3 acima"
+### 3.2 Os 173 que o humano pôs em 0 e o agente subiu
+
+É o maior bolso de divergência da base (88 em 1★, 66 em 2★, 16 em 3★, 3 em 5★). Amostre uns 15
+e responda: o piso da régua está frouxo, ou a triagem zerou por não ter tempo de olhar? A
+resposta muda o que se ajusta — o critério do 0, ou nada.
+
+### 3.3 Os 7 casos de "humano > 0 e agente +3 acima"
 
 `Envio de Comprovante de Reembolso 1→5` · `Controle de Pedidos de Compra 2→5` · `CTR Machine
 Admaker 4→7` · `Automação envio Reinf 2→5` · `ecom-metrics-hub 3→6` · `Integração Life of
@@ -94,7 +112,7 @@ Colour 2→6` · `Esteira de Hits 1→5`.
 
 Estes têm nota humana real. São o material de calibragem mais valioso da base.
 
-### 3.3 ⚠️ A contradição PIAPP × Prisma
+### 3.4 ⚠️ A contradição PIAPP × Prisma
 
 O agente deu **6★ ao PIAPP** citando *"o Prisma já opera sobre ela"*, e **0★ ao Prisma** dizendo
 *"o memorial descreve capacidades, mas não comprova campanhas em operação"*. Usou o Prisma como
@@ -103,13 +121,13 @@ prova de operação em curso e depois negou que o Prisma opere.
 **É o argumento nº 1 a favor do time interno:** um agente único, julgando projeto a projeto em
 chamadas independentes, não enxerga a própria contradição.
 
-### 3.4 O escape virou "é plataforma"
+### 3.5 O escape virou "é plataforma"
 
 **3 dos 5** entraram por "sustenta outros projetos nomeados". A regra que adicionei está
 fazendo quase todo o trabalho da faixa. Decidir com o Luis: existe um segundo caminho de
 entrada (muda o jeito de trabalhar sem ser infraestrutura de outros)?
 
-### 3.5 Bug conhecido, não consertado — 30 projetos invisíveis
+### 3.6 Bug conhecido, não consertado — 30 projetos invisíveis
 
 `LEGADO-049` devolve *"projeto sem contexto para classificar"*; `legado-049` passa. **A busca do
 projeto é case-sensitive** onde o resto do repo trata ID como case-insensitive. Os 30 não
