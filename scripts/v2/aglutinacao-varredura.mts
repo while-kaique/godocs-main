@@ -1,0 +1,107 @@
+// Varredura de aglutinação sobre a aba alvo. SEMPRE read-only na planilha: escreve no
+// máximo o relatório em JSON. PARES=1 pára antes do LLM (só a vizinhança vetorial).
+import { getAccessToken } from '../../src/lib/google/auth';
+import { gerarEmbeddingsLote, cosseno } from '../../src/lib/embeddings';
+import { textoParaEmbedding } from '../../src/lib/especial-corpus';
+import {
+  candidatosDe, consolidarSugestoes, PISO_SIMILARIDADE_AGLUTINACAO,
+  type ProjetoAglutinavel, type Sugestao,
+} from '../../src/lib/aglutinacao';
+import { julgarAglutinacao } from '../../src/lib/agents/aglutinador';
+
+const SPREADSHEET = process.env.GOOGLE_SHEETS_ID || '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
+const TAB = process.env.GOOGLE_SHEETS_TAB!;
+const SO_PARES = process.env.PARES === '1';
+const PISO = Number(process.env.PISO ?? PISO_SIMILARIDADE_AGLUTINACAO);
+const MAX_JULGAMENTOS = Number(process.env.MAX ?? Infinity);
+
+const token = await getAccessToken();
+const base = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET}`;
+const { values = [] } = (await (await fetch(`${base}/values/${encodeURIComponent(TAB)}`, {
+  headers: { Authorization: `Bearer ${token}` },
+})).json()) as { values?: string[][] };
+const [header, ...linhas] = values;
+const col = (n: string) => header.indexOf(n);
+const iId = col('ID Projeto'), iNome = col('Projeto'), iDesc = col('Descrição');
+const iData = col('Data Submissão'), iPai = col('ID Pai'), iStatus = col('Status');
+
+/** pt-BR "12/05/2026" ou ISO. Sem data → null (o par não é sugerido). */
+const dataMs = (s?: string) => {
+  const t = (s ?? '').trim();
+  if (!t) return null;
+  const br = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (br) return Date.UTC(+br[3], +br[2] - 1, +br[1]);
+  const d = new Date(t);
+  return Number.isFinite(d.getTime()) ? d.getTime() : null;
+};
+
+const projetos: ProjetoAglutinavel[] = [];
+const textos: string[] = [];
+for (const l of linhas) {
+  const id = (l[iId] ?? '').trim(), nome = (l[iNome] ?? '').trim();
+  if (!id || !nome) continue;
+  if ((l[iStatus] ?? '').trim().toLowerCase() === 'rascunho') continue;
+  projetos.push({
+    id, nome, descricao: l[iDesc],
+    dataMs: dataMs(l[iData]),
+    jaVinculado: !!(l[iPai] ?? '').trim() && (l[iPai] ?? '').trim() !== '—',
+  });
+  textos.push(textoParaEmbedding({ nome, descricao: l[iDesc] }));
+}
+console.log(`${TAB}: ${projetos.length} projetos · piso ${PISO}`);
+
+const vetores: (number[] | null)[] = [];
+for (let i = 0; i < textos.length; i += 100) {
+  const r = await gerarEmbeddingsLote(textos.slice(i, i + 100));
+  vetores.push(...r.map((x) => x?.vetor ?? null));
+  process.stdout.write(`  embeddings ${Math.min(i + 100, textos.length)}/${textos.length}\r`);
+}
+const semVetor = vetores.filter((v) => !v).length;
+console.log(`\nembeddings: ${vetores.length - semVetor} ok · ${semVetor} sem vetor`);
+if (semVetor === vetores.length) throw new Error('nenhum embedding gerado — confira LLM_EMBEDDINGS_KEY/LLM_FALLBACK');
+projetos.forEach((p, i) => (p.vetor = vetores[i]));
+const universo = new Map(projetos.map((p) => [p.id, p]));
+
+// Vizinhança por cosseno (581² = ~337k comparações, instantâneo em JS).
+const comCandidatos: Array<{ p: ProjetoAglutinavel; cands: ReturnType<typeof candidatosDe> }> = [];
+for (const p of projetos) {
+  if (!p.vetor) continue;
+  const viz = projetos
+    .filter((o) => o.id !== p.id && o.vetor)
+    .map((o) => ({ id: o.id, similaridade: cosseno(p.vetor!, o.vetor!) }));
+  const cands = candidatosDe(p, viz, universo, { piso: PISO });
+  if (cands.length) comCandidatos.push({ p, cands });
+}
+const paresUnicos = new Set(comCandidatos.flatMap(({ cands }) => cands.map((c) => `${c.filhoId}>${c.paiId}`)));
+console.log(`projetos com ≥1 candidato: ${comCandidatos.length} · pares únicos: ${paresUnicos.size}`);
+const top = comCandidatos.flatMap(({ cands }) => cands).sort((a, b) => b.similaridade - a.similaridade).slice(0, 15);
+console.log('\n15 pares mais parecidos (ANTES do julgamento):');
+for (const t of top)
+  console.log(`  ${t.similaridade.toFixed(3)}  ${universo.get(t.filhoId)?.nome.slice(0, 42)}  ⟵ filho de ⟶  ${universo.get(t.paiId)?.nome.slice(0, 42)}`);
+
+if (SO_PARES) { console.log('\nPARES=1 — parando antes do LLM.'); process.exit(0); }
+
+const aJulgar = comCandidatos.slice(0, MAX_JULGAMENTOS);
+console.log(`\njulgando ${aJulgar.length} projetos...`);
+const brutas: Sugestao[] = [];
+let t0 = Date.now();
+for (const [n, { p, cands }] of aJulgar.entries()) {
+  const s = await julgarAglutinacao(p, cands, universo);
+  if (s) brutas.push(s);
+  process.stdout.write(`  ${n + 1}/${aJulgar.length} · ${brutas.length} sugestões (${Math.round((Date.now() - t0) / 1000)}s)\r`);
+}
+const sugestoes = consolidarSugestoes(brutas);
+console.log(`\n\n${sugestoes.length} sugestões após consolidar (de ${brutas.length} brutas):\n`);
+for (const s of sugestoes)
+  console.log(
+    `  conf ${s.confianca.toFixed(2)} · sim ${s.similaridade.toFixed(3)}\n` +
+    `    FILHO: ${universo.get(s.filhoId)?.nome}\n` +
+    `    PAI:   ${universo.get(s.paiId)?.nome}\n` +
+    `    ${s.justificativa}\n`,
+  );
+const saida = `${process.env.BACKUP_DIR ?? '.'}/aglutinacao-${TAB}.json`;
+await (await import('node:fs/promises')).writeFile(
+  saida,
+  JSON.stringify(sugestoes.map((s) => ({ ...s, filho: universo.get(s.filhoId)?.nome, pai: universo.get(s.paiId)?.nome })), null, 1),
+);
+console.log(`relatório: ${saida}`);
