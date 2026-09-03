@@ -17,6 +17,7 @@ import {
 } from '@/lib/especial-corpus';
 import {
   extrairJson,
+  recuperarDeProsa,
   normalizarRecomendacao,
   anexarEvidencia,
   buildSystemPromptEspecial,
@@ -393,5 +394,55 @@ describe('agente — evidência do escape chega ao painel', () => {
       ajuste_guard: null,
     };
     expect(anexarEvidencia(rec)).toEqual(rec);
+  });
+});
+
+/**
+ * Resposta em PROSA não é resposta ausente.
+ *
+ * ⚠️ Medido em prod (03/09/2026, `getAppLogs`): o modelo devolvia a avaliação COMPLETA em
+ * Markdown (`**Recomendação: 0★ — Experimenta**`) e o parse dizia "LLM não devolveu recomendação
+ * utilizável". O projeto sumia da rodada como se ninguém tivesse perguntado — a mesma perda
+ * silenciosa dos 502, por outro caminho. Structured Outputs está morta no proxy, então o formato
+ * é pedido, não garantido: quem tem de aguentar a variação é o parse.
+ */
+describe('recuperação de resposta em prosa', () => {
+  const REAIS = [
+    { texto: '**Recomendação: 0★ — Experimenta**  \n**Confiança: baixa**, por falta de comprovação.\n\n**Passo 1 — Muda o jogo?** Não.\n- **Gatilho 1:** não há processo citado.\nO projeto gera um relatório e ninguém além do autor usa.', nota: 0, conf: 'baixa' },
+    { texto: '## Recomendação: **0★ — Experimenta**\n\n### Passo 1 — Muda o jogo?\n**Não.**\n\n- **Gatilho 1:** nada nomeado.\nEle roda uma vez por mês e alimenta uma planilha.', nota: 0, conf: 'baixa' },
+    { texto: '## Recomendação: **3★ Garante**\nConfiança: média\nBloqueia pedidos com erro antes de seguir.', nota: 3, conf: 'media' },
+  ];
+
+  it('recupera nota e confiança do Markdown que prod realmente devolveu', () => {
+    for (const c of REAIS) {
+      const r = normalizarRecomendacao(recuperarDeProsa(c.texto));
+      expect(r, c.texto.slice(0, 40)).not.toBeNull();
+      expect(r!.estrelas_recomendada).toBe(c.nota);
+      expect(r!.confianca).toBe(c.conf);
+    }
+  });
+
+  // ⚠️ A trava que importa: trocar "perdi a resposta" por "inventei a nota" seria PIOR, porque o
+  // primeiro aparece no relatório de falhas e o segundo entra na base como se fosse avaliação.
+  it('NÃO inventa nota a partir de número solto na prosa', () => {
+    for (const t of [
+      'O projeto economiza 12 horas por mês e roda desde 2024.',
+      'Foram 3 pessoas envolvidas e 5 integrações.',
+      'Sem informação suficiente para avaliar.',
+      '',
+    ]) {
+      expect(recuperarDeProsa(t)).toBeNull();
+    }
+  });
+
+  // O porquê recuperado passa pelas MESMAS regras de escrita do gerado: sem o andaime do
+  // raciocínio e sem travessão, senão o fallback reintroduz na tela o que o prompt proibiu.
+  it('o porquê recuperado sai limpo, sem andaime e sem travessão', () => {
+    const r = normalizarRecomendacao(recuperarDeProsa(REAIS[0].texto))!;
+    expect(r.leitura).not.toMatch(/gatilho/i);
+    expect(r.leitura).not.toMatch(/passo\s*\d/i);
+    expect(r.leitura).not.toMatch(/[—–]/);
+    expect(r.leitura).not.toMatch(/\*\*/);
+    expect(r.leitura).toContain('ninguém além do autor usa');
   });
 });

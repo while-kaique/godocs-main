@@ -28,6 +28,8 @@ import {
   FAIXA_ESCAPE,
   GATILHOS_ESCAPE,
   REGRAS_DO_PORQUE,
+  NIVEL_ZERO,
+  CRITERIOS_ESTRELA,
   descreverReguaAgente,
   descreverEscape,
   escapeValido,
@@ -207,6 +209,85 @@ export function extrairJson(raw: string): unknown | null {
 }
 
 /**
+ * Recupera nota/confiança/porquê de uma resposta que veio em PROSA em vez de JSON.
+ *
+ * ⚠️ Por que isto existe: Structured Outputs está MORTA no proxy (o backend do Codex ignora
+ * `response_format`), então o formato é só pedido, e pedido o modelo às vezes não atende. Medido
+ * em prod (03/09/2026): o modelo respondia a avaliação COMPLETA e correta em Markdown
+ * (`**Recomendação: 0★ — Experimenta** / **Confiança: baixa**`) e o parse devolvia `null` —
+ * "LLM não devolveu recomendação utilizável". Jogávamos fora uma resposta boa por causa da
+ * formatação, e o projeto sumia da rodada como se ninguém tivesse perguntado. É a mesma perda
+ * silenciosa dos 502, por outro caminho.
+ *
+ * ⚠️ **Conservador de propósito**: só aceita quando o número vem COLADO a um verbo da régua
+ * (`0★ — Experimenta`, `3★ Garante`) ou a uma chave que se parece com a do JSON. Adivinhar a
+ * nota de um número solto no texto trocaria "perdi a resposta" por "inventei a nota", que é
+ * pior: o primeiro aparece no relatório, o segundo não.
+ */
+export function recuperarDeProsa(raw: string): Record<string, unknown> | null {
+  const texto = String(raw ?? '');
+  if (!texto.trim()) return null;
+
+  const verbos = [NIVEL_ZERO, ...CRITERIOS_ESTRELA].map((n) => n.verbo);
+  const nota = (() => {
+    // 1) chave do JSON solta no meio da prosa (o caso mais fácil e o mais seguro)
+    const chave = texto.match(/"?estrelas_recomendada"?\s*[:=]\s*"?(\d{1,2})/i);
+    if (chave) return Number(chave[1]);
+    // 2) número colado a um VERBO da régua — é o verbo que prova que aquele número é a nota
+    const comVerbo = new RegExp(`(\\d{1,2})\\s*★?\\s*[—:-]?\\s*(?:${verbos.join('|')})`, 'i');
+    const mv = texto.match(comVerbo);
+    if (mv) return Number(mv[1]);
+    // 3) "Recomendação: 3★" — sem verbo, mas com a palavra que nomeia o campo
+    const rec = texto.match(/recomenda[çc][ãa]o[^\d\n]{0,24}(\d{1,2})\s*★/i);
+    if (rec) return Number(rec[1]);
+    return null;
+  })();
+  if (nota == null || !Number.isFinite(nota)) return null;
+
+  const conf = texto.match(/confian[çc]a[^a-zà-ú]{0,12}(alta|m[ée]dia|media|baixa)/i);
+  const confianca = conf ? conf[1].toLowerCase().replace('é', 'e').replace('ĩ', 'i') : 'baixa';
+
+  return {
+    estrelas_recomendada: nota,
+    confianca: confianca === 'media' || confianca === 'média' ? 'media' : confianca,
+    leitura: prosaComoLeitura(texto),
+  };
+}
+
+/** Teto do porquê recuperado — o mesmo tamanho que o prompt pede ao modelo. */
+const LEITURA_MAX = 400;
+
+/**
+ * Transforma a prosa em um porquê legível: tira marcação de Markdown e as linhas de ANDAIME do
+ * raciocínio (`Passo 1`, `Gatilho 2`), que são o vocabulário interno que `REGRAS_DO_PORQUE`
+ * proíbe justamente na coluna que a triagem lê.
+ */
+function prosaComoLeitura(texto: string): string {
+  const semMarcacao = texto
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[*_#`]+/g, ' '); // tira a marcação ANTES de filtrar: `- **Gatilho 1:**` só vira
+                               // reconhecível depois que os asteriscos saem do caminho.
+  const util = semMarcacao
+    .split('\n')
+    // Fora o ANDAIME do raciocínio e o cabeçalho do veredito: "Passo 1", "Gatilho 2",
+    // "Recomendação: 3★", "Confiança: baixa". Nada disso é o PORQUÊ — é o formulário em volta
+    // dele, e `REGRAS_DO_PORQUE` proíbe exatamente esse vocabulário na coluna que a triagem lê.
+    .filter((l) => !/^\s*[->\s]*\s*(passo|gatilho|crit[ée]rio)\s*\d/i.test(l))
+    .filter((l) => !/^\s*[->\s]*\s*(recomenda[çc][ãa]o|confian[çc]a)\s*[:=]/i.test(l))
+    .join(' ')
+    // Travessão e hífen soltos viram vírgula (decisão do Luis, 03/09): o texto recuperado passa
+    // pelas MESMAS regras de escrita que o texto gerado, senão o fallback reintroduz na tela o
+    // que o prompt acabou de proibir.
+    .replace(/\s+[—–-]\s+/g, ', ')
+    .replace(/\s*[,;]\s*(?=[,;])/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,;.]+/, '')
+    .trim();
+  if (util.length <= LEITURA_MAX) return util;
+  return util.slice(0, LEITURA_MAX).replace(/\s+\S*$/, '') + '…';
+}
+
+/**
  * Normaliza + aplica o GUARD determinístico sobre a saída crua do LLM:
  * - clampa a nota em [0, NOTA_MAX] e arredonda para inteiro;
  * - confiança inválida vira 'baixa' (conservador);
@@ -316,8 +397,16 @@ export async function classificarEspecial(
     { jsonMode: true, temperature: 0.2, maxTokens: 900 },
   );
   const json = extrairJson(raw);
-  const rec = normalizarRecomendacao(json);
-  return rec ? anexarEvidencia(aplicarGuardVizinhoDivergente(rec, vizinhos)) : null;
+  // Resposta em prosa não é resposta ausente: recuperar é a diferença entre "o agente avaliou
+  // e nós perdemos" e "o projeto não foi avaliado". O `ajuste_guard` deixa a recuperação
+  // VISÍVEL — sem isso a rodada não teria como saber com que frequência isso acontece.
+  const recuperado = json == null;
+  const rec = normalizarRecomendacao(json ?? recuperarDeProsa(raw));
+  if (!rec) return null;
+  const marcado = recuperado
+    ? { ...rec, ajuste_guard: [rec.ajuste_guard, 'nota recuperada de resposta em prosa'].filter(Boolean).join(' · ') }
+    : rec;
+  return anexarEvidencia(aplicarGuardVizinhoDivergente(marcado, vizinhos));
 }
 
 /**
