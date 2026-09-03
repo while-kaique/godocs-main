@@ -3,7 +3,7 @@
 ## Plano ativo
 `docs/plans/regua-estrelas-e-time-unificado.md` — **§11 "Time AUTÔNOMO de triagem"** (direção do Luis,
 03/09/2026): dossiê + agentes com ferramentas + debate com teto + consenso com 3 saídas + retroativo
-iterativo por amostragem. Tarefas **T11–T20** (§11.3), ordem T11 → T12 → T13/T14 → T16 → T15 → T17 → T18 →
+iterativo por amostragem. Tarefas **T11–T21** (§11.3), ordem **T21 (log/memória dos agentes)** → T11 → T12 → T13/T14 → T16 → T15 → T17 → T18 →
 T19 → T20 → T10. **Pronto para `/ggsd:code`.**
 
 ## Estado (03/09/2026)
@@ -28,5 +28,5 @@ T19 → T20 → T10. **Pronto para `/ggsd:code`.**
   de ~50 projetos não avaliados para o gabarito.
 
 ## Próximo passo
-`/ggsd:code` começando por **T11 (dossiê)**, que todos os outros consomem. Retroativo sempre em `dry`, sombra
+`/ggsd:code` começando por **T21 (log e memória dos agentes)** e depois **T11 (dossiê)**. Sessão AUTÔNOMA noturna autorizada pelo Luis (03/09): codar T21→T18, rodar T19 em amostras 30→100 em `dry`, relatório de manhã. Sem deploy, sem gravar Estrelas/Status, régua intacta (D20). Retroativo sempre em `dry`, sombra
 em tudo, prod e staging v1 intocados.

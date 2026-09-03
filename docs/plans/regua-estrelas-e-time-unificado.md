@@ -520,7 +520,18 @@ consenso, texto ao autor e dossiê de comitê → **forte** (`LLM_MODEL`); embed
   `AVALIACAO_LIBERAR_AJUSTE` (default OFF) só passam a agir quando a `politicaDeLiberacao` autoriza.
   "Estrelas" e "Status" continuam **só por clique humano** até a liberação.
 
-**Ordem:** T11 → T12 → T13/T14 (paralelas) → T16 → T15 → T17 → T18 → T19 (rodadas) → T20 → T10.
+- **T21 — Memória e LOG dos agentes (pedido do Luis, 03/09, PRIMEIRA a entrar)**: tabelas INTERNAS
+  **`agente_log`** (por ciclo × projeto × agente: entrada resumida, tools chamadas com argumentos e retorno,
+  conclusão ÍNTEGRA, confiança, rodada do debate, veredito final, modelo, custo/tokens, `created_at`) e
+  **`avaliacao_ciclos`** (uma linha por rodada de retroativo: data, amostra e seed, modelo, variante do
+  prompt, métricas agregadas, caminho do relatório). `registrarLogAgente` **nunca lança** (auditoria não
+  derruba a avaliação — mesma régua de `registrarAtividade`). Fora de `SAFE_UPDATE_FIELDS`, sem Sheets,
+  comentário do schema **sem `;`**. Leitura: `GET /api/admin/agentes/log?projeto=&ciclo=&agente=`
+  (`requireAdmin`) + o script de rodada imprime o resumo. Vetorizar o log fica **fora** até a busca por
+  texto livre se provar necessária. Motivo: *"para não ficarmos às cegas e esquecer o que rodamos na terça,
+  qual foi a conclusão da semana passada, por que o agente estava dando erro."*
+
+**Ordem:** **T21** → T11 → T12 → T13/T14 (paralelas) → T16 → T15 → T17 → T18 → T19 (rodadas) → T20 → T10.
 
 ### 11.4 Metas (proposta — o Luis fixa os números)
 
