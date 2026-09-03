@@ -395,7 +395,12 @@ CORRIGIDO no mesmo dia:
 - **Cabeçalho:** `alertarCabecalhoDivergente` (append e update) loga ERRO uma vez por aba quando ≥ 5 colunas do código
   não existem na planilha — o sintoma de bundle de uma versão contra aba de outra.
 - **Rascunho local:** `saveDraft` não guarda mais os bytes dos anexos (`semAnexosNoRascunho`); a pessoa reanexa ao retomar.
-- **`salvarGanhos` ganhou teste** (`tests/ganhos-salvar.test.ts`, 15 casos).
+- **`salvarGanhos` ganhou teste** (`tests/ganhos-salvar.test.ts`, 13 casos).
+- **D6 ganhou rede** (`tests/submit-sem-llm-d6.test.ts`): submit com doc pendente não chama compilador nem Drive; o cron
+  compila e só então grava o resumo (rascunho não grava nem analisa); Drive falhando não derruba. Era o achado alto da
+  re-verificação: sem esse teste, reintroduzir o `await` no submit passaria verde.
+- Re-revisão de qualidade (`sugestoes`): `AbortSignal.timeout(15 s)` nos 3 `fetch` do Drive (o resumo passou a rodar no
+  laço do cron) e aviso de frequência ilegível no rollup.
 
 **Cabeçalho — a realidade medida em leitura (03/09):** `STAGING-V2` tem **59 colunas**, com as 3 novas
 (`Saving Efetivado Agora` · `Custo Evitado Não Contratado` · `Impacto Líquido Mensal`) **e 19 renomeações** — as 17 da

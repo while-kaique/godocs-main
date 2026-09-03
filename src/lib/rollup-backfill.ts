@@ -65,6 +65,8 @@ function savingCruDaLinha(row: Record<string, string>): number | null {
   return Math.max(0, savingEfetivado + custoEvitado);
 }
 
+const freqsAvisadas = new Set<string>();
+
 /** Valor do período → valor MENSAL pela frequência da célula (texto da planilha). Sem frequência legível, o valor entra como está. */
 function mensalizar(valor: number, freqCru: string | undefined): number {
   if (!valor) return 0;
@@ -72,6 +74,12 @@ function mensalizar(valor: number, freqCru: string | undefined): number {
   try {
     return f ? valor / divisorDe(f as Frequencia) : valor;
   } catch {
+    // Frequência editada à mão na planilha ("Mensal (recorrente)", "trimestre"): entra sem
+    // mensalizar, mas AVISADA — a série do Intelli não tem como detectar isso depois.
+    if (!freqsAvisadas.has(f)) {
+      freqsAvisadas.add(f);
+      console.warn(`[rollup] frequência ilegível na planilha: "${freqCru}" — valor entrou sem mensalizar.`);
+    }
     return valor;
   }
 }

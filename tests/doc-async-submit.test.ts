@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type BetterSqlite3 from 'better-sqlite3';
 import { criarDbMemoria } from './helpers/db-memoria';
 
-// Frente 1 (T6) — wiring da compilação ASSÍNCRONA: a reconciliação no submit e o persist do
-// background. Cobre o que o §9 apontou sem teste:
-//  - "submit aguarda doc": reconciliarDocSePendente compila quando pendente, preservando o
-//    financeiro, e BLOQUEIA se a compilação falhar (nunca submete doc incompleta).
-//  - "doc em background não bloqueia / fail-safe": compilarEPersistirDoc persiste via patch e
-//    NUNCA lança (deixa pendente p/ o submit reconciliar).
+// Frente 1 (T6) — wiring da compilação ASSÍNCRONA: `reconciliarDocSePendente` e o persist do
+// background. ⚠️ Desde a v2 (D6, 03/09/2026) o SUBMIT NÃO chama mais `reconciliarDocSePendente`:
+// quem a usa é o cron `recompilarDocsPendentes` (ver `tests/submit-sem-llm-d6.test.ts`). Aqui:
+//  - reconciliarDocSePendente compila quando pendente, preservando o financeiro, e NÃO lança
+//    quando a compilação falha (a doc fica pendente para a próxima corrida).
+//  - compilarEPersistirDoc persiste via patch e NUNCA lança.
 
 // Mocka SÓ compilarDocumentacao (mantém o resto do módulo real via importOriginal).
 vi.mock('@/lib/agents/doc-compiler', async (importOriginal) => {
