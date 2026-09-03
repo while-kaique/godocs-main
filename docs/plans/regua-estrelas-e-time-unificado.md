@@ -627,3 +627,11 @@ OpenAI direto — `gpt-5.6-luna` nos especialistas, `gpt-5.6-sol` na estrela e n
   contagem no Argos. É o crítico que o Luis pediu; o defeito era o ROTEAMENTO. **Variante 4:** o cético
   passa a propor `pergunta_ao_autor`; refutação que sobrevive à réplica e traz pergunta vira **ajuste**
   (saída autônoma), não humano; sem pergunta segue para o humano.
+- **Rodada 4 (`r04-n30-v4`, variante 4, US$ 1,53):** **5 aprovar · 24 ajuste · 1 humano (3%)**; mérito 6
+  acertos (43%), **aprovar 100% em 4, 0 erro grave**; 13 réplicas, o cético refutou 24/30 e em TODAS trouxe
+  pergunta ao autor → a refutação virou ajuste em vez de humano. Estrelas: exato 38%, dentro de 1 = **62%**
+  (caiu de 69%), **viés +0,54** (sobe a cada rodada: 0,23 → 0,31 → 0,38 → 0,54) — a disciplina da rodada 3
+  ("fora_de_uso" só quando o dossiê diz) tirou zeros indevidos mas o time ficou um degrau generoso
+  (Integração Operador Logístico 2★ → 5★ "assume"). Roteamento fechado: humano é exceção, aprovar preciso,
+  o que resta em "conservador" são contradições concretas que o time pergunta ao autor. **Próximo:** medir
+  em amostra nova de 100 (seed 11) e depois a base inteira; a estrela generosa fica para a leitura final.
