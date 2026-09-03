@@ -65,6 +65,7 @@ const FORMATO_JSON = `FORMATO DE RESPOSTA — responda APENAS com um objeto JSON
 const DISCIPLINA = `DISCIPLINA:
 - Raciocine em cima da régua, mas NÃO a reescreva: cada nível é o texto acima, e você conclui a partir dele com um racional que faça sentido no contexto deste projeto.
 - Ter saving medido NÃO zera. Só zera se o projeto se RESUME ao número (ou cai em outro item do piso).
+- O dossiê da base legada vem SÓ da planilha: não ter anexo, documentação compilada ou "prova de uso" nele NÃO é sinal de que o projeto está parado. "fora_de_uso" só vale quando o dossiê DIZ que parou, está em staging, é POC ou foi descontinuado. Julgue o que o projeto faz pelo que está descrito; a triagem humana avaliou com esse mesmo material.
 - Toda nota acima de 0 exige pelo menos UMA citação literal do dossiê em "evidencias". Sem citação, o critério não vale.
 - A classe do artefato é pista, não decisão. Os exemplos reais de cada nível são âncoras de comparação.
 - Promoção +1 só com o dependente NOMEADO (nome do projeto/processo). "Poderá ser consultado" não é dependente.

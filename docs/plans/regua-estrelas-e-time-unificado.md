@@ -594,3 +594,14 @@ OpenAI direto — `gpt-5.6-luna` nos especialistas, `gpt-5.6-sol` na estrela e n
   não preocupa por si; 1 pergunta por dimensão, ≤220 chars. Também: perguntas duplicadas entre
   dimensões (plausibilidade e financeiro perguntaram a mesma coisa) — a consolidação já dedupa exatas;
   falta dedupe semântico.
+- **Rodada 1 (`r01-n30`, 03/09, amostra seed 7, luna+sol, US$ 1,27):** saídas **0 aprovar · 27 ajuste · 3
+  humano**; mérito 2 acertos (os 2 reprovados pela triagem viraram ajuste) · 12 conservador · 0 erro grave
+  · 16 sem base; estrelas: 13 comparáveis, **exato 23% · dentro de 1 = 69% · viés +0,23**, achatamento
+  suspeito (5 quedas, 60% para 0). Por dimensão: **evidência preocupou 30/30**, financeiro 27/30,
+  plausibilidade 19/30, precedente 16/30; **cético refutou 30/30** ("sem documentação compilada, anexo
+  inacessível"); 5 projetos foram à réplica e 3 caíram em humano por debate não fechado. Leitura: o
+  MÉRITO está travado por exigir evidência que a base legada não tem (é o que a variante 2 ataca); a
+  ESCADA de estrelas raciocina bem (Prisma 5★→4★ "decide, alinha ao Admaker 4★"; Antifraude 1★→3★
+  "impede fraude de avançar") mas também zera por "não comprova operação atual" (Gocreators 3★→0★),
+  a mesma falha de material — ajuste na DISCIPLINA do prompt da estrela (não na régua): "fora_de_uso"
+  só quando o dossiê DIZ que parou.
