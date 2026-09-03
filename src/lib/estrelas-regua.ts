@@ -1,10 +1,10 @@
 /**
  * Régua de ESTRELAS 0–10 — módulo PURO e **FONTE ÚNICA** dos critérios.
  *
- * Validada pelo dono do produto (Luis, 02/09/2026) depois de sete desenhos rejeitados. O registro
- * da decisão, o que foi descartado e por quê, e as tarefas estão em
- * `docs/plans/regua-estrelas-e-time-unificado.md`. ⚠️ **Não redigite critério em prompt nem em
- * tela — altere estas constantes.**
+ * Validada pelo dono do produto (Luis, 02/09/2026) depois de sete desenhos rejeitados e
+ * **revisada por ele em 03/09/2026** à luz do T1 (§6.1 do plano). O registro da decisão, o que foi
+ * descartado e por quê, e as tarefas estão em `docs/plans/regua-estrelas-e-time-unificado.md`.
+ * ⚠️ **Não redigite critério em prompt nem em tela — altere estas constantes.**
  *
  * ## O que a estrela é
  * Nota qualitativa dada na auditoria, nunca pelo autor. Ela existe para o impacto **difícil de
@@ -15,14 +15,35 @@
  * (os limiares saíram errados por uma ordem de grandeza: "< 60k/ano" cobria 95% da base). O que
  * discrimina é a NATUREZA do impacto.
  *
+ * ## O que a revisão de 03/09 mudou (e por quê)
+ * - **0★ ganhou nome — `Experimenta` — e deixou de ser só uma lista de exclusões.** O piso agora
+ *   inclui *impacto marginal*, *pouco relevante para a empresa como um todo* e *experimentação*,
+ *   que é o que a base realmente tem no fundo da escala.
+ * - **O item do piso que zerava tudo passou a exigir o "APENAS".** O T1 mediu o texto antigo (*"o
+ *   ganho é mensurável"*) disparando em **484 de 484** não-especiais — por construção, todo
+ *   não-especial tem ganho medido. Zera quem **se resume** ao número, não quem tem número.
+ * - **Cada nível carrega CLASSE DE ARTEFATO típica e EXEMPLOS REAIS da base.** É a âncora que
+ *   faltava: no T1 a régua sem exemplos achatou 60% do lote em 1★. ⚠️ Classe de artefato é
+ *   **pista, nunca gate** — "é um dashboard" não decide a nota sozinho (um painel que bloqueia
+ *   erro é 3★). Isto não contradiz o descarte de *classe de artefato como CAMPO do formulário*:
+ *   o agente INFERE a classe, o autor não a declara.
+ * - **5★ virou `Assume`** e recebeu como âncoras `Robo orçamento`, `GoBrands` e `CTR Machine` —
+ *   que estavam em 7★–8★. Isso **resolve a pendência (1)** do plano na direção "caem para 5★".
+ * - **6★–10★ virou UMA caixa, `Muda o Jogo`.** Os cinco verbos (Habilita/Suporta/Concentra/
+ *   Redefine/Funda) saíram: o agente não sugere mais a POSIÇÃO dentro da faixa — ele indica a
+ *   faixa e **o comitê humano define o número por critério comparativo** contra os projetos que
+ *   já estão nela.
+ *
  * ## Fronteiras que não podem regredir
- * - **1★ a 5★ é do agente; 6★ a 10★ é ESCAPE para comitê humano** — o agente indica e sugere a
- *   posição, nunca concede (`TETO_AGENTE`).
+ * - **0★ a 5★ é do agente; 6★ a 10★ é ESCAPE para comitê humano** — o agente indica a faixa,
+ *   nunca concede (`TETO_AGENTE`).
  * - **Projeto com nota humana não é reclassificado.** Discordância vira CONTESTAÇÃO (D11): no
  *   máximo duas frases, com o gatilho que falhou NOMEADO e a evidência citada da doc.
  * - **Queda em massa para o mesmo nível é suspeita da RÉGUA, não dos projetos** (D12) — foi o
  *   defeito do desenho de "10 critérios somados", que empatava um projeto de milhões com um
  *   dashboard. Daí `detectarAchatamento`.
+ * - **A forma esperada da distribuição é declarada** (`DISTRIBUICAO_ESPERADA`), porque lote que
+ *   sobe demais é tão suspeito quanto lote que achata.
  */
 
 /** Teto do que o agente pode conceder sozinho. Acima disso é escape para o comitê. */
@@ -39,71 +60,112 @@ export const PRINCIPIO_ORDENADOR_AGENTE =
 export const PRINCIPIO_ORDENADOR_ESCAPE =
   'Quantos processos existem por causa dele, e quão irreversível é essa dependência.';
 
-// ─── 0★ — o piso ─────────────────────────────────────────────────────────────
-
-/**
- * Desqualificadores do piso: basta UM para a nota ser 0. Declarados como lista para o prompt e a
- * tela lerem a mesma coisa, e para o agente poder DIZER qual deles aplicou.
- */
-export const PISO_ZERO = [
-  {
-    chave: 'mensuravel',
-    texto: 'O ganho é mensurável com o que está descrito — volta como saving/receita.',
-  },
-  {
-    chave: 'so_o_autor',
-    texto: 'Ninguém além do autor usa de forma recorrente.',
-  },
-  {
-    chave: 'simples_local',
-    texto:
-      'É tarefa simples e local, que uma planilha ou consulta manual resolveria sem mudar decisão nenhuma.',
-  },
-  { chave: 'fora_de_uso', texto: 'Não está em uso — descontinuado, POC ou parado.' },
-  { chave: 'ressubmissao', texto: 'É ressubmissão do mesmo escopo já documentado.' },
-] as const;
-
-export type ChavePisoZero = (typeof PISO_ZERO)[number]['chave'];
-
-// ─── 1★ a 5★ — a faixa do agente ─────────────────────────────────────────────
+// ─── Forma dos níveis ────────────────────────────────────────────────────────
 
 export type NivelEstrela = {
   nota: number;
   /** O verbo é o nome do critério: é assim que o time se refere a ele em voz alta. */
   verbo: string;
   criterio: string;
+  /**
+   * Classes de artefato típicas do nível. ⚠️ **Pista, NUNCA gate** — serve para o agente
+   * reconhecer a prateleira, não para decidir a nota. Um painel que bloqueia erro é 3★ mesmo
+   * sendo "um dashboard".
+   */
+  artefatos: string;
+  /** Projetos REAIS da base que ancoram o nível (nomes como estão na planilha). */
+  exemplos: string[];
 };
+
+// ─── 0★ — o piso ─────────────────────────────────────────────────────────────
+
+/**
+ * Desqualificadores do piso: basta UM para a nota ser 0★. Declarados como lista para o prompt e a
+ * tela lerem a mesma coisa, e para o agente poder DIZER qual deles aplicou.
+ */
+export const PISO_ZERO = [
+  {
+    chave: 'apenas_mensuravel',
+    texto:
+      'O projeto se RESUME ao ganho mensurável: tudo o que ele entrega já está capturado pelo saving/receita declarado. ⚠️ Ter número NÃO zera — zera quando não sobra nada além do número.',
+  },
+  { chave: 'so_o_autor', texto: 'Ninguém além do autor usa de forma recorrente.' },
+  {
+    chave: 'simples_local',
+    texto:
+      'É simples e local: resolve uma tarefa pontual que uma planilha ou consulta manual resolveria, sem mudar decisão de ninguém.',
+  },
+  { chave: 'fora_de_uso', texto: 'Não está em uso — parado, descontinuado ou POC.' },
+  {
+    chave: 'marginal',
+    texto:
+      'O impacto é marginal, ou pouco relevante para a empresa como um todo — atende um caso de borda ou um punhado de pessoas.',
+  },
+  {
+    chave: 'experimentacao',
+    texto:
+      'É experimentação: existe para testar uma ideia ou aprender uma ferramenta, não para sustentar uma rotina.',
+  },
+  { chave: 'ressubmissao', texto: 'É ressubmissão do mesmo escopo já documentado.' },
+] as const;
+
+export type ChavePisoZero = (typeof PISO_ZERO)[number]['chave'];
+
+/** A caixa do 0★ — tem nome e exemplos como qualquer outro nível. */
+export const NIVEL_ZERO: NivelEstrela = {
+  nota: 0,
+  verbo: 'Experimenta',
+  criterio:
+    'Não recebe estrela: basta UM dos desqualificadores do piso ser verdade. É o fundo da escala e é onde a maior parte da base cai.',
+  artefatos: 'Dashboards, apps e skills simples.',
+  exemplos: ['Automação de mimos de aniversário', 'Cruzamento de XML'],
+};
+
+// ─── 1★ a 5★ — a faixa do agente ─────────────────────────────────────────────
 
 export const CRITERIOS_ESTRELA: NivelEstrela[] = [
   {
     nota: 1,
     verbo: 'Informa',
     criterio:
-      'Produz o insumo, não a ação. Entrega dado, visibilidade, alerta, registro ou esforço poupado; alguém lê e age. Sem ele, a informação volta a ser buscada à mão.',
+      'Produz o insumo, não a ação: entrega dado, visibilidade, alerta ou registro, e alguém lê e age. Sem ele, a informação volta a ser buscada à mão.',
+    artefatos: 'Dashboards e apps gerenciais. Skills mais complexas, com rotina informativa.',
+    exemplos: ['Damidash', 'Godash'],
   },
   {
     nota: 2,
     verbo: 'Executa',
     criterio:
-      'Assume a ação recorrente ponta a ponta e roda sem alguém iniciar. Não escolhe o que fazer — faz. Volume não muda o nível.',
+      'Assume a ação recorrente ponta a ponta e roda sem ninguém iniciar. Não escolhe o que fazer — faz. Volume não muda o nível.',
+    artefatos: 'Rotinas mais complexas, com execução automática. Bots em geral.',
+    exemplos: ['Tiktok Scraper', 'Live Machine'],
   },
   {
     nota: 3,
     verbo: 'Garante',
     criterio:
-      'Assume a barreira: impede que o erro passe (valida, bloqueia, exige registro, torna auditável o que era julgamento de cada um). A consequência evitada recai sobre outra pessoa ou área, não sobre quem fez.',
+      'Impede o erro de passar: valida, bloqueia, exige registro, torna auditável o que era julgamento de cada um. A consequência evitada recai sobre OUTRA área e tem impacto na operação.',
+    artefatos:
+      'Alertas de alto impacto na operação. Painéis gerenciais com autonomia de bloqueio de erro.',
+    exemplos: ['SAIBBI', 'Checklist de turno'],
   },
   {
     nota: 4,
     verbo: 'Decide',
     criterio:
-      'Assume a escolha que compromete recurso da empresa, por regra explícita e auditável. O erro dele tem consequência direta, mesmo que alguém aprove no fim.',
+      'Assume a escolha que compromete recurso da empresa, por regra auditável. Decide de forma estocástica, não determinística — há inteligência agregada, não uma tabela de "se isto, então aquilo". O erro dele tem consequência direta, mesmo que alguém aprove no fim.',
+    artefatos:
+      'Agentes mais complexos, necessariamente com inteligência agregada; envolve aprendizado de máquina.',
+    exemplos: ['GoPrice', 'Cases IA'],
   },
   {
     nota: 5,
-    verbo: 'Responde pelo resultado',
+    verbo: 'Assume',
     criterio:
-      'Está no caminho pelo qual o resultado chega ao cliente, ao fornecedor ou ao mercado, e não há intermediário humano entre a falha dele e o prejuízo. Seu alcance passa da área que o criou.',
+      'Está no caminho até o cliente, o fornecedor ou o mercado, sem humano entre a falha dele e o prejuízo. Assume a responsabilidade pela entrega final, com meta clara e auditável sendo entregue.',
+    artefatos:
+      'Agentes complexos, com claws, graph engineering e auto-cura. Metas claras e auditáveis sendo entregues.',
+    exemplos: ['CX - Ticket Creator', 'Robo orçamento', 'GoBrands', 'CTR Machine'],
   },
 ];
 
@@ -111,15 +173,42 @@ export const CRITERIOS_ESTRELA: NivelEstrela[] = [
  * A única promoção da régua: +1 nível quando outro processo ou projeto depende dele como fonte.
  * ⚠️ O dependente tem de ser NOMEADO — "poderá ser consultado" e "abre portas para" não valem (era
  * o que fazia meia base se declarar plataforma).
+ *
+ * ⚠️ **Medida no T1: letra morta hoje** — apareceu em 4 de 484 e promoveu 1. Só volta a existir
+ * quando o dado do dependente nomeado for coletado; não é motivo para afrouxar o critério.
  */
 export const PROMOCAO_DEPENDENTE_NOMEADO =
   'Outro processo ou projeto depende dele como fonte, com o dependente NOMEADO. Não vale "poderá ser consultado" nem "abre portas para".';
 
-// ─── 6★ a 10★ — o escape ─────────────────────────────────────────────────────
+// ─── 6★ a 10★ — o escape ("Muda o Jogo") ─────────────────────────────────────
+
+/** A faixa inteira, que o agente indica mas não fatia. */
+export const FAIXA_ESCAPE = { min: TETO_AGENTE + 1, max: NOTA_MAX } as const;
 
 /**
- * Os dois gatilhos do escape. **Ambos** têm de ser verdade; faltando um, a nota é 5★. São o que
- * torna a faixa RARA — e cada um exige evidência citada da doc (`escapeValido`).
+ * ⚠️ **Revisão de 03/09/2026:** os cinco verbos que existiam aqui (Habilita · Suporta · Concentra ·
+ * Redefine · Funda) foram REMOVIDOS. O agente não sugere mais a posição dentro de 6★–10★: ele
+ * indica a faixa, e **o comitê humano define o número por critério comparativo** contra os
+ * projetos que já estão nela. Não reintroduzir os cinco níveis sem decisão do dono do produto.
+ */
+export const ESCAPE_MUDA_O_JOGO = {
+  verbo: 'Muda o Jogo',
+  criterio:
+    'Revoluciona como a área — ou a empresa — trabalha. O agente INDICA a faixa; quem define o número é o comitê humano, comparando com os projetos que já estão em 6★–10★.',
+  /** Os traços que descrevem a faixa. São a leitura do dono do produto, não um checklist somado. */
+  tracos: [
+    'Sistema agêntico com impacto direto nos KPIs e no resultado financeiro.',
+    'Abre uma nova frente de receita ou de saving, não uma melhoria da frente que já existia.',
+    'Substitui humanos de maneira clara e inequívoca.',
+    'Muda o jeito de trabalhar da área inteira, não a velocidade de uma rotina.',
+  ],
+} as const;
+
+/**
+ * Os dois gatilhos de ENTRADA na faixa. **Ambos** têm de ser verdade; faltando um, a nota é 5★.
+ * São o que a torna RARA — na base inteira só 4 projetos já estiveram nela — e cada um exige
+ * evidência citada da doc (`escapeValido`). Vieram da régua validada em 02/09 e a revisão de 03/09
+ * não os contradisse.
  */
 export const GATILHOS_ESCAPE = [
   {
@@ -129,54 +218,63 @@ export const GATILHOS_ESCAPE = [
   },
   {
     chave: 'sem_volta',
-    texto:
-      'Removê-lo não devolve o estado anterior — o jeito antigo deixou de existir como opção.',
+    texto: 'Removê-lo não devolve o estado anterior — o jeito antigo deixou de existir como opção.',
   },
 ] as const;
 
 export type ChaveGatilhoEscape = (typeof GATILHOS_ESCAPE)[number]['chave'];
 
-/** O ranking que o agente SUGERE ao comitê. Ele nunca concede estes níveis. */
-export const NIVEIS_ESCAPE: NivelEstrela[] = [
-  {
-    nota: 6,
-    verbo: 'Habilita',
-    criterio:
-      'Torna possível um processo que não existia. Há gente fazendo algo novo por causa dele, não algo antigo melhor.',
-  },
-  {
-    nota: 7,
-    verbo: 'Suporta',
-    criterio: 'Vários processos já rodam sobre ele, e nenhum deles tem alternativa em uso.',
-  },
-  {
-    nota: 8,
-    verbo: 'Concentra',
-    criterio:
-      'Virou o único ponto por onde aquilo acontece na empresa. Não há caminho paralelo, nem manual.',
-  },
-  {
-    nota: 9,
-    verbo: 'Redefine',
-    criterio:
-      'O padrão de operação mudou por causa dele — o jeito anterior deixou de ser referência para quem entra hoje.',
-  },
-  {
-    nota: 10,
-    verbo: 'Funda',
-    criterio:
-      'Outros projetos existem só porque ele existe, e a empresa passa a organizar decisões em torno dele.',
-  },
-];
+// ─── Distribuição esperada (calibragem declarada) ────────────────────────────
+
+/**
+ * A forma que o dono do produto espera da base. Existe para MEDIR o lote (T1/T7/T9), não para ser
+ * despejada no prompt como cota: dizer ao modelo "a maioria é 0★" convida-o a zerar tudo, que foi
+ * exatamente o defeito que o T1 encontrou pelo outro caminho.
+ */
+export const DISTRIBUICAO_ESPERADA = {
+  texto:
+    'A maioria dos projetos cai entre 0★ e 3★, e dentro dessa faixa a concentração é em 0★ e 1★. 4★ e 5★ são raros; 6★–10★ é excepcional.',
+  /** Piso da proporção que se espera em 0★–3★. */
+  minAte3: 0.8,
+  /** Teto da proporção que se espera acima de 3★ — acima disso o lote está inflado. */
+  maxAcimaDe3: 0.2,
+} as const;
+
+export type Calibragem = {
+  ok: boolean;
+  /** `inflado` (nota alta demais), `achatado` (um só destino domina) ou `null`. */
+  desvio: 'inflado' | 'achatado' | null;
+  proporcaoAte3: number;
+  proporcaoAcimaDe3: number;
+  total: number;
+};
+
+/**
+ * Confere a FORMA de um lote de notas contra `DISTRIBUICAO_ESPERADA`. Complementa o
+ * `detectarAchatamento`: aquele acusa a régua que não discrimina, este acusa a que infla.
+ */
+export function conferirCalibragem(notas: number[]): Calibragem {
+  const total = notas.length;
+  if (total === 0)
+    return { ok: true, desvio: null, proporcaoAte3: 0, proporcaoAcimaDe3: 0, total: 0 };
+  const ate3 = notas.filter((n) => n <= 3).length / total;
+  const acima = 1 - ate3;
+  const achatado = detectarAchatamento(notas).suspeito;
+  if (acima > DISTRIBUICAO_ESPERADA.maxAcimaDe3)
+    return { ok: false, desvio: 'inflado', proporcaoAte3: ate3, proporcaoAcimaDe3: acima, total };
+  if (achatado)
+    return { ok: false, desvio: 'achatado', proporcaoAte3: ate3, proporcaoAcimaDe3: acima, total };
+  return { ok: true, desvio: null, proporcaoAte3: ate3, proporcaoAcimaDe3: acima, total };
+}
 
 // ─── Leitura da régua ────────────────────────────────────────────────────────
 
 export function nivelDe(nota: number): NivelEstrela | null {
-  return [...CRITERIOS_ESTRELA, ...NIVEIS_ESCAPE].find((n) => n.nota === nota) ?? null;
+  return [NIVEL_ZERO, ...CRITERIOS_ESTRELA].find((n) => n.nota === nota) ?? null;
 }
 
 export function ehEscape(nota: number): boolean {
-  return nota > TETO_AGENTE && nota <= NOTA_MAX;
+  return nota >= FAIXA_ESCAPE.min && nota <= FAIXA_ESCAPE.max;
 }
 
 /** Clampa a nota em [0, NOTA_MAX] e arredonda — a saída do LLM não é confiável como número. */
@@ -188,21 +286,33 @@ export function normalizarNota(bruta: unknown): number | null {
 
 /**
  * Aplica a promoção do dependente nomeado. Teto no `TETO_AGENTE`: a promoção NUNCA leva ao escape
- * (subir para 6★ exige os dois gatilhos, não uma dependência).
+ * (entrar em 6★ exige os dois gatilhos, não uma dependência).
  */
 export function aplicarPromocao(nota: number, temDependenteNomeado: boolean): number {
   if (!temDependenteNomeado || nota < 1) return nota;
   return Math.min(TETO_AGENTE, nota + 1);
 }
 
+function renderNivel(n: NivelEstrela): string {
+  return [
+    `${n.nota}★ — ${n.verbo}. ${n.criterio}`,
+    `   Costuma ser: ${n.artefatos}`,
+    `   Exemplos reais: ${n.exemplos.join(' · ')}`,
+  ].join('\n');
+}
+
 /** Renderiza a faixa do agente para o prompt. Fonte única — não redigitar no prompt. */
 export function descreverReguaAgente(): string {
   const piso = PISO_ZERO.map((p) => `  - ${p.texto}`).join('\n');
-  const niveis = CRITERIOS_ESTRELA.map((n) => `${n.nota}★ — ${n.verbo}. ${n.criterio}`).join('\n');
+  const niveis = CRITERIOS_ESTRELA.map(renderNivel).join('\n\n');
   return [
     `PRINCÍPIO ORDENADOR: ${PRINCIPIO_ORDENADOR_AGENTE}`,
     '',
-    '0★ — não recebe estrela. Basta UM destes:',
+    'A classe do artefato ("é um dashboard", "é um bot") é PISTA da prateleira, nunca a decisão:',
+    'o que define o nível é quanto da cadeia o projeto assume.',
+    '',
+    renderNivel(NIVEL_ZERO),
+    '   Basta UM destes ser verdade:',
     piso,
     '',
     niveis,
@@ -211,32 +321,40 @@ export function descreverReguaAgente(): string {
   ].join('\n');
 }
 
-/** Renderiza o escape para o prompt: gatilhos + ranking sugerido. */
+/** Renderiza o escape para o prompt: gatilhos de entrada + o que a faixa é. */
 export function descreverEscape(): string {
   const gatilhos = GATILHOS_ESCAPE.map((g, i) => `  ${i + 1}. ${g.texto}`).join('\n');
-  const niveis = NIVEIS_ESCAPE.map((n) => `${n.nota}★ — ${n.verbo}. ${n.criterio}`).join('\n');
+  const tracos = ESCAPE_MUDA_O_JOGO.tracos.map((t) => `  - ${t}`).join('\n');
   return [
-    `ESCAPE 6★–10★ — você NÃO concede, apenas indica ao comitê humano e sugere a posição.`,
+    `ESCAPE ${FAIXA_ESCAPE.min}★–${FAIXA_ESCAPE.max}★ — ${ESCAPE_MUDA_O_JOGO.verbo}.`,
+    ESCAPE_MUDA_O_JOGO.criterio,
     `PRINCÍPIO ORDENADOR: ${PRINCIPIO_ORDENADOR_ESCAPE}`,
     '',
-    'GATILHO — os DOIS têm de ser verdade (faltando um, a nota é 5★):',
+    'PARA ENTRAR NA FAIXA — os DOIS têm de ser verdade (faltando um, a nota é 5★):',
     gatilhos,
     '',
-    niveis,
+    'Como a faixa se parece:',
+    tracos,
+    '',
+    `Você indica a FAIXA e cita a evidência de cada gatilho. NÃO escolha o número entre ${FAIXA_ESCAPE.min} e ${FAIXA_ESCAPE.max}: isso é do comitê humano.`,
   ].join('\n');
 }
 
 // ─── Escape: validação da saída ──────────────────────────────────────────────
 
 export type IndicacaoEscape = {
+  /**
+   * A nota que o agente devolveu. Qualquer valor na faixa serve como "indico o escape" — o número
+   * em si é descartado pelo comitê, que decide por comparação.
+   */
   sugestao: number;
   /** Cada gatilho com a frase da doc que o sustenta. Sem citação, o escape não vale. */
   evidencias: Partial<Record<ChaveGatilhoEscape, string>>;
 };
 
 /**
- * O escape só vale com os DOIS gatilhos evidenciados por citação da doc e a sugestão dentro de
- * 6–10. É o que impede o agente de mandar tudo ao comitê por entusiasmo.
+ * O escape só vale com os DOIS gatilhos evidenciados por citação da doc e a indicação dentro da
+ * faixa. É o que impede o agente de mandar tudo ao comitê por entusiasmo.
  */
 export function escapeValido(ind: IndicacaoEscape): boolean {
   if (!ehEscape(ind.sugestao)) return false;
@@ -261,7 +379,8 @@ export type SinaisConfianca = {
 
 /**
  * `alta` só com os três sinais; falta um → `media`; faltam dois ou mais → `baixa`. Regra explícita
- * de propósito: confiança que sai de julgamento do LLM não é auditável.
+ * de propósito: confiança que sai de julgamento do LLM não é auditável — medido no T1, o modelo
+ * auto-declarou `alta` em 456 de 484.
  */
 export function confiancaDe(s: SinaisConfianca): Confianca {
   const ok = [s.cerebrosConcordam, s.temEvidenciaCitada, s.temVizinhos].filter(Boolean).length;

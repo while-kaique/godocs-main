@@ -2,10 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   TETO_AGENTE,
   NOTA_MAX,
+  FAIXA_ESCAPE,
   PISO_ZERO,
+  NIVEL_ZERO,
   CRITERIOS_ESTRELA,
-  NIVEIS_ESCAPE,
+  ESCAPE_MUDA_O_JOGO,
   GATILHOS_ESCAPE,
+  DISTRIBUICAO_ESPERADA,
   nivelDe,
   ehEscape,
   normalizarNota,
@@ -14,6 +17,7 @@ import {
   descreverEscape,
   escapeValido,
   confiancaDe,
+  conferirCalibragem,
   deveIrParaHumano,
   montarContestacao,
   contarFrases,
@@ -21,6 +25,8 @@ import {
   CONTESTACAO_MAX_FRASES,
   LIMIAR_ACHATAMENTO,
 } from '@/lib/estrelas-regua';
+
+const TODOS_NIVEIS = [NIVEL_ZERO, ...CRITERIOS_ESTRELA];
 
 describe('estrutura da régua', () => {
   it('tem exatamente os 5 níveis do agente, 1 a 5, com verbo e critério', () => {
@@ -30,54 +36,72 @@ describe('estrutura da régua', () => {
       'Executa',
       'Garante',
       'Decide',
-      'Responde pelo resultado',
+      'Assume',
     ]);
     for (const n of CRITERIOS_ESTRELA) expect(n.criterio.length).toBeGreaterThan(40);
   });
 
-  it('tem os 5 níveis do escape, 6 a 10', () => {
-    expect(NIVEIS_ESCAPE.map((n) => n.nota)).toEqual([6, 7, 8, 9, 10]);
-    expect(NIVEIS_ESCAPE.map((n) => n.verbo)).toEqual([
-      'Habilita',
-      'Suporta',
-      'Concentra',
-      'Redefine',
-      'Funda',
-    ]);
+  it('o 0★ é um nível com nome, não só uma lista de exclusões', () => {
+    expect(NIVEL_ZERO.nota).toBe(0);
+    expect(NIVEL_ZERO.verbo).toBe('Experimenta');
   });
 
-  it('o piso do 0 tem os 5 desqualificadores', () => {
+  it('todo nível traz classe de artefato e ao menos 2 exemplos reais', () => {
+    for (const n of TODOS_NIVEIS) {
+      expect(n.artefatos.length).toBeGreaterThan(10);
+      expect(n.exemplos.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('o escape é UMA caixa — os 5 verbos antigos não voltam sem decisão do dono', () => {
+    expect(ESCAPE_MUDA_O_JOGO.verbo).toBe('Muda o Jogo');
+    expect(FAIXA_ESCAPE).toEqual({ min: 6, max: 10 });
+    expect(ESCAPE_MUDA_O_JOGO.tracos.length).toBeGreaterThanOrEqual(3);
+    const t = descreverEscape();
+    for (const morto of ['Habilita', 'Suporta', 'Concentra', 'Redefine', 'Funda'])
+      expect(t).not.toContain(morto);
+  });
+
+  it('o piso do 0 tem os 7 desqualificadores, e o do número exige o "se resume"', () => {
     expect(PISO_ZERO.map((p) => p.chave)).toEqual([
-      'mensuravel',
+      'apenas_mensuravel',
       'so_o_autor',
       'simples_local',
       'fora_de_uso',
+      'marginal',
+      'experimentacao',
       'ressubmissao',
     ]);
+    // O T1 mediu o texto antigo ("o ganho é mensurável") zerando 484 de 484: ter número não zera.
+    const item = PISO_ZERO.find((p) => p.chave === 'apenas_mensuravel')!;
+    expect(item.texto).toMatch(/RESUME/);
+    expect(item.texto).toMatch(/Ter número NÃO zera/);
   });
 
   it('nenhum critério cita valor em R$ — a régua é para impacto imensurável', () => {
-    const tudo = [...CRITERIOS_ESTRELA, ...NIVEIS_ESCAPE]
-      .map((n) => n.criterio)
+    const tudo = TODOS_NIVEIS.map((n) => n.criterio)
       .concat(PISO_ZERO.map((p) => p.texto))
+      .concat(ESCAPE_MUDA_O_JOGO.criterio, ...ESCAPE_MUDA_O_JOGO.tracos)
       .join(' ');
     expect(tudo).not.toMatch(/R\$|reais|\/m[êe]s|\/ano/i);
   });
 
   it('nenhum critério se define pelo vizinho (autossuficiência)', () => {
-    const tudo = [...CRITERIOS_ESTRELA, ...NIVEIS_ESCAPE].map((n) => n.criterio).join(' ');
+    const tudo = TODOS_NIVEIS.map((n) => n.criterio).join(' ');
     expect(tudo).not.toMatch(/o mesmo do|idem|igual ao anterior/i);
   });
 
-  it('nenhum critério nomeia projeto, marca ou plataforma da base', () => {
-    const tudo = [...CRITERIOS_ESTRELA, ...NIVEIS_ESCAPE].map((n) => n.criterio).join(' ');
-    expect(tudo).not.toMatch(/PIAPP|GoBrands|Gocase|Gobeaut|VERSTA|Shopify|Meta Ads|marca/i);
+  it('o CRITÉRIO não nomeia projeto da base — quem nomeia é o campo `exemplos`', () => {
+    const tudo = TODOS_NIVEIS.map((n) => n.criterio).join(' ');
+    expect(tudo).not.toMatch(/PIAPP|GoBrands|GoPrice|SAIBBI|Damidash|CTR Machine/i);
+    expect(CRITERIOS_ESTRELA[4].exemplos).toContain('GoBrands');
   });
 
-  it('nivelDe e ehEscape respeitam a fronteira do agente', () => {
+  it('nivelDe cobre 0–5 e para na fronteira do agente', () => {
+    expect(nivelDe(0)?.verbo).toBe('Experimenta');
     expect(nivelDe(3)?.verbo).toBe('Garante');
-    expect(nivelDe(10)?.verbo).toBe('Funda');
-    expect(nivelDe(11)).toBeNull();
+    expect(nivelDe(5)?.verbo).toBe('Assume');
+    expect(nivelDe(6)).toBeNull();
     expect(ehEscape(TETO_AGENTE)).toBe(false);
     expect(ehEscape(6)).toBe(true);
     expect(ehEscape(NOTA_MAX + 1)).toBe(false);
@@ -100,7 +124,7 @@ describe('promoção do dependente nomeado', () => {
     expect(aplicarPromocao(2, true)).toBe(3);
   });
 
-  it('NUNCA leva ao escape — subir para 6 exige os dois gatilhos', () => {
+  it('NUNCA leva ao escape — entrar em 6 exige os dois gatilhos', () => {
     expect(aplicarPromocao(5, true)).toBe(TETO_AGENTE);
   });
 
@@ -110,20 +134,51 @@ describe('promoção do dependente nomeado', () => {
   });
 });
 
-describe('render para o prompt', () => {
-  it('a faixa do agente traz piso, princípio, os 5 verbos e a promoção', () => {
-    const t = descreverReguaAgente();
-    expect(t).toContain('PRINCÍPIO ORDENADOR');
-    expect(t).toContain('0★');
-    for (const n of CRITERIOS_ESTRELA) expect(t).toContain(`${n.nota}★ — ${n.verbo}`);
-    expect(t).toContain('NOMEADO');
+describe('calibragem do lote', () => {
+  it('acusa lote inflado — nota alta demais para a forma esperada', () => {
+    const r = conferirCalibragem([5, 5, 4, 4, 1]);
+    expect(r.desvio).toBe('inflado');
+    expect(r.proporcaoAcimaDe3).toBeGreaterThan(DISTRIBUICAO_ESPERADA.maxAcimaDe3);
   });
 
-  it('o escape deixa explícito que o agente não concede e exige os dois gatilhos', () => {
+  it('acusa lote achatado mesmo dentro da faixa esperada', () => {
+    expect(conferirCalibragem([1, 1, 1, 1, 0, 2]).desvio).toBe('achatado');
+  });
+
+  it('aceita a forma esperada: fundo cheio, cauda curta', () => {
+    const r = conferirCalibragem([0, 0, 0, 1, 1, 1, 2, 2, 3, 5]);
+    expect(r.ok).toBe(true);
+    expect(r.desvio).toBeNull();
+  });
+
+  it('lote vazio não acusa nada', () => {
+    expect(conferirCalibragem([]).ok).toBe(true);
+  });
+});
+
+describe('render para o prompt', () => {
+  it('a faixa do agente traz piso, princípio, os verbos, exemplos e a promoção', () => {
+    const t = descreverReguaAgente();
+    expect(t).toContain('PRINCÍPIO ORDENADOR');
+    for (const n of TODOS_NIVEIS) {
+      expect(t).toContain(`${n.nota}★ — ${n.verbo}`);
+      for (const ex of n.exemplos) expect(t).toContain(ex);
+    }
+    expect(t).toContain('NOMEADO');
+    // Classe de artefato é pista, e o prompt tem de dizer isso — senão vira gate.
+    expect(t).toMatch(/PISTA/i);
+  });
+
+  it('o escape exige os dois gatilhos e devolve o NÚMERO ao comitê', () => {
     const t = descreverEscape();
-    expect(t).toMatch(/NÃO concede/);
     for (const g of GATILHOS_ESCAPE) expect(t).toContain(g.texto);
-    for (const n of NIVEIS_ESCAPE) expect(t).toContain(`${n.nota}★ — ${n.verbo}`);
+    expect(t).toMatch(/comitê humano/);
+    expect(t).toMatch(/NÃO escolha o número/);
+  });
+
+  it('a distribuição esperada NÃO vai para o prompt — seria cota, não critério', () => {
+    const t = descreverReguaAgente() + descreverEscape();
+    expect(t).not.toContain(DISTRIBUICAO_ESPERADA.texto);
   });
 });
 
@@ -179,7 +234,7 @@ describe('contestação de âncora (D11)', () => {
   const base = {
     notaHumana: 8,
     notaRegua: 5,
-    criterioAplicado: 'Responde pelo resultado',
+    criterioAplicado: 'Assume',
     gatilhoQueFalhou: 'nao_existiria',
     racional: 'O gerenciamento manual existia. Eram 300h/mês declaradas na doc.',
     evidencia: 'se gastava quase 300hrs por mês gerenciando os orçamentos',

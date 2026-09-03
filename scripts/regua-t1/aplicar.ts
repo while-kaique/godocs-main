@@ -53,12 +53,12 @@ const CONTRATO = `
 Responda SÓ com um objeto JSON, sem cercas de código:
 {
   "nota": <inteiro 0..5>,
-  "criterio_aplicado": "<piso|informa|executa|garante|decide|responde>",
-  "piso_aplicado": "<mensuravel|so_o_autor|simples_local|fora_de_uso|ressubmissao|null>",
+  "criterio_aplicado": "<piso|informa|executa|garante|decide|assume>",
+  "piso_aplicado": "<apenas_mensuravel|so_o_autor|simples_local|fora_de_uso|marginal|experimentacao|ressubmissao|null>",
   "evidencias": ["<frase CITADA do texto do projeto que sustenta o critério>"],
   "dependente_nomeado": "<nome do processo/projeto dependente, ou null>",
   "promocao_aplicada": <true|false>,
-  "escape": null | { "sugestao": <6..10>, "nao_existiria": "<citação>", "sem_volta": "<citação>" },
+  "escape": null | { "nao_existiria": "<citação>", "sem_volta": "<citação>" },
   "confianca": "<alta|media|baixa>"
 }
 
@@ -68,6 +68,8 @@ Regras da resposta:
 - Toda evidência é CITAÇÃO literal do texto acima. Sem citação, o critério não vale: baixe um nível
   ou marque confianca "baixa".
 - Escape só quando os DOIS gatilhos forem verdade, cada um com citação. Na dúvida, escape = null.
+  Ao indicar escape, "nota" fica 5: o número da faixa 6-10 é do comitê humano, não seu.
+- A classe do artefato ("é um dashboard", "é um bot") é PISTA da prateleira, não a decisão.
 `.trim();
 
 it('T1 — régua cega nos não-especiais', async () => {
@@ -116,11 +118,19 @@ it('T1 — régua cega nos não-especiais', async () => {
   // VARIANTE 'c' — diagnóstico. Remove do PROMPT o desqualificador `mensuravel` inteiro (os outros
   // 4 do piso ficam). Isola a pergunta: o colapso vem DESSE item ou os critérios 1★–5★ é que não
   // discriminam este material? Também não toca `estrelas-regua.ts`.
+  // VARIANTE 'd' — diagnóstico da revisão de 03/09: remove do PROMPT as linhas de EXEMPLOS REAIS
+  // (mantendo critério e classe de artefato). Isola quanto do ganho de discriminação vem das
+  // âncoras nomeadas e quanto vem do texto do critério. Não toca `estrelas-regua.ts`.
   const reguaAgente =
-    VARIANTE === 'c'
+    VARIANTE === 'd'
       ? descreverReguaAgente()
           .split('\n')
-          .filter((l) => !l.includes('volta como saving/receita'))
+          .filter((l) => !l.trimStart().startsWith('Exemplos reais:'))
+          .join('\n')
+      : VARIANTE === 'c'
+      ? descreverReguaAgente()
+          .split('\n')
+          .filter((l) => !l.includes('se RESUME ao ganho mensurável'))
           .join('\n')
       : descreverReguaAgente();
 
