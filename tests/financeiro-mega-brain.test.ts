@@ -40,3 +40,37 @@ describe('o financeiro diz PARA QUANTO, não só "conservador"', () => {
     expect(lerImpacto(-500, []).declarado).toBe(0);
   });
 });
+
+describe('validação DUPLA do financeiro', () => {
+  const semAchado = lerImpacto(1000, []);
+  it('duas leituras que concordam fecham no MENOR', async () => {
+    const { conferirLeituras } = await import('@/lib/agents/financeiro-mega-brain');
+    const b = lerImpacto(1000, []);
+    const r = conferirLeituras(semAchado, b);
+    expect(r.tipo).toBe('confere');
+    if (r.tipo === 'confere') expect(r.ajustado).toBe(1000);
+  });
+
+  it('discordância grande manda reprocessar — não tira média', async () => {
+    const { conferirLeituras } = await import('@/lib/agents/financeiro-mega-brain');
+    const outra = lerImpacto(1000, [{ motivo: 'dupla_contagem', bloco: 'receita', detalhe: 'x' }]);
+    const r = conferirLeituras(semAchado, outra);
+    expect(r.tipo).toBe('reprocessar');
+    // Média de duas leituras discordantes seria 500 — um número que ninguém defendeu.
+    expect(JSON.stringify(r)).not.toContain('500');
+  });
+
+  it('⚠️ a divergência é RELATIVA: R$ 50 é ruído em 100 mil e é tudo em 60', async () => {
+    const { conferirLeituras } = await import('@/lib/agents/financeiro-mega-brain');
+    const grande = conferirLeituras(lerImpacto(100000, []), { ...lerImpacto(100000, []), ajustado: 99950 });
+    expect(grande.tipo).toBe('confere');
+    const pequeno = conferirLeituras(lerImpacto(60, []), { ...lerImpacto(60, []), ajustado: 10 });
+    expect(pequeno.tipo).toBe('reprocessar');
+  });
+
+  it('esgotadas as voltas, é sem_acordo (vai ao humano), não uma das duas', async () => {
+    const { conferirLeituras, MAX_VOLTAS_FINANCEIRO } = await import('@/lib/agents/financeiro-mega-brain');
+    const outra = lerImpacto(1000, [{ motivo: 'ganho_projetado', bloco: 'receita', detalhe: 'x' }]);
+    expect(conferirLeituras(semAchado, outra, MAX_VOLTAS_FINANCEIRO).tipo).toBe('sem_acordo');
+  });
+});

@@ -88,3 +88,66 @@ export function explicarLeitura(l: LeituraFinanceira, moeda = (n: number) => n.t
   const passos = l.memoria.map((m) => `${moeda(m.de)} para ${moeda(m.para)}, porque ${m.porque}`);
   return `O impacto declarado é ${moeda(l.declarado)} por mês e o time sustenta ${moeda(l.ajustado)}. ${passos.join('. ')}.`;
 }
+
+// ─── VALIDAÇÃO DUPLA + loop do financeiro ────────────────────────────────────
+
+/**
+ * ⚠️ **Por que o financeiro tem validação dupla e os outros não.** Ele é o único agente que
+ * produz um NÚMERO que a gestão vai usar. Um rótulo errado ("atenção" onde era "ok") custa
+ * uma conferência; um número errado entra em relatório, vira meta e ninguém reabre a conta.
+ * O custo do erro é assimétrico, então a checagem também é.
+ *
+ * A régua: duas leituras INDEPENDENTES do mesmo projeto precisam chegar ao mesmo ajustado.
+ * Divergiram, o número não é confiável — e o desfecho não é escolher uma das duas nem tirar
+ * média (média de duas leituras discordantes é um número que ninguém defendeu), é reprocessar
+ * com as duas na mão e, persistindo, mandar ao humano.
+ */
+export const TOLERANCIA_DIVERGENCIA = 0.05;
+
+export type ConferenciaFinanceira =
+  | { tipo: 'confere'; ajustado: number; racional: string }
+  | { tipo: 'reprocessar'; volta: number; divergencia: number; racional: string }
+  | { tipo: 'sem_acordo'; divergencia: number; racional: string };
+
+/** Teto de voltas do financeiro. Mesmo raciocínio do cético: 2 é o que converge. */
+export const MAX_VOLTAS_FINANCEIRO = 2;
+
+/**
+ * Confere duas leituras do mesmo projeto.
+ *
+ * ⚠️ A divergência é RELATIVA ao declarado, não absoluta: R$ 50 de diferença é ruído num
+ * projeto de R$ 100 mil e é o projeto inteiro num de R$ 60.
+ */
+export function conferirLeituras(
+  a: LeituraFinanceira,
+  b: LeituraFinanceira,
+  volta = 0,
+): ConferenciaFinanceira {
+  const base = Math.max(a.declarado, b.declarado, 1);
+  const divergencia = Math.abs(a.ajustado - b.ajustado) / base;
+  if (divergencia <= TOLERANCIA_DIVERGENCIA) {
+    // Empata pelo MENOR: entre duas leituras que praticamente concordam, a mais
+    // conservadora é a que não precisa ser defendida depois.
+    const ajustado = Math.min(a.ajustado, b.ajustado);
+    return {
+      tipo: 'confere',
+      ajustado,
+      racional:
+        a.achados.length === 0 && b.achados.length === 0
+          ? 'as duas leituras sustentam o valor declarado'
+          : `as duas leituras chegaram ao mesmo ajuste (diferença de ${(divergencia * 100).toFixed(1)}%)`,
+    };
+  }
+  if (volta < MAX_VOLTAS_FINANCEIRO)
+    return {
+      tipo: 'reprocessar',
+      volta: volta + 1,
+      divergencia,
+      racional: `as duas leituras discordam em ${(divergencia * 100).toFixed(0)}% — reprocessando com as duas em mãos`,
+    };
+  return {
+    tipo: 'sem_acordo',
+    divergencia,
+    racional: `depois de ${MAX_VOLTAS_FINANCEIRO} voltas as leituras continuam discordando em ${(divergencia * 100).toFixed(0)}%`,
+  };
+}
