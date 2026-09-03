@@ -608,6 +608,58 @@ const SCHEMA_SQL = `
     atualizado_em TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (grao, periodo, area, tipo_saving)
   );
+
+  -- ═══ Memória e LOG dos agentes avaliadores em ÁRVORE (T21, plano regua-estrelas-e-time-unificado §11) ═══
+  -- avaliacao_ciclos é a RAIZ: uma linha por rodada (retroativo ou avaliação real). agente_log é um nó
+  -- por passo de agente, SEMPRE pendurado num pai (pai_id) do MESMO ciclo — só o orquestrador do
+  -- projeto pode ter pai_id NULL. caminho é materialized path ("ciclo/orq:a/cerebroA:b/tool:c") para
+  -- puxar a subárvore com UM LIKE 'prefixo/%'. Tabelas INTERNAS (fora de SAFE_UPDATE_FIELDS, sem
+  -- Sheets). saida/tools_chamadas são JSON PEQUENO, nunca blob (teto de 32 MiB de RPC).
+  -- (comentários aqui não podem ter ponto-e-vírgula: o initSchema divide por ele)
+  CREATE TABLE IF NOT EXISTS avaliacao_ciclos (
+    id             TEXT PRIMARY KEY,
+    gatilho        TEXT NOT NULL,                   -- 'retroativo'|'submissao'|'cron'|'manual'
+    status         TEXT NOT NULL DEFAULT 'aberto',  -- 'aberto'|'concluido'|'erro'
+    amostra        TEXT,                            -- JSON: ids/seed/estratos da rodada
+    modelos        TEXT,                            -- JSON: modelo por papel
+    variante       TEXT,                            -- variante do prompt/régua medida
+    metricas       TEXT,                            -- JSON agregado ao fechar
+    relatorio_path TEXT,
+    created_at     TEXT DEFAULT (datetime('now')),
+    finalizado_em  TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_avaliacao_ciclos_criado ON avaliacao_ciclos(created_at);
+
+  CREATE TABLE IF NOT EXISTS agente_log (
+    id             TEXT PRIMARY KEY,
+    ciclo_id       TEXT NOT NULL,
+    pai_id         TEXT,                            -- NULL só para o orquestrador do projeto
+    caminho        TEXT NOT NULL,                   -- materialized path
+    profundidade   INTEGER NOT NULL DEFAULT 0,
+    projeto_id     TEXT NOT NULL,
+    agente         TEXT NOT NULL,                   -- nome do papel (orq, cerebroA, especialista-fte...)
+    tipo           TEXT NOT NULL,                   -- orquestrador|cerebro|especialista|cetico|consenso|tool|debate
+    rodada         INTEGER,
+    entrada        TEXT,                            -- resumo do que o agente recebeu
+    saida          TEXT,                            -- conclusão ÍNTEGRA (texto), não resumida
+    tools_chamadas TEXT,                            -- JSON: [{nome, args, retorno}]
+    confianca      TEXT,
+    veredito       TEXT,
+    modelo         TEXT,
+    tokens_in      INTEGER,
+    tokens_out     INTEGER,
+    custo_usd      REAL,
+    duracao_ms     INTEGER,
+    erro           TEXT,
+    created_at     TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_agente_log_ciclo_projeto ON agente_log(ciclo_id, projeto_id);
+  CREATE INDEX IF NOT EXISTS idx_agente_log_projeto_criado ON agente_log(projeto_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_agente_log_agente_criado ON agente_log(agente, created_at);
+  CREATE INDEX IF NOT EXISTS idx_agente_log_pai ON agente_log(pai_id);
+  CREATE INDEX IF NOT EXISTS idx_agente_log_caminho ON agente_log(caminho);
+  CREATE INDEX IF NOT EXISTS idx_agente_log_veredito ON agente_log(veredito);
+  CREATE INDEX IF NOT EXISTS idx_agente_log_criado ON agente_log(created_at);
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.

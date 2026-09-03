@@ -143,6 +143,7 @@ import {
   reabrirPreAprovacoes,
 } from "@/lib/aprovacoes.functions";
 import { registrarAtividade, listarAtividades } from "@/lib/atividades.functions";
+import { listarCiclos, lerArvore, listarLog } from "@/lib/agentes-log.functions";
 import {
   notificarLideresPendentes,
   notificarLideresDoProjeto,
@@ -883,6 +884,39 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         await listarAtividades({
           cursor: url.searchParams.get("cursor") ?? undefined,
           limit: url.searchParams.get("limit") ?? undefined,
+        }),
+        200,
+        { "Cache-Control": "no-store" },
+      );
+    }
+
+    // ── Memória e LOG dos agentes avaliadores (T21) — leitura em árvore, só admin ──
+    if (pathname === "/api/admin/agentes/ciclos" && method === "GET") {
+      await requireAdmin(request);
+      return json(
+        await listarCiclos({
+          cursor: url.searchParams.get("cursor") ?? undefined,
+          limit: url.searchParams.get("limit") ?? undefined,
+        }),
+        200,
+        { "Cache-Control": "no-store" },
+      );
+    }
+    if (pathname === "/api/admin/agentes/arvore" && method === "GET") {
+      await requireAdmin(request);
+      const ciclo = url.searchParams.get("ciclo");
+      if (!ciclo) return errorJson("Parâmetro 'ciclo' é obrigatório", 400);
+      return json(await lerArvore(ciclo, url.searchParams.get("projeto") ?? undefined), 200, {
+        "Cache-Control": "no-store",
+      });
+    }
+    if (pathname === "/api/admin/agentes/log" && method === "GET") {
+      await requireAdmin(request);
+      const q = (k: string) => url.searchParams.get(k) ?? undefined;
+      return json(
+        await listarLog({
+          agente: q("agente"), desde: q("desde"), veredito: q("veredito"), projeto: q("projeto"),
+          ciclo: q("ciclo"), cursor: q("cursor"), limit: q("limit"),
         }),
         200,
         { "Cache-Control": "no-store" },
