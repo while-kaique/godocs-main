@@ -17,12 +17,16 @@
  * sustenta com evidência. Sem esse piso, uma objeção ao ESCAPE zerava o projeto inteiro — foi
  * o que aconteceu com o «[VERSTA] Robô orçamento» (8★ humano) fechando em 0★ com uma volta.
  */
+// ⚠️ FONTE ÚNICA da régua e do escape: `estrelas-regua.ts`, a mesma que o time de avaliação
+// (`src/lib/avaliacao/`) usa. Não criar uma segunda régua "para especiais" — foi tentado em
+// 03/09/2026 e o resultado foram DOIS arquivos com a mesma escala, que é justamente o que a
+// disciplina de fonte única existe para impedir.
 import {
-  ESCAPE_MINIMO,
-  MIN_EVIDENCIA,
-  rebaixarEscapeSemLastro,
-  type SinaisEscape,
-} from '@/lib/especiais-regua-v2';
+  FAIXA_ESCAPE,
+  escapeValido,
+  GATILHOS_ESCAPE,
+  type IndicacaoEscape,
+} from '@/lib/estrelas-regua';
 
 export type ObjecaoCetico = {
   /** `true` = a proposta não se sustenta como está. */
@@ -44,16 +48,20 @@ export type ObjecaoCetico = {
  */
 export function ceticoDeterministico(input: {
   estrela: number;
-  sinais: SinaisEscape;
+  sinais: IndicacaoEscape['evidencias'];
   /** Nota que a faixa 1–5 sustenta sozinha, com evidência. É o PISO. */
   piso_estrutural?: number | null;
 }): ObjecaoCetico {
   const piso = Math.max(0, Math.min(5, input.piso_estrutural ?? 0));
-  const { estrela, ajuste } = rebaixarEscapeSemLastro(input.estrela, input.sinais);
-  if (!ajuste) return { refuta: false, estrela_sugerida: input.estrela, objecao: '', gatilho_que_falhou: null };
-  // ⚠️ Só há UM jeito determinístico de o escape falhar (a faixa 6-10 é um critério só e a
-  // nota exata é humana): faltar evidência citada. Não reintroduzir "gatilhos" aqui.
-  const falhou = `evidência citada com pelo menos ${MIN_EVIDENCIA} caracteres`;
+  const valido = escapeValido({ sugestao: input.estrela, evidencias: input.sinais });
+  if (input.estrela < FAIXA_ESCAPE.min || valido)
+    return { refuta: false, estrela_sugerida: input.estrela, objecao: '', gatilho_que_falhou: null };
+  const semEvidencia = GATILHOS_ESCAPE.find(
+    (g) => !String(input.sinais[g.chave] ?? '').trim(),
+  );
+  const estrela = 5;
+  const falhou = semEvidencia ? semEvidencia.texto : 'indicação fora da faixa do escape';
+  const ajuste = `escape sem evidência citada para "${falhou}" — voltou para 5★`;
   return {
     refuta: true,
     // ⚠️ Nunca abaixo do piso: a objeção é ao SALTO, não ao trabalho da faixa do agente.

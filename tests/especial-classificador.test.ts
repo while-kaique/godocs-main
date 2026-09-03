@@ -219,7 +219,7 @@ describe('agente — normalizarRecomendacao (guard)', () => {
     // ⚠️ 12 clampa em 10, mas 10 é ESCAPE: sem evidência citada o guard o devolve a 5★.
     // Com lastro, o 10 sobrevive — é o mesmo clamp de sempre, agora com o freio do escape.
     expect(
-      normalizarRecomendacao({ estrelas_recomendada: 12, evidencia: 'x'.repeat(60) })
+      normalizarRecomendacao({ estrelas_recomendada: 12, evidencias: { nao_existiria: 'a fila do Fiscal roda hoje só por causa dele', sem_volta: 'o processo manual foi desligado e ninguém o mantém' } })
         ?.estrelas_recomendada,
     ).toBe(10);
     expect(normalizarRecomendacao({ estrelas_recomendada: 12 })?.estrelas_recomendada).toBe(5);
@@ -233,18 +233,18 @@ describe('agente — normalizarRecomendacao (guard)', () => {
     const r = normalizarRecomendacao({
       estrelas_recomendada: 7,
       confianca: 'alta',
-      evidencia: 'x'.repeat(60),
+      evidencias: { nao_existiria: 'a fila do Fiscal roda hoje só por causa dele', sem_volta: 'o processo manual foi desligado e ninguém o mantém' },
     });
     expect(r?.confianca).toBe('media');
     expect(r?.contestada).toBe(true);
-    expect(r?.evidencia).toHaveLength(60);
+    expect(Object.keys(r?.evidencias ?? {})).toHaveLength(2);
   });
   it('nota da faixa do agente preserva confiança alta e não contesta', () => {
     for (const nota of [2, 4, 5]) {
       const r = normalizarRecomendacao({ estrelas_recomendada: nota, confianca: 'alta' });
       expect(r?.confianca).toBe('alta');
       expect(r?.contestada).toBe(false);
-      expect(r?.evidencia).toBeNull();
+      expect(r?.evidencias).toEqual({});
     }
   });
   it('⚠️ escape sem evidência CITADA volta para 5★ e diz o que houve na leitura', () => {
@@ -252,10 +252,11 @@ describe('agente — normalizarRecomendacao (guard)', () => {
       estrelas_recomendada: 9,
       confianca: 'alta',
       leitura: 'muda o jogo',
-      evidencia: 'é muito importante',
+      // só UM gatilho citado: o escape exige os DOIS
+      evidencias: { nao_existiria: 'a fila do Fiscal roda hoje só por causa dele' },
     });
     expect(r?.estrelas_recomendada).toBe(5);
-    expect(r?.ajuste_guard).toMatch(/evidência citada/);
+    expect(r?.ajuste_guard).toMatch(/sem citação da doc/);
     expect(r?.leitura).toMatch(/⚠/);
   });
   it('confiança inválida → baixa (conservador)', () => {
@@ -279,6 +280,9 @@ describe('agente — prompt de sistema (fonte única da régua)', () => {
     expect(p).toContain('Muda o Jogo'); // a faixa 6-10 EXISTE no prompt
     expect(p).toContain('Experimenta'); // 0★ é nível nomeado
     expect(p).toContain('Godash'); // os exemplos reais ancoram os níveis
+    // ⚠️ a régua vem de estrelas-regua.ts — a MESMA do time de avaliação. Se alguém
+    // recriar uma régua paralela "dos especiais", estes literais saem daqui.
+    expect(p).toContain('Assume'); // 5★ com o verbo da fonte única
     expect(p).toContain('JSON'); // formato forçado
     expect(p).toMatch(/0 a 10/); // escala
   });
@@ -325,6 +329,8 @@ function rec(over: Partial<RecomendacaoEspecial>): RecomendacaoEspecial {
     confianca: 'baixa',
     leitura: 'memorial magro, parece POC',
     contestada: false,
+    evidencias: {},
+    ajuste_guard: null,
     ...over,
   };
 }
@@ -370,11 +376,11 @@ describe('agente — evidência do escape chega ao painel', () => {
       confianca: 'media' as const,
       leitura: 'muda o jogo na área',
       contestada: true,
-      evidencia: 'x'.repeat(60),
+      evidencias: { nao_existiria: 'a fila do Fiscal roda hoje só por causa dele', sem_volta: 'o processo manual foi desligado e ninguém o mantém' },
       ajuste_guard: null,
     };
-    expect(anexarEvidencia(rec).leitura).toContain('Evidência citada');
-    expect(anexarEvidencia(rec).leitura).toContain('x'.repeat(60));
+    expect(anexarEvidencia(rec).leitura).toContain('Evidência do escape');
+    expect(anexarEvidencia(rec).leitura).toContain('a fila do Fiscal');
   });
 
   it('fora da faixa 6-10 não mexe em nada', () => {
@@ -383,7 +389,7 @@ describe('agente — evidência do escape chega ao painel', () => {
       confianca: 'alta' as const,
       leitura: 'garante',
       contestada: false,
-      evidencia: null,
+      evidencias: {},
       ajuste_guard: null,
     };
     expect(anexarEvidencia(rec)).toEqual(rec);

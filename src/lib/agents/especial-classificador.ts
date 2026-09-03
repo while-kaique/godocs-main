@@ -15,18 +15,24 @@
  * usamos `jsonMode` + parser defensivo por regex, o mesmo padrão do `analyzer.ts`.
  */
 import { llmChat } from '@/lib/llm';
-import { NOTA_MAX, type Confianca } from '@/lib/especiais-regua';
-// ⚠️ A ESCALA vem da régua V2 (fechada pelo Luis em 03/09/2026), não da `especiais-regua`.
-// A antiga era circular ("10 = topo absoluto") e por isso, em 734 projetos, NUNCA houve um
-// 6★ nem um 9★: o escape não existia como coisa alcançável. `NIVEIS`/`CRITERIOS`/`DERRUBA`
-// saíram do import de propósito — enquanto estiverem à mão, alguém as recoloca no prompt.
+import { type Confianca } from '@/lib/especiais-regua';
+// ⚠️ **A ESCALA vem de `estrelas-regua.ts` — a MESMA fonte única que o time de avaliação
+// (`src/lib/avaliacao/`) usa.** Antes este agente lia `NIVEIS`/`CRITERIOS`/`DERRUBA` da
+// `especiais-regua`, uma escala CIRCULAR ("10 = topo absoluto") e sem faixa 6–10: por isso,
+// em 734 projetos, NUNCA houve um 6★ nem um 9★ — o escape não existia como coisa alcançável.
+// ⚠️ E não criar uma régua "v2 dos especiais": foi tentado em 03/09/2026 e produziu DOIS
+// arquivos com a mesma escala. Se a régua mudar, muda em `estrelas-regua.ts` e os dois
+// caminhos (este agente e o time) andam juntos.
 import {
-  descreverRegua,
-  ESCAPE_MINIMO,
-  ESCAPE_DECISOR,
-  MIN_EVIDENCIA,
-  rebaixarEscapeSemLastro,
-} from '@/lib/especiais-regua-v2';
+  NOTA_MAX,
+  FAIXA_ESCAPE,
+  GATILHOS_ESCAPE,
+  descreverReguaAgente,
+  descreverEscape,
+  escapeValido,
+  ehEscape,
+  type ChaveGatilhoEscape,
+} from '@/lib/estrelas-regua';
 // ⚠️ A curva de referência deste agente é a dos ESPECIAIS, não a da base inteira — ver o
 // comentário de `descreverCurva`. `CURVA_BASE`/`TOTAL_AUDITADO` saíram do import de
 // propósito: enquanto estiverem à mão, alguém as recoloca no prompt sem perceber.
@@ -43,8 +49,8 @@ export type RecomendacaoEspecial = {
    * Não é "suspeita": é o encaminhamento normal do escape.
    */
   contestada: boolean;
-  /** Trecho da doc citado para sustentar o escape. `null` fora da faixa 6–10. */
-  evidencia: string | null;
+  /** Uma citação da doc POR GATILHO do escape. Vazio fora da faixa 6–10. */
+  evidencias: Partial<Record<ChaveGatilhoEscape, string>>;
   /** O que o guard determinístico mexeu, se mexeu (só rebaixa, nunca promove). */
   ajuste_guard: string | null;
 };
@@ -109,7 +115,9 @@ O QUE A ESTRELA É:
 Uma nota QUALITATIVA de valor estratégico. Projetos especiais NÃO têm memorial financeiro — a estrela é o único "pagamento", então o que manda é VALOR ESTRATÉGICO + USO REAL. Nunca premie R$ ou horas com estrela (isso é contar o mesmo ganho duas vezes).
 
 A RÉGUA:
-${descreverRegua()}
+${descreverReguaAgente()}
+
+${descreverEscape()}
 
 ⚠️ COMO USAR OS EXEMPLOS: cada nível traz projetos REAIS já classificados. Posicione o projeto ao lado deles — "isto se parece com o Godash" é um argumento melhor do que "isto me parece um 1". Se o projeto faz o mesmo tipo de coisa que um exemplo, a nota é a daquele nível.
 
@@ -124,10 +132,7 @@ DISCIPLINA:
 - Admitir limite no memorial conta A FAVOR (honestidade), não contra.
 - ⚠️ Se um VIZINHO quase idêntico (alta similaridade) tem nota bem MAIOR, IGUALE a faixa dele OU justifique a diferença ESPECÍFICA e concreta entre os dois — não desça só porque o memorial DESTE projeto veio magro. Dois projetos que fazem a mesma coisa merecem faixas próximas.
 
-A FAIXA 6–10 ("Muda o Jogo"):
-${ESCAPE_DECISOR}
-Ela é UM critério só: não tente escolher entre 6, 7, 8, 9 e 10 por definição — não existe definição por nível. Diga que está na faixa, argumente onde você acha que encaixa e por quê, e deixe o número exato para a pessoa.
-⚠️ Para a faixa valer você DEVE preencher "evidencia" com um trecho LITERAL da documentação ou do memorial do projeto (mínimo ${MIN_EVIDENCIA} caracteres) que sustente a afirmação. Sem esse trecho a nota volta automaticamente para 5★ — não parafraseie, cite.
+⚠️ NO ESCAPE, preencha "evidencias" com uma citação LITERAL da doc/memorial para CADA gatilho. Sem as duas citações a nota volta automaticamente para 5★ — não parafraseie, cite.
 
 FORMATO DE RESPOSTA:
 Responda APENAS com JSON válido, exatamente neste formato, sem texto fora do JSON:
@@ -135,7 +140,7 @@ Responda APENAS com JSON válido, exatamente neste formato, sem texto fora do JS
   "estrelas_recomendada": <inteiro 0 a ${NOTA_MAX}>,
   "confianca": "alta" | "media" | "baixa",
   "leitura": "<até ~400 caracteres: por que esta faixa · por que não sobe · o que faria subir. Cite o exemplo da régua ou o projeto vizinho que ancora a comparação.>",
-  "evidencia": "<só quando a nota for ${ESCAPE_MINIMO} ou mais: trecho LITERAL da doc/memorial que sustenta. Fora da faixa, deixe string vazia.>"
+  "evidencias": { ${GATILHOS_ESCAPE.map((g) => `"${g.chave}": "<citação literal>"`).join(', ')} }
 }
 Use confiança BAIXA quando o memorial for ausente/fraco ou o uso não for comprovado (o normal em projeto recém-submetido).`;
 }
@@ -215,17 +220,28 @@ export function normalizarRecomendacao(bruto: unknown): RecomendacaoEspecial | n
   const leituraCrua = typeof o.leitura === 'string' ? o.leitura.trim() : '';
   let leitura = leituraCrua || 'Sem leitura — o modelo não justificou a nota.';
 
-  const evidenciaCrua = typeof o.evidencia === 'string' ? o.evidencia.trim() : '';
+  const brutas = (o.evidencias ?? {}) as Record<string, unknown>;
+  const evidencias: Partial<Record<ChaveGatilhoEscape, string>> = {};
+  for (const g of GATILHOS_ESCAPE) {
+    const v = typeof brutas[g.chave] === 'string' ? String(brutas[g.chave]).trim() : '';
+    if (v) evidencias[g.chave] = v;
+  }
 
-  // ⚠️ GUARD DO ESCAPE — só REBAIXA, nunca promove. Uma nota 6–10 sem trecho CITADO da
-  // documentação volta para 5★: é o único freio determinístico da faixa (o critério dela é
-  // um só e a nota exata é humana), e é o que torna a indicação auditável depois.
-  const { estrela, ajuste } = rebaixarEscapeSemLastro(nota, { evidencia: evidenciaCrua });
-  if (ajuste) leitura = `⚠ ${ajuste}. ${leitura}`;
+  // ⚠️ GUARD DO ESCAPE — só REBAIXA, nunca promove. `escapeValido` é a FONTE ÚNICA da regra
+  // (a mesma que o time de avaliação aplica): os DOIS gatilhos precisam de citação da doc.
+  // Sem elas a nota volta a 5★ — é o que impede o agente de mandar tudo ao comitê por
+  // entusiasmo, e o que torna a indicação auditável depois.
+  let estrela = nota;
+  let ajuste: string | null = null;
+  if (ehEscape(nota) && !escapeValido({ sugestao: nota, evidencias })) {
+    const faltou = GATILHOS_ESCAPE.find((g) => !evidencias[g.chave]);
+    estrela = 5;
+    ajuste = `escape sem citação da doc para "${faltou?.texto ?? 'um dos gatilhos'}" — voltou para 5★`;
+    leitura = `⚠ ${ajuste}. ${leitura}`;
+  }
 
-  // Na faixa 6–10 quem crava o número é gente (decisão do Luis, 03/09) — então o agente
-  // nunca se diz "alta" ali, e a recomendação sai marcada para a mesa humana.
-  const noEscape = estrela >= ESCAPE_MINIMO;
+  // Escape vai SEMPRE ao humano (`deveIrParaHumano`) — então o agente nunca se diz "alta" ali.
+  const noEscape = ehEscape(estrela);
   if (noEscape && confianca === 'alta') confianca = 'media';
 
   return {
@@ -233,7 +249,7 @@ export function normalizarRecomendacao(bruto: unknown): RecomendacaoEspecial | n
     confianca,
     leitura,
     contestada: noEscape,
-    evidencia: noEscape && evidenciaCrua ? evidenciaCrua : null,
+    evidencias: noEscape ? evidencias : {},
     ajuste_guard: ajuste,
   };
 }
@@ -306,6 +322,9 @@ export async function classificarEspecial(
  * a leitura já viaja inteira até o painel. Fora da faixa 6–10 não mexe em nada.
  */
 export function anexarEvidencia(rec: RecomendacaoEspecial): RecomendacaoEspecial {
-  if (!rec.evidencia) return rec;
-  return { ...rec, leitura: `${rec.leitura}\n\nEvidência citada: "${rec.evidencia}"` };
+  const linhas = GATILHOS_ESCAPE.map((g) =>
+    rec.evidencias[g.chave] ? `• ${g.texto}\n  "${rec.evidencias[g.chave]}"` : null,
+  ).filter(Boolean);
+  if (linhas.length === 0) return rec;
+  return { ...rec, leitura: `${rec.leitura}\n\nEvidência do escape:\n${linhas.join('\n')}` };
 }
