@@ -32,9 +32,9 @@ describe('padronizarLinha', () => {
   });
 
   it('coluna numérica com valor (número ou string pt-BR) é preservada', () => {
-    const r = padronizarLinha({ 'Impacto Bruto': 418.2, 'Custo Externo Mensal': '1.234,56', 'Custo Evitado Horas': 30 });
+    const r = padronizarLinha({ 'Impacto Bruto': 418.2, 'Custo para Rodar': '1.234,56', 'Custo Evitado Horas': 30 });
     expect(r['Impacto Bruto']).toBe(418.2);
-    expect(r['Custo Externo Mensal']).toBeCloseTo(1234.56, 2);
+    expect(r['Custo para Rodar']).toBeCloseTo(1234.56, 2);
     expect(r['Custo Evitado Horas']).toBe(30);
   });
 

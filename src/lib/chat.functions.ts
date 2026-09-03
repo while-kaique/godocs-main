@@ -325,6 +325,7 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     // Insumo do gate de sobreposição receita × custo evitado. NÃO entra em prompt.
     custo_evitado_itens: data.custo_evitado_itens ?? null,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
+      url_godeploy: data.url_godeploy ?? null,
     // 'sim'/'nao' — no 'nao' as horas_antes são o equivalente manual estimado, não
     // uma rotina real (o orquestrador valida de forma diferente — sem pedir o passo
     // a passo de uma rotina inexistente).
@@ -573,6 +574,7 @@ const iniciarSubmissaoSchema = z.object({
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
   usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
+  url_godeploy: z.string().max(300).optional().nullable(),
   // Contrafactual (Etapa 2): quem sentiria falta ("pessoa:a@x;b@y" | "time:Fiscal;CX")
   // (o "o que piora" saiu do form em 03/08/2026). Não barra a submissão — alimenta a
   // classificação de elegibilidade do analisador. O PONTEIRO movido também saiu do form
@@ -789,6 +791,7 @@ export async function iniciarSubmissao(
       tipos_projeto: data.especial ? ["especial"] : (data.tipos_projeto ?? null),
       descricao_breve: data.descricao_breve ?? null,
       usa_ai_proxy: data.usa_ai_proxy ?? null,
+      url_godeploy: data.url_godeploy ?? null,
       contrafactual_afetados: data.contrafactual_afetados ?? null,
       especial: data.especial ?? false,
       contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
@@ -822,6 +825,7 @@ export async function iniciarSubmissao(
       : (data.tipos_projeto ?? (data.tipo_projeto ? [data.tipo_projeto] : [])),
     descricao_breve: data.descricao_breve ?? null,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
+      url_godeploy: data.url_godeploy ?? null,
     contrafactual_afetados: data.contrafactual_afetados ?? null,
     especial: data.especial ?? false,
     contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
@@ -2962,6 +2966,7 @@ const atualizarMetadadosSchema = z.object({
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
   usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
+  url_godeploy: z.string().max(300).optional().nullable(),
   // Contrafactual (Etapa 2): quem sentiria falta ("pessoa:a@x;b@y" | "time:Fiscal;CX")
   // (o "o que piora" saiu do form em 03/08/2026). Não barra a submissão — alimenta a
   // classificação de elegibilidade do analisador. O PONTEIRO movido também saiu do form
@@ -3030,6 +3035,7 @@ export async function atualizarMetadados(rawData: unknown) {
         data_criacao: data.data_criacao ?? null,
         descricao_breve: data.descricao_breve ?? null,
         usa_ai_proxy: data.usa_ai_proxy ?? null,
+      url_godeploy: data.url_godeploy ?? null,
         contrafactual_afetados: data.contrafactual_afetados ?? null,
         contexto_especial: data.contexto_especial ?? null,
       },

@@ -645,6 +645,40 @@ export function Step2({
         />
       </FormGroup>
 
+      {/* App no GoDeploy — pergunta OPCIONAL. A coluna `URL Godeploy` existia na planilha
+          e nunca era preenchida porque nada no formulário a alimentava.
+          ⚠️ Nada aqui bloqueia o envio: o "sim" sem link é resposta válida (o link pode
+          vir depois), e é por isso que nem o rádio nem a URL entram em `validarEtapa2`. */}
+      <FormGroup>
+        <FormLabel hint="Se a solução roda no GoDeploy, o link ajuda quem for validar a abrir o app direto. Opcional.">
+          Este projeto tem app no GoDeploy?
+        </FormLabel>
+        <RadioGroup
+          name="temAppGodeploy"
+          value={form.temAppGodeploy}
+          onChange={(v) => {
+            updateField("temAppGodeploy", v as FormData["temAppGodeploy"]);
+            if (v !== "sim") updateField("urlGodeploy", "");
+          }}
+          options={[
+            { value: "sim", label: "Sim" },
+            { value: "nao", label: "Não" },
+          ]}
+        />
+        {form.temAppGodeploy === "sim" && (
+          <div className="mt-2.5" style={{ animation: "go-slide-down 0.25s ease" }}>
+            <input
+              type="url"
+              className="go-input w-full"
+              placeholder="https://seu-app.devgogroup.com"
+              value={form.urlGodeploy}
+              onChange={(e) => updateField("urlGodeploy", e.target.value)}
+              maxLength={300}
+            />
+          </div>
+        )}
+      </FormGroup>
+
       {/* ─── Contrafactual — "se desligar isso hoje, quem reclama?"
           A resposta aqui NÃO BARRA a submissão: ela alimenta a classificação do
           analisador depois do envio. O PONTEIRO movido (custo/receita/KPI + onde

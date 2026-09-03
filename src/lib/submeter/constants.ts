@@ -596,6 +596,13 @@ export interface FormData {
   // '' = não respondido; 'sim'/'nao' = resposta determinística na etapa 2. O agente
   // de documentação faz auto-detecção do uso na doc enviada e cruza com esta resposta.
   usaAiProxy: "sim" | "nao" | "";
+  // ─── App no GoDeploy (Etapa 2) ───
+  // A coluna `URL Godeploy` existia na planilha desde sempre e NUNCA foi preenchida —
+  // não havia pergunta que a alimentasse. ⚠️ Tudo OPCIONAL por decisão do Luis: responder
+  // "sim" e não colar o link é aceito, e o "sim" sozinho já é informação (tem app, o link
+  // vem depois). Por isso o link não entra em `validarEtapa2`.
+  temAppGodeploy: "sim" | "nao" | "";
+  urlGodeploy: string;
   // ─── Contrafactual ("se desligar isso hoje, quem reclama?") ───
   // QUEM sente falta é escolhido na Team Guide (mesma fonte do autocomplete da Etapa 1),
   // dinamicamente por PESSOA ou por TIME/ÁREA — quando o impacto é de um time inteiro,

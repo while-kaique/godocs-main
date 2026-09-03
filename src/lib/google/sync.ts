@@ -46,7 +46,6 @@ const COLUNAS_NUMERICAS = new Set<SheetColumn>([
   'Custo Evitado Horas Reais',
   'Saving Efetivado',
   'Impacto Bruto',
-  'Custo Externo Mensal',
   'Custo para Rodar',
   'Receita Incremental',
   'Impacto Líquido',
@@ -493,7 +492,6 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Impacto Bruto': savingReais,
       'Freq. Custo Evitado': ouTraco(p.saving?.tipo_saving as string | undefined),
       'Memorial de Saving': ouTraco(p.memorialLimpo),
-      'Custo Externo Mensal': p.projeto.custo_externo_mensal ?? 0,
       'Receita Incremental': receitaValor,
       'Freq. Receita': ouTraco(p.receita?.tipo_saving as string | undefined),
       'Racional Receita': ouTraco(p.receitaMemorialLimpo),
@@ -513,6 +511,8 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         p.projeto.usa_ai_proxy === 'sim' ? 'Sim'
           : p.projeto.usa_ai_proxy === 'nao' ? 'Não'
             : '—',
+      // Link do app no GoDeploy — opcional; sem link a célula fica "—" (padronizarLinha).
+      'URL Godeploy': ouTraco(p.projeto.url_godeploy as string | null | undefined),
       // Custos do projeto (serviços pagos que a solução consome pra rodar — ABATE).
       'Custo para Rodar': custoProjetoReais, // numérico: 0 quando não há (padrão)
       'Justificativa Custo para Rodar': ouTraco(p.projeto.custo_projeto_justificativa),

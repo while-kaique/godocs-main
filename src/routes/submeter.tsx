@@ -109,6 +109,10 @@ type AgentMeta = {
   descricaoBreve: string;
   // Usa o AI Proxy interno? Entra no meta para que uma mudança dispare metaChanged.
   usaAiProxy: "sim" | "nao" | "";
+  // App no GoDeploy (Etapa 2, opcional) — no meta pelo mesmo motivo: colar o link no meio
+  // do fluxo tem de disparar metaChanged e ser persistido via `atualizar-metadados`.
+  temAppGodeploy: "sim" | "nao" | "";
+  urlGodeploy: string;
   // Contrafactual (Etapa 2). `contrafactualAfetados` viaja SERIALIZADO
   // ("pessoa:a@x;b@y") para a comparação de metaChanged ser estável — é o mesmo formato
   // gravado no SQLite.
@@ -651,6 +655,8 @@ export function SubmeterPageContent({
           // é read-only. `paiProdStatus` é gate de porta da submissão NOVA, então nasce vazio.
           paiNome: "",
           paiProdStatus: "",
+          temAppGodeploy: (data.url_godeploy as string | null) ? "sim" : "",
+          urlGodeploy: (data.url_godeploy as string | null) ?? "",
         };
 
         setForm(newForm);
@@ -721,6 +727,8 @@ export function SubmeterPageContent({
             newForm.participantesContribuicoes,
           ),
           descricaoBreve: newForm.descricaoBreve.trim(),
+          temAppGodeploy: newForm.temAppGodeploy,
+          urlGodeploy: newForm.urlGodeploy,
           usaAiProxy: newForm.usaAiProxy,
           contrafactualAfetados: serializarAfetados(
             newForm.contrafactualAfetadosTipo,
@@ -899,6 +907,8 @@ export function SubmeterPageContent({
     ganhoCategorias: [],
     descricaoBreve: "",
     usaAiProxy: "",
+    temAppGodeploy: "",
+    urlGodeploy: "",
     contrafactualAfetadosTipo: "pessoa",
     contrafactualAfetados: [],
     vinculo: "novo",
@@ -1123,6 +1133,8 @@ export function SubmeterPageContent({
   }, [form.escopo, form.servicoExterno]);
 
   const snapshotMeta = useCallback((): AgentMeta => ({
+    temAppGodeploy: form.temAppGodeploy,
+    urlGodeploy: form.urlGodeploy,
     nomeProjeto: form.nomeProjeto.trim(),
     ferramenta: computeFerramenta(),
     participantes: form.participantes,
@@ -1185,6 +1197,7 @@ export function SubmeterPageContent({
             projeto_pai_id: form.vinculo === "feature" && form.paiId ? form.paiId : undefined,
             descricao_breve: form.descricaoBreve.trim() || undefined,
             usa_ai_proxy: form.usaAiProxy || undefined,
+            url_godeploy: form.temAppGodeploy === "sim" ? form.urlGodeploy.trim() || undefined : undefined,
             contrafactual_afetados:
               serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
               undefined,
@@ -1392,6 +1405,7 @@ export function SubmeterPageContent({
         membros_contribuicoes: meta.participantesContribuicoes,
         descricao_breve: meta.descricaoBreve,
         usa_ai_proxy: meta.usaAiProxy || undefined,
+        url_godeploy: meta.temAppGodeploy === "sim" ? meta.urlGodeploy.trim() || undefined : undefined,
         contrafactual_afetados: meta.contrafactualAfetados || undefined,
         ...(docs ? { docs } : {}),
       });

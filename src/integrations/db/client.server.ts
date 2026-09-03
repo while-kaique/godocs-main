@@ -451,6 +451,7 @@ export function getProjetoContextoData(id: string) {
       | "custo_externo_mensal"
       | "alguem_fazia"
       | "usa_ai_proxy"
+      | "url_godeploy"
       | "contrafactual_afetados"
       | "custo_evitado_itens"
       | "submitted_at"
@@ -463,7 +464,7 @@ export function getProjetoContextoData(id: string) {
            p.especial, p.contexto_especial,
            p.saving_horas, p.saving_reais, p.tipo_saving, p.memorial_calculo,
            p.custo_externo_mensal, p.alguem_fazia,
-           p.usa_ai_proxy, p.contrafactual_afetados,
+           p.usa_ai_proxy, p.url_godeploy, p.contrafactual_afetados,
            -- Itens do custo evitado: insumo do gate de SOBREPOSIÇÃO receita × custo
            -- evitado (agents/sobreposicao-receita.ts). Sem eles a fase de receita é
            -- cega para o dinheiro já contado no saving — o buraco do Sucesso.AI.
@@ -512,6 +513,8 @@ export type InsertProjeto = {
   contexto_especial?: string | null;
   arquivos_nomes?: string[] | null;
   usa_ai_proxy?: string | null;
+  /** Link do app no GoDeploy (Etapa 2, OPCIONAL) → coluna `URL Godeploy`. */
+  url_godeploy?: string | null;
   // Contrafactual (Etapa 2) — ver ProjetoRow/schema.ts.
   contrafactual_afetados?: string | null;
   // Vínculo de FEATURE: id do projeto PAI (marcado na Etapa 1). Null = projeto novo.
@@ -527,9 +530,9 @@ export async function insertProjeto(data: InsertProjeto) {
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, membros_papeis, membros_contribuicoes, nome,
       data_criacao_projeto, tipo_projeto, tipos_projeto,
-      descricao_breve, especial, contexto_especial, arquivos_nomes, usa_ai_proxy,
+      descricao_breve, especial, contexto_especial, arquivos_nomes, usa_ai_proxy, url_godeploy,
       contrafactual_afetados, projeto_pai_id, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
     [
       id,
@@ -552,6 +555,7 @@ export async function insertProjeto(data: InsertProjeto) {
       data.contexto_especial ?? null,
       data.arquivos_nomes ? JSON.stringify(data.arquivos_nomes) : null,
       data.usa_ai_proxy ?? null,
+      data.url_godeploy ?? null,
       data.contrafactual_afetados ?? null,
       data.projeto_pai_id ?? null,
       data.status ?? "rascunho",
@@ -2640,7 +2644,8 @@ export type ProjetoRow = {
   observacoes: string | null; // parecer da análise automática (staff-only)
   especial: number | null; // 1 = projeto especial (altíssimo impacto, validação humana)
   contexto_especial: string | null; // descrição do contexto do projeto especial (etapa 2.5)
-  usa_ai_proxy: string | null; // 'sim' | 'nao' — usa o AI Proxy interno (governança de custo)
+  usa_ai_proxy: string | null;
+  url_godeploy: string | null; // link do app no GoDeploy (opcional) // 'sim' | 'nao' — usa o AI Proxy interno (governança de custo)
   // Contrafactual — resposta determinística da Etapa 2 (não barra submissão).
   // "pessoa:a@x.com;b@y.com" | "time:Fiscal;CX" — quem sentiria falta (Team Guide).
   contrafactual_afetados: string | null;

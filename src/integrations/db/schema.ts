@@ -776,6 +776,8 @@ const MIGRATIONS = [
   // documentação faz auto-detecção do uso na doc enviada e o analisador cruza
   // declaração × detecção. Vai para a coluna "Usa AI Proxy" do Sheets.
   'ALTER TABLE projetos ADD COLUMN usa_ai_proxy TEXT',
+  // Link do app no GoDeploy (Etapa 2, OPCIONAL) → coluna `URL Godeploy` da planilha.
+  'ALTER TABLE projetos ADD COLUMN url_godeploy TEXT',
   // Split do saving em carga real × ganho por escala (só quando alguém fazia à mão).
   // horas_carga_real = trabalho humano de fato; horas_escala = volume incremental que
   // só a automação cobre. Somam o total (saving_horas), que continua sendo o que vira R$.

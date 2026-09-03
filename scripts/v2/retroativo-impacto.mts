@@ -6,6 +6,7 @@
 // o valor que já tinha (lido no MESMO passe), então a coluna nunca é zerada por engano.
 import { getAccessToken } from '../../src/lib/google/auth';
 import { recalcularLinha, resumir, COLUNAS_SAIDA } from '../../src/lib/impacto-retroativo';
+import { NOME_LEGADO } from '../../src/lib/coluna-chave';
 
 const SPREADSHEET = process.env.GOOGLE_SHEETS_ID || '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
 const TAB = process.env.GOOGLE_SHEETS_TAB;
@@ -22,10 +23,15 @@ const { values = [] } = (await (
   await fetch(`${base}/values/${encodeURIComponent(TAB)}`, { headers: auth })
 ).json()) as { values?: string[][] };
 const [header, ...linhas] = values;
+// ⚠️ Mesmo alias do app: numa aba ainda NÃO migrada (a `GoDocs` de prod) o nome novo não
+// existe e a célula certa é a legada — `Impacto Líquido` mora em `Ganho Total`.
 const idx = (n: string) => {
   const i = header.indexOf(n);
-  if (i < 0) throw new Error(`coluna "${n}" não existe no cabeçalho de ${TAB}`);
-  return i;
+  if (i >= 0) return i;
+  const legado = (NOME_LEGADO as Record<string, string>)[n];
+  const j = legado ? header.indexOf(legado) : -1;
+  if (j < 0) throw new Error(`coluna "${n}" (nem o legado "${legado ?? '—'}") existe em ${TAB}`);
+  return j;
 };
 const iId = idx('ID Projeto');
 const letra = (n: number) => {
@@ -38,6 +44,10 @@ const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', curren
 const resultados = linhas.map((l, i) => {
   const row: Record<string, string> = {};
   header.forEach((h, j) => (row[h] = l[j] ?? ''));
+  // Espelha a célula legada sob o nome da v2, para o `recalcularLinha` ler por um nome só.
+  for (const [novo, legado] of Object.entries(NOME_LEGADO)) {
+    if (!(novo in row) && legado in row) row[novo] = row[legado];
+  }
   return recalcularLinha(row, (l[iId] ?? `linha ${i + 2}`).trim());
 });
 const r = resumir(resultados);

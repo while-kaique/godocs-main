@@ -50,7 +50,10 @@ export const SHEET_COLUMNS = [
   'Participante',                   // I  (papel "Participante" — value interno planejador)
   'Contribuidor',                   // J  (papel "Contribuidor" — value interno contribuidor)
   'Descrição',                      // L
-  'URL',                            // M
+  'URL',
+  // Link do app no GoDeploy (Etapa 2, OPCIONAL). A coluna existia na planilha desde sempre
+  // e NUNCA era preenchida — não havia pergunta no formulário que a alimentasse.
+  'URL Godeploy',                            // M
   'Ferramenta',                     // N
   'Escopo',                         // O
   'Tipos de Ganho',                 // P  (v2: as 4 categorias de ganho)
@@ -69,7 +72,11 @@ export const SHEET_COLUMNS = [
   'Impacto Bruto',                  // W  (v2: S + CE + R, sem pesos)
   'Freq. Custo Evitado',            // X
   'Memorial de Saving',             // Y
-  'Custo Externo Mensal',           // Z
+  // ⚠️ `Custo Externo Mensal` SAIU (03/09/2026). A D3 da v2 fundiu as duas linhas de custo
+  // da v1 — a plataforma onde a solução roda e a API/SaaS por uso — em `Custo para Rodar`,
+  // porque economicamente sempre foram a mesma coisa e ninguém as distinguia. A coluna
+  // estava zerada nas 581 linhas da STAGING-V2 e tem UMA linha com valor em prod, onde ela
+  // continua existindo (não a apagamos lá) — o alias não a reintroduz.           // Z
   'Receita Incremental',            // AA
   'Freq. Receita',                  // AB
   'Racional Receita',               // AC

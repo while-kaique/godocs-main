@@ -389,6 +389,8 @@ export type RevisaoContexto = {
 // ─── Contexto do projeto (vem do formulário + doc enviado) ──────────────────
 
 export type ProjetoContexto = {
+  /** Link do app no GoDeploy (Etapa 2, opcional). */
+  url_godeploy?: string | null;
   responsavel_nome: string;
   responsavel_email: string;
   area: string | null;

@@ -24,7 +24,9 @@ const CABECALHO_PROD_V1 = [
   'Justificativa Saving Escalado e Real', 'Custo do Projeto', 'Justificativa Custo do Projeto',
   'Custo do Projeto Mensal ou Pontual', 'Usa AI Proxy', 'Análise Antiagente', 'Motivo Reenvio',
   'Motivo Reprovado', 'Classificação', 'Atualizado Em', 'ID Pai', 'ID Feature',
-  'Tipo de Projeto'
+  'Tipo de Projeto',
+  // criada em 03/09/2026, junto com o campo da Etapa 2 que a alimenta
+  'URL Godeploy',
 ];
 
 const mapaDe = (headers: string[]) => ({
