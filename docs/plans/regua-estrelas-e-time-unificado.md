@@ -635,3 +635,10 @@ OpenAI direto — `gpt-5.6-luna` nos especialistas, `gpt-5.6-sol` na estrela e n
   (Integração Operador Logístico 2★ → 5★ "assume"). Roteamento fechado: humano é exceção, aprovar preciso,
   o que resta em "conservador" são contradições concretas que o time pergunta ao autor. **Próximo:** medir
   em amostra nova de 100 (seed 11) e depois a base inteira; a estrela generosa fica para a leitura final.
+- **Rodada 5 (`r05-n100-v4`, amostra NOVA de 100, seed 11, US$ 4,88, 1.057 chamadas, 0 erro de execução):**
+  **20 aprovar · 79 ajuste · 1 humano (1%)**; mérito 17 acertos, 43 conservadores, **0 erro grave**, 40 sem
+  base; **aprovar 100% preciso em 15**; os **3 reprovados** pela triagem receberam ajuste (acerto).
+  Estrelas: **57 comparáveis, exato 33%, dentro de 1 = 70%, viés −0,07** (o +0,54 da rodada 4 era ruído de
+  amostra pequena), **sem achatamento**, calibragem ok. Leitura: o time está estável para escalar — humano
+  é exceção, nunca aprova o que o humano reprovou, e onde é "conservador" ele pergunta algo concreto.
+  **Próximo: base inteira** (734 linhas, sem descontinuados), mesma variante 4, teto de US$ 45 na rodada.
