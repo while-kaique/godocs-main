@@ -51,7 +51,12 @@ mensalização `pontual ÷4 · mensal ÷1 · trimestral ÷3 · semestral ÷6`, p
 `impacto_*` e **nada envia** o líquido mensal por projeto ao Gomoon (o push que existe é o rollup do João
 Gabriel: saving e receita crus e separados, contrato diferente). É a T6 que entrega.
 
-### ⚠️ PENDÊNCIA QUE BARRA O ENVIO
+### ✅ Revisores rodaram em 03/09 na branch integrada (ver seção final do plano v2)
+Conformidade e qualidade do bloco v2 apontaram 3+3 achados altos; os 6 foram tratados na `feat/avaliadores-unificados`
+(D6 sem LLM no submit + Drive pelo cron · rollup por bloco · sync reverso `soV1` · guarda de cabeçalho · rascunho sem
+anexos · testes de `salvarGanhos`). ⚠️ Pré-condição de PROD: migrar o cabeçalho da aba `GoDocs` como a `STAGING-V2` (59 colunas).
+
+### ⚠️ PENDÊNCIA (histórico)
 Os **3 revisores de contexto fresco NÃO rodaram** neste bloco (é o ritmo acordado: rodam uma vez, no fim).
 Os marcadores `.claude/.review-status` e `.claude/.quality-status` estão **ausentes/`pendente`**, e isso
 **barra o `git push` e o `/ggsd:ship`** — commit na branch e deploy na staging seguem livres. Destravar:

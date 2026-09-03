@@ -262,6 +262,36 @@ export function chavesForaDoCabecalho(
 // Recebe um mapa header→valor e o alinha à ordem REAL do cabeçalho (por nome).
 // Colunas ausentes entram vazias. Chaves que não existem no cabeçalho são
 // ignoradas (com aviso) — nunca escrevem na coluna errada.
+
+/**
+ * Chave fora do cabeçalho é descartada (mapeamento por NOME). Um ou dois nomes a mais é ruído
+ * normal; MUITOS de uma vez é o sinal de que este bundle está escrevendo numa aba com o
+ * cabeçalho de OUTRA versão (v2 contra a aba v1, ou o inverso) — e aí o dado some em silêncio.
+ * Fail-LOUD: erro com a lista inteira, uma vez por aba por isolate. Não aborta (abortar perderia
+ * a linha inteira; o que fica é a coluna faltante, visível no log).
+ */
+const LIMITE_CHAVES_FORA = 5;
+const abasJaAlertadas = new Set<string>();
+export function alertarCabecalhoDivergente(
+  sheetName: string,
+  headers: string[],
+  values: Partial<Record<string, string | number>>,
+  operacao: 'append' | 'update',
+): string[] {
+  const fora = chavesForaDoCabecalho(headers, values);
+  for (const key of fora) {
+    console.warn(`[google/sheets] Coluna "${key}" não existe no cabeçalho da planilha — valor ignorado no ${operacao}.`);
+  }
+  if (fora.length >= LIMITE_CHAVES_FORA && !abasJaAlertadas.has(sheetName)) {
+    abasJaAlertadas.add(sheetName);
+    console.error(
+      `[google/sheets] ⚠️ CABEÇALHO DIVERGENTE na aba "${sheetName}": ${fora.length} colunas do código não existem na planilha (${fora.join(', ')}). ` +
+        `Provável bundle de uma versão contra aba de outra — migre o cabeçalho antes de deployar. Os valores dessas colunas estão sendo DESCARTADOS.`,
+    );
+  }
+  return fora;
+}
+
 export async function appendRow(values: Partial<Record<SheetColumn, string | number>>): Promise<void> {
   const token = await getAccessToken();
   const { spreadsheetId, sheetName } = getSheetConfig();
@@ -271,9 +301,7 @@ export async function appendRow(values: Partial<Record<SheetColumn, string | num
     throw new Error('Sheets append abortado: cabeçalho da planilha está vazio.');
   }
 
-  for (const key of chavesForaDoCabecalho(headers, values)) {
-    console.warn(`[google/sheets] Coluna "${key}" não existe no cabeçalho da planilha — valor ignorado no append.`);
-  }
+  alertarCabecalhoDivergente(sheetName, headers, values, 'append');
 
   const rowValues = orderValuesByHeaders(headers, values);
   const range = `'${sheetName}'!A:${colLetter(headers.length - 1)}`;
@@ -361,6 +389,7 @@ export async function updateRowByProjectId(
   // 0. Resolver as letras das colunas pelo cabeçalho real (exato, com rede
   //    tolerante a acento/caixa — ver `resolverColunaLetra`).
   const mapa = await fetchHeaderMap(token, spreadsheetId, sheetName);
+  alertarCabecalhoDivergente(sheetName, mapa.headers, updates, 'update');
   const idCol = resolverColunaLetra(mapa, 'ID Projeto');
   if (!idCol) {
     console.warn('[google/sheets] Coluna "ID Projeto" não encontrada no cabeçalho — update abortado.');

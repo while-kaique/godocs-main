@@ -376,3 +376,37 @@ profunda dos dependentes reais antes de mexer em `SHEET_COLUMNS` e na fórmula.
 `scripts/dryrun-lider/cabecalho-full.ts`) · `validate()` interno do `SavingForm` não lido campo a campo ·
 cadência real dos crons vive na plataforma, não no repo · quais campos de `documentacao.conteudo` o
 analisador exige (decide se a doc pode aterrissar depois dele).
+
+
+## Revisão de conformidade e qualidade do bloco v2 (03/09/2026, contexto fresco) — tratado na integração
+
+Os revisores rodaram sobre `51f3fd2...feat/godocs-v2` na branch integrada `feat/avaliadores-unificados`. O que foi
+CORRIGIDO no mesmo dia:
+
+- **D6 valia só no papel:** `submeterParaValidacao` fazia `await reconciliarDocSePendente(...)` (LLM no caminho do
+  clique). Agora, doc pendente → a submissão segue SEM esperar; o cron `recompilarDocsPendentes` compila, redispara a
+  análise **e grava o resumo no Drive** (`salvarResumoDocNoDrive`, extraído do submit) — o Drive não recebe mais o
+  placeholder "(não preenchido)".
+- **Rollup (Gabriel):** linha v2 mensaliza saving efetivado e custo evitado **cada um pela própria frequência** e só
+  então soma (`savingCruDaLinha`); `tipo_saving` da linha v2 é `mensal`. Linha v2 sem as células por bloco cai na regra
+  anterior (bruto − receita).
+- **Sync reverso:** em linha v2, as colunas renomeadas (`Impacto Bruto`, `Freq. Custo Evitado`, `Impacto Líquido`,
+  `Evidência Saving Efetivado`, `Ganho Imensurável`) **não** gravam mais nos campos v1 do SQLite (`soV1`).
+- **Cabeçalho:** `alertarCabecalhoDivergente` (append e update) loga ERRO uma vez por aba quando ≥ 5 colunas do código
+  não existem na planilha — o sintoma de bundle de uma versão contra aba de outra.
+- **Rascunho local:** `saveDraft` não guarda mais os bytes dos anexos (`semAnexosNoRascunho`); a pessoa reanexa ao retomar.
+- **`salvarGanhos` ganhou teste** (`tests/ganhos-salvar.test.ts`, 15 casos).
+
+**Cabeçalho — a realidade medida em leitura (03/09):** `STAGING-V2` tem **59 colunas**, com as 3 novas
+(`Saving Efetivado Agora` · `Custo Evitado Não Contratado` · `Impacto Líquido Mensal`) **e 19 renomeações** — as 17 da
+tabela acima mais `Participantes → Coautor` e `Participantes 2 → Participante`. O código (`SHEET_COLUMNS`) bate com a
+aba; é esta tabela que estava defasada. `GoDocs` (prod) e `STAGING` seguem na **v1 (55 colunas)**.
+
+⚠️ **PRÉ-CONDIÇÃO DURA DO DEPLOY EM PROD:** antes de subir este bundle na `674a3710`, a aba `GoDocs` precisa receber a
+MESMA migração de cabeçalho (17+2 renomeações in-place + 3 colunas novas, `scripts/dryrun-lider/cabecalho-full.ts`), e
+o secret `GOOGLE_SHEETS_TAB` da staging deve apontar para `STAGING-V2`. Sem isso, ~20 colunas são descartadas em silêncio
+(agora com ERRO no log, mas descartadas).
+
+**Registrado, não tratado:** a pausa de submissão desligada fora de produção por código (commit `9440164`, sem teste);
+status/materialidade do submit ainda leem saving/receita do chat (vazios em v2 → área RPA auto-aprova; `impacto_*` guarda
+o número); réplicas da fórmula v1 não migradas para `impacto.ts`; 20 análises concorrentes por corrida do cron.

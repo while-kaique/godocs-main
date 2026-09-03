@@ -47,9 +47,23 @@ export type DraftSnapshot = {
 
 // `key` permite separar o rascunho de submissão NOVA (default) do de EDIÇÃO (por
 // projeto, via editDraftKey). Default mantém o comportamento antigo.
+/**
+ * Anexos de evidência NÃO vão para o rascunho: são base64 de até 5 MB cada, serializados a cada
+ * tecla da Etapa 3 — um print grande estourava a cota do localStorage e o rascunho INTEIRO
+ * (Etapas 1 a 3) deixava de persistir em silêncio (achado ALTO da revisão de qualidade). A v1
+ * nunca guardou bytes no draft. Ao retomar, a pessoa reanexa; o que ela DIGITOU está salvo.
+ */
+export function semAnexosNoRascunho<T extends { savingAnexos?: unknown[]; receitaAnexos?: unknown[]; imensuravelAnexos?: unknown[] }>(
+  ganhos: T | undefined,
+): T | undefined {
+  if (!ganhos) return ganhos;
+  return { ...ganhos, savingAnexos: [], receitaAnexos: [], imensuravelAnexos: [] };
+}
+
 export function saveDraft(snapshot: DraftSnapshot, key: string = DRAFT_KEY): void {
   try {
-    localStorage.setItem(key, JSON.stringify(snapshot));
+    const enxuto = { ...snapshot, ganhos: semAnexosNoRascunho(snapshot.ganhos) as DraftSnapshot['ganhos'] };
+    localStorage.setItem(key, JSON.stringify(enxuto));
   } catch (e) {
     // Quota cheia / localStorage indisponível — degrada silenciosamente.
     console.warn("[rascunho] não foi possível salvar o rascunho local:", e);

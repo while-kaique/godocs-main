@@ -20,6 +20,7 @@ import { canonicalizarArea } from "@/lib/area-canonico";
 import { lerResumosEspelho } from "@/lib/sheet-espelho";
 import { chaveStatus, texto, numero } from "@/lib/dashboard-resumo";
 import { parseDataFlexivel } from "@/lib/format-date";
+import { divisorDe, type Frequencia } from "@/lib/impacto";
 
 const log = (...a: unknown[]) => console.log("[rollupBackfill]", ...a);
 
@@ -45,10 +46,34 @@ const log = (...a: unknown[]) => console.log("[rollupBackfill]", ...a);
 function savingCruDaLinha(row: Record<string, string>): number | null {
   const bruto = numero(row["Impacto Bruto"]);
   const ehV2 = String(row["Impacto Líquido Mensal"] ?? "").trim() !== "";
-  // Célula ausente/ilegível continua `null` (é o que o agregador já trata); só a linha v2
-  // com número é que precisa descontar a receita.
-  if (!ehV2 || bruto == null) return bruto;
-  return Math.max(0, bruto - (numero(row["Receita Incremental"]) ?? 0));
+  if (!ehV2) return bruto;
+  // Linha v2: saving efetivado (antes − agora) e custo evitado (horas em R$ + não contratado)
+  // são DOIS blocos com frequência própria (D2). Cada um é mensalizado pela sua e só então
+  // somados — somar os dois sob a "Freq. Custo Evitado" (como era) multiplicava um saving
+  // mensal pela cadência trimestral do outro bloco (achado ALTO da revisão de qualidade).
+  const COLS_BLOCO = ["Saving Efetivado", "Saving Efetivado Agora", "Custo Evitado Horas Reais", "Custo Evitado Não Contratado"];
+  const temBlocos = COLS_BLOCO.some((c) => String(row[c] ?? "").trim() !== "");
+  // Linha v2 sem as células por bloco (espelho antigo/legado): cai na regra anterior, bruto − receita.
+  if (!temBlocos) return bruto == null ? null : Math.max(0, bruto - (numero(row["Receita Incremental"]) ?? 0));
+  const antes = numero(row["Saving Efetivado"]) ?? 0;
+  const agora = numero(row["Saving Efetivado Agora"]) ?? 0;
+  const savingEfetivado = mensalizar(Math.max(0, antes - agora), row["Freq. Saving Efetivado"]);
+  const custoEvitado = mensalizar(
+    (numero(row["Custo Evitado Horas Reais"]) ?? 0) + (numero(row["Custo Evitado Não Contratado"]) ?? 0),
+    row["Freq. Custo Evitado"],
+  );
+  return Math.max(0, savingEfetivado + custoEvitado);
+}
+
+/** Valor do período → valor MENSAL pela frequência da célula (texto da planilha). Sem frequência legível, o valor entra como está. */
+function mensalizar(valor: number, freqCru: string | undefined): number {
+  if (!valor) return 0;
+  const f = String(freqCru ?? "").trim().toLowerCase();
+  try {
+    return f ? valor / divisorDe(f as Frequencia) : valor;
+  } catch {
+    return valor;
+  }
 }
 
 export type RollupBackfillResultado = {
@@ -73,7 +98,8 @@ export async function recalcularRollupBackfill(): Promise<RollupBackfillResultad
       // grafia das 23 do Gabriel). Como o agregador agrupa por (periodo, area, tipo), variantes que
       // viram o mesmo nome SOMAM — total preservado, nada descartado. Ver `area-canonico.ts`.
       area: canonicalizarArea(texto(row["Área"])),
-      tipo_saving: texto(row["Freq. Custo Evitado"]),
+      // v2 já sai MENSALIZADA acima → cadência "mensal"; v1 segue com a cadência da célula.
+      tipo_saving: String(row["Impacto Líquido Mensal"] ?? "").trim() !== "" ? "mensal" : texto(row["Freq. Custo Evitado"]),
       // ⚠️ O contrato do squad Intelli exige saving e receita CRUS e SEPARADOS — nunca
       // somados. Na v1 isso saía de graça: "Saving Reais" (hoje "Impacto Bruto") já era o
       // saving sozinho. Na v2 NÃO: `Impacto Bruto` é `S + CE + R` (D2), então lê-lo direto
