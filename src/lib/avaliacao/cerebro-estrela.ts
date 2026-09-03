@@ -58,11 +58,18 @@ const FORMATO_JSON = `FORMATO DE RESPOSTA — responda APENAS com um objeto JSON
   "escape": { "indicado": <bool>, "por_que_nao": "<OBRIGATÓRIO quando indicado=false: qual gatilho falta e por quê, em uma frase>", "evidencias": { "${GATILHOS_ESCAPE[0].chave}": "<citação>", "${GATILHOS_ESCAPE[1].chave}": "<citação>" } },
   "tipo": "<dashboard | app | automacao | agente | sistema>",
   "nivel": "<deterministico | inteligente | autonomo>",
-  "racional": "<até 600 caracteres: por que este nível, por que não o de cima, o que faria subir>",
+  "racional": "<2 a 3 frases curtas, até 600 caracteres, em português comum: o que o projeto faz, por que este nível e não o de cima, o que faria subir. Sem o vocabulário interno da régua — ver COMO ESCREVER O PORQUÊ.>",
   "gatilho_que_falhou": "<só quando o dossiê traz uma nota humana MAIOR que a sua: qual critério/gatilho dela não se sustenta, com a citação>"
 }`;
 
-const DISCIPLINA = `DISCIPLINA:
+const DISCIPLINA = `COMO ESCREVER O PORQUÊ (a pessoa que lê não conhece a régua por dentro):
+- Escreva 2 a 3 frases curtas, nesta ordem: o que o projeto FAZ · por que é essa nota e não a de cima · o que faria subir, em termos concretos deste projeto.
+- PROIBIDO usar o vocabulário interno da régua. Nunca escreva: "gatilho", "escape", "piso", "critério aplicado", "desqualificador", "faixa", "promoção", "dependente nomeado", "modo anterior deixou de existir", "irreversibilidade", "não existiria sem ele". Essas são as palavras do CÓDIGO, não do leitor.
+- Diga a mesma coisa em português comum. Em vez de "falta prova de que o modo anterior deixou de existir", escreva "para subir, faltaria mostrar que ninguém mais faz esse trabalho do jeito antigo". Em vez de "sem dependente nomeado", escreva "nenhum outro projeto é citado como dependente deste".
+- Nada de "conforme a régua", "de acordo com o critério", "alinhado ao nível". Fale do PROJETO, não do instrumento.
+- Citar um projeto de comparação é bom e ajuda ("faz o mesmo que o Godash, que é 1"). Citar o número do critério não é.
+
+DISCIPLINA:
 - Raciocine em cima da régua, mas NÃO a reescreva: cada nível é o texto acima, e você conclui a partir dele com um racional que faça sentido no contexto deste projeto.
 - Ter saving medido NÃO zera. Só zera se o projeto se RESUME ao número (ou cai em outro item do piso).
 - O dossiê da base legada vem SÓ da planilha: não ter anexo, documentação compilada ou "prova de uso" nele NÃO é sinal de que o projeto está parado. "fora_de_uso" só vale quando o dossiê DIZ que parou, está em staging, é POC ou foi descontinuado. Julgue o que o projeto faz pelo que está descrito; a triagem humana avaliou com esse mesmo material.
