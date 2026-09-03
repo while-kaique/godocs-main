@@ -20,7 +20,6 @@
 import {
   ESCAPE_MINIMO,
   MIN_EVIDENCIA,
-  GATILHOS_ESCAPE,
   rebaixarEscapeSemLastro,
   type SinaisEscape,
 } from '@/lib/especiais-regua-v2';
@@ -52,11 +51,9 @@ export function ceticoDeterministico(input: {
   const piso = Math.max(0, Math.min(5, input.piso_estrutural ?? 0));
   const { estrela, ajuste } = rebaixarEscapeSemLastro(input.estrela, input.sinais);
   if (!ajuste) return { refuta: false, estrela_sugerida: input.estrela, objecao: '', gatilho_que_falhou: null };
-  const falhou = ajuste.includes('gatilho 1')
-    ? GATILHOS_ESCAPE[0]
-    : ajuste.includes('gatilho 2')
-      ? GATILHOS_ESCAPE[1]
-      : `evidência citada com pelo menos ${MIN_EVIDENCIA} caracteres`;
+  // ⚠️ Só há UM jeito determinístico de o escape falhar (a faixa 6-10 é um critério só e a
+  // nota exata é humana): faltar evidência citada. Não reintroduzir "gatilhos" aqui.
+  const falhou = `evidência citada com pelo menos ${MIN_EVIDENCIA} caracteres`;
   return {
     refuta: true,
     // ⚠️ Nunca abaixo do piso: a objeção é ao SALTO, não ao trabalho da faixa do agente.

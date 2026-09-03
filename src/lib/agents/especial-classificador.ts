@@ -15,13 +15,18 @@
  * usamos `jsonMode` + parser defensivo por regex, o mesmo padrão do `analyzer.ts`.
  */
 import { llmChat } from '@/lib/llm';
+import { NOTA_MAX, type Confianca } from '@/lib/especiais-regua';
+// ⚠️ A ESCALA vem da régua V2 (fechada pelo Luis em 03/09/2026), não da `especiais-regua`.
+// A antiga era circular ("10 = topo absoluto") e por isso, em 734 projetos, NUNCA houve um
+// 6★ nem um 9★: o escape não existia como coisa alcançável. `NIVEIS`/`CRITERIOS`/`DERRUBA`
+// saíram do import de propósito — enquanto estiverem à mão, alguém as recoloca no prompt.
 import {
-  NIVEIS,
-  CRITERIOS,
-  DERRUBA,
-  NOTA_MAX,
-  type Confianca,
-} from '@/lib/especiais-regua';
+  descreverRegua,
+  ESCAPE_MINIMO,
+  ESCAPE_DECISOR,
+  MIN_EVIDENCIA,
+  rebaixarEscapeSemLastro,
+} from '@/lib/especiais-regua-v2';
 // ⚠️ A curva de referência deste agente é a dos ESPECIAIS, não a da base inteira — ver o
 // comentário de `descreverCurva`. `CURVA_BASE`/`TOTAL_AUDITADO` saíram do import de
 // propósito: enquanto estiverem à mão, alguém as recoloca no prompt sem perceber.
@@ -33,8 +38,15 @@ export type RecomendacaoEspecial = {
   confianca: Confianca;
   /** Por que esta faixa · por que não sobe · o que faria subir. */
   leitura: string;
-  /** A nota é alta (≥3) e mereceria um segundo olhar humano — sinal, não veredito. */
+  /**
+   * A nota caiu na faixa 6–10 e, por decisão de produto, **quem crava o número é gente**.
+   * Não é "suspeita": é o encaminhamento normal do escape.
+   */
   contestada: boolean;
+  /** Trecho da doc citado para sustentar o escape. `null` fora da faixa 6–10. */
+  evidencia: string | null;
+  /** O que o guard determinístico mexeu, se mexeu (só rebaixa, nunca promove). */
+  ajuste_guard: string | null;
 };
 
 /** O projeto-alvo, já resolvido do banco pelo orquestrador (`.functions.ts`). */
@@ -52,18 +64,6 @@ export type AlvoClassificacao = {
 };
 
 // ─── Prompt (montado da régua — fonte única) ───────────────────────────────────
-
-function descreverNiveis(): string {
-  return NIVEIS.map((n) => `${n.nota} — ${n.titulo}: ${n.definicao}`).join('\n');
-}
-
-function descreverCriterios(): string {
-  return CRITERIOS.map((c) => `- ${c.titulo}: ${c.texto}`).join('\n');
-}
-
-function descreverDerruba(): string {
-  return DERRUBA.map((d) => `- ${d}`).join('\n');
-}
 
 /**
  * ⚠️ **A curva é a dos ESPECIAIS, não a da base inteira** (corrigido 03/09/2026).
@@ -103,37 +103,39 @@ function acimaDe(nota: number): string {
 }
 
 export function buildSystemPromptEspecial(): string {
-  return `Você é o AUDITOR de projetos ESPECIAIS do GoDocs. Sua função é recomendar uma nota de ESTRELAS de 0 a ${NOTA_MAX} para um projeto especial, comparando-o com projetos já avaliados e com a régua abaixo.
+  return `Você é o AUDITOR de projetos ESPECIAIS do GoDocs. Sua função é recomendar uma nota de ESTRELAS de 0 a ${NOTA_MAX} para um projeto especial, comparando-o com a régua abaixo e com os projetos já avaliados.
 
 O QUE A ESTRELA É:
 Uma nota QUALITATIVA de valor estratégico. Projetos especiais NÃO têm memorial financeiro — a estrela é o único "pagamento", então o que manda é VALOR ESTRATÉGICO + USO REAL. Nunca premie R$ ou horas com estrela (isso é contar o mesmo ganho duas vezes).
 
-A ESCALA (âncoras de cada nível):
-${descreverNiveis()}
+A RÉGUA:
+${descreverRegua()}
 
-O QUE VALE ESTRELA (ordem em que você olha):
-${descreverCriterios()}
+⚠️ COMO USAR OS EXEMPLOS: cada nível traz projetos REAIS já classificados. Posicione o projeto ao lado deles — "isto se parece com o Godash" é um argumento melhor do que "isto me parece um 1". Se o projeto faz o mesmo tipo de coisa que um exemplo, a nota é a daquele nível.
 
-O QUE DERRUBA para 0–1, por melhor que o memorial esteja:
-${descreverDerruba()}
-
-A CURVA REAL DOS ESPECIAIS JÁ AUDITADOS — a população com que você compara:
+A CURVA DOS ESPECIAIS JÁ AUDITADOS (contexto, NÃO cota):
 ${descreverCurva()}
-Entre os especiais, ≥3★ são ${acimaDe(3)} e ≥5★ são ${acimaDe(5)}. ⚠️ Não confunda com a base inteira (especiais + normais), onde ≥3★ é 6%: você julga SÓ especiais, e nesta população nota alta é bem menos rara. Se você se pegar recomendando ≥3, tenha uma razão forte e concreta: inteligência real no fluxo, reuso multi-área, risco material evitado ou adoção comprovada por outras pessoas. Na dúvida entre duas faixas, fique na MENOR.
+Entre os especiais, ≥3★ são ${acimaDe(3)}. ⚠️ Não confunda com a base inteira (especiais + normais), onde ≥3★ é 6%: você julga SÓ especiais, e nesta população nota alta é bem menos rara. Esta curva foi medida sob a régua ANTERIOR — use-a para não inflar em bloco, nunca como limite: se o projeto satisfaz a definição de um nível, dê aquele nível, mesmo que a curva tenha poucos ali.
 
 DISCIPLINA:
 - Prefira notas INTEIRAS.
-- "Uso esperado", "resultado projetado", "vai reduzir" NÃO é uso real — trata como POC até ter ponteiro medido.
+- "Uso esperado", "resultado projetado", "vai reduzir" NÃO é uso real — trata como 0★ (Experimenta) até ter ponteiro medido.
 - O próprio entregável (o dashboard, o CSV, o documento que o projeto gera) NÃO é ponteiro de uso recorrente.
 - Admitir limite no memorial conta A FAVOR (honestidade), não contra.
-- ⚠️ Se um VIZINHO quase idêntico (alta similaridade) tem nota bem MAIOR, IGUALE a faixa dele OU justifique a diferença ESPECÍFICA e concreta entre os dois — não desça para POC/0–1 só porque o memorial DESTE projeto veio magro. Dois projetos que fazem a mesma coisa merecem faixas próximas.
+- ⚠️ Se um VIZINHO quase idêntico (alta similaridade) tem nota bem MAIOR, IGUALE a faixa dele OU justifique a diferença ESPECÍFICA e concreta entre os dois — não desça só porque o memorial DESTE projeto veio magro. Dois projetos que fazem a mesma coisa merecem faixas próximas.
+
+A FAIXA 6–10 ("Muda o Jogo"):
+${ESCAPE_DECISOR}
+Ela é UM critério só: não tente escolher entre 6, 7, 8, 9 e 10 por definição — não existe definição por nível. Diga que está na faixa, argumente onde você acha que encaixa e por quê, e deixe o número exato para a pessoa.
+⚠️ Para a faixa valer você DEVE preencher "evidencia" com um trecho LITERAL da documentação ou do memorial do projeto (mínimo ${MIN_EVIDENCIA} caracteres) que sustente a afirmação. Sem esse trecho a nota volta automaticamente para 5★ — não parafraseie, cite.
 
 FORMATO DE RESPOSTA:
 Responda APENAS com JSON válido, exatamente neste formato, sem texto fora do JSON:
 {
   "estrelas_recomendada": <inteiro 0 a ${NOTA_MAX}>,
   "confianca": "alta" | "media" | "baixa",
-  "leitura": "<até ~400 caracteres: por que esta faixa · por que não sobe · o que faria subir. Cite o projeto vizinho que ancora a comparação quando houver.>"
+  "leitura": "<até ~400 caracteres: por que esta faixa · por que não sobe · o que faria subir. Cite o exemplo da régua ou o projeto vizinho que ancora a comparação.>",
+  "evidencia": "<só quando a nota for ${ESCAPE_MINIMO} ou mais: trecho LITERAL da doc/memorial que sustenta. Fora da faixa, deixe string vazia.>"
 }
 Use confiança BAIXA quando o memorial for ausente/fraco ou o uso não for comprovado (o normal em projeto recém-submetido).`;
 }
@@ -211,12 +213,29 @@ export function normalizarRecomendacao(bruto: unknown): RecomendacaoEspecial | n
     : 'baixa';
 
   const leituraCrua = typeof o.leitura === 'string' ? o.leitura.trim() : '';
-  const leitura = leituraCrua || 'Sem leitura — o modelo não justificou a nota.';
+  let leitura = leituraCrua || 'Sem leitura — o modelo não justificou a nota.';
 
-  const alta = nota >= 3;
-  if (alta && confianca === 'alta') confianca = 'media';
+  const evidenciaCrua = typeof o.evidencia === 'string' ? o.evidencia.trim() : '';
 
-  return { estrelas_recomendada: nota, confianca, leitura, contestada: alta };
+  // ⚠️ GUARD DO ESCAPE — só REBAIXA, nunca promove. Uma nota 6–10 sem trecho CITADO da
+  // documentação volta para 5★: é o único freio determinístico da faixa (o critério dela é
+  // um só e a nota exata é humana), e é o que torna a indicação auditável depois.
+  const { estrela, ajuste } = rebaixarEscapeSemLastro(nota, { evidencia: evidenciaCrua });
+  if (ajuste) leitura = `⚠ ${ajuste}. ${leitura}`;
+
+  // Na faixa 6–10 quem crava o número é gente (decisão do Luis, 03/09) — então o agente
+  // nunca se diz "alta" ali, e a recomendação sai marcada para a mesa humana.
+  const noEscape = estrela >= ESCAPE_MINIMO;
+  if (noEscape && confianca === 'alta') confianca = 'media';
+
+  return {
+    estrelas_recomendada: estrela,
+    confianca,
+    leitura,
+    contestada: noEscape,
+    evidencia: noEscape && evidenciaCrua ? evidenciaCrua : null,
+    ajuste_guard: ajuste,
+  };
 }
 
 // ─── Guard de divergência contra vizinho forte ─────────────────────────────────
@@ -274,5 +293,19 @@ export async function classificarEspecial(
   );
   const json = extrairJson(raw);
   const rec = normalizarRecomendacao(json);
-  return rec ? aplicarGuardVizinhoDivergente(rec, vizinhos) : null;
+  return rec ? anexarEvidencia(aplicarGuardVizinhoDivergente(rec, vizinhos)) : null;
+}
+
+/**
+ * Costura a evidência do escape DENTRO da leitura, que é a única coluna que
+ * `especial_avaliacao` guarda e a única que a tela mostra.
+ *
+ * ⚠️ Sem isto, a citação que SUSTENTA um 6–10 morre no processo: a pessoa que vai cravar a
+ * nota final veria "muda o jogo" sem o trecho da doc que autoriza a afirmação — e o guard
+ * teria checado uma evidência que ninguém mais consegue ler. Coluna nova exigiria migração;
+ * a leitura já viaja inteira até o painel. Fora da faixa 6–10 não mexe em nada.
+ */
+export function anexarEvidencia(rec: RecomendacaoEspecial): RecomendacaoEspecial {
+  if (!rec.evidencia) return rec;
+  return { ...rec, leitura: `${rec.leitura}\n\nEvidência citada: "${rec.evidencia}"` };
 }

@@ -18,6 +18,7 @@ import {
 import {
   extrairJson,
   normalizarRecomendacao,
+  anexarEvidencia,
   buildSystemPromptEspecial,
   aplicarGuardVizinhoDivergente,
   type RecomendacaoEspecial,
@@ -215,19 +216,47 @@ describe('agente — extrairJson', () => {
 
 describe('agente — normalizarRecomendacao (guard)', () => {
   it('clampa e arredonda a nota', () => {
-    expect(normalizarRecomendacao({ estrelas_recomendada: 12 })?.estrelas_recomendada).toBe(10);
+    // ⚠️ 12 clampa em 10, mas 10 é ESCAPE: sem evidência citada o guard o devolve a 5★.
+    // Com lastro, o 10 sobrevive — é o mesmo clamp de sempre, agora com o freio do escape.
+    expect(
+      normalizarRecomendacao({ estrelas_recomendada: 12, evidencia: 'x'.repeat(60) })
+        ?.estrelas_recomendada,
+    ).toBe(10);
+    expect(normalizarRecomendacao({ estrelas_recomendada: 12 })?.estrelas_recomendada).toBe(5);
     expect(normalizarRecomendacao({ estrelas_recomendada: -3 })?.estrelas_recomendada).toBe(0);
     expect(normalizarRecomendacao({ estrelas_recomendada: 1.7 })?.estrelas_recomendada).toBe(2);
   });
-  it('nota ≥3 força confiança ≤ média e marca contestada', () => {
-    const r = normalizarRecomendacao({ estrelas_recomendada: 4, confianca: 'alta' });
+  it('⚠️ é a faixa 6-10 que marca contestada, não ≥3 (régua v2, 03/09/2026)', () => {
+    // Sob a régua ANTIGA, ≥3★ era top 4% e por isso pedia segundo olhar. Sob a v2, 3★ é
+    // "Garante" — um nível com definição e exemplos, nada raro entre especiais (41,7%).
+    // O que exige gente agora é o ESCAPE: quem crava o número de 6 a 10 é humano.
+    const r = normalizarRecomendacao({
+      estrelas_recomendada: 7,
+      confianca: 'alta',
+      evidencia: 'x'.repeat(60),
+    });
     expect(r?.confianca).toBe('media');
     expect(r?.contestada).toBe(true);
+    expect(r?.evidencia).toHaveLength(60);
   });
-  it('nota <3 preserva confiança alta e não contesta', () => {
-    const r = normalizarRecomendacao({ estrelas_recomendada: 2, confianca: 'alta' });
-    expect(r?.confianca).toBe('alta');
-    expect(r?.contestada).toBe(false);
+  it('nota da faixa do agente preserva confiança alta e não contesta', () => {
+    for (const nota of [2, 4, 5]) {
+      const r = normalizarRecomendacao({ estrelas_recomendada: nota, confianca: 'alta' });
+      expect(r?.confianca).toBe('alta');
+      expect(r?.contestada).toBe(false);
+      expect(r?.evidencia).toBeNull();
+    }
+  });
+  it('⚠️ escape sem evidência CITADA volta para 5★ e diz o que houve na leitura', () => {
+    const r = normalizarRecomendacao({
+      estrelas_recomendada: 9,
+      confianca: 'alta',
+      leitura: 'muda o jogo',
+      evidencia: 'é muito importante',
+    });
+    expect(r?.estrelas_recomendada).toBe(5);
+    expect(r?.ajuste_guard).toMatch(/evidência citada/);
+    expect(r?.leitura).toMatch(/⚠/);
   });
   it('confiança inválida → baixa (conservador)', () => {
     expect(normalizarRecomendacao({ estrelas_recomendada: 1, confianca: 'xpto' })?.confianca).toBe(
@@ -247,7 +276,9 @@ describe('agente — normalizarRecomendacao (guard)', () => {
 describe('agente — prompt de sistema (fonte única da régua)', () => {
   it('carrega a régua e a curva no system prompt', () => {
     const p = buildSystemPromptEspecial();
-    expect(p).toContain('Recorrência real'); // critério da régua
+    expect(p).toContain('Muda o Jogo'); // a faixa 6-10 EXISTE no prompt
+    expect(p).toContain('Experimenta'); // 0★ é nível nomeado
+    expect(p).toContain('Godash'); // os exemplos reais ancoram os níveis
     expect(p).toContain('JSON'); // formato forçado
     expect(p).toMatch(/0 a 10/); // escala
   });
@@ -329,5 +360,32 @@ describe('agente — aplicarGuardVizinhoDivergente', () => {
       viz({ similaridade: 0.8, estrela_efetiva: 5 }),
     ]);
     expect(r.estrelas_recomendada).toBe(1);
+  });
+});
+
+describe('agente — evidência do escape chega ao painel', () => {
+  it('a citação é costurada na leitura (é a única coluna que a tela mostra)', () => {
+    const rec = {
+      estrelas_recomendada: 8,
+      confianca: 'media' as const,
+      leitura: 'muda o jogo na área',
+      contestada: true,
+      evidencia: 'x'.repeat(60),
+      ajuste_guard: null,
+    };
+    expect(anexarEvidencia(rec).leitura).toContain('Evidência citada');
+    expect(anexarEvidencia(rec).leitura).toContain('x'.repeat(60));
+  });
+
+  it('fora da faixa 6-10 não mexe em nada', () => {
+    const rec = {
+      estrelas_recomendada: 3,
+      confianca: 'alta' as const,
+      leitura: 'garante',
+      contestada: false,
+      evidencia: null,
+      ajuste_guard: null,
+    };
+    expect(anexarEvidencia(rec)).toEqual(rec);
   });
 });
