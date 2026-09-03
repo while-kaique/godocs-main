@@ -216,3 +216,33 @@ describe('prefixo de FAMÍLIA — o caso «Lab Gobeaute» (03/09/2026)', () => {
     expect(similaridadeFinal(0, { prefixo: true })).toBe(BONUS_PREFIXO_FAMILIA);
   });
 });
+
+describe('varredura em duas fases (03/09/2026)', () => {
+  it('o lote com pares prontos não precisa da similaridade — ela já foi decidida', async () => {
+    // A fase 1 escolhe os pares (determinística, uma vez); a fase 2 só julga. É o que
+    // impede cada um dos ~30 lotes de reler ~11 MB de vetores para redescobrir o mesmo.
+    const { aplicarVeredito } = await import('@/lib/aglutinacao');
+    const cands = [{ filhoId: 'novo', paiId: 'velho', similaridade: 0 }];
+    const r = aplicarVeredito(cands, {
+      eh_feature: true,
+      pai_id: 'velho',
+      confianca: 0.9,
+      porque: 'acrescenta a etapa de aprovação',
+    });
+    // Similaridade 0 (não recomputada) NÃO invalida a sugestão: quem julga é o LLM.
+    expect(r).not.toBeNull();
+    expect(r?.paiId).toBe('velho');
+  });
+
+  it('⚠️ o pai continua conferido contra os candidatos, mesmo com pares prontos', () => {
+    // A trava contra id alucinado não pode cair junto com a recuperação.
+    expect(
+      aplicarVeredito([{ filhoId: 'novo', paiId: 'velho', similaridade: 0 }], {
+        eh_feature: true,
+        pai_id: 'outro-qualquer',
+        confianca: 0.99,
+        porque: 'x',
+      }),
+    ).toBeNull();
+  });
+});

@@ -134,10 +134,25 @@ function CartaoSugestao({
   );
 }
 
-/** Pares julgados por requisição. Pequeno o bastante para nenhuma passar de ~30s. */
-const TAMANHO_LOTE = 12;
+/**
+ * Pares julgados por requisição. PEQUENO de propósito: cada lote é uma atualização de tela,
+ * e um lote grande vira silêncio longo. 4 pares ≈ 10s — perto do limite do que se espera sem
+ * notícia. (O teto de duração da requisição continua sendo o motivo de haver lotes; o
+ * TAMANHO é escolhido pelo ritmo da informação.)
+ */
+const TAMANHO_LOTE = 4;
 /** Teto de voltas — um freio contra laço infinito se o servidor parar de avançar o cursor. */
-const MAX_LOTES = 40;
+const MAX_LOTES = 120;
+
+type LinhaLog = { filho: string; pai: string; desfecho: 'sugerido' | 'descartado' | 'falhou'; confianca?: number };
+
+/** "2 min 10 s". Sem casas: aqui o número é para calibrar a espera, não para cronometrar. */
+function duracao(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  return `${m} min${s % 60 ? ` ${s % 60} s` : ''}`;
+}
 
 function AglutinacaoPage() {
   useTituloPagina(SECAO.aglutinacao);
@@ -150,6 +165,7 @@ function AglutinacaoPage() {
   const [varrendo, setVarrendo] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
   const [progresso, setProgresso] = useState<string | null>(null);
+  const [log, setLog] = useState<LinhaLog[]>([]);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -179,45 +195,77 @@ function AglutinacaoPage() {
     setVarrendo(true);
     setErro(null);
     setResultado(null);
-    setProgresso(null);
+    setLog([]);
+    const t0 = Date.now();
     try {
+      // ── Fase 1: os pares candidatos, SEM LLM. ────────────────────────────────
+      // É determinística e rápida, e é ela que dá o denominador: sem isto a pessoa
+      // olha para "Procurando…" sem saber se são 3 pares ou 300, nem quanto vai durar.
+      setProgresso('Comparando os projetos para achar os pares candidatos…');
+      const fase1 = await apiFetch<{
+        projetos: number;
+        pares_unicos: number;
+        com_candidatos: number;
+        com_vetor: number;
+        julgar_pares: Array<{ filhoId: string; paiIds: string[] }>;
+      }>('/api/admin/aglutinacao/varredura', {
+        method: 'POST',
+        body: JSON.stringify({ somente_pares: true }),
+      });
+      const pares = fase1.julgar_pares ?? [];
+      const total = pares.length || fase1.com_candidatos;
+      setProgresso(
+        `${fase1.pares_unicos} pares candidatos entre ${fase1.projetos} projetos` +
+          (fase1.com_vetor ? ` · ${fase1.com_vetor} com vetor` : ' · sem vetores (só léxico)') +
+          ` — pedindo o parecer do agente para ${total}…`,
+      );
+      if (total === 0) {
+        setResultado(`Nenhum par candidato entre ${fase1.projetos} projetos.`);
+        return;
+      }
+
+      // ── Fase 2: julgar em lotes, mostrando cada par assim que sai. ────────────
       let pular = 0;
       let julgados = 0;
       let sugestoes = 0;
       let falhas = 0;
-      let projetos = 0;
-      // ⚠️ Em LOTES dirigidos pelo FRONT, não numa requisição só: ~100 pares × ~2s de LLM
-      // são minutos, e requisição longa morre no Godeploy — mesma disciplina do disparo de
-      // e-mails. A lista de candidatos é determinística, então o `pular` cai sempre no
-      // mesmo lugar entre um lote e o seguinte.
       for (let volta = 0; volta < MAX_LOTES; volta++) {
         const r = await apiFetch<{
-          projetos: number;
           julgados: number;
           falhas: number;
           restantes: number;
           proximo_pular: number;
-          total_com_candidatos: number;
           sugestoes: unknown[];
+          detalhe: LinhaLog[];
         }>('/api/admin/aglutinacao/varredura', {
           method: 'POST',
-          body: JSON.stringify({ dry: false, max: TAMANHO_LOTE, pular }),
+          // ⚠️ Manda os pares JÁ escolhidos na fase 1: sem isso cada lote refaria a
+          // recuperação e releria ~11 MB de vetores — 30 vezes.
+          body: JSON.stringify({
+            dry: false,
+            julgar_pares: pares.slice(pular, pular + TAMANHO_LOTE),
+          }),
         });
-        projetos = r.projetos;
         julgados += r.julgados;
         sugestoes += r.sugestoes?.length ?? 0;
         falhas += r.falhas ?? 0;
-        pular = r.proximo_pular;
+        pular += r.julgados;
+        const restantes = Math.max(0, total - pular);
+        setLog((atual) => [...(r.detalhe ?? []).reverse(), ...atual]);
+        // ETA medida no próprio ritmo desta corrida — não uma constante chutada.
+        const porPar = (Date.now() - t0) / Math.max(1, julgados);
         setProgresso(
-          `${julgados} de ${r.total_com_candidatos} pares analisados · ${sugestoes} ${sugestoes === 1 ? 'sugestão' : 'sugestões'}`,
+          `${julgados} de ${total} analisados · ${sugestoes} ${sugestoes === 1 ? 'sugestão' : 'sugestões'}` +
+            (restantes ? ` · faltam ~${duracao(restantes * porPar)}` : ''),
         );
-        await carregar();
-        if (r.restantes === 0 || r.julgados === 0) break;
+        if (r.sugestoes?.length) await carregar();
+        if (restantes === 0 || r.julgados === 0) break;
       }
+      await carregar();
       // ⚠️ As falhas aparecem SEMPRE que existem: uma rajada de erro do proxy não pode se
       // parecer com "não achei nada".
       setResultado(
-        `${sugestoes} ${sugestoes === 1 ? 'sugestão' : 'sugestões'} · ${julgados} pares analisados de ${projetos} projetos` +
+        `${sugestoes} ${sugestoes === 1 ? 'sugestão' : 'sugestões'} em ${julgados} pares · ${duracao(Date.now() - t0)}` +
           (falhas ? ` · ⚠️ ${falhas} não foram analisados (falha na chamada)` : ''),
       );
     } catch (e) {
@@ -285,12 +333,45 @@ function AglutinacaoPage() {
         </Button>
       </header>
 
-      {varrendo ? (
-        <p className="mb-4 rounded-md border bg-muted/40 p-3 text-[12.5px] text-muted-foreground">
-          {progresso ?? 'Comparando os projetos e montando a lista de pares candidatos…'}
-          <br />
-          As sugestões vão aparecendo abaixo conforme cada lote termina.
-        </p>
+      {varrendo || log.length ? (
+        <div className="mb-4 rounded-md border bg-muted/30 p-3">
+          <p className="text-[12.5px] font-medium">
+            {progresso ?? 'Comparando os projetos…'}
+          </p>
+          {log.length ? (
+            <ul className="mt-2 max-h-56 space-y-0.5 overflow-y-auto pr-1 font-mono text-[11.5px] leading-relaxed">
+              {log.map((l, i) => (
+                <li key={`${l.filho}-${i}`} className="flex gap-1.5">
+                  <span
+                    aria-hidden
+                    className={
+                      l.desfecho === 'sugerido'
+                        ? 'text-emerald-700'
+                        : l.desfecho === 'falhou'
+                          ? 'text-amber-700'
+                          : 'text-muted-foreground'
+                    }
+                  >
+                    {l.desfecho === 'sugerido' ? '✓' : l.desfecho === 'falhou' ? '⚠' : '·'}
+                  </span>
+                  <span className="truncate">
+                    <span className={l.desfecho === 'sugerido' ? 'font-medium' : 'text-muted-foreground'}>
+                      {l.filho}
+                    </span>
+                    {/* Estado nunca só por cor: o desfecho vai por extenso, não só no ícone. */}
+                    {l.desfecho === 'sugerido' ? (
+                      <span className="text-emerald-700"> → é feature de {l.pai}</span>
+                    ) : l.desfecho === 'falhou' ? (
+                      <span className="text-amber-700"> → não foi analisado</span>
+                    ) : (
+                      <span className="text-muted-foreground"> → projeto próprio</span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
       {resultado ? (
         <p className="mb-4 rounded-md border p-3 text-[12.5px]" style={{ borderColor: 'var(--go-lime)' }}>

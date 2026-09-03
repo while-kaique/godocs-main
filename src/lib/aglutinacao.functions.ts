@@ -62,6 +62,19 @@ const varreduraSchema = z.object({
   sem_vetor: z.boolean().optional(),
   /** Piso do cosseno para um vizinho VETORIAL virar candidato. */
   piso_vetor: z.number().min(0).max(1).optional(),
+  /**
+   * Pares JÁ escolhidos, para julgar sem refazer a recuperação.
+   *
+   * ⚠️ Existe por PESO, não por elegância. Montar os candidatos lê a tabela de vetores
+   * inteira — ~700 vetores de 3072 floats são **~11 MB por chamada** —, e a varredura roda
+   * em ~30 lotes: refazer isso a cada lote é 11 MB × 30 de I/O puro, que é a maior parte da
+   * espera. Com os pares em mãos, o lote só carrega os projetos e chama o LLM.
+   *
+   * Quem os obtém é a fase `somente_pares`, que roda UMA vez e é determinística.
+   */
+  julgar_pares: z
+    .array(z.object({ filhoId: z.string().min(1), paiIds: z.array(z.string().min(1)).min(1) }))
+    .optional(),
 });
 
 /**
@@ -106,9 +119,8 @@ function paraAglutinavel(p: {
 }
 
 export async function varrerAglutinacao(body: unknown) {
-  const { dry, piso, max, pular, somente_pares, sem_vetor, piso_vetor } = varreduraSchema.parse(
-    body ?? {},
-  );
+  const { dry, piso, max, pular, somente_pares, sem_vetor, piso_vetor, julgar_pares } =
+    varreduraSchema.parse(body ?? {});
   const gravar = dry === false;
   const limiar = piso ?? PISO_SIMILARIDADE_AGLUTINACAO;
 
@@ -142,7 +154,8 @@ export async function varrerAglutinacao(body: unknown) {
    * Falha ou tabela vazia → segue só com o léxico (a varredura nunca depende disto).
    */
   const vetores = new Map<string, number[]>();
-  if (!sem_vetor) {
+  // Pares prontos → nada de vetores nem de TF-IDF: só julgar.
+  if (!sem_vetor && !julgar_pares) {
     try {
       for (const row of await getEmbeddingsProjetos()) {
         if (!universo.has(row.projeto_id)) continue;
@@ -157,6 +170,16 @@ export async function varrerAglutinacao(body: unknown) {
 
   const porque = new Map<string, string>();
   const comCandidatos: Array<{ p: ProjetoAglutinavel; cands: ReturnType<typeof candidatosDe> }> = [];
+  if (julgar_pares) {
+    for (const { filhoId, paiIds } of julgar_pares) {
+      const filho = universo.get(filhoId);
+      if (!filho) continue;
+      const cands = paiIds
+        .filter((id) => universo.has(id))
+        .map((paiId) => ({ filhoId, paiId, similaridade: 0 }));
+      if (cands.length) comCandidatos.push({ p: filho, cands });
+    }
+  } else
   projetos.forEach((p, i) => {
     const viz = projetos
       .map((o, j) => {
@@ -208,6 +231,11 @@ export async function varrerAglutinacao(body: unknown) {
       com_candidatos: comCandidatos.length,
       pares_unicos: paresUnicos.size,
       piso: limiar,
+      // O que o lote consome depois — na MESMA ordem, que é o que torna a corrida resumível.
+      julgar_pares: comCandidatos.map(({ p, cands }) => ({
+        filhoId: p.id,
+        paiIds: cands.map((c) => c.paiId),
+      })),
       pares: [...paresUnicos].slice(0, 100).map((k) => {
         const [filhoId, paiId] = k.split('>');
         return {
@@ -228,10 +256,30 @@ export async function varrerAglutinacao(body: unknown) {
       : comCandidatos.slice(inicio);
   const brutas: Sugestao[] = [];
   const falhas: string[] = [];
+  /**
+   * O que ACONTECEU com cada par deste lote — é o que a tela mostra enquanto roda.
+   * ⚠️ Sem isto o painel só sabe contar: a pessoa vê "Procurando…" por minutos e não tem
+   * como saber se está funcionando, o que está sendo comparado, nem quanto falta. Cada
+   * julgamento vira uma linha, inclusive o "não é feature" — que é a maioria, e é
+   * justamente o que prova que o agente está trabalhando.
+   */
+  const detalhe: Array<{
+    filho: string;
+    pai: string;
+    desfecho: 'sugerido' | 'descartado' | 'falhou';
+    confianca?: number;
+  }> = [];
   for (const { p, cands } of aJulgar) {
     const { sugestao, erro } = await julgarAglutinacao(p, cands, universo);
+    const paiNome = universo.get(sugestao?.paiId ?? cands[0]?.paiId ?? '')?.nome ?? '';
     if (sugestao) brutas.push(sugestao);
     if (erro) falhas.push(`${p.id}: ${erro}`);
+    detalhe.push({
+      filho: p.nome,
+      pai: paiNome,
+      desfecho: erro ? 'falhou' : sugestao ? 'sugerido' : 'descartado',
+      ...(sugestao ? { confianca: sugestao.confianca } : {}),
+    });
   }
   const sugestoes = consolidarSugestoes(brutas);
 
@@ -263,6 +311,7 @@ export async function varrerAglutinacao(body: unknown) {
     // proxy faria a rota responder "0 sugestões" sobre uma base que ninguém analisou.
     falhas: falhas.length,
     falhas_exemplos: falhas.slice(0, 5),
+    detalhe,
     sugestoes: sugestoes.map((s) => ({
       ...s,
       filhoNome: universo.get(s.filhoId)?.nome ?? '',
