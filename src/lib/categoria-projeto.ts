@@ -233,6 +233,16 @@ export function resolverTipoProjeto(input: {
   };
 }
 
+/**
+ * Rótulo de exibição do NÍVEL a partir do slug gravado. Valor fora da escala (legado, ou
+ * texto que alguém digitou à mão na planilha) volta como veio — a tela mostra o que existe
+ * em vez de esconder o que não reconhece.
+ */
+export function rotuloNivel(valor: string | null | undefined): string {
+  const chave = String(valor ?? '').trim().toLowerCase();
+  return (ROTULO_NIVEL as Record<string, string>)[chave] ?? String(valor ?? '');
+}
+
 /** Célula da planilha: rótulo legível, "—" quando não há tipo (padrão do repo). */
 export function tipoParaSheet(tipo: TipoProjeto | null | undefined): string {
   return tipo ? ROTULO_TIPO[tipo] : '—';

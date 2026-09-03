@@ -13,7 +13,9 @@ import {
   getAglutinacoes,
   upsertAglutinacao,
   decidirAglutinacao,
+  getEmbeddingsProjetos,
 } from '@/integrations/db/client.server';
+import { base64ParaVetor, cosseno } from '@/lib/embeddings';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { espelharEscrita } from '@/lib/sheet-espelho';
 import { registrarAtividade } from '@/lib/atividades.functions';
@@ -46,7 +48,19 @@ const varreduraSchema = z.object({
   max: z.number().int().positive().optional(),
   /** Pula o LLM: devolve só os pares candidatos, para calibrar a régua. */
   somente_pares: z.boolean().optional(),
+  /** Desliga a fonte vetorial (só léxico). Útil para medir quanto cada fonte contribui. */
+  sem_vetor: z.boolean().optional(),
+  /** Piso do cosseno para um vizinho VETORIAL virar candidato. */
+  piso_vetor: z.number().min(0).max(1).optional(),
 });
+
+/**
+ * Piso do cosseno. Mais alto que o piso léxico porque o embedding aproxima por TEMA, e tema
+ * puxa irmão (dois dashboards de margem de marcas diferentes ficam muito próximos). Aqui ele
+ * é a SEGUNDA fonte: entra para achar a feature REBATIZADA, que não divide vocabulário com o
+ * pai — e quem separa "parecido" de "parte de" continua sendo o juiz, que lê a documentação.
+ */
+export const PISO_VETOR_AGLUTINACAO = 0.62;
 
 export type ParaPainel = {
   filhoId: string;
@@ -82,7 +96,7 @@ function paraAglutinavel(p: {
 }
 
 export async function varrerAglutinacao(body: unknown) {
-  const { dry, piso, max, somente_pares } = varreduraSchema.parse(body ?? {});
+  const { dry, piso, max, somente_pares, sem_vetor, piso_vetor } = varreduraSchema.parse(body ?? {});
   const gravar = dry === false;
   const limiar = piso ?? PISO_SIMILARIDADE_AGLUTINACAO;
 
@@ -106,6 +120,29 @@ export async function varrerAglutinacao(body: unknown) {
   );
   const pesos = textos.map(tokensPesados);
 
+  /**
+   * ⚠️ **Fonte VETORIAL sem chave nenhuma.** Os vetores da base inteira JÁ estão gravados em
+   * `projeto_embedding` (a memória do time de avaliação dos normais) — a chave da OpenAI só
+   * faz falta para embeddar projeto NOVO. Para varrer o que já existe, basta ler a tabela e
+   * fazer cosseno em JS, que é o mesmo caminho degradado que o classificador de especiais já
+   * usa quando o Pinecone está fora.
+   *
+   * Falha ou tabela vazia → segue só com o léxico (a varredura nunca depende disto).
+   */
+  const vetores = new Map<string, number[]>();
+  if (!sem_vetor) {
+    try {
+      for (const row of await getEmbeddingsProjetos()) {
+        if (!universo.has(row.projeto_id)) continue;
+        const v = base64ParaVetor(row.vetor);
+        if (v.length) vetores.set(row.projeto_id, v);
+      }
+    } catch (e) {
+      console.error('[aglutinacao] sem fonte vetorial (segue só com o léxico):', e);
+    }
+  }
+  const pisoVetor = piso_vetor ?? PISO_VETOR_AGLUTINACAO;
+
   const porque = new Map<string, string>();
   const comCandidatos: Array<{ p: ProjetoAglutinavel; cands: ReturnType<typeof candidatosDe> }> = [];
   projetos.forEach((p, i) => {
@@ -114,16 +151,25 @@ export async function varrerAglutinacao(body: unknown) {
         if (o.id === p.id) return null;
         const contido = nomeContido(textos[i], textos[j], idf);
         const pre = prefixoDeFamilia(textos[i], textos[j], idf);
-        const sim = similaridadeFinal(similaridade(pesos[i], pesos[j], idf), {
+        const lexica = similaridadeFinal(similaridade(pesos[i], pesos[j], idf), {
           contido,
           prefixo: pre.length > 0,
         });
+        // ⚠️ As duas fontes SOMAM candidatos, não médias: um par que só o vetor vê (feature
+        // rebatizada) e um que só o léxico vê (namespace no nome) são ambos legítimos, e
+        // tirar a média de um zero afundaria os dois. Vence a fonte que viu melhor.
+        const va = vetores.get(p.id);
+        const vb = vetores.get(o.id);
+        const cos = va && vb ? cosseno(va, vb) : 0;
+        const porVetor = cos >= pisoVetor;
+        const sim = porVetor ? Math.max(lexica, cos) : lexica;
         if (sim >= limiar) {
           porque.set(
             `${p.id}|${o.id}`,
             [
               pre.length ? `família "${pre.join(' ')}"` : '',
               contido ? 'nome contido' : '',
+              porVetor ? `semelhança de conteúdo ${cos.toFixed(2)}` : '',
               tokensEmComum(pesos[i], pesos[j], idf).join(', '),
             ]
               .filter(Boolean)
@@ -146,6 +192,7 @@ export async function varrerAglutinacao(body: unknown) {
       ok: true,
       projetos: projetos.length,
       com_documentacao: projetos.filter((p) => (p.documentacao ?? '').trim()).length,
+      com_vetor: vetores.size,
       com_candidatos: comCandidatos.length,
       pares_unicos: paresUnicos.size,
       piso: limiar,
@@ -190,6 +237,7 @@ export async function varrerAglutinacao(body: unknown) {
     dry: !gravar,
     projetos: projetos.length,
     com_documentacao: projetos.filter((p) => (p.documentacao ?? '').trim()).length,
+    com_vetor: vetores.size,
     julgados: aJulgar.length,
     // ⚠️ Falha de chamada NÃO é "não é feature": sem este número, uma rajada de 502 do
     // proxy faria a rota responder "0 sugestões" sobre uma base que ninguém analisou.

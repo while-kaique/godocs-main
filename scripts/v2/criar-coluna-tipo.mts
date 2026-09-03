@@ -7,7 +7,10 @@ const TAB = process.env.GOOGLE_SHEETS_TAB;
 const NOME = 'Tipo de Projeto';
 const ESCREVER = process.env.ESCREVER === '1';
 if (!TAB) throw new Error('setar GOOGLE_SHEETS_TAB');
-if (TAB === 'GoDocs') throw new Error('recusado: a aba de PRODUÇÃO não é alvo deste script');
+// A aba de PRODUÇÃO exige confirmação explícita. Acrescentar coluna no FIM não move
+// nenhuma célula das linhas existentes, mas é escrita em prod — a trava é deliberada.
+if (TAB === 'GoDocs' && process.env.CONFIRMO_PROD !== '1')
+  throw new Error('recusado: a aba de PRODUÇÃO exige CONFIRMO_PROD=1');
 
 const token = await getAccessToken();
 const url = (r: string) =>

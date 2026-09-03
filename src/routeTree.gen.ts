@@ -27,6 +27,7 @@ import { Route as AuthenticatedEmailLegadosRouteImport } from './routes/_authent
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAreasRouteImport } from './routes/_authenticated/areas'
 import { Route as AuthenticatedAprovacoesPendentesRouteImport } from './routes/_authenticated/aprovacoes-pendentes'
+import { Route as AuthenticatedAglutinacaoRouteImport } from './routes/_authenticated/aglutinacao'
 import { Route as AuthenticatedTestesRouteRouteImport } from './routes/_authenticated/testes/route'
 import { Route as FaqCategoriaIndexRouteImport } from './routes/faq.$categoria.index'
 import { Route as AuthenticatedTestesIndexRouteImport } from './routes/_authenticated/testes/index'
@@ -126,6 +127,12 @@ const AuthenticatedAprovacoesPendentesRoute =
     path: '/aprovacoes-pendentes',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAglutinacaoRoute =
+  AuthenticatedAglutinacaoRouteImport.update({
+    id: '/aglutinacao',
+    path: '/aglutinacao',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTestesRouteRoute =
   AuthenticatedTestesRouteRouteImport.update({
     id: '/testes',
@@ -169,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
   '/testes': typeof AuthenticatedTestesRouteRouteWithChildren
+  '/aglutinacao': typeof AuthenticatedAglutinacaoRoute
   '/aprovacoes-pendentes': typeof AuthenticatedAprovacoesPendentesRoute
   '/areas': typeof AuthenticatedAreasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -192,6 +200,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
+  '/aglutinacao': typeof AuthenticatedAglutinacaoRoute
   '/aprovacoes-pendentes': typeof AuthenticatedAprovacoesPendentesRoute
   '/areas': typeof AuthenticatedAreasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -219,6 +228,7 @@ export interface FileRoutesById {
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
   '/_authenticated/testes': typeof AuthenticatedTestesRouteRouteWithChildren
+  '/_authenticated/aglutinacao': typeof AuthenticatedAglutinacaoRoute
   '/_authenticated/aprovacoes-pendentes': typeof AuthenticatedAprovacoesPendentesRoute
   '/_authenticated/areas': typeof AuthenticatedAreasRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/meus-projetos'
     | '/submeter'
     | '/testes'
+    | '/aglutinacao'
     | '/aprovacoes-pendentes'
     | '/areas'
     | '/dashboard'
@@ -269,6 +280,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/meus-projetos'
     | '/submeter'
+    | '/aglutinacao'
     | '/aprovacoes-pendentes'
     | '/areas'
     | '/dashboard'
@@ -295,6 +307,7 @@ export interface FileRouteTypes {
     | '/meus-projetos'
     | '/submeter'
     | '/_authenticated/testes'
+    | '/_authenticated/aglutinacao'
     | '/_authenticated/aprovacoes-pendentes'
     | '/_authenticated/areas'
     | '/_authenticated/dashboard'
@@ -453,6 +466,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAprovacoesPendentesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/aglutinacao': {
+      id: '/_authenticated/aglutinacao'
+      path: '/aglutinacao'
+      fullPath: '/aglutinacao'
+      preLoaderRoute: typeof AuthenticatedAglutinacaoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/testes': {
       id: '/_authenticated/testes'
       path: '/testes'
@@ -518,6 +538,7 @@ const AuthenticatedTestesRouteRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedTestesRouteRoute: typeof AuthenticatedTestesRouteRouteWithChildren
+  AuthenticatedAglutinacaoRoute: typeof AuthenticatedAglutinacaoRoute
   AuthenticatedAprovacoesPendentesRoute: typeof AuthenticatedAprovacoesPendentesRoute
   AuthenticatedAreasRoute: typeof AuthenticatedAreasRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -530,6 +551,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTestesRouteRoute: AuthenticatedTestesRouteRouteWithChildren,
+  AuthenticatedAglutinacaoRoute: AuthenticatedAglutinacaoRoute,
   AuthenticatedAprovacoesPendentesRoute: AuthenticatedAprovacoesPendentesRoute,
   AuthenticatedAreasRoute: AuthenticatedAreasRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,

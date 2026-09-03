@@ -77,6 +77,7 @@ import {
   semearLote,
 } from '@/lib/dashboard-detalhe-cache';
 import { fmtDataBR } from '@/lib/format-date';
+import { rotuloNivel } from '@/lib/categoria-projeto';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 // Do módulo PURO (não do .functions server) para não puxar código de servidor ao bundle.
 import { apenasAutoresComMultiplos, agruparAdjacentePorAutor } from '@/lib/dashboard-resumo';
@@ -622,7 +623,10 @@ function Dashboard() {
                 >
                   Estrelas
                 </Th>
-                <Th className="hidden xl:table-cell">Complexidade</Th>
+                {/* Os DOIS eixos da categorização (item 5.4) na mesma célula: o TIPO é o
+                    que o projeto é, o NÍVEL é como o trabalho acontece. Coluna nova
+                    alargaria uma tabela que já é densa — e a régua desta tela é escanear. */}
+                <Th className="hidden xl:table-cell">Tipo · Nível</Th>
                 <Th
                   className="text-right"
                   onClick={() => alternarOrdem('ganho')}
@@ -759,7 +763,16 @@ function Dashboard() {
                       )}
                     </td>
                     <td className="hidden px-3 py-2.5 text-[12.5px] xl:table-cell">
-                      {p.complexidade ?? '—'}
+                      {p.tipoProjeto && p.tipoProjeto !== '—' ? (
+                        <span className="font-medium">{p.tipoProjeto}</span>
+                      ) : null}
+                      {p.tipoProjeto && p.tipoProjeto !== '—' && p.complexidade ? (
+                        <span className="text-muted-foreground"> · </span>
+                      ) : null}
+                      {p.complexidade ? (
+                        <span className="text-muted-foreground">{rotuloNivel(p.complexidade)}</span>
+                      ) : null}
+                      {!p.complexidade && (!p.tipoProjeto || p.tipoProjeto === '—') ? '—' : null}
                     </td>
                     <td className="px-3 py-2.5 text-right text-[13px] font-medium tabular-nums">
                       {fmtGanho(p.ganhoTotal)}
