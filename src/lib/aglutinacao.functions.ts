@@ -27,6 +27,7 @@ import {
   similaridadeFinal,
   tokensEmComum,
   nomeContido,
+  prefixoDeFamilia,
 } from '@/lib/similaridade-lexical';
 import {
   candidatosDe,
@@ -112,11 +113,19 @@ export async function varrerAglutinacao(body: unknown) {
       .map((o, j) => {
         if (o.id === p.id) return null;
         const contido = nomeContido(textos[i], textos[j], idf);
-        const sim = similaridadeFinal(similaridade(pesos[i], pesos[j], idf), contido);
+        const pre = prefixoDeFamilia(textos[i], textos[j], idf);
+        const sim = similaridadeFinal(similaridade(pesos[i], pesos[j], idf), {
+          contido,
+          prefixo: pre.length > 0,
+        });
         if (sim >= limiar) {
           porque.set(
             `${p.id}|${o.id}`,
-            [contido ? 'nome contido' : '', tokensEmComum(pesos[i], pesos[j], idf).join(', ')]
+            [
+              pre.length ? `família "${pre.join(' ')}"` : '',
+              contido ? 'nome contido' : '',
+              tokensEmComum(pesos[i], pesos[j], idf).join(', '),
+            ]
               .filter(Boolean)
               .join(' · '),
           );

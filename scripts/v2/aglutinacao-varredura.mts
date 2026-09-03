@@ -3,7 +3,7 @@
 import { getAccessToken } from '../../src/lib/google/auth';
 import {
   calcularIdf, tokenizar, tokensPesados, similaridade, tokensEmComum, nomeContido,
-  similaridadeFinal,
+  similaridadeFinal, prefixoDeFamilia,
 } from '../../src/lib/similaridade-lexical';
 import {
   candidatosDe, consolidarSugestoes, PISO_SIMILARIDADE_AGLUTINACAO,
@@ -98,11 +98,13 @@ projetos.forEach((p, i) => {
       const sim = similaridade(pesos[i], pesos[j], idf);
       // Nome contido vale mais que a soma de tokens — é a assinatura de família.
       const contido = nomeContido(textosProjeto[i], textosProjeto[j], idf);
-      const ajustada = similaridadeFinal(sim, contido);
+      const pre = prefixoDeFamilia(textosProjeto[i], textosProjeto[j], idf);
+      const ajustada = similaridadeFinal(sim, { contido, prefixo: pre.length > 0 });
       if (ajustada >= PISO)
         porque.set(
           `${p.id}|${o.id}`,
           [
+            pre.length ? `família "${pre.join(' ')}"` : '',
             contido ? 'nome contido' : '',
             tokensEmComum(pesos[i], pesos[j], idf).join(', '),
           ].filter(Boolean).join(' · '),

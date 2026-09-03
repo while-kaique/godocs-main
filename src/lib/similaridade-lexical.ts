@@ -157,16 +157,72 @@ export function nomeContido(
   return tokenizar(curto).some((t) => (idf.get(t) ?? 0) >= IDF_NOME_DISTINTIVO);
 }
 
+
 /**
- * ⚠️ Nome contido é um **BÔNUS**, não um piso (decisão do Luis, 03/09/2026). Na 1ª versão ele
- * levava o par direto a 0,75, ou seja: dois projetos cujos textos não têm NADA em comum viravam
- * candidatos só porque um nome cabia dentro do outro. Isso é aglutinar por nome. Agora ele
- * SOMA a uma similaridade que já existe — reforça o par que o conteúdo já sugeriu, e não
- * consegue criar par sozinho (um par de similaridade 0 continua em 0,15, abaixo do piso).
+ * ⚠️ **PREFIXO DE FAMÍLIA** — o sinal que faltava, e a razão de ele existir está medida
+ * (03/09/2026, base de prod, 734 projetos). O «Lab Gobeaute» são QUATRO projetos do mesmo
+ * autor — o sistema de P&D mais os módulos Indexação, Estabilidade (Build) e Estabilidade
+ * (Uso) — e **nenhum par deles aparecia na varredura**: a similaridade do sistema com o
+ * módulo é **0,135**, muito abaixo do piso, porque cada um tem memorial longo e próprio, o
+ * que dilui o vocabulário comum. E o `nomeContido` não pega: exige o nome INTEIRO dentro do
+ * outro, e «Lab Gobeaute · Sistema…» não contém «Lab Gobeaute · Módulo…».
+ *
+ * O que os liga é o autor ter feito NAMESPACE no nome. Prefixo comum cujo vocabulário é RARO
+ * (`lab` está em ≤4 projetos de 734) não é "nome parecido" — é família DECLARADA por quem
+ * submeteu. Com `idf ≥ 5` são **36 pares** na base inteira, e os exemplos são todos famílias
+ * de verdade: `[Meli] - Check Updated Ad` ⟷ `[Meli] - Auth Layer` ⟷ `[Meli] Monitor
+ * Catálogos`; `Marketplace Scraper - Código de Conduta` ⟷ `- Faturamento`.
+ *
+ * ⚠️ **Um 3º sinal foi MEDIDO E REPROVADO: "o nome do pai aparece no TEXTO do filho"**
+ * (pegaria «Spectrum» citando «Argos»). Mesmo no limiar mais rígido dá **521 pares** — seis
+ * vezes a lista inteira de candidatos —, porque memorial cita ferramenta e sistema o tempo
+ * todo. Não reintroduzir sem uma régua que separe "cita" de "é parte de".
+ */
+// ⚠️ 4,5 e não 5, e o 0,5 de diferença tem nome: o token `lab` do «Lab Gobeaute» tem idf
+// **4,99**. Um limiar de 5,00 perdia a família inteira por 0,01 — e a família só apareceu
+// porque o Luis a deu como caso de referência. Limiar calibrado contra caso conhecido, não
+// contra a distribuição sozinha: em 4,5 o token está em ≤8 projetos de 734, o que ainda é
+// namespace, e o total sobe de 36 para 54 pares na base inteira.
+export const IDF_PREFIXO_FAMILIA = 4.5;
+
+/** Os tokens do prefixo comum dos dois nomes, se ele for distintivo. Vazio = sem família. */
+export function prefixoDeFamilia(
+  a: TextoProjeto,
+  b: TextoProjeto,
+  idf: Map<string, number>,
+): string[] {
+  const ta = tokenizar(a.nome);
+  const tb = tokenizar(b.nome);
+  const pre: string[] = [];
+  for (let i = 0; i < Math.min(ta.length, tb.length); i++) {
+    if (ta[i] !== tb[i]) break;
+    pre.push(ta[i]);
+  }
+  if (!pre.length) return [];
+  // ⚠️ Um dos tokens do prefixo tem de ser RARO. Sem isso, «Automação de X» ⟷ «Automação de
+  // Y» viraria família — e é por isso que `RUIDO` já derruba as palavras genéricas antes.
+  return pre.some((t) => (idf.get(t) ?? 0) >= IDF_PREFIXO_FAMILIA) ? pre : [];
+}
+
+/**
+ * ⚠️ Os dois sinais do NOME são **BÔNUS que somam**, nunca pisos (decisão do Luis: "não faça a
+ * aglutinação por nome"). O prefixo pesa mais que a contenção porque é namespace explícito,
+ * mas nem ele decide sozinho: um par sem NENHUMA palavra em comum no conteúdo fica em 0,40 e
+ * ainda passa pelo juiz, que lê a documentação dos dois lados e recusa por padrão.
+ *
+ * Calibragem: os 4 pares do «Lab Gobeaute» vão de 0,09–0,35 para **0,49–0,75**, todos acima
+ * do piso de 0,35.
  */
 export const BONUS_NOME_CONTIDO = 0.15;
+export const BONUS_PREFIXO_FAMILIA = 0.4;
 
-/** Similaridade final do par: conteúdo + o bônus, teto em 1. */
-export function similaridadeFinal(base: number, contido: boolean): number {
-  return Math.min(1, base + (contido ? BONUS_NOME_CONTIDO : 0));
+export function similaridadeFinal(
+  base: number,
+  sinais: { contido?: boolean; prefixo?: boolean } | boolean,
+): number {
+  const s = typeof sinais === 'boolean' ? { contido: sinais, prefixo: false } : sinais;
+  return Math.min(
+    1,
+    base + (s.contido ? BONUS_NOME_CONTIDO : 0) + (s.prefixo ? BONUS_PREFIXO_FAMILIA : 0),
+  );
 }

@@ -247,10 +247,23 @@ describe('agente — normalizarRecomendacao (guard)', () => {
 describe('agente — prompt de sistema (fonte única da régua)', () => {
   it('carrega a régua e a curva no system prompt', () => {
     const p = buildSystemPromptEspecial();
-    expect(p).toContain('top 4%'); // curva
     expect(p).toContain('Recorrência real'); // critério da régua
     expect(p).toContain('JSON'); // formato forçado
     expect(p).toMatch(/0 a 10/); // escala
+  });
+
+  it('⚠️ a curva do prompt é a dos ESPECIAIS, não a da base inteira', () => {
+    // Este teste substitui um que exigia o literal "top 4%" — a âncora ERRADA, que ele
+    // prendia no lugar. Medido em 03/09/2026: na base inteira ≥3★ é 6,2% e ≥5★ é 1,5%;
+    // entre os especiais auditados (a população que este agente julga) é 41,7% e 12,5%.
+    // O agente recebia uma régua anti-inflação ~7× apertada demais e rebaixava o topo.
+    const p = buildSystemPromptEspecial();
+    expect(p).toContain('ESPECIAIS JÁ AUDITADOS');
+    expect(p).toMatch(/≥3★ são 4\d%/); // a curva dos especiais, não os 4% da base
+    expect(p).not.toMatch(/≥3★ é top 4% da base/);
+    // A menção à base inteira SOBREVIVE, mas só como contraste explícito — é ela que
+    // impede o modelo de confundir as duas populações.
+    expect(p).toMatch(/Não confunda com a base inteira/);
   });
   it('instrui a igualar a faixa de um vizinho quase idêntico com nota maior', () => {
     expect(buildSystemPromptEspecial()).toMatch(/vizinho quase idêntico/i);

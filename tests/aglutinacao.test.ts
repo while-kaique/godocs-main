@@ -180,3 +180,39 @@ describe('o NOME não decide sozinho (decisão do Luis, 03/09/2026)', () => {
     expect(t.has('despacha')).toBe(true);
   });
 });
+
+describe('prefixo de FAMÍLIA — o caso «Lab Gobeaute» (03/09/2026)', () => {
+  it('pega a família que o TF-IDF sozinho perdia', async () => {
+    const { calcularIdf, tokenizar, prefixoDeFamilia, similaridadeFinal } = await import(
+      '@/lib/similaridade-lexical'
+    );
+    // ⚠️ O corpus do teste precisa ter TAMANHO REALISTA: `idf = ln(N/df)`, e o limiar de
+    // 4,5 quer dizer "o token está em no máximo ~1,1% dos projetos". Num corpus de 12
+    // documentos isso é inalcançável por construção — a 1ª versão deste teste falhou por
+    // isso, não por defeito da régua. Na base real são 734 projetos e `lab` está em ~5.
+    const corpus = [
+      'Lab Gobeaute Sistema de P&D',
+      'Lab Gobeaute Módulo Estabilidade',
+      ...Array.from({ length: 300 }, (_, i) => `Painel Gobeaute area ${i}`),
+    ];
+    const idf = calcularIdf(corpus.map((t) => tokenizar(t)));
+    const a = { nome: 'Lab Gobeaute Sistema de P&D' };
+    const b = { nome: 'Lab Gobeaute Módulo Estabilidade' };
+    expect(prefixoDeFamilia(a, b, idf)).toEqual(['lab', 'gobeaute']);
+    // O par real media 0,135 — abaixo do piso. Com o bônus, passa.
+    expect(similaridadeFinal(0.135, { prefixo: true })).toBeGreaterThan(0.35);
+  });
+
+  it('prefixo GENÉRICO não é família (é o que RUIDO + raridade impedem)', async () => {
+    const { calcularIdf, tokenizar, prefixoDeFamilia } = await import('@/lib/similaridade-lexical');
+    const corpus = Array.from({ length: 20 }, (_, i) => `Automação de Chamados area ${i}`);
+    const idf = calcularIdf(corpus.map((t) => tokenizar(t)));
+    // "automação" está em RUIDO; "chamados" está em 20 de 20 → idf 0.
+    expect(prefixoDeFamilia({ nome: 'Automação de Chamados A' }, { nome: 'Automação de Chamados B' }, idf)).toEqual([]);
+  });
+
+  it('nem o prefixo decide sozinho: sem conteúdo em comum fica em 0,40 e o juiz ainda recusa', async () => {
+    const { similaridadeFinal, BONUS_PREFIXO_FAMILIA } = await import('@/lib/similaridade-lexical');
+    expect(similaridadeFinal(0, { prefixo: true })).toBe(BONUS_PREFIXO_FAMILIA);
+  });
+});

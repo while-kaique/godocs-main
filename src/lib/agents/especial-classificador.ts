@@ -20,10 +20,12 @@ import {
   CRITERIOS,
   DERRUBA,
   NOTA_MAX,
-  CURVA_BASE,
-  TOTAL_AUDITADO,
   type Confianca,
 } from '@/lib/especiais-regua';
+// ⚠️ A curva de referência deste agente é a dos ESPECIAIS, não a da base inteira — ver o
+// comentário de `descreverCurva`. `CURVA_BASE`/`TOTAL_AUDITADO` saíram do import de
+// propósito: enquanto estiverem à mão, alguém as recoloca no prompt sem perceber.
+import { CURVA_ESPECIAIS_AUDITADOS } from '@/lib/especiais-calibrador';
 import { montarBlocoFewShot, type Vizinho } from '@/lib/especial-corpus';
 
 export type RecomendacaoEspecial = {
@@ -63,15 +65,41 @@ function descreverDerruba(): string {
   return DERRUBA.map((d) => `- ${d}`).join('\n');
 }
 
+/**
+ * ⚠️ **A curva é a dos ESPECIAIS, não a da base inteira** (corrigido 03/09/2026).
+ *
+ * Este agente só julga projeto ESPECIAL, mas o prompt vinha mostrando a `CURVA_BASE` — a
+ * distribuição dos 644 projetos, especiais e normais juntos. As duas populações não se
+ * parecem: na base inteira **≥3★ é 6,2%** e **≥5★ é 1,5%**; entre os especiais auditados
+ * **≥3★ é 41,7%** e **≥5★ é 12,5%**. Ou seja, o agente recebia uma âncora anti-inflação
+ * SETE VEZES mais apertada do que a população que ele avalia, e a instrução "na dúvida fique
+ * na faixa MENOR" transformava isso em rebaixamento sistemático — os projetos de 6–10★
+ * voltavam como 5★ ou menos.
+ *
+ * ⚠️ **Este é o MESMO defeito que o painel de agentes já tinha encontrado e corrigido** (o
+ * revisor lendo a `CURVA_BASE` refutou 17 de 17); a constante `CURVA_ESPECIAIS_AUDITADOS`
+ * nasceu ali, com o aviso de que é ELA a referência de uma rodada de especiais. A correção
+ * só nunca tinha chegado a este agente — que é o que roda em produção.
+ *
+ * ⚠️ Não trocar de volta por "a base é dura": a régua contra inflação continua existindo, só
+ * que medida contra quem o agente de fato compara.
+ */
 function descreverCurva(): string {
-  const linhas = Object.entries(CURVA_BASE)
+  const total = Object.values(CURVA_ESPECIAIS_AUDITADOS).reduce((a, b) => a + b, 0);
+  const linhas = Object.entries(CURVA_ESPECIAIS_AUDITADOS)
     .filter(([k]) => k !== 'vazio')
     .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([nota, qtd]) => {
-      const pct = ((qtd / TOTAL_AUDITADO) * 100).toFixed(1);
-      return `${nota}★: ${qtd} projetos (${pct}%)`;
-    });
+    .map(([nota, qtd]) => `${nota}★: ${qtd} (${((qtd / total) * 100).toFixed(1)}%)`);
   return linhas.join(' · ');
+}
+
+/** Percentual acumulado ≥ `nota` na curva DOS ESPECIAIS — a régua que o prompt cita. */
+function acimaDe(nota: number): string {
+  const total = Object.values(CURVA_ESPECIAIS_AUDITADOS).reduce((a, b) => a + b, 0);
+  const n = Object.entries(CURVA_ESPECIAIS_AUDITADOS)
+    .filter(([k]) => /^\d+$/.test(k) && Number(k) >= nota)
+    .reduce((a, [, q]) => a + q, 0);
+  return `${((n / total) * 100).toFixed(0)}%`;
 }
 
 export function buildSystemPromptEspecial(): string {
@@ -89,9 +117,9 @@ ${descreverCriterios()}
 O QUE DERRUBA para 0–1, por melhor que o memorial esteja:
 ${descreverDerruba()}
 
-A CURVA REAL DA BASE (644 projetos) — sua régua contra inflação:
+A CURVA REAL DOS ESPECIAIS JÁ AUDITADOS — a população com que você compara:
 ${descreverCurva()}
-≥3★ é top 4% da base; ≥5★ é top 1%. Se você se pegar recomendando ≥3, tenha uma razão forte e concreta: inteligência real no fluxo, reuso multi-área, risco material evitado ou adoção comprovada por outras pessoas. Na dúvida entre duas faixas, fique na MENOR.
+Entre os especiais, ≥3★ são ${acimaDe(3)} e ≥5★ são ${acimaDe(5)}. ⚠️ Não confunda com a base inteira (especiais + normais), onde ≥3★ é 6%: você julga SÓ especiais, e nesta população nota alta é bem menos rara. Se você se pegar recomendando ≥3, tenha uma razão forte e concreta: inteligência real no fluxo, reuso multi-área, risco material evitado ou adoção comprovada por outras pessoas. Na dúvida entre duas faixas, fique na MENOR.
 
 DISCIPLINA:
 - Prefira notas INTEIRAS.
