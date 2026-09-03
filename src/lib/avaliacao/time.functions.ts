@@ -6,7 +6,7 @@
 // `minimal` fica fora da allowlist (o gateway devolve 502). Liberação em SOMBRA: sem acurácia medida,
 // nenhuma saída age sozinha (D14).
 import { carregarDossie } from '@/lib/avaliacao/dossie.functions';
-import { avaliarComTime, type Executor, type VizinhoTime, type ResultadoTime, type Papel } from '@/lib/avaliacao/time';
+import { avaliarComTime, NOTA_MIN_ANCORA_COMITE, type AncoraComite, type Executor, type VizinhoTime, type ResultadoTime, type Papel } from '@/lib/avaliacao/time';
 import { abrirCiclo, fecharCiclo, registrarNoAgente } from '@/lib/agentes-log.functions';
 import { llmChat } from '@/lib/llm';
 import { getCargoDe } from '@/lib/areas/teamguide.server';
@@ -132,6 +132,14 @@ function vizinhosLexicais(dossie: Dossie, linhas: LinhaEsp[]): VizinhoTime[] {
   return out.sort((a, b) => b.similaridade - a.similaridade).slice(0, 6);
 }
 
+/** Âncoras congeladas da faixa 6–10: todo projeto da base com nota HUMANA ≥ 6 (D9). */
+function ancorasDe(linhas: LinhaEsp[]): AncoraComite[] {
+  return linhas
+    .map((r) => ({ nome: g(r, 'Projeto') ?? '', nota: numero(g(r, 'Estrelas')) ?? 0, resumo: (g(r, 'Descrição') ?? '').slice(0, 220), status: g(r, 'Status') }))
+    .filter((a) => a.nome && a.nota >= NOTA_MIN_ANCORA_COMITE && !/descontinuad/i.test(a.status ?? ''))
+    .map(({ nome, nota, resumo }) => ({ nome, nota, resumo }));
+}
+
 function candidatosDe(linhas: LinhaEsp[]) {
   return linhas
     .filter((r) => g(r, 'ID Projeto'))
@@ -199,6 +207,7 @@ export async function avaliarProjetoComTime(
       executar,
       registrar: registrar as never,
       liberacao,
+      ancoras: ancorasDe(linhas),
     });
     if (abriuAqui && cicloId) {
       try {

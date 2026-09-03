@@ -409,7 +409,11 @@ caem em 2★ em toda variante (falta de MATERIAL: dependente nomeado não está 
 
 - **D13 — Aprovação autônoma é o alvo; humano é exceção.** Três saídas do time: `aprovar` ·
   `ajuste` (texto ao autor dizendo o que falta e por quê) · `humano` (só escape 6–10 e divergência que o
-  debate não fechou). O modo SOMBRA deixa de ser fronteira e vira **fase 1**.
+  debate não fechou). O modo SOMBRA deixa de ser fronteira e vira **fase 1**. **Emenda (03/09, medida na
+  rodada 3 do retroativo):** refutação do cético que SOBREVIVE às 2 rodadas e traz `pergunta_ao_autor`
+  respondível vira **`ajuste`** (é a saída autônoma que devolve o motivo ao autor); só a refutação SEM
+  pergunta é "divergência que o debate não fechou" e vai ao humano. Teste: `tests/time-avaliacao.test.ts`
+  ("refutação sustentada do cético COM pergunta vira ajuste").
 - **D14 — Raciocínio LIVRE, fecho MEDIDO.** Cada agente é um LLM com ferramentas, lê o dossiê inteiro,
   pode discordar e mudar de ideia. Quem autoriza o veredito a sair **sem humano** é a `politicaDeLiberacao`:
   lê a acurácia MEDIDA no retroativo por tipo de veredito e libera um por um. A confiança do agente é VOTO;
@@ -419,9 +423,10 @@ caem em 2★ em toda variante (falta de MATERIAL: dependente nomeado não está 
   rodadas**, sobre a máquina de deliberação que já existe (`avancarDeliberacoesPendentes`, cron). O proxy
   dá ~60 s por chamada e um request não cabe um loop; o debate atravessa tiques de cron.
 - **D16 — Escape 6–10 vai ao humano COM dossiê de comitê.** O agente indica a faixa (nunca a posição) e
-  entrega: resumo do projeto, o gatilho de escape com evidência citada, os pares já notados em 6–10 (as 4
+  entrega: resumo do projeto, o gatilho de escape com evidência citada, os pares já notados em 6–10 (as
   âncoras congeladas, D9) lado a lado, e a frase "o time lê como acima/abaixo de X porque…". O comitê
-  escolhe o número por comparação.
+  escolhe o número por comparação. **Implementação:** `paresDeComite` (`time.ts`) = âncoras da base com
+  nota humana ≥ 6 (`ancorasDe`, lidas do espelho no server e do dump no retroativo) ∪ vizinhos ≥ 6.
 - **D17 — Sem logs de chat na v2.** O dossiê não depende de `chat_messages`. Fontes: campos determinísticos
   da v2 (`saving_efetivado_*`, `custo_evitado_nao_contratado`, `ganho_imensuravel_racional`, `custo_rodar_itens`,
   receita) + **texto extraído dos ANEXOS/evidências** + documentação gerada em background + `form_events` +
@@ -569,6 +574,20 @@ consenso, texto ao autor e dossiê de comitê → **forte** (`LLM_MODEL`); embed
 - **(d)** Onde o texto ao autor aterrissa na v2 (coluna `Motivo Reenvio`, campo próprio, ou só ficha).
 - **(e)** Auditoria humana de ~50 projetos ao acaso entre os NÃO avaliados (maior alavanca: sem ela o
   retroativo mede contra "ninguém olhou").
+
+### 11.5b Decisões de implementação registradas (verificador de conformidade, 03/09)
+- **Texto dos anexos NÃO foi feito** (T11 pedia "reusa `extract-text`"): o texto extraído só transita na
+  submissão e não é persistido; `texto_anexos` é lacuna declarada e `ler_evidencia` devolve o link + aviso.
+  Fica para a frente da v2 (persistir o texto no submit) — sem isso, o dossiê legado é só a planilha.
+- Rota `POST /api/admin/avaliacao/time` (admin, sombra, background/202) é escopo adicional ao T21: existe
+  para rodar o time sob demanda num projeto sem esperar o T20 (painel).
+- `FERRAMENTAS_POR_AGENTE = 2` como default do time (o loop aceita até `MAX_CHAMADAS_TOOL = 4`): custo —
+  4 especialistas × 4 tools por rodada dobraria o gasto sem ganho medido.
+- O dump do retroativo lê a planilha de prod UMA vez por dump (`readAllRows`, mesma cota compartilhada do
+  T1), não o espelho — o espelho vive no SQLite do app, que não é acessível fora do Worker.
+- T13 nasceu em `cerebro-estrela.ts` (módulo paralelo), não reescrevendo `especial-classificador.ts`
+  (que segue intocado, conforme "não apagar os agentes"). T17 é esqueleto puro; a prosa dos agentes já
+  vem do LLM nos julgamentos.
 
 ### 11.6 Fronteiras
 

@@ -30,7 +30,7 @@ T19 → T20 → T10. **Pronto para `/ggsd:code`.**
 ## Estado da sessão noturna de 03/09 (autônoma, autorizada pelo Luis)
 - **Código:** T21, T11, T12, T13, T14, T16, T17, T15, T18 e o wrapper server (`time.functions.ts` + rota
   `POST /api/admin/avaliacao/time`) **codados, testados (red em contexto fresco) e commitados**. Suíte verde.
-  `worker.js` rebuildado. T20 (painel sombra no `/dashboard`) e T10 (aglutinação) **não** foram feitos.
+  `worker.js` rebuildado. T20 (painel sombra no `/dashboard`), T10 (aglutinação) e o **texto extraído dos anexos no dossiê** (T11/D17) **não** foram feitos.
 - **Retroativo (T19):** harness em `scripts/avaliacao-retro/`; dump só-leitura da planilha de prod (734
   linhas); rodadas em `docs/plans/retro-rodadas/` com diário em `§11.7` do plano. 4 rodadas de 30 na mesma
   amostra (variantes 1→4) fecharam o roteamento: humano 3%, 0 erro grave, aprovar preciso; depois amostra

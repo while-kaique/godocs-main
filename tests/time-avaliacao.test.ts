@@ -637,3 +637,57 @@ describe('buildPromptCetico / normalizarCetico', () => {
     expect(normalizarCetico({ refuta: false, sinais: ['a', 'b'] })?.sinais).toEqual(['a', 'b']);
   });
 });
+
+// ── 10. variante 4 (D13 emendada, 03/09): refutação sustentada COM pergunta vira AJUSTE ─────────
+// Regressão registrada depois da rodada 3 do retroativo (8 dos 9 humanos eram "debate não fechou" com
+// o cético apontando contradição concreta e respondível). Sem pergunta, segue humano (caso 3 acima).
+
+describe('avaliarComTime — refutação sustentada do cético COM pergunta vira ajuste (D13 emendada)', () => {
+  it('cético refuta nas 2 rodadas com pergunta_ao_autor → ajuste, texto ao autor traz a pergunta sem R$', async () => {
+    const llm = fakeLlm({
+      cetico: () =>
+        JSON.stringify({
+          refuta: true,
+          motivo: 'O memorial divide o tempo posterior por dois: 2.200 × 30 s = 66.000 s, não 33.000 s.',
+          sinais: ['erro de conta'],
+          pergunta_ao_autor: 'O tempo depois da automação é 66.000 segundos por mês (18,3 h) ou 33.000? O valor/hora é R$ 73,00/hora.',
+        }),
+    });
+    const r = await rodar({ chamarLlm: llm.fn });
+    expect(r.cetico.refuta).toBe(true);
+    expect(r.rodadas_debate).toBe(MAX_RODADAS_DEBATE);
+    expect(r.merito.veredito).toBe('ajuste');
+    expect(r.debate_fechou).toBe(true);
+    expect(r.consenso.saida).toBe('ajuste');
+    expect(r.textos.ao_autor).not.toBeNull();
+    expect(r.textos.ao_autor!).toContain('66.000 segundos');
+    expect(r.textos.ao_autor!).not.toMatch(/R\$/);
+  });
+});
+
+// ── 11. D16: as âncoras congeladas entram no dossiê de comitê mesmo sem vizinho ≥ 6 ─────────────
+
+describe('avaliarComTime — dossiê de comitê traz as âncoras congeladas (D16)', () => {
+  it('sem vizinho de nota ≥ 6, as âncoras passadas aparecem como pares do comitê', async () => {
+    const llm = fakeLlm({
+      estrela: () =>
+        concluirEstrela({
+          nota: 5,
+          criterio_aplicado: 'Assume',
+          escape: {
+            indicado: true,
+            evidencias: { nao_existiria: 'a conciliação em D+0 só existe porque o robô roda', sem_volta: 'a rotina manual deixou de existir' },
+          },
+        }),
+    });
+    const r = await rodar({
+      chamarLlm: llm.fn,
+      vizinhos: VIZINHOS,
+      ancoras: [{ nome: 'PIAPP', nota: 10, resumo: 'Plataforma de IA da casa.' }],
+    });
+    expect(r.consenso.saida).toBe('humano');
+    expect(r.textos.comite).not.toBeNull();
+    expect(r.textos.comite!).toContain('PIAPP (10 estrelas)');
+    expect(r.textos.comite!).not.toMatch(/sem par|nenhum par/i);
+  });
+});

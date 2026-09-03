@@ -53,6 +53,9 @@ export type NoParaRegistrar = {
 };
 export type Registrador = (no: NoParaRegistrar) => Promise<string | null>;
 export type VizinhoTime = { id: string; nome: string; nota: number | null; status: string | null; similaridade: number; resumo: string };
+/** Âncora da faixa 6–10 (D9/D16): projeto com nota HUMANA ≥ 6 na base, congelado como referência do comitê. */
+export type AncoraComite = { nome: string; nota: number; resumo: string };
+export const NOTA_MIN_ANCORA_COMITE = 6;
 
 export const MAX_RODADAS_DEBATE = 2;
 export const FERRAMENTAS_POR_AGENTE = 2;
@@ -168,6 +171,22 @@ function json(v: unknown): string | null {
   }
 }
 
+/** Pares do comitê = âncoras congeladas (D9) ∪ vizinhos com nota humana ≥ 6, sem repetir nome. */
+export function paresDeComite(vizinhos: VizinhoTime[], ancoras: AncoraComite[]): AncoraComite[] {
+  const out: AncoraComite[] = [];
+  const nomes = new Set<string>();
+  for (const a of ancoras) {
+    if (a.nota >= NOTA_MIN_ANCORA_COMITE && !nomes.has(a.nome)) { out.push(a); nomes.add(a.nome); }
+  }
+  for (const v of vizinhos) {
+    if (typeof v.nota === 'number' && v.nota >= NOTA_MIN_ANCORA_COMITE && !nomes.has(v.nome)) {
+      out.push({ nome: v.nome, nota: v.nota, resumo: v.resumo });
+      nomes.add(v.nome);
+    }
+  }
+  return out;
+}
+
 export async function avaliarComTime(args: {
   dossie: Dossie;
   vizinhos: VizinhoTime[];
@@ -177,6 +196,8 @@ export async function avaliarComTime(args: {
   registrar: Registrador;
   liberacao: Liberacao;
   ferramentasPorAgente?: number;
+  /** Âncoras congeladas da faixa 6–10 (D16): entram SEMPRE no dossiê de comitê, além dos vizinhos ≥ 6. */
+  ancoras?: AncoraComite[];
 }): Promise<ResultadoTime> {
   const { dossie, vizinhos } = args;
   const maxTools = args.ferramentasPorAgente ?? FERRAMENTAS_POR_AGENTE;
@@ -373,7 +394,7 @@ export async function avaliarComTime(args: {
           consenso,
           merito,
           estrela,
-          pares: vizinhos.filter((v) => typeof v.nota === 'number' && (v.nota as number) >= 6).map((v) => ({ nome: v.nome, nota: v.nota as number, resumo: v.resumo })),
+          pares: paresDeComite(vizinhos, args.ancoras ?? []),
           resumoProjeto: dossie.descricao ?? dossie.documentacao.o_que_faz ?? dossie.nome,
         })
       : null;

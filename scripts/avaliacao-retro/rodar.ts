@@ -160,6 +160,10 @@ it('retroativo em sombra — time de agentes sobre a base de prod', async () => 
   expect(cicloId).toBeTruthy();
 
   const liberacao = politicaDeLiberacao(null, {});
+  const ancoras = gabaritos
+    .filter((x) => !x.descontinuado && typeof x.nota_humana === 'number' && x.nota_humana >= 6)
+    .map((x) => ({ nome: x.nome, nota: x.nota_humana as number, resumo: (g(porId.get(x.id)!, 'Descrição') || x.nome).slice(0, 220) }));
+  console.log(`âncoras 6–10 na base: ${ancoras.map((a) => `${a.nome} (${a.nota})`).join(' · ')}`);
   const resultados: Record<string, unknown>[] = [];
   const comparacoes: ReturnType<typeof compararProjeto>[] = [];
   let feitos = 0;
@@ -191,7 +195,7 @@ it('retroativo em sombra — time de agentes sobre a base de prod', async () => 
       return r?.id ?? null;
     };
     const ini = Date.now();
-    const res = await avaliarComTime({ dossie, vizinhos, notaHumana: gab.nota_humana !== null && gab.nota_humana >= 1 ? gab.nota_humana : null, chamarLlm, executar, registrar, liberacao });
+    const res = await avaliarComTime({ dossie, vizinhos, notaHumana: gab.nota_humana !== null && gab.nota_humana >= 1 ? gab.nota_humana : null, chamarLlm, executar, registrar, liberacao, ancoras });
     const comp = compararProjeto(
       { id: gab.id, nome: gab.nome, area: gab.area, especial: gab.especial, saida: res.consenso.saida, veredito_merito: res.consenso.veredito_merito, estrela: res.consenso.estrela, escape: res.consenso.escape, confianca: res.consenso.confianca, valor_absurdo: res.consenso.valor?.absurdo ?? null, valor_sugerido: res.consenso.valor?.valor_sugerido ?? null, contestacao: res.consenso.contestacao, erros: res.erros.length, custo_usd: 0 },
       gab,
