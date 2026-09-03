@@ -1,6 +1,6 @@
 # Régua de estrelas 0–10 + time unificado de agentes avaliadores
 
-**Status:** régua ✅ **validada pelo Luis (02/09/2026)** · arquitetura dos agentes = planejamento aberto
+**Status:** ✅ **aprovado** — régua validada pelo Luis (02/09/2026); §11 (time autônomo, T11–T21) **aprovado pelo Luis em 03/09/2026** na conversa (*"quero confiar em você… vai ficar rodando até concluir os agentes"*), com D20 (régua intacta) e T21 (log em árvore) ditados por ele.
 **Branch:** `feat/avaliadores-unificados` · worktree `~/godocs-wt-avaliadores` (base `origin/main` `51f3fd2`)
 
 ---
