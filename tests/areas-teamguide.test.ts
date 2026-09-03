@@ -1,8 +1,10 @@
 // Testa a derivação de áreas da TeamGuide com uma árvore sintética (sem rede).
 // Valida a regra v3: filhos L1 da raiz viram área, EXCETO nós passthrough (por
 // líder), cujos filhos L2 é que viram área. Dedup por slug, ordenado.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { deriveAreasFromTeamGuide, deriveAreaFromEmail } from '@/lib/areas/teamguide.server';
+import { criarDbMemoria } from './helpers/db-memoria';
+import { semearEspelhoTeamGuide } from './helpers/teamguide-espelho-fake';
 
 // Árvore mínima: 3 domínios (por líder) + 1 passthrough em cada um para cobrir a regra.
 const TEAMS = [
@@ -24,13 +26,9 @@ const TEAMS = [
 ];
 
 describe('deriveAreasFromTeamGuide', () => {
-  beforeEach(() => {
-    process.env.TG_API_TOKEN = 'fake-token';
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => TEAMS } as Response)));
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    delete process.env.TG_API_TOKEN;
+  beforeEach(async () => {
+    await criarDbMemoria();
+    await semearEspelhoTeamGuide({ times: TEAMS });
   });
 
   it('aplica a regra passthrough (L1 normal vira área; passthrough usa L2)', async () => {
@@ -42,9 +40,11 @@ describe('deriveAreasFromTeamGuide', () => {
     expect(areas).not.toContain('Operações');
   });
 
-  it('lança erro sem TG_API_TOKEN', async () => {
-    delete process.env.TG_API_TOKEN;
-    await expect(deriveAreasFromTeamGuide()).rejects.toThrow(/TG_API_TOKEN/);
+  it('espelho vazio → [] (fail-safe, NÃO lança)', async () => {
+    await criarDbMemoria();
+    const { __resetTeamguideSnapshotCache } = await import('@/lib/areas/teamguide.server');
+    __resetTeamguideSnapshotCache();
+    await expect(deriveAreasFromTeamGuide()).resolves.toEqual([]);
   });
 });
 
@@ -56,43 +56,10 @@ const MEMBERS = [
   { id: 'm3', name: 'Chefe Geral', contactEmail: 'chefe.geral@gocase.com', teamsIds: ['r'] },
 ];
 
-const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-
 describe('deriveAreaFromEmail', () => {
-  beforeEach(() => {
-    process.env.TG_API_TOKEN = 'fake-token';
-    // Dublê da API real: /teams (árvore), /employees/emails/{email} (resolve o
-    // e-mail exato) e /members paginado por pageNumber/pageSize (?page= é
-    // IGNORADO pela API, como no bug 3.1 da SPEC_APROVACAO_LIDER).
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      const u = new URL(url);
-      if (u.pathname === '/teams') {
-        return { ok: true, json: async () => TEAMS } as Response;
-      }
-      const alvoEmail = u.pathname.match(/^\/employees\/emails\/(.+)$/);
-      if (alvoEmail) {
-        const email = decodeURIComponent(alvoEmail[1]).toLowerCase();
-        const pessoa = MEMBERS.find((m) => m.contactEmail.toLowerCase() === email);
-        return {
-          ok: true,
-          json: async () =>
-            pessoa ? { exists: true, employeeId: pessoa.id } : { exists: false, employeeId: null },
-        } as Response;
-      }
-      if (u.pathname.includes('/members')) {
-        const text = norm(u.searchParams.get('text') ?? '');
-        let hits = MEMBERS.filter((m) => norm(m.name).includes(text));
-        const tamanho = Math.min(Number(u.searchParams.get('pageSize') ?? '25') || 25, 100);
-        const pagina = Number(u.searchParams.get('pageNumber') ?? '0') || 0;
-        hits = hits.slice(pagina * tamanho, pagina * tamanho + tamanho);
-        return { ok: true, json: async () => hits } as Response;
-      }
-      return { ok: true, json: async () => [] } as Response;
-    }));
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    delete process.env.TG_API_TOKEN;
+  beforeEach(async () => {
+    await criarDbMemoria();
+    await semearEspelhoTeamGuide({ times: TEAMS, membros: MEMBERS });
   });
 
   it('resolve a área pelo email (L2 de passthrough)', async () => {
@@ -114,8 +81,10 @@ describe('deriveAreaFromEmail', () => {
     expect(await deriveAreaFromEmail('chefe.geral@gocase.com')).toBe('Gocase');
   });
 
-  it('lança erro sem TG_API_TOKEN', async () => {
-    delete process.env.TG_API_TOKEN;
-    await expect(deriveAreaFromEmail('joao.dados@gocase.com')).rejects.toThrow(/TG_API_TOKEN/);
+  it('espelho vazio → null (fail-safe, NÃO lança)', async () => {
+    await criarDbMemoria();
+    const { __resetTeamguideSnapshotCache } = await import('@/lib/areas/teamguide.server');
+    __resetTeamguideSnapshotCache();
+    await expect(deriveAreaFromEmail('joao.dados@gocase.com')).resolves.toBeNull();
   });
 });

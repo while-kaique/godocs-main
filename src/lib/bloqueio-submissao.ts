@@ -27,12 +27,14 @@ export type FaseBloqueio = "antes" | "durante" | "livre";
 export type JanelaBloqueio = { inicio: number; fim: number };
 
 // ── Marcos PADRÃO (baked), em UTC ────────────────────────────────────────────
-// BRT = UTC-3.
-//  • Início: terça 25/08/2026 23h59 BRT  = 2026-08-26T02:59:00Z
-//  • Reabre: terça 01/09/2026 00h00 BRT  = 2026-09-01T03:00:00Z
+// BRT = UTC-3. ⚠️ Estes defaults BAKED são o que o CLIENTE usa (no navegador não há
+// `process.env`, então a faixa/botão saem daqui). Os secrets só movem o gate do SERVIDOR,
+// não a tela — por isso, para o AVISO aparecer, a janela tem de estar BAKED aqui.
+//  • Início: 02/09/2026 (já passado no deploy) = 2026-09-02T00:00:00Z
+//  • Reabre: sexta 04/09/2026 16h00 BRT        = 2026-09-04T19:00:00Z
 // Bloqueado quando  INICIO <= agora < FIM  (fim é exclusivo = instante de reabertura).
-export const INICIO_PADRAO_UTC = "2026-08-26T02:59:00Z";
-export const FIM_PADRAO_UTC = "2026-09-01T03:00:00Z";
+export const INICIO_PADRAO_UTC = "2026-09-02T00:00:00Z";
+export const FIM_PADRAO_UTC = "2026-09-04T19:00:00Z";
 
 /**
  * Copy — FONTE ÚNICA. As três frases pedidas (aviso prévio · durante · recusa) se
@@ -40,12 +42,12 @@ export const FIM_PADRAO_UTC = "2026-09-01T03:00:00Z";
  * ⚠️ Sem "-" nem "—" nas frases.
  */
 export const COPY_BLOQUEIO = {
-  /** ANTES da janela — o botão ainda funciona; é só um lembrete de prazo. */
+  /** ANTES da janela — o botão ainda funciona; é só um lembrete. */
   avisoPrevio:
-    "As novas submissões serão pausadas nesta terça, 25 de agosto, às 23h59. Se você já começou a submissão de um projeto, conclua o envio antes desse horário. Voltamos a receber submissões na terça, 1º de setembro.",
+    "Em breve o GoDocs vai receber uma versão nova e melhor. Durante a atualização, as submissões e edições ficam pausadas por um tempo. Se você já começou um projeto, conclua o envio antes.",
   /** DURANTE a janela — botão bloqueado. Também é a copy da recusa do servidor. */
   durante:
-    "As submissões estão pausadas no momento e voltam na terça, 1º de setembro. Os projetos que você já enviou seguem em avaliação normalmente pelo time de RPA.",
+    "Estamos preparando uma versão nova e melhor do GoDocs para deixar tudo mais simples para vocês. Enquanto isso, as submissões e edições ficam pausadas até esta sexta às 16h. Já já voltamos com as novidades.",
 } as const;
 
 /** Lê uma env de override de forma LAZY e segura no cliente (sem `process`). */

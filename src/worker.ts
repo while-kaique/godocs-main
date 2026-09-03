@@ -8,6 +8,12 @@
 import { getCurrentUser, isAdmin } from "@/lib/auth.functions";
 import { ehLideranca } from "@/lib/areas/teamguide.server";
 import {
+  sincronizarTeamGuide,
+  statusTeamGuideEspelho,
+} from "@/lib/teamguide-espelho";
+import { diasParaExpirarTokenTG } from "@/lib/teamguide-token";
+import { alertarErroIntegracao, COOLDOWN_ALERTA_LENTO_MS } from "@/lib/alertas.functions";
+import {
   iniciarSubmissao,
   enviarMensagem,
   iniciarSaving,
@@ -95,6 +101,7 @@ import {
   getApiLogById,
   cleanupOldApiLogs,
   cleanupOldSyncRuns,
+  cleanupOldTeamguideSyncRuns,
   getSyncRunsRecentes,
   deleteProjetosTesteE2E,
   excluirProjetoCascade,
@@ -316,6 +323,36 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         return errorJson("Rota exclusiva de cron.", 403);
       }
       return json(await syncSheetsToSqlite("cron"));
+    }
+
+    // ── Cron: sync do ESPELHO da TeamGuide (árvore + pessoas) + aviso de token ──
+    // As leituras de cargo/liderança/área/nome leem do espelho SQLite (fail-safe); é ESTE cron
+    // (sugerido a cada 30 min — a árvore muda devagar) que o mantém fresco. Também avisa, no
+    // Chat de Ajuda, quando o JWT do TG_API_TOKEN está a < 14 dias de expirar (o incidente
+    // 01–02/09/2026 foi o token vencendo sem aviso). Nunca lança — `sincronizarTeamGuide` já
+    // é fail-safe e dispara o próprio alerta em falha.
+    if (pathname === "/api/cron/sync-teamguide" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      // Higiene do log de corridas (~48/dia com o cron de 30 min).
+      runBackground(cleanupOldTeamguideSyncRuns(7));
+      const resultado = await sincronizarTeamGuide("cron");
+      const dias = diasParaExpirarTokenTG(process.env.TG_API_TOKEN);
+      if (dias != null && dias < 14) {
+        const data = new Date(Date.now() + dias * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .slice(0, 10);
+        await alertarErroIntegracao(
+          "teamguide-token",
+          `token da TeamGuide expira em ${dias} dia(s) (${data})`,
+          "Renove o TG_API_TOKEN nos secrets do Godeploy (prod + staging) antes de vencer.",
+          // Cooldown LONGO: a expiração é condição lenta e o cron roda a cada 30 min — sem
+          // isto, o Chat de Ajuda receberia o aviso a cada corrida.
+          COOLDOWN_ALERTA_LENTO_MS,
+        );
+      }
+      return json({ ...resultado, tokenDiasRestantes: dias });
     }
 
     // ── Cron: reconcilia a coluna "Complexidade" da planilha ──
@@ -1271,6 +1308,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request);
       const [saude, recentes] = await Promise.all([statusEspelho(), getSyncRunsRecentes(20)]);
       return json({ ...saude, recentes });
+    }
+
+    // ── Saúde das INTEGRAÇÕES externas (admin) ──
+    // Hoje só a TeamGuide: idade do espelho, última corrida e dias restantes do token — para
+    // ver, sem abrir log, se o snapshot envelheceu ou o token está perto de vencer.
+    if (pathname === "/api/admin/integracoes-status" && method === "GET") {
+      await requireAdmin(request);
+      return json({
+        teamguide: await statusTeamGuideEspelho(),
+        tokenDiasRestantes: diasParaExpirarTokenTG(process.env.TG_API_TOKEN),
+      });
     }
 
     // ── Reconciliação da análise sob demanda (admin) ──

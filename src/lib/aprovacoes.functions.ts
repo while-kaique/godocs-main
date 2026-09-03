@@ -23,6 +23,7 @@
 import { z } from 'zod';
 import { registrarAtividade } from '@/lib/atividades.functions';
 import { ehLideranca, getLideresDe, getLideradosDe } from '@/lib/areas/teamguide.server';
+import { espelhoTeamGuideDisponivel } from '@/lib/teamguide-espelho';
 import {
   AVISO_SAVING_INCOERENTE,
   bloqueiaPreAprovacao,
@@ -341,6 +342,15 @@ export async function abrirPreAprovacao(
     // projeto em que a pessoa responde a outro líder.
     const lideres = (await getLideresDe(autor, { projetoId })).filter((l) => !!l.email);
     if (!lideres.length) {
+      // ⚠️ As leituras da TeamGuide agora são FAIL-SAFE (leem o espelho, nunca lançam): `[]`
+      // pode ser "sem líder de fato" OU "espelho ainda vazio / TG fora". Distinguimos aqui
+      // para PRESERVAR o motivo `teamguide_indisponivel` (que antes vinha do throw, hoje
+      // capturado só pelo catch externo) — sem snapshot não dá para afirmar que a pessoa não
+      // tem líder. Com o espelho populado (regime normal) isto é sempre `true`.
+      if (!(await espelhoTeamGuideDisponivel())) {
+        console.log(`[aprovacoes] espelho da TeamGuide vazio → teamguide_indisponivel (${autor}).`);
+        return semFila('teamguide_indisponivel');
+      }
       console.log(`[aprovacoes] ${autor} sem líder na TeamGuide → sem fila de aprovação (D6).`);
       return semFila('sem_lider');
     }
