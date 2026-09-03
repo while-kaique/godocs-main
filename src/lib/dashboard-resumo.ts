@@ -152,16 +152,21 @@ export const COLUNAS_RESUMO: readonly string[] = [
   'Ferramenta',
   'Data Submissão',
   'Status',
-  'Ganho Total',
-  'Saving Reais',
-  'Receita Mensal',
+  'Impacto Líquido',
+  'Impacto Bruto',
+  'Receita Incremental',
   // Lida pelo rollup histórico (`rollup-backfill.ts`), NÃO pelo `mapResumo` — é a cadência
   // (mensal/pontual/tri/semestral) que o grão do rollup usa e que o Gabriel normaliza. Fica
   // aqui, como `Ferramenta`, para existir no `linha_resumo` do espelho sem virar campo do
   // payload da listagem (não entra em `ProjetoDashboardResumo`).
-  'Tipo de Saving',
+  'Freq. Custo Evitado',
+  // Lida pelo rollup histórico (`rollup-backfill.ts`) como DISCRIMINADOR de geração: só o
+  // caminho v2 escreve esta coluna, e é ela que diz se a receita já está dentro do
+  // "Impacto Bruto". Não vira campo do payload da listagem (não entra em
+  // `ProjetoDashboardResumo`), como `Ferramenta` e `Freq. Custo Evitado`.
+  'Impacto Líquido Mensal',
   'Complexidade',
-  'Tipos Projeto',
+  'Tipos de Ganho',
   'Especial?',
   'Estrelas',
   COLUNA_ESTADO_LIDER,
@@ -176,7 +181,12 @@ export const COLUNAS_RESUMO: readonly string[] = [
  * ~600 linhas que ninguém editou com o recorte ANTIGO — a coluna existiria no código e
  * viria vazia na tela, para sempre.
  */
-export const VERSAO_RECORTE_RESUMO = 3;
+// ⚠️ 3 → 4 na T6 da v2 (02/09/2026): as 19 RENOMEAÇÕES do cabeçalho passam por aqui. O
+// recorte casa por NOME, então sem o bump as ~600 linhas que ninguém editou manteriam o
+// `linha_resumo` com as chaves da v1 e `mapResumo` leria `undefined` — Ganho/Saving/
+// Receita/Tipos nasceriam VAZIOS na tela, para sempre. Renomear é o mesmo caso de
+// "coluna nova" que este contador existe para cobrir.
+export const VERSAO_RECORTE_RESUMO = 5;
 
 /**
  * Recorta de uma linha da planilha só as `COLUNAS_RESUMO`.
@@ -223,11 +233,11 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
     statusChave: chaveStatus(row['Status']),
     dataSubmissao,
     dataOrdenacao: d ? d.getTime() : null,
-    ganhoTotal: numero(row['Ganho Total']),
-    savingReais: numero(row['Saving Reais']),
-    receitaMensal: numero(row['Receita Mensal']),
+    ganhoTotal: numero(row['Impacto Líquido']),
+    savingReais: numero(row['Impacto Bruto']),
+    receitaMensal: numero(row['Receita Incremental']),
     complexidade: texto(row['Complexidade']),
-    tipos: texto(row['Tipos Projeto']),
+    tipos: texto(row['Tipos de Ganho']),
     especial: ehSim(row['Especial?']),
     // ⚠️ Casamento TOLERANTE: o cabeçalho real de prod/staging é "Aprovação do Lider"
     // (sem acento) e `row['Aprovação do Líder']` devolveria `undefined` — a coluna

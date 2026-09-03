@@ -2554,6 +2554,8 @@ export type ProjetoRow = {
   custo_rodar_itens: string | null;
   // Impacto MATERIALIZADO. ⚠️ DERIVADO — sempre gravado a partir de `src/lib/impacto.ts`,
   // nunca calculado no call site (a v1 pagou a fórmula redigitada em 5 lugares).
+  /** Links no Drive dos anexos de evidência (JSON array). Coluna INTERNA. */
+  ganho_anexos_links: string | null;
   impacto_bruto: number | null;
   impacto_liquido: number | null;
   impacto_liquido_mensal: number | null;

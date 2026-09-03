@@ -868,6 +868,12 @@ const MIGRATIONS = [
   //     PARCIAL, que é pior que derivado nenhum (o relatório soma o que existe).
   //     ⚠️ `paraGanhosProjeto` valida o VALOR (`valorFinito`) mas não a FREQUÊNCIA — quem
   //     materializar tem de tratar o throw do `divisorDe` como tudo-ou-nada.
+  // Links no Drive dos ANEXOS de evidência da Etapa 3 (JSON array). Coluna INTERNA:
+  // não vai ao Sheets, não está em `SAFE_UPDATE_FIELDS`, o sync reverso não a toca.
+  // ⚠️ Separada de `arquivos_links` de propósito: `submeterParaValidacao` SOBRESCREVE
+  // aquela com `[link]` do resumo da doc e usa o `[0]` para dar upsert no MESMO arquivo
+  // do Drive — a evidência guardada lá seria apagada pela chamada seguinte do cliente.
+  'ALTER TABLE projetos ADD COLUMN ganho_anexos_links TEXT',
   'ALTER TABLE projetos ADD COLUMN impacto_bruto REAL',
   'ALTER TABLE projetos ADD COLUMN impacto_liquido REAL',
   'ALTER TABLE projetos ADD COLUMN impacto_liquido_mensal REAL',

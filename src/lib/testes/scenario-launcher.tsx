@@ -124,6 +124,12 @@ export function ScenarioLauncher() {
       const payload = {
         ...scenario.formData,
         docs: scenario.docs,
+        // ⚠️ O painel de cenários existe para EXERCITAR o agente conversacional, e desde a
+        // T9 do GoDocs v2 a submissão real não passa mais por ele (a doc é compilada numa
+        // passada, em background). Este opt-in é o que mantém o ramo de conversa alcançável
+        // — "tirar do fluxo, não excluir": sem ele, `iniciar-submissao` devolve só o
+        // `projeto_id` e esta tela não teria turno de agente para simular.
+        modo_conversa: true,
       };
 
       const result = await testApiFetch<{

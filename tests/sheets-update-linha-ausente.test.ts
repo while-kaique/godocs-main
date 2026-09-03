@@ -11,7 +11,7 @@ import { updateRowByProjectId } from '@/lib/google/sheets';
 const okResp = (body: unknown) =>
   ({ ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) }) as Response;
 
-const LIVE_HEADERS = ['ID Projeto', 'Saving Horas', 'Status', 'Observações', 'Atualizado Em'];
+const LIVE_HEADERS = ['ID Projeto', 'Custo Evitado Horas', 'Status', 'Observações', 'Atualizado Em'];
 
 /** 1:1 → cabeçalho; GET → coluna do ID; batchUpdate → ok. */
 function makeFetchMock(idColumnValues: string[][]) {

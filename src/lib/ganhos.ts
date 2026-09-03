@@ -69,7 +69,12 @@
 //    contrato testado, a v2 nasce ZERADA e sem migração, e nenhum caminho liga as duas
 //    gerações. ⚠️ Se a T6 algum dia ler dado da v1 nestas colunas, isto vira defeito.
 //
-import { DIVISOR_FREQUENCIA } from './impacto'
+import {
+  DIVISOR_FREQUENCIA,
+  impactoBruto,
+  impactoLiquido,
+  impactoLiquidoMensal,
+} from './impacto'
 import type { Frequencia, GanhosProjeto } from './impacto'
 
 /**
@@ -616,4 +621,136 @@ export function paraGanhosProjeto(g: GanhosDeclarados): GanhosProjeto {
   }
 
   return projeto
+}
+
+// ─── a ponte com a PERSISTÊNCIA (T6) ────────────────────────────────────────────
+
+/**
+ * O R$ do braço das HORAS do custo evitado, a partir da tabela antes/depois.
+ *
+ * ⚠️ A conversão hora→R$ entra por **INJEÇÃO** (`valorHoraDe`), nunca por uma segunda
+ * tabela de valor/hora aqui dentro. O canônico é `resolverValorHora`
+ * (`agents/saving-calc.ts`), que carrega o fix do falso-zero do cargo genérico e o piso
+ * conservador; uma cópia local nasceria sem eles e divergiria em silêncio — é a doença
+ * ("a mesma conta em N lugares") que esta frente existe para curar. A injeção também é o
+ * que mantém este módulo PURO e fora do `agents/types.ts`, que a T9 demole.
+ *
+ * ⚠️ **Cada linha é clampada em 0 ANTES de somar**, e a ordem importa: a régua "depois
+ * tem de ser menor que antes" é do formulário (`validacao-etapa3.ts`), com mensagem no
+ * campo. Aqui, um par invertido não pode virar valor NEGATIVO, porque ele abateria o
+ * ganho das OUTRAS linhas e o projeto perderia impacto que de fato existe. Clampar só o
+ * total deixaria justamente essa compensação passar.
+ *
+ * Arredonda a 2 casas: a coluna guarda dinheiro, não dízima (`10h × 33,333` grava
+ * `333.33`, não `333.33000000000004`).
+ */
+export function derivarValorHorasCustoEvitado(
+  linhas: CustoEvitadoLinhaHoras[],
+  valorHoraDe: (funcao: string) => number,
+): number {
+  const total = (linhas ?? []).reduce((soma, linha) => {
+    const liberadas = Math.max(
+      0,
+      (Number(linha.horasAntes) || 0) - (Number(linha.horasDepois) || 0),
+    )
+    const valorHora = Number(valorHoraDe(linha.funcao)) || 0
+    return soma + liberadas * valorHora
+  }, 0)
+  return Math.round(total * 100) / 100
+}
+
+/** O que a submissão v2 grava: as colunas de `projetos` + os 3 impactos derivados. */
+export type PatchGanhos = {
+  /** Colunas snake_case de `projetos`, prontas para UM `updateProjeto`. */
+  colunas: Record<string, unknown>
+  /** Os 3 números da fórmula (`impacto.ts`), já materializados. */
+  impacto: { bruto: number; liquido: number; liquidoMensal: number }
+}
+
+/**
+ * Traduz o ganho DECLARADO no formulário para o patch de colunas + os 3 `impacto_*`.
+ *
+ * É a única ponte entre o modelo da T3 e o banco: nenhum call site monta esse mapeamento
+ * à mão nem chama `JSON.stringify` no valor de uma coluna (a serialização snake_case tem
+ * dono, e é `serializar*` acima — chave trocada não dá erro, devolve `undefined`).
+ *
+ * Três contratos que este corpo carrega, cada um com o seu modo de falha:
+ *
+ *  1. **RF-218 — bloco de categoria DESMARCADA é resíduo.** Quem manda é `categorias`,
+ *     não a presença do bloco: trocar de categoria no meio do preenchimento deixa o bloco
+ *     antigo preenchido no estado do formulário, e ele não pode voltar pelas costas. A
+ *     coluna da categoria desmarcada nasce **`null`** (explicitamente, não ausente — o
+ *     `UPDATE` precisa APAGAR o que uma submissão anterior gravou).
+ *  2. **RF-219 — o imensurável fica FORA de toda conta**, e quem garante isso é o
+ *     `paraGanhosProjeto` (impacto zero quando ele é a ÚNICA categoria, custo para rodar
+ *     incluído). O racional continua sendo GRAVADO: ele é o insumo do classificador.
+ *  3. ⚠️ **Tudo-ou-nada dos 3 `impacto_*`** (contrato em `schema.ts`): os três são
+ *     calculados ANTES de qualquer coluna ser montada. `impactoBruto` não usa divisor,
+ *     mas `impactoLiquidoMensal` passa pelo `divisorDe`, que LANÇA em frequência
+ *     desconhecida — e o vocabulário das fontes reais é maior que o enum (`'anual'`,
+ *     `''`, `null`). Montando as colunas primeiro, um throw no mensal devolveria patch
+ *     com o bruto preenchido: derivado PARCIAL, que é **pior** que derivado nenhum,
+ *     porque o relatório soma o que existe em vez de acusar o que falta.
+ */
+export function montarPatchGanhos(g: GanhosDeclarados): PatchGanhos {
+  const marcadas = canonizar(g.categorias ?? [])
+  const marcada = (categoria: GanhoCategoria) => marcadas.includes(categoria)
+
+  // (3) Os 3 impactos PRIMEIRO — ver contrato acima. Um throw aqui não deixa patch algum.
+  const nucleo = paraGanhosProjeto(g)
+  const impacto = {
+    bruto: impactoBruto(nucleo),
+    liquido: impactoLiquido(nucleo),
+    liquidoMensal: impactoLiquidoMensal(nucleo),
+  }
+
+  // (1) Só o que está MARCADO atravessa; o resto vira `null`.
+  const saving = marcada('saving_efetivado') ? g.savingEfetivado : undefined
+  const custoEvitado = marcada('custo_evitado') ? g.custoEvitado : undefined
+  const receita = marcada('receita_incremental') ? g.receitaIncremental : undefined
+  const imensuravel = marcada(CATEGORIA_IMENSURAVEL) ? g.imensuravel : undefined
+
+  // ⚠️ O custo para rodar é perguntado a TODO MUNDO (fora do acordeão), então ele não tem
+  // categoria que o marque — é a lista que decide. Ele é gravado inclusive no projeto
+  // imensurável (é dado declarado pela pessoa); quem o mantém fora da CONTA daquele caso
+  // é o `paraGanhosProjeto`.
+  const custoRodar = g.custoRodar ?? []
+
+  return {
+    colunas: {
+      ganho_categorias: serializarCategorias(marcadas),
+
+      // Saving efetivado: as DUAS pontas. O saving é a diferença (`savingLiquido`) e NÃO
+      // tem coluna — um terceiro número existiria só para divergir dos outros dois.
+      // ⚠️ `saving_efetivado_valor` e `_desde` nasceram LEGADO e não são escritas aqui.
+      saving_efetivado_valor_antes: saving ? saving.valorAntes : null,
+      saving_efetivado_valor_agora: saving ? saving.valorAgora : null,
+      saving_efetivado_frequencia: saving ? saving.frequencia : null,
+      saving_efetivado_evidencia: saving ? saving.evidencia : null,
+
+      // Custo evitado: os dois braços + as linhas que justificam o das horas.
+      custo_evitado_frequencia: custoEvitado ? custoEvitado.frequencia : null,
+      custo_evitado_horas_linhas: custoEvitado
+        ? serializarLinhasHoras(custoEvitado.linhasHoras)
+        : null,
+      custo_evitado_horas_valor: custoEvitado ? custoEvitado.valorHoras : null,
+      custo_evitado_nao_contratado: custoEvitado ? custoEvitado.naoContratado : null,
+      custo_evitado_racional: custoEvitado ? custoEvitado.racional : null,
+
+      // Receita. ⚠️ `receita_incremental_tipo` nasceu LEGADO e não é escrita.
+      receita_incremental_valor: receita ? receita.valor : null,
+      receita_incremental_frequencia: receita ? receita.frequencia : null,
+      receita_incremental_racional: receita ? receita.racional : null,
+
+      // (2) Fora da conta, mas gravado: é o que o classificador lê.
+      ganho_imensuravel_racional: imensuravel ? imensuravel.racional : null,
+
+      custo_rodar_itens: custoRodar.length > 0 ? serializarCustoRodar(custoRodar) : null,
+
+      impacto_bruto: impacto.bruto,
+      impacto_liquido: impacto.liquido,
+      impacto_liquido_mensal: impacto.liquidoMensal,
+    },
+    impacto,
+  }
 }

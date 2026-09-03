@@ -22,6 +22,9 @@ import {
   retroativoCustosPontuais,
   recompilarDocsPendentes,
 } from "@/lib/chat.functions";
+// GoDocs v2 — persistência do ganho declarado (T6). Módulo próprio: o `chat.functions`
+// é o caminho conversacional, que a T9 tira do fluxo de submissão.
+import { salvarGanhos } from "@/lib/ganhos.functions";
 import { reconciliarSnapshots } from "@/lib/reconciliar-snapshots";
 import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
 import { derivarTotaisPorArea } from "@/lib/rollup-financeiro";
@@ -252,6 +255,20 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       }
       const admin = email ? await isAdmin(email) : false;
       return json({ ehLideranca: lider, isAdmin: admin });
+    }
+
+    // ── GoDocs v2: grava o ganho declarado na Etapa 3 (formulário determinístico) ──
+    // Chamada pelo cliente ANTES de `/api/chat/submeter-validacao` — as duas dividem o
+    // mesmo `try` lá, então uma falha aqui aborta a submissão de propósito (submeter sem
+    // o ganho gravado daria projeto sem impacto).
+    //
+    // ⚠️ Fora do bloco `/api/chat/*`: aquele if é do fluxo conversacional (carrega
+    // streaming SSE, `insertApiLog` e a tradução de ZodError daquele caminho). Aqui o
+    // tratamento de erro é o do `catch` geral do roteador — o mesmo do `/api/submeter/perfil`.
+    if (pathname === "/api/submeter/ganhos" && method === "POST") {
+      const body = await readBody<unknown>(request);
+      const resultado = await salvarGanhos(body, getEmailFromRequest(request));
+      return json(resultado);
     }
 
     // ── Config pública (rótulo do ambiente) — usado pela faixa de staging ──
