@@ -165,6 +165,100 @@ foram lidos, e conferir se a distribuição tem a mesma forma. **Tarefa T1.**
 
 ---
 
+## 6.1 T1 — VALIDAÇÃO CEGA (medida 02/09/2026, 484 não-especiais)
+
+**Como foi feito.** `scripts/regua-t1/` — leitura pura da planilha de prod + aplicação da régua por
+LLM (`gpt-5.4-mini` direto na OpenAI, `json_object`, 3 tentativas). O prompt é montado por
+`descreverReguaAgente()` + `descreverEscape()` do `estrelas-regua.ts` (fonte única, sem redigitar
+critério). O agente **não vê a nota humana**. Alvo: 484 projetos **não-especiais · com nota · não
+descontinuados** — os que a sessão da régua nunca leu. Custo total: ~US$ 1,10, ~2 min.
+
+Três variantes, para separar "a régua não discrimina" de "UM item do piso zera tudo". As variantes
+B e C mexem **só no prompt do script**; `estrelas-regua.ts` não foi tocado.
+
+| | 0★ | 1★ | 2★ | 3★ | 4★ | 5★ | escape |
+|---|---|---|---|---|---|---|---|
+| **Humano** (gabarito) | 400 | 59 | 16 | 7 | 2 | 0 | — |
+| **A** — régua literal | **483** | 1 | 0 | 0 | 0 | 0 | 0 |
+| **B** — A + a leitura da D1 dita no prompt | **483** | 1 | 0 | 0 | 0 | 0 | 0 |
+| **C** — piso sem o item `mensuravel` | 63 | **288** | 125 | 4 | 3 | 0 | 0 |
+
+### Achado 1 — a régua literal é INERTE fora do especial declarado
+O desqualificador de piso **`mensuravel`** (*"o ganho é mensurável com o que está descrito — volta
+como saving/receita"*) disparou em **484 de 484**. Não é acidente de amostra: **100% dos
+não-especiais têm ganho medido > 0**, porque passar pelo memorial financeiro é o que os torna
+não-especiais. E ele **também morde os especiais**: na variante A, **27 dos 65** caem a 0★,
+incluindo os de nota humana alta.
+
+⚠️ Como está escrito, o piso `mensuravel` e a **D6** (*"estrela vale para TODO projeto"*) não podem
+ser verdade ao mesmo tempo. **Decisão do Luis** — não mexi na régua.
+
+### Achado 2 — não é problema de prompt (variante B)
+Dizer no prompt a intenção da **D1** (*ter número não zera; só zera se TUDO estiver capturado pelo
+número*) mudou **1 projeto em 484**. O texto do piso é lido como binário — reescrevê-lo com mais
+cuidado no prompt não resolve, porque o problema é o **critério**, não a redação dele.
+
+### Achado 3 — sem esse item, a régua discrimina, mas achata em 1★–2★
+Variante C: **60% em 1★ e 26% em 2★**; só **7 projetos em 484** acima de 2★. Pelo próprio
+`detectarAchatamento` (D12), o lote é **achatamento suspeito** (um destino com 60% > `LIMIAR_ACHATAMENTO`).
+A causa parece **MATERIAL, não de calibragem**: 3★/4★/5★ pedem *barreira*, *escolha que compromete
+recurso* e *caminho pelo qual o resultado chega ao cliente* — e o material do não-especial é
+memorial financeiro (cargo, horas, R$). O texto que sustentaria 3★+ não está escrito em lugar
+nenhum. É o mesmo diagnóstico já registrado no painel de agentes dos especiais.
+
+### Achado 4 — a FORMA bate; o "fundo" da escala é que está deslocado um degrau
+Humano `83/12/3/1/0`, régua C `13/60/26/1/1`: as duas são fortemente concentradas no fundo com
+cauda curta — a diferença é **onde fica o fundo**. A régua praticamente não usa o 0★ quando o item
+`mensuravel` sai, e o humano quase só usa o 0★.
+
+### Achado 5 — ⚠️ o gabarito humano está contaminado: `0` também quer dizer "ninguém auditou"
+A coluna "Estrelas" é numérica e "sem nota" é gravado como **`0`** (já registrado no CLAUDE.md).
+A taxa de projetos com nota ≥1 por mês de submissão prova que a triagem parou:
+
+| mês | 2026-03 | 04 | 05 | 06 | **07** | 08 |
+|---|---|---|---|---|---|---|
+| projetos | 46 | 40 | 106 | 87 | **198** | 4 |
+| com ≥1★ | 26% | 33% | 24% | 31% | **1,5%** | 100% |
+
+Os **221 projetos de julho** não são "avaliados como zero", são **não avaliados**. No subconjunto
+dos meses em que a triagem estava ativa (**n=263**) o gabarito muda de forma: humano `73/18/6/3/1`
+contra régua C `17/57/25/0/0`. **Spearman 0,199** — ordenação fraca.
+
+### Achado 6 — onde o humano de fato avaliou, a régua concorda
+Restrito aos **84 não-especiais com nota humana ≥1**: **44% exato · 93% dentro de ±1**. Nos
+especiais 1★–5★ (n=58): 24% exato · 66% dentro de ±1. O ruído do conjunto inteiro vem do bloco de
+zeros do Achado 5, não da ordenação.
+
+### Achado 7 — o §6 estava contaminado, e o viés é o esperado
+Mesma régua (variante C) nos 65 especiais, contra o §6 escrito à mão por quem os havia lido:
+
+| | 0★ | 1★ | 2★ | 3★ | 4★ | 5★ | escape |
+|---|---|---|---|---|---|---|---|
+| humano hoje (6–10 dobrado em 5) | 0 | 12 | 16 | 18 | 8 | 8 | — |
+| **§6, à mão** | 0 | 21 | 18 | 9 | 7 | 9 | 2 |
+| **régua C, cega** | 2 | 33 | 12 | 3 | 9 | 6 | 2 |
+
+A régua aplicada às cegas roda **mais achatada** do que a mão que a escreveu produziu (1★: 33 vs 21;
+3★: 3 vs 9). O escape achou 2 candidatos: **`Gocontent Machine` 6★** (bate com o §6) e
+**`Portal de Ocorrências B2B` 6★** (novo, humano 2★).
+
+### Achado 8 — a promoção `+1` é letra morta e a confiança auto-declarada é inútil
+`dependente_nomeado` apareceu em **4 de 484** e a promoção foi aplicada **1 vez**. Ninguém escreve o
+dependente nomeado na doc — a promoção só volta a existir se o dado for coletado.
+E o LLM auto-declarou `alta` em **456 de 484**: em T4 a confiança tem de vir da pura
+`confiancaDe()`, **nunca do modelo**.
+
+### O que isto significa para T4 (cérebro B)
+1. **O piso `mensuravel` precisa de decisão do Luis antes do T4** — com ele, o cérebro B devolve 0
+   para tudo que não é especial declarado, e a D6 morre.
+2. A confiança sai de `confiancaDe()`, não do LLM.
+3. O corpus do RAG (T3) é o que pode desatar o achatamento do Achado 3 — sem vizinho com nota
+   humana, o modelo não tem contra o que comparar.
+4. **O gabarito do T7 tem de excluir os 221 de julho**, senão o retroativo vai medir contra
+   "ninguém auditou".
+
+---
+
 ## 7. Arquitetura — 3 cérebros
 
 O que já existe em `main` e é reaproveitado:
