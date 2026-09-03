@@ -27,6 +27,18 @@ T19 → T20 → T10. **Pronto para `/ggsd:code`.**
 - (c) metas de liberação da tabela 11.4 · (d) onde o texto ao autor aterrissa na v2 · (e) auditoria humana
   de ~50 projetos não avaliados para o gabarito.
 
+## Estado da sessão noturna de 03/09 (autônoma, autorizada pelo Luis)
+- **Código:** T21, T11, T12, T13, T14, T16, T17, T15, T18 e o wrapper server (`time.functions.ts` + rota
+  `POST /api/admin/avaliacao/time`) **codados, testados (red em contexto fresco) e commitados**. Suíte verde.
+  `worker.js` rebuildado. T20 (painel sombra no `/dashboard`) e T10 (aglutinação) **não** foram feitos.
+- **Retroativo (T19):** harness em `scripts/avaliacao-retro/`; dump só-leitura da planilha de prod (734
+  linhas); rodadas em `docs/plans/retro-rodadas/` com diário em `§11.7` do plano. 4 rodadas de 30 na mesma
+  amostra (variantes 1→4) fecharam o roteamento: humano 3%, 0 erro grave, aprovar preciso; depois amostra
+  nova de 100 e a base inteira.
+- **Régua intacta (D20).** Toda calibração foi em prompt do MÉRITO/CÉTICO ou em trava estrutural.
+
 ## Próximo passo
-`/ggsd:code` começando por **T21 (log e memória dos agentes)** e depois **T11 (dossiê)**. Sessão AUTÔNOMA noturna autorizada pelo Luis (03/09): codar T21→T18, rodar T19 em amostras 30→100 em `dry`, relatório de manhã. Sem deploy, sem gravar Estrelas/Status, régua intacta (D20). Retroativo sempre em `dry`, sombra
+Ler o artefato final e o `§11.7`; decidir (a) as metas de liberação (§11.4), (b) onde o texto ao autor
+aterrissa na v2, (c) a auditoria humana dos ~50 não avaliados. Pendentes de código: T20 (painel sombra) e
+T10 (aglutinação). Antes do PR: CLAUDE.md (seção do time) + spec (`SPEC_FEATURES_NOVAS.md`). Retroativo sempre em `dry`, sombra
 em tudo, prod e staging v1 intocados.
