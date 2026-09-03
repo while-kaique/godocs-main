@@ -617,3 +617,13 @@ OpenAI direto — `gpt-5.6-luna` nos especialistas, `gpt-5.6-sol` na estrela e n
   evitado declarados não pode ter preocupação financeira; (c) `aplicarTravaCeticoMaterial`: refutação do
   cético que só reclama de material ausente (anexo, documentação, "não auditável") sem citar número é
   ignorada; (d) prompts citam a seção "Fontes ausentes" (ausência é do sistema, não do autor).
+- **Rodada 3 (`r03-n30-v3`, variante 3, US$ 1,54):** **4 aprovar · 17 ajuste · 9 humano**; mérito 5 acertos
+  (36%), aprovar 100% em 4, 0 erro grave; estrelas exato 38%, dentro de 1 = 69%, viés +0,38, 1 escape
+  indicado. As travas tiraram os ajustes moles, mas o **cético virou o gargalo**: refutou 25/30 e, sem os
+  ajustes moles, a refutação sustentada caía em "debate não fechou" → humano (8 dos 9 humanos). Lendo os
+  motivos: o cético está achando **contradições REAIS que a triagem humana deixou passar** — erro de conta
+  no FAQ dos Agentes (2.200 × 30 s = 66.000 s, não 33.000), 6 h × 4,5 h na Análise Salarial, 0 h × 51 h na
+  Gestão de Consumíveis, bot em staging declarado como realizado (LIA DM), 4 níveis × 3 no SAIBBI, dupla
+  contagem no Argos. É o crítico que o Luis pediu; o defeito era o ROTEAMENTO. **Variante 4:** o cético
+  passa a propor `pergunta_ao_autor`; refutação que sobrevive à réplica e traz pergunta vira **ajuste**
+  (saída autônoma), não humano; sem pergunta segue para o humano.
