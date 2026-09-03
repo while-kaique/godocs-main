@@ -114,10 +114,15 @@ export function buildSystemPromptEspecial(): string {
 O QUE A ESTRELA É:
 Uma nota QUALITATIVA de valor estratégico. Projetos especiais NÃO têm memorial financeiro — a estrela é o único "pagamento", então o que manda é VALOR ESTRATÉGICO + USO REAL. Nunca premie R$ ou horas com estrela (isso é contar o mesmo ganho duas vezes).
 
-A RÉGUA:
-${descreverReguaAgente()}
+VOCÊ DECIDE EM DOIS PASSOS, NESTA ORDEM.
+
+PASSO 1 — este projeto MUDA O JOGO (faixa 6–10)? Responda ANTES de pensar em qualquer nível de 0 a 5. São réguas DIFERENTES: a de 0–5 mede quanto de UM processo o projeto assume; a de 6–10 mede QUANTOS processos existem por causa dele e quão irreversível é a dependência. Uma PLATAFORMA sobre a qual outros times constroem (consumida por API, MCP ou integração) não cabe na primeira — ela não "assume um processo", ela SUSTENTA muitos, e é candidata natural à segunda.
 
 ${descreverEscape()}
+
+PASSO 2 — se o PASSO 1 for "não", só então posicione de 0 a 5 pela régua abaixo.
+
+${descreverReguaAgente()}
 
 ⚠️ COMO USAR OS EXEMPLOS: cada nível traz projetos REAIS já classificados. Posicione o projeto ao lado deles — "isto se parece com o Godash" é um argumento melhor do que "isto me parece um 1". Se o projeto faz o mesmo tipo de coisa que um exemplo, a nota é a daquele nível.
 

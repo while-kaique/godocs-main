@@ -6,6 +6,10 @@
  * ⚠️ Faz DUMP da planilha inteira antes de escrever. Uma escrita só, do cabeçalho + linhas.
  */
 import { getAccessToken } from '../../src/lib/google/auth';
+// ⚠️ FONTE ÚNICA do de-para v1→v2. A aba de PRODUÇÃO ainda tem os nomes antigos
+// ('Participantes', 'Saving Reais', 'Ganho Total'…): sem esta ponte, a reorganização criaria
+// as colunas novas VAZIAS e empurraria 734 linhas de dado para o fim da planilha.
+import { NOME_LEGADO } from '../../src/lib/coluna-chave';
 import { writeFile } from 'node:fs/promises';
 
 const SP = '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
@@ -39,7 +43,7 @@ const ORDEM = [
   // ── IMPACTO (o que sai da fórmula) ──
   'Impacto Bruto', 'Impacto Líquido', 'Impacto Líquido Mensal',
   // classificação
-  'Tipo de Projeto', 'Complexidade', 'Estrelas',
+  'Tipo de Projeto', 'Especial?', 'Complexidade', 'Estrelas',
   // triagem
   'Status', 'Classificação', 'Motivo Reprovado', 'Motivo Reenvio', 'Observações', 'Análise Antiagente',
   // líder
@@ -61,20 +65,31 @@ const { values = [] } = (await (await fetch(`${base}/values/${encodeURIComponent
 const [header, ...linhas] = values;
 
 const idx = new Map(header.map((h, i) => [h.trim(), i]));
+/** Onde está o dado de uma coluna da v2: sob o nome NOVO, ou sob o LEGADO se a aba não migrou. */
+const de = (col: string): number | undefined => idx.get(col) ?? idx.get(NOME_LEGADO[col] ?? '\u0000');
+/** As legadas cujo dado foi ADOTADO por uma coluna da v2 não são "desconhecidas": já viajaram. */
+const adotadas = new Set(
+  [...ORDEM, ...ARQUIVADAS]
+    .filter((c) => !idx.has(c) && NOME_LEGADO[c] && idx.has(NOME_LEGADO[c]))
+    .map((c) => NOME_LEGADO[c]),
+);
 const naOrdem = [...ORDEM, ...ARQUIVADAS];
-const desconhecidas = header.filter((h) => h.trim() && !naOrdem.includes(h.trim()) && !APAGAR.includes(h.trim()));
-const ausentes = naOrdem.filter((n) => !idx.has(n));
+const desconhecidas = header.filter(
+  (h) => h.trim() && !naOrdem.includes(h.trim()) && !APAGAR.includes(h.trim()) && !adotadas.has(h.trim()),
+);
+const ausentes = naOrdem.filter((n) => de(n) === undefined);
 
 console.log(`${TAB}: ${header.length} colunas · ${linhas.length} linhas`);
 console.log(`  apagar: ${APAGAR.join(', ')}`);
 console.log(`  arquivar no fim: ${ARQUIVADAS.length}`);
 console.log(`  ordem nova: ${ORDEM.length} + ${ARQUIVADAS.length} = ${naOrdem.length} colunas`);
+if (adotadas.size) console.log(`  ↻ renomeadas (dado preservado): ${[...adotadas].join(', ')}`);
 if (desconhecidas.length) console.log(`  ⚠️ NA PLANILHA mas fora da ordem (vão para o fim): ${desconhecidas.join(', ')}`);
 if (ausentes.length) console.log(`  ⚠️ na ordem mas NÃO na planilha (serão criadas vazias): ${ausentes.join(', ')}`);
 
 const finalCols = [...naOrdem, ...desconhecidas];
 const matriz = [finalCols, ...linhas.map((l) => finalCols.map((c) => {
-  const i = idx.get(c);
+  const i = de(c);
   return i === undefined ? '' : (l[i] ?? '');
 }))];
 
