@@ -642,3 +642,13 @@ OpenAI direto — `gpt-5.6-luna` nos especialistas, `gpt-5.6-sol` na estrela e n
   amostra pequena), **sem achatamento**, calibragem ok. Leitura: o time está estável para escalar — humano
   é exceção, nunca aprova o que o humano reprovou, e onde é "conservador" ele pergunta algo concreto.
   **Próximo: base inteira** (734 linhas, sem descontinuados), mesma variante 4, teto de US$ 45 na rodada.
+
+### 11.8 Revisão de qualidade (contexto fresco, 03/09) — veredito `sugestoes`, o que foi tratado e o que ficou
+
+Tratado no mesmo dia: máscara de R$ cobre "horas" e "/h"; nó tool não duplica o retorno no pai (teto de
+32 MiB); `LIMIT 2000` na leitura da árvore por ciclo; `created_at` com milissegundos (ordem dos irmãos);
+rota `POST /api/admin/avaliacao/time` roda em background e devolve 202 (`sincrono:true` para a forma antiga).
+**Pendências registradas (baixas/médias latentes):** validar `cicloId` vindo do cliente (`getAvaliacaoCiclo`
+antes de registrar; ausente → 400) · cache `id → pai` no registrador (hoje 1 SELECT por nó) · retenção de
+`agente_log`/`avaliacao_ciclos` concluídos (irmã de `cleanupOldApiLogs`) · reaper de ciclos `aberto` antigos.
+**Fora desta fatia:** T20 (painel sombra no `/dashboard`) e T10 (aglutinação de feature em projeto existente).
