@@ -5,13 +5,13 @@ import { padronizarLinha, derivarSplitHorasSheet } from '@/lib/google/sync';
 describe('padronizarLinha', () => {
   it('texto vazio/null/"-"/"—" vira "—"', () => {
     const r = padronizarLinha({
-      'Projeto': '', 'Descrição': null, 'Observações': '-', 'Tipo de Saving': '—', 'Participantes': undefined,
+      'Projeto': '', 'Descrição': null, 'Observações': '-', 'Freq. Custo Evitado': '—', 'Coautor': undefined,
     });
     expect(r['Projeto']).toBe('—');
     expect(r['Descrição']).toBe('—');
     expect(r['Observações']).toBe('—');
-    expect(r['Tipo de Saving']).toBe('—');
-    expect(r['Participantes']).toBe('—');
+    expect(r['Freq. Custo Evitado']).toBe('—');
+    expect(r['Coautor']).toBe('—');
   });
 
   it('texto preenchido é preservado', () => {
@@ -22,20 +22,20 @@ describe('padronizarLinha', () => {
 
   it('coluna numérica vazia/inválida vira 0', () => {
     const r = padronizarLinha({
-      'Saving Reais': null, 'Custo Evitado': '', 'Receita Mensal': '—', 'Ganho Total': undefined, 'Horas em Reais': 'abc',
+      'Impacto Bruto': null, 'Saving Efetivado': '', 'Receita Incremental': '—', 'Impacto Líquido': undefined, 'Custo Evitado Horas Reais': 'abc',
     });
-    expect(r['Saving Reais']).toBe(0);
-    expect(r['Custo Evitado']).toBe(0);
-    expect(r['Receita Mensal']).toBe(0);
-    expect(r['Ganho Total']).toBe(0);
-    expect(r['Horas em Reais']).toBe(0);
+    expect(r['Impacto Bruto']).toBe(0);
+    expect(r['Saving Efetivado']).toBe(0);
+    expect(r['Receita Incremental']).toBe(0);
+    expect(r['Impacto Líquido']).toBe(0);
+    expect(r['Custo Evitado Horas Reais']).toBe(0);
   });
 
   it('coluna numérica com valor (número ou string pt-BR) é preservada', () => {
-    const r = padronizarLinha({ 'Saving Reais': 418.2, 'Custo Externo Mensal': '1.234,56', 'Saving Horas': 30 });
-    expect(r['Saving Reais']).toBe(418.2);
+    const r = padronizarLinha({ 'Impacto Bruto': 418.2, 'Custo Externo Mensal': '1.234,56', 'Custo Evitado Horas': 30 });
+    expect(r['Impacto Bruto']).toBe(418.2);
     expect(r['Custo Externo Mensal']).toBeCloseTo(1234.56, 2);
-    expect(r['Saving Horas']).toBe(30);
+    expect(r['Custo Evitado Horas']).toBe(30);
   });
 
   // F4 — split carga real × escala: colunas NUMÉRICAS (horas). Número quando há split;

@@ -54,11 +54,11 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
         Projeto: 'Projeto Legado X',
         Ferramenta: 'n8n',
         Status: 'Aprovado',
-        'Saving Horas': '30',
-        'Saving Reais': '418,2',
+        'Custo Evitado Horas': '30',
+        'Impacto Bruto': '418,2',
         'Custo Externo Mensal': 'R$ 1.234,56',
-        'Tipos Projeto': 'saving',
-        Participantes: 'a@gocase.com, b@gocase.com',
+        'Tipos de Ganho': 'saving',
+        Coautor: 'a@gocase.com, b@gocase.com',
         'Memorial de Saving': '30h × R$13,94 = R$418,20',
       },
     ]);
@@ -95,7 +95,7 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
         Ferramenta: 'n8n',
         Status: 'Aprovado',
         Observações: 'Parecer revisado manualmente.',
-        'Saving Reais': '500',
+        'Impacto Bruto': '500',
       },
     ]);
     const r = await syncSheetsToSqlite();
@@ -147,7 +147,7 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
         Email: 'novodono@gocase.com',
         Projeto: 'Projeto Legado X',
         Ferramenta: 'n8n',
-        Participantes: 'c@gocase.com, d@gocase.com',
+        Coautor: 'c@gocase.com, d@gocase.com',
       },
     ]);
     await syncSheetsToSqlite();
@@ -181,8 +181,8 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
         Email: 'dona@gocase.com',
         Projeto: 'Projeto com Papéis',
         Ferramenta: 'n8n',
-        Participantes: 'coex@gocase.com', // coexecutor/"Coautor" (coluna retrocompatível)
-        'Participantes 2': 'plan@gocase.com', // planejador/"Participante" (ex-"Planejador")
+        Coautor: 'coex@gocase.com', // coexecutor/"Coautor" (coluna retrocompatível)
+        'Participante': 'plan@gocase.com', // planejador/"Participante" (ex-"Planejador")
         Contribuidor: 'contrib@gocase.com, contrib2@gocase.com',
       },
     ]);
@@ -208,7 +208,7 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
         Projeto: 'Outro Legado',
         Ferramenta: 'python',
         Status: 'Reenvio Pendente',
-        'Saving Horas': '10.5',
+        'Custo Evitado Horas': '10.5',
       },
     ]);
     const r = await syncSheetsToSqlite();
@@ -263,8 +263,8 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
         Projeto: 'AVD Central v2',
         Ferramenta: 'Claude',
         'Especial?': 'Não',
-        'Tipos Projeto': 'saving',
-        'Contexto do Projeto Especial': '—',
+        'Tipos de Ganho': 'saving',
+        'Ganho Imensurável': '—',
       },
     ]);
     const r = await syncSheetsToSqlite();
@@ -334,7 +334,7 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
         Projeto: 'Base Custos',
         Ferramenta: 'n8n',
         'Especial?': 'Sim', // planilha ainda diz "Sim" (só vira "Não" no submit)
-        'Tipos Projeto': 'especial',
+        'Tipos de Ganho': 'especial',
       },
     ]);
     await syncSheetsToSqlite();
@@ -415,7 +415,7 @@ describe('syncOwnerRowsFromSheet (sync sob demanda por dono)', () => {
         'ID Projeto': 'OWN-2',
         'Nome Completo': 'Responsável',
         Email: 'chefe@gocase.com',
-        Participantes: 'membro@gocase.com, outro@gocase.com',
+        Coautor: 'membro@gocase.com, outro@gocase.com',
         Projeto: 'Projeto em Equipe',
         Ferramenta: 'n8n',
         Status: 'Pendente',

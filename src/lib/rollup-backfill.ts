@@ -7,8 +7,8 @@
 //
 // ⚠️ **Tudo sai do ESPELHO da planilha, o MESMO que o /dashboard lê** (decisão do Luis,
 // 26/08/2026): "aprovado" = coluna "Status"="Aprovado" (a triagem decide na planilha, e o
-// sync reverso NÃO devolve `status` para `projetos.status`); saving = "Saving Reais",
-// receita = "Receita Mensal", área = "Área", cadência = "Tipo de Saving", mês = "Data
+// sync reverso NÃO devolve `status` para `projetos.status`); saving = "Impacto Bruto",
+// receita = "Receita Incremental", área = "Área", cadência = "Freq. Custo Evitado", mês = "Data
 // Submissão". Ler de `projetos`/`documentacao` divergia do que a empresa vê: o status
 // interno subcontava os aprovados (~7×) e a receita de legado mora na planilha, não em
 // `documentacao`. Assim o rollup BATE com o dashboard por construção. Grão MENSAL, "sem
@@ -22,6 +22,34 @@ import { chaveStatus, texto, numero } from "@/lib/dashboard-resumo";
 import { parseDataFlexivel } from "@/lib/format-date";
 
 const log = (...a: unknown[]) => console.log("[rollupBackfill]", ...a);
+
+/**
+ * O saving CRU da linha — sem a receita dentro, nas duas gerações do formulário.
+ *
+ * ⚠️ A régua muda com a geração porque a MESMA célula mudou de sentido:
+ *  - **v1**: "Saving Reais" (renomeada para "Impacto Bruto") já era só o saving.
+ *  - **v2**: `Impacto Bruto = S + CE + R` (D2 do plano) — a receita está DENTRO dele.
+ *
+ * Somar `Impacto Bruto` com `Receita Incremental` numa linha v2 contaria a receita duas
+ * vezes na série empurrada ao app do squad Intelli, cujo contrato é explícito: saving e
+ * receita **crus e separados, nunca somados**. Por isso o v2 subtrai.
+ *
+ * O discriminador é `Impacto Líquido Mensal`: coluna que **só** o caminho v2 escreve
+ * (`celulasGanhoV2`) — linha da v1 nunca a preenche. Preferida a "Tipos de Ganho" porque
+ * esta guarda um número, não um vocabulário que as duas gerações escrevem com palavras
+ * diferentes.
+ *
+ * Clampa em 0: `Impacto Bruto` menor que a receita significaria célula editada à mão, e
+ * saving negativo entraria como abatimento no total da área.
+ */
+function savingCruDaLinha(row: Record<string, string>): number | null {
+  const bruto = numero(row["Impacto Bruto"]);
+  const ehV2 = String(row["Impacto Líquido Mensal"] ?? "").trim() !== "";
+  // Célula ausente/ilegível continua `null` (é o que o agregador já trata); só a linha v2
+  // com número é que precisa descontar a receita.
+  if (!ehV2 || bruto == null) return bruto;
+  return Math.max(0, bruto - (numero(row["Receita Incremental"]) ?? 0));
+}
 
 export type RollupBackfillResultado = {
   projetos: number;
@@ -45,9 +73,14 @@ export async function recalcularRollupBackfill(): Promise<RollupBackfillResultad
       // grafia das 23 do Gabriel). Como o agregador agrupa por (periodo, area, tipo), variantes que
       // viram o mesmo nome SOMAM — total preservado, nada descartado. Ver `area-canonico.ts`.
       area: canonicalizarArea(texto(row["Área"])),
-      tipo_saving: texto(row["Tipo de Saving"]),
-      saving_reais: numero(row["Saving Reais"]),
-      receita_reais: numero(row["Receita Mensal"]),
+      tipo_saving: texto(row["Freq. Custo Evitado"]),
+      // ⚠️ O contrato do squad Intelli exige saving e receita CRUS e SEPARADOS — nunca
+      // somados. Na v1 isso saía de graça: "Saving Reais" (hoje "Impacto Bruto") já era o
+      // saving sozinho. Na v2 NÃO: `Impacto Bruto` é `S + CE + R` (D2), então lê-lo direto
+      // ao lado de `Receita Incremental` contaria a receita DUAS vezes na série empurrada.
+      // O discriminador é `Impacto Líquido Mensal`, coluna que só o v2 escreve.
+      saving_reais: savingCruDaLinha(row),
+      receita_reais: numero(row["Receita Incremental"]),
     });
   }
 

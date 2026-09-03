@@ -7,6 +7,7 @@ import {
   deveDescartarDraftEdicao,
   type DraftSnapshot,
 } from "@/lib/submeter/draft-storage";
+import { ganhosFormVazio } from "@/lib/submeter/validacao-etapa3";
 
 // localStorage em memória (node não tem). Replica o suficiente p/ o draft-storage.
 function memoryStorage(): Storage {
@@ -61,34 +62,33 @@ describe("draft-storage: isolamento submissão nova × edição (por projeto)", 
   });
 });
 
-describe("deveDescartarDraftEdicao: servidor manda (guard do rascunho de edição)", () => {
-  const draft = (d: Partial<DraftSnapshot>) =>
-    ({ chatComplete: false, approvedDocPreview: null, ...d }) as DraftSnapshot;
+describe("deveDescartarDraftEdicao: hoje NEUTRO (v2), e é decisão", () => {
+  // ⚠️ Este guard era ativo na v1: descartava o rascunho de edição que afirmava "fase de
+  // doc concluída" (`chatComplete`/preview aprovado) contra um servidor SEM documentação —
+  // estado típico de legado, que ressuscitava a tela de aprovação final e travava a
+  // submissão em "Documentação ainda não foi gerada".
+  //
+  // Na v2 esse estado não existe: a doc é gerada em background, invisível, sem tela de
+  // aprovação, e projeto com doc pendente é reconciliado pelo cron em vez de travar. O
+  // rascunho não tem mais nada a afirmar sobre a doc.
+  //
+  // Estes casos travam a NEUTRALIDADE de propósito: se alguém voltar a descartar rascunho
+  // de edição, tem de ser DECISÃO (passa por aqui), não efeito colateral — descartar hoje
+  // jogaria fora os blocos de ganho que a pessoa já preencheu.
+  const draft = (d: Partial<DraftSnapshot> = {}) => ({ ...d }) as DraftSnapshot;
 
-  it("DESCARTA quando o draft diz doc concluída (chatComplete) mas servidor sem doc", () => {
-    // Caso Juliana: legado na tela de aprovação final, sem doc persistida no servidor.
-    expect(
-      deveDescartarDraftEdicao({ serverTemDoc: false, draft: draft({ chatComplete: true }) }),
-    ).toBe(true);
+  it("PRESERVA o rascunho mesmo quando o servidor ainda não tem doc", () => {
+    expect(deveDescartarDraftEdicao({ serverTemDoc: false, draft: draft() })).toBe(false);
   });
 
-  it("DESCARTA quando o draft tem preview de doc aprovado mas servidor sem doc", () => {
-    expect(
-      deveDescartarDraftEdicao({
-        serverTemDoc: false,
-        draft: draft({ approvedDocPreview: "**O que faz:** ..." }),
-      }),
-    ).toBe(true);
+  it("PRESERVA o rascunho quando o servidor JÁ tem doc (reenvio normal)", () => {
+    expect(deveDescartarDraftEdicao({ serverTemDoc: true, draft: draft() })).toBe(false);
   });
 
-  it("PRESERVA edição legítima: draft avançado E servidor COM doc (reenvio normal)", () => {
-    expect(
-      deveDescartarDraftEdicao({ serverTemDoc: true, draft: draft({ chatComplete: true }) }),
-    ).toBe(false);
-  });
-
-  it("PRESERVA quem está no meio da fase de doc (sem preview aprovado, chatComplete=false)", () => {
-    // Servidor ainda sem doc, mas o draft não afirma conclusão → não descarta.
-    expect(deveDescartarDraftEdicao({ serverTemDoc: false, draft: draft({}) })).toBe(false);
+  it("PRESERVA rascunho com blocos de ganho preenchidos — é o que se perderia", () => {
+    const comGanhos = draft({
+      ganhos: { ...ganhosFormVazio(), savingValorAntes: "1.200,00" },
+    });
+    expect(deveDescartarDraftEdicao({ serverTemDoc: false, draft: comGanhos })).toBe(false);
   });
 });

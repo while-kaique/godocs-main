@@ -259,6 +259,15 @@ describe('notificarLideresPendentes — envio', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).ambiente).toBe('staging');
   });
 
+  it('⚠️ no ambiente V2 o `ambiente` também sai "staging" (nunca "producao")', async () => {
+    process.env.GODOCS_ENV = 'v2-staging';
+    fetchMock.mockResolvedValue(resposta202([{ ok: true }]));
+    const r = await notificarLideresPendentes();
+
+    expect(r.ambiente).toBe('staging');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).ambiente).toBe('staging');
+  });
+
   it('sem GODOCS_ENV o ambiente é "producao"', async () => {
     fetchMock.mockResolvedValue(resposta202([{ ok: true }]));
     const r = await notificarLideresPendentes();

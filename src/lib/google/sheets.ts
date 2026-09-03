@@ -46,14 +46,14 @@ export const SHEET_COLUMNS = [
   'Nome Completo',                  // E
   'Email',                          // F
   'Projeto',                        // G
-  'Participantes',                  // H  (papel "Coautor" — value interno coexecutor)
-  'Participantes 2',                // I  (papel "Participante" — value interno planejador)
+  'Coautor',                        // H  (papel "Coautor" — value interno coexecutor)
+  'Participante',                   // I  (papel "Participante" — value interno planejador)
   'Contribuidor',                   // J  (papel "Contribuidor" — value interno contribuidor)
   'Descrição',                      // L
   'URL',                            // M
   'Ferramenta',                     // N
   'Escopo',                         // O
-  'Tipos Projeto',                  // P
+  'Tipos de Ganho',                 // P  (v2: as 4 categorias de ganho)
   'Alguém Fazia?',                  // Q
   // Nota de 0 a 5 dada pela TRIAGEM humana — coluna **manual**, como as de Diff: nenhum
   // fluxo automático a escreve (nem o append, nem o analisador, nem o sync reverso), e o
@@ -61,34 +61,34 @@ export const SHEET_COLUMNS = [
   // `updateRowByProjectId` poder alcançá-la por NOME. Valores fora de 0-5 existem em
   // linhas antigas (7, 8, 10) e são PRESERVADOS até alguém regravar a nota.
   'Estrelas',
-  'Saving Horas',                   // R
-  'Horas em Reais',                 // S  (R$ das horas economizadas — bruto)
-  'Custo Evitado',                  // T  (valor R$ mensal do custo evitado)
-  'Justificativa Custo Evitado',    // U
-  'Custo Mensal ou Pontual',        // V  (recorrência marcada no custo evitado)
-  'Saving Reais',                   // W  (líquido: horas + custo evitado − custo externo)
-  'Tipo de Saving',                 // X
+  'Custo Evitado Horas',            // R  (v2: horas liberadas — o braço de horas)
+  'Custo Evitado Horas Reais',      // S  (R$ das horas liberadas — bruto)
+  'Saving Efetivado',               // T  (v2: quanto a despesa era ANTES)
+  'Evidência Saving Efetivado',     // U
+  'Freq. Saving Efetivado',         // V
+  'Impacto Bruto',                  // W  (v2: S + CE + R, sem pesos)
+  'Freq. Custo Evitado',            // X
   'Memorial de Saving',             // Y
   'Custo Externo Mensal',           // Z
-  'Receita Mensal',                 // AA
-  'Tipo de Receita',                // AB
-  'Receita Memorial',               // AC
+  'Receita Incremental',            // AA
+  'Freq. Receita',                  // AB
+  'Racional Receita',               // AC
   'Status',                         // AD
-  'Ganho Total',                    // AE
+  'Impacto Líquido',                // AE (v2: 1,0·S + 0,5·CE + 0,1·R − C)
   'Complexidade',                   // AF (preenchida pelo analisador)
   'Diff Horas / Antes',             // AG (manual — não escrever)
   'Diff Saving / Antes',            // AH (manual — não escrever)
   'Memorial anterior',              // AI (escrita pelo sistema só na edição)
   'Observações',                    // AJ (preenchida pelo analisador)
-  'Contexto do Projeto Especial',   // AK
+  'Ganho Imensurável',              // AK (v2: o ganho que não tem número)
   'Especial?',                      // AL
   'Atualizado Em',                  // AM (carimbo da última escrita do sistema)
   'Alocação Ganhos',                // AN (justificativa [2.4] do gate ≥44h — fatiada do memorial)
   'Usa AI Proxy',                   // AO (governança: 'Sim'/'Não' declarado no formulário)
   // Custos do projeto: serviços externos pagos que a solução consome pra rodar (ABATE).
-  'Custo do Projeto',                     // valor R$ (pontual e mensal pelo valor cheio, sem ÷12)
-  'Justificativa Custo do Projeto',       // detalhamento por serviço (nome/valor/recorrência/just.)
-  'Custo do Projeto Mensal ou Pontual',   // recorrência marcada (Mensal/Pontual/Misto)
+  'Custo para Rodar',                     // valor R$ (pontual e mensal pelo valor cheio, sem ÷12)
+  'Justificativa Custo para Rodar',       // detalhamento por serviço (nome/valor/recorrência/just.)
+  'Freq. Custo para Rodar',               // recorrência marcada (Mensal/Pontual/Misto)
   // Split do saving (transparência) — colunas NUMÉRICAS: 0 quando não se aplica.
   'Saving Horas Real',              // carga humana real do split
   'Saving Horas Escalado',          // ganho por escala do split
@@ -96,7 +96,7 @@ export const SHEET_COLUMNS = [
   // acima) — coluna de TEXTO: fatiada do memorial (subseção "Carga real e ganho por
   // escala", ponto [2.5]); "—" quando o split não se aplica. Posição resolvida por nome
   // em runtime (fetchHeaderMap), então a ordem aqui é só documentação.
-  'Justificativa Saving Escalado e Real',
+  'Racional Custo Evitado',
   // Análise do antiagente (crítico adversarial — F5). Coluna de TEXTO: "—" quando
   // ainda não há análise (F5 a preenche depois). Já mapeada p/ não ficar em branco.
   'Análise Antiagente',
@@ -123,6 +123,15 @@ export const SHEET_COLUMNS = [
   // comentário. A coluna acima fica só com o ESTADO (Pré-aprovado/Pré-pendente/
   // Pré-reprovado) — decisão do Luis, 03/08/2026.
   'Justificativa Aprovação do Líder',
+  // ─── GoDocs v2 — as 3 perguntas que a v1 nunca fez (BE, BF, BG) ─────────────
+  // As demais colunas da v2 são RENOMEAÇÕES in-place das da v1 (a régua D1 trocou os
+  // conceitos de nome: o `Custo Evitado` da v1 — a empresa pagava e parou — é o SAVING
+  // EFETIVADO da v2, e o saving por HORAS da v1 é o CUSTO EVITADO da v2). Renomear
+  // cabeçalho não move célula e o casamento é por NOME, então as 578 linhas antigas
+  // seguem legíveis sob o nome novo.
+  'Saving Efetivado Agora',         // BE (a 2ª ponta do par; o saving é a DIFERENÇA)
+  'Custo Evitado Não Contratado',   // BF (a vaga não aberta, a consultoria não contratada)
+  'Impacto Líquido Mensal',         // BG (o líquido normalizado no tempo — vai ao Gomoon)
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];

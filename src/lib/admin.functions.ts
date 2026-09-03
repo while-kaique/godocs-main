@@ -31,7 +31,25 @@ const idSchema = z.string().min(1).max(64)
 // ── Mapeadores (linha SQLite → formato consumido pelo frontend) ────────────────
 
 function mapProjeto(row: ProjetoRow & { area_nome?: string | null }) {
-  const { area_nome, membros, tipos_projeto, chat_completo, ...rest } = row
+  const {
+    area_nome,
+    membros,
+    tipos_projeto,
+    chat_completo,
+    // ⚠️ As colunas de TEXTO LONGO do ganho v2 ficam FORA do payload (pendência que a T3
+    // deixou anotada para a T6). Esta rota faz `SELECT p.*` de TODOS os projetos, sem
+    // LIMIT, e o `...rest` abaixo espalha tudo: com o formulário v2 escrevendo evidência,
+    // racionais e os 2 JSONs, cada linha ganharia quilobytes multiplicados por ~600 — a
+    // forma exata das lições dos 32 MiB de RPC e do payload de 563 KB do dashboard.
+    // Nenhuma tela lê estes campos daqui; quem precisa deles lê a ficha do projeto.
+    saving_efetivado_evidencia: _evidencia,
+    custo_evitado_horas_linhas: _linhasHoras,
+    custo_evitado_racional: _racionalCe,
+    receita_incremental_racional: _racionalReceita,
+    ganho_imensuravel_racional: _racionalImensuravel,
+    custo_rodar_itens: _custoRodar,
+    ...rest
+  } = row
   return {
     ...rest,
     membros: parseJson<string[]>(membros) ?? [],

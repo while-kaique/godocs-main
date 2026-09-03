@@ -2620,6 +2620,47 @@ export type ProjetoRow = {
   // "Saving Horas Escalado". Null quando não se aplica (ninguém fazia / pontual).
   horas_carga_real: number | null;
   horas_escala: number | null;
+  // ─────── GoDocs v2 — os 4 ganhos declarados (tipos e regras em `src/lib/ganhos.ts`) ───────
+  // Modelo da submissão determinística. CONVIVE com as colunas da v1 acima (nenhum
+  // projeto tem as duas gerações preenchidas — o banco da v2 nasce zerado) até a T9
+  // aposentar a v1. Colunas INTERNAS por enquanto: a ida/volta com o Sheets é a T6.
+  // `ganho_categorias`: JSON array de 'saving_efetivado'|'custo_evitado'|
+  // 'receita_incremental'|'imensuravel' — o imensurável é EXCLUSIVO dos outros 3.
+  ganho_categorias: string | null;
+  // Saving efetivado: a despesa existia e PAROU (comprovável → pesa 100%, pede evidência).
+  saving_efetivado_valor: number | null;
+  saving_efetivado_frequencia: string | null; // 'pontual'|'mensal'|'trimestral'|'semestral'
+  saving_efetivado_evidencia: string | null;
+  saving_efetivado_desde: string | null;
+  /** As DUAS pontas do saving (o ganho é a diferença). Ver `ganhos.ts`. */
+  saving_efetivado_valor_antes: number | null;
+  saving_efetivado_valor_agora: number | null;
+  // Custo evitado: a despesa nunca nasceu (sem extrato → pesa 50%, NÃO pede evidência).
+  // Dois braços que SOMAM antes do peso: horas liberadas + o que não foi contratado.
+  custo_evitado_frequencia: string | null;
+  custo_evitado_horas_linhas: string | null; // JSON [{funcao,funcao_descricao,horas_antes,horas_depois}]
+  custo_evitado_horas_valor: number | null;
+  custo_evitado_nao_contratado: number | null;
+  custo_evitado_racional: string | null;
+  // Receita incremental. ⚠️ Na v1 não havia coluna para ela (vivia no blob
+  // `documentacao.conteudo.receita`) — daí o rollup ter de ler a planilha.
+  receita_incremental_valor: number | null;
+  receita_incremental_frequencia: string | null;
+  receita_incremental_racional: string | null;
+  receita_incremental_tipo: string | null;
+  // Ganho imensurável: projeto sem número, FORA de toda conta de impacto (é a estrela
+  // que o representa).
+  ganho_imensuravel_racional: string | null;
+  // Custo para rodar: fusão de `custo_externo_mensal` + `custo_projeto_itens` da v1.
+  // JSON [{nome,valor,frequencia,o_que_e}]. SUBTRAI com peso 100%.
+  custo_rodar_itens: string | null;
+  // Impacto MATERIALIZADO. ⚠️ DERIVADO — sempre gravado a partir de `src/lib/impacto.ts`,
+  // nunca calculado no call site (a v1 pagou a fórmula redigitada em 5 lugares).
+  /** Links no Drive dos anexos de evidência (JSON array). Coluna INTERNA. */
+  ganho_anexos_links: string | null;
+  impacto_bruto: number | null;
+  impacto_liquido: number | null;
+  impacto_liquido_mensal: number | null;
   created_at: string | null;
   updated_at: string | null;
 };

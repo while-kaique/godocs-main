@@ -190,12 +190,23 @@ export function CheckboxGroup({
  * A11y: o estado NÃO é só cor — o "check" aparece/desaparece e o título fica em
  * negrito; o foco de teclado tem anel visível (o input é sr-only + peer).
  */
+/**
+ * Card de opção COM descrição — o padrão do repo para "opção que precisa de explicação"
+ * (opção com descrição nunca é texto solto).
+ *
+ * ⚠️ `onToggle` existe para o call site saber QUAL item foi clicado. Sem ele só chega o
+ * array novo inteiro, e uma régua de EXCLUSIVIDADE (marcar A desmarca B) não pode ser
+ * aplicada por cima — foi por isso que a v1 reimplementou aquela regra dentro da tela,
+ * em 3 lugares. Quando `onToggle` é passado, ele MANDA e o `onChange` não é chamado:
+ * quem decide a lista resultante é a régua pura do call site, não este componente.
+ */
 export function CardCheckboxGroup({
-  options, value, onChange, error,
+  options, value, onChange, onToggle, error,
 }: {
   options: { value: string; title: string; desc?: string; icon?: string }[];
   value: string[];
   onChange: (v: string[]) => void;
+  onToggle?: (value: string) => void;
   error?: string;
 }) {
   return (
@@ -217,11 +228,15 @@ export function CardCheckboxGroup({
                 type="checkbox"
                 className="peer sr-only"
                 checked={checked}
-                onChange={() =>
+                onChange={() => {
+                  if (onToggle) {
+                    onToggle(opt.value);
+                    return;
+                  }
                   onChange(
                     checked ? value.filter((x) => x !== opt.value) : [...value, opt.value],
-                  )
-                }
+                  );
+                }}
               />
               {/* Indicador do checkbox — o "check" só aparece quando marcado */}
               <span

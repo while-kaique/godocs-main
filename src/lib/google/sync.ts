@@ -11,6 +11,15 @@ import { sendChatNotification, buildSubmitMessage, ehProjetoTesteE2E } from './c
 // Espelho da planilha: quem escreve no Sheets remenda o espelho na hora, senão o efeito da
 // escrita só apareceria na tela no próximo cron (as telas leem o espelho — `sheet-espelho.ts`).
 import { espelharEscrita } from '@/lib/sheet-espelho';
+// GoDocs v2 (T6): as células financeiras de um projeto que declarou o ganho pelo
+// formulário determinístico saem das colunas da v2, não do `saving`/`receita` do chat.
+import {
+  desserializarCategorias,
+  desserializarCustoRodar,
+  desserializarLinhasHoras,
+} from '@/lib/ganhos';
+import { tituloGanho } from '@/lib/ganhos-rotulos';
+import { moedaBR } from '@/lib/mensagens-submissao';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -32,17 +41,25 @@ function parseArquivosLinks(raw: string | null | undefined): string[] {
 // Todas as demais são tratadas como TEXTO: vazio → "—". É a padronização para a
 // planilha não ter célula suja/vazia. Mudou alguma regra → ajustar só aqui.
 const COLUNAS_NUMERICAS = new Set<SheetColumn>([
-  'Saving Horas',
-  'Horas em Reais',
-  'Custo Evitado',
-  'Saving Reais',
+  'Custo Evitado Horas',
+  'Custo Evitado Horas Reais',
+  'Saving Efetivado',
+  'Impacto Bruto',
   'Custo Externo Mensal',
-  'Custo do Projeto',
-  'Receita Mensal',
-  'Ganho Total',
+  'Custo para Rodar',
+  'Receita Incremental',
+  'Impacto Líquido',
   // Split do saving (horas) — numéricas: vazio/não-aplicável → 0 (NÃO "—").
   'Saving Horas Real',
   'Saving Horas Escalado',
+  // ⚠️ As 3 colunas NOVAS da v2 são DINHEIRO e entram na mesma régua. Hoje o ramo v2
+  // sempre entrega número (0 explícito), mas deixá-las fora faria um `null` sair como
+  // "—" numa coluna que o rollup SOMA — exatamente o defeito que esta lista existe para
+  // impedir. As demais colunas financeiras da v2 já estão aqui sob o nome novo (são as
+  // mesmas células, renomeadas in-place).
+  'Saving Efetivado Agora',
+  'Custo Evitado Não Contratado',
+  'Impacto Líquido Mensal',
 ]);
 
 // Padroniza a linha ANTES de gravar: coluna numérica vazia/inválida → 0; coluna de
@@ -133,7 +150,7 @@ export type SubmitSyncParams = {
   // memorial → coluna "Alocação Ganhos". Vazia/null quando o gate não disparou.
   alocacaoGanhos?: string | null;
   // Justificativa [2.5] "carga real e ganho por escala" (cálculo + gatilhos do split),
-  // fatiada do memorial → coluna "Justificativa Saving Escalado e Real". Null quando o
+  // fatiada do memorial → coluna "Racional Custo Evitado". Null quando o
   // split não se aplica (ninguém fazia à mão / pontual / receita-pura) → "—".
   justificativaCargaEscala?: string | null;
   // Edição: memorial da ÚLTIMA versão ANTES desta edição → coluna "Memorial anterior".
@@ -192,7 +209,7 @@ export type UpdateSyncParams = {
 
 // ─── Split carga real × escala (derivação das colunas do Sheets) ────────────
 // Colunas NUMÉRICAS "Saving Horas Real" / "Saving Horas Escalado" (transparência/
-// auditoria — o TOTAL "Saving Horas" NÃO muda). Derivado de "Alguém Fazia?" + total:
+// auditoria — o TOTAL "Custo Evitado Horas" NÃO muda). Derivado de "Alguém Fazia?" + total:
 //  • 'sim'  (rotina humana real) → usa o split capturado pelo gate (carga real × escala).
 //  • 'nao'  (contrafactual — NINGUÉM fazia à mão) → a carga humana real é 0 e TODO o
 //    saving é volume que só a automação cobre ⇒ Real=0, Escalado=total. (Decisão de
@@ -250,14 +267,14 @@ export function deveRecuperarPorAppend(
 }
 
 // ─── Papéis dos participantes → 3 colunas do Sheets ─────────────────────────
-// Distribui os membros (lista plana) nas colunas por papel. "Participantes" guarda os
-// COAUTORES (value interno `coexecutor`); "Participantes 2" os PARTICIPANTES (value
+// Distribui os membros (lista plana) nas colunas por papel. "Coautor" guarda os
+// COAUTORES (value interno `coexecutor`); "Participante" os PARTICIPANTES (value
 // interno `planejador`); "Contribuidor" os CONTRIBUIDORES (value interno `contribuidor`).
 // Cada e-mail entra em exatamente UMA coluna. Coluna sem ninguém → '' (vira "—" no
 // padronizarLinha). Lookup tolerante a caixa.
 // ⚠️ As CHAVES do bucket são os `value` internos (`coexecutor`/`planejador` mantidos);
-// só rótulos e nomes de coluna mudaram. Papel AUSENTE → coexecutor/"Participantes"
-// (retrocompatível: legados tinham todos em "Participantes"); papéis LEGADOS
+// só rótulos e nomes de coluna mudaram. Papel AUSENTE → coexecutor/"Coautor"
+// (retrocompatível: legados tinham todos em "Coautor"); papéis LEGADOS
 // `idealizador`/`referencia_tecnica` (feature anterior) → "Contribuidor". Pura — testável.
 const PAPEIS_COLUNA = ['coexecutor', 'planejador', 'contribuidor'] as const;
 export type PapelColuna = (typeof PAPEIS_COLUNA)[number];
@@ -298,6 +315,92 @@ export function derivarColunasPapeis(
 
 // ─── Submit: Sheets → Chat (fire-and-forget) ────────────────────────────────
 
+/**
+ * As células da planilha de um projeto do GoDocs **v2** — ou `null` se ele não é v2.
+ *
+ * O discriminador é `ganho_categorias`: só o formulário determinístico da Etapa 3 a
+ * escreve (`salvarGanhos`), então projeto sem ela é v1 e segue pelo caminho de sempre.
+ * ⚠️ Não existe migração entre as duas gerações (Fronteira do plano) — o que existe é
+ * esta bifurcação, e ela é por PROJETO, não por ambiente.
+ *
+ * ⚠️ As colunas são as MESMAS células da v1, renomeadas in-place: a régua D1 só trocou os
+ * conceitos de nome (o `Custo Evitado` da v1 — a empresa pagava e parou — é o SAVING
+ * EFETIVADO da v2; o saving por HORAS da v1 é o CUSTO EVITADO da v2). Por isso as 578
+ * linhas antigas continuam legíveis, e por isso um projeto v1 e um v2 convivem na mesma
+ * aba sem coluna duplicada.
+ *
+ * ⚠️ Nenhum número é recalculado aqui: os 3 impactos vêm MATERIALIZADOS de
+ * `montarPatchGanhos` (`ganhos.ts` → `impacto.ts`), gravados no mesmo UPDATE do ganho.
+ * Recalcular no sync criaria a 2ª cabeça que esta frente existe para desfazer — e um
+ * `undefined` num campo numérico vira `0` no `padronizarLinha`, o que passaria por
+ * "projeto sem ganho" em vez de acusar erro.
+ */
+function celulasGanhoV2(
+  projeto: ProjetoRow,
+): Partial<Record<SheetColumn, string | number>> | null {
+  const categorias = desserializarCategorias(projeto.ganho_categorias);
+  if (categorias.length === 0) return null;
+
+  // Horas liberadas: o TOTAL das linhas, clampado por linha (par invertido não abate o
+  // ganho das outras — mesma régua de `derivarValorHorasCustoEvitado`).
+  const linhas = desserializarLinhasHoras(projeto.custo_evitado_horas_linhas);
+  const horas =
+    Math.round(
+      linhas.reduce((soma, l) => soma + Math.max(0, l.horasAntes - l.horasDepois), 0) * 100,
+    ) / 100;
+
+  const itensCusto = desserializarCustoRodar(projeto.custo_rodar_itens);
+  const custoRodarTotal =
+    Math.round(itensCusto.reduce((soma, i) => soma + Math.max(0, i.valor), 0) * 100) / 100;
+  // Mesmo formato de item da v1 (`• nome — R$ valor (recorrência). o que é`), para a
+  // coluna continuar legível por quem já lê a da v1.
+  // ⚠️ O detalhamento usa o MESMO valor clampado do total. Listar o item negativo cru
+  // (`R$ -100,00`) ao lado de um total que o ignora faz a coluna contradizer a vizinha, e
+  // quem lê a planilha perde a confiança nas duas — a justificativa existe para EXPLICAR
+  // o número ao lado, não para divergir dele.
+  const custoRodarDescricao = itensCusto
+    .map((i) => {
+      const oQueE = i.oQueE.trim() ? ` ${i.oQueE.trim()}` : '';
+      return `• ${i.nome} — R$ ${moedaBR(Math.max(0, i.valor))} (${i.frequencia}).${oQueE}`;
+    })
+    .join('\n');
+  const freqCustoRodar = [...new Set(itensCusto.map((i) => i.frequencia))];
+
+  const num = (v: number | null | undefined) => (typeof v === 'number' ? v : 0);
+
+  return {
+    'Tipos de Ganho': categorias.map((c) => tituloGanho(c)).join(', '),
+
+    // Saving efetivado: as DUAS pontas (o ganho é a diferença, derivada — sem célula).
+    'Saving Efetivado': num(projeto.saving_efetivado_valor_antes),
+    'Saving Efetivado Agora': num(projeto.saving_efetivado_valor_agora),
+    'Evidência Saving Efetivado': ouTraco(projeto.saving_efetivado_evidencia),
+    'Freq. Saving Efetivado': ouTraco(projeto.saving_efetivado_frequencia),
+
+    // Custo evitado: os dois braços, com a frequência do BLOCO.
+    'Custo Evitado Horas': horas,
+    'Custo Evitado Horas Reais': num(projeto.custo_evitado_horas_valor),
+    'Custo Evitado Não Contratado': num(projeto.custo_evitado_nao_contratado),
+    'Freq. Custo Evitado': ouTraco(projeto.custo_evitado_frequencia),
+    'Racional Custo Evitado': ouTraco(projeto.custo_evitado_racional),
+
+    'Receita Incremental': num(projeto.receita_incremental_valor),
+    'Freq. Receita': ouTraco(projeto.receita_incremental_frequencia),
+    'Racional Receita': ouTraco(projeto.receita_incremental_racional),
+
+    'Ganho Imensurável': ouTraco(projeto.ganho_imensuravel_racional),
+
+    'Custo para Rodar': custoRodarTotal,
+    'Justificativa Custo para Rodar': ouTraco(custoRodarDescricao),
+    'Freq. Custo para Rodar': ouTraco(freqCustoRodar.join(' + ')),
+
+    // Os 3 impactos, materializados no UPDATE do ganho. Nunca recalculados aqui.
+    'Impacto Bruto': num(projeto.impacto_bruto),
+    'Impacto Líquido': num(projeto.impacto_liquido),
+    'Impacto Líquido Mensal': num(projeto.impacto_liquido_mensal),
+  };
+}
+
 export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
   try {
     const dataSubmissao = nowFortaleza();
@@ -313,9 +416,9 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     const receitaValor = (p.receita?.valor_ganho_mensal as number) ?? 0;
     const ganhoTotal = p.ganhoTotalMensal > 0 ? Math.round(p.ganhoTotalMensal * 100) / 100 : 0;
 
-    // "Horas em Reais" (bruto): valor das horas de cada pessoa (horas × valor-hora
+    // "Custo Evitado Horas Reais" (bruto): valor das horas de cada pessoa (horas × valor-hora
     // do cargo), ANTES de somar custo evitado e de abater custo externo. O líquido
-    // total continua em "Saving Reais".
+    // total continua em "Impacto Bruto".
     const linhasSaving = Array.isArray(p.saving?.linhas)
       ? (p.saving!.linhas as { economia_reais_mes?: number }[])
       : [];
@@ -324,7 +427,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
 
     // Custo evitado: valor R$ (pontual e mensal pelo valor cheio, sem ÷12) que entra no
     // saving — substitui o antigo "sim/não" na coluna. A recorrência marcada pela
-    // pessoa no formulário vai em "Custo Mensal ou Pontual".
+    // pessoa no formulário vai em "Freq. Saving Efetivado".
     const custoEvitadoReais = Math.max(0, Number(p.saving?.custo_evitado_reais) || 0);
     const custoEvitadoRecorrencia = custoEvitadoRecorrenciaLabel(
       p.projeto.custo_evitado as string | null,
@@ -332,7 +435,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     );
 
     // Custos do projeto: valor R$ (pontual e mensal pelo valor cheio, sem ÷12) que ABATE o
-    // saving. A recorrência marcada vai em "Custo do Projeto Mensal ou Pontual".
+    // saving. A recorrência marcada vai em "Freq. Custo para Rodar".
     // (custoEvitadoRecorrenciaLabel é genérico: flag 'sim'/'nao' + itens JSON.)
     const custoProjetoReais = Math.max(0, Number(p.saving?.custo_projeto_reais) || 0);
     const custoProjetoRecorrencia = custoEvitadoRecorrenciaLabel(
@@ -341,7 +444,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     );
 
     // Split carga real × ganho por escala → colunas NUMÉRICAS (transparência; o TOTAL
-    // "Saving Horas" não muda). Derivado de "Alguém Fazia?" — ver derivarSplitHorasSheet:
+    // "Custo Evitado Horas" não muda). Derivado de "Alguém Fazia?" — ver derivarSplitHorasSheet:
     // 'sim' usa o split capturado; 'nao' (contrafactual) é 100% escala (Real=0); o resto 0/0.
     const { real: savingHorasReal, escalado: savingHorasEscalado } = derivarSplitHorasSheet(
       p.projeto.alguem_fazia as string | null,
@@ -362,36 +465,36 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Nome Completo': ouTraco(p.projeto.responsavel_nome),
       'Email': ouTraco(p.projeto.responsavel_email),
       'Projeto': ouTraco(p.projeto.nome),
-      // "Participantes" = Coautores; "Participantes 2" = Participantes; "Contribuidor"
+      // "Coautor" = Coautores; "Participante" = Participantes; "Contribuidor"
       // = Contribuidores. Coluna sem ninguém → '' → padronizarLinha "—".
-      'Participantes': colsPapeis.coexecutor,
-      'Participantes 2': colsPapeis.planejador,
+      'Coautor': colsPapeis.coexecutor,
+      'Participante': colsPapeis.planejador,
       'Contribuidor': colsPapeis.contribuidor,
       'Descrição': ouTraco(p.projeto.descricao_breve),
       'URL': urlDocs,
       'Ferramenta': ouTraco(p.projeto.ferramenta),
       'Escopo': ouTraco(p.projeto.escopo),
-      'Tipos Projeto': tiposStr,
+      'Tipos de Ganho': tiposStr,
       'Alguém Fazia?': ouTraco(p.projeto.alguem_fazia),
-      'Saving Horas': savingHoras,
-      'Horas em Reais': horasEmReais,
-      'Custo Evitado': custoEvitadoReais, // numérico: 0 quando não há (padrão)
-      'Justificativa Custo Evitado': ouTraco(p.projeto.custo_evitado_justificativa),
-      'Custo Mensal ou Pontual': custoEvitadoRecorrencia,
-      'Saving Reais': savingReais,
-      'Tipo de Saving': ouTraco(p.saving?.tipo_saving as string | undefined),
+      'Custo Evitado Horas': savingHoras,
+      'Custo Evitado Horas Reais': horasEmReais,
+      'Saving Efetivado': custoEvitadoReais, // numérico: 0 quando não há (padrão)
+      'Evidência Saving Efetivado': ouTraco(p.projeto.custo_evitado_justificativa),
+      'Freq. Saving Efetivado': custoEvitadoRecorrencia,
+      'Impacto Bruto': savingReais,
+      'Freq. Custo Evitado': ouTraco(p.saving?.tipo_saving as string | undefined),
       'Memorial de Saving': ouTraco(p.memorialLimpo),
       'Custo Externo Mensal': p.projeto.custo_externo_mensal ?? 0,
-      'Receita Mensal': receitaValor,
-      'Tipo de Receita': ouTraco(p.receita?.tipo_saving as string | undefined),
-      'Receita Memorial': ouTraco(p.receitaMemorialLimpo),
+      'Receita Incremental': receitaValor,
+      'Freq. Receita': ouTraco(p.receita?.tipo_saving as string | undefined),
+      'Racional Receita': ouTraco(p.receitaMemorialLimpo),
       'Status': p.status,
-      'Ganho Total': ganhoTotal,
+      'Impacto Líquido': ganhoTotal,
       // Observações vem do analisador (preenchida depois, via syncUpdateToGoogle).
       // No append ainda está vazia → grava "—" (regra: texto vazio → traço) em vez
       // de deixar a célula em branco. O analisador sobrescreve quando concluir.
       'Observações': ouTraco(p.projeto.observacoes as string | null | undefined),
-      'Contexto do Projeto Especial': ouTraco(p.projeto.contexto_especial),
+      'Ganho Imensurável': ouTraco(p.projeto.contexto_especial),
       'Especial?': p.projeto.especial === 1 ? 'Sim' : 'Não',
       'Atualizado Em': dataSubmissao,
       // Justificativa do gate ≥44h fatiada do memorial; "—" quando não houve gate.
@@ -402,15 +505,15 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
           : p.projeto.usa_ai_proxy === 'nao' ? 'Não'
             : '—',
       // Custos do projeto (serviços pagos que a solução consome pra rodar — ABATE).
-      'Custo do Projeto': custoProjetoReais, // numérico: 0 quando não há (padrão)
-      'Justificativa Custo do Projeto': ouTraco(p.projeto.custo_projeto_justificativa),
-      'Custo do Projeto Mensal ou Pontual': custoProjetoRecorrencia,
+      'Custo para Rodar': custoProjetoReais, // numérico: 0 quando não há (padrão)
+      'Justificativa Custo para Rodar': ouTraco(p.projeto.custo_projeto_justificativa),
+      'Freq. Custo para Rodar': custoProjetoRecorrencia,
       // Split do saving (transparência): carga humana real × ganho por escala.
       // Numéricas — 0 quando não se aplica (não "—").
       'Saving Horas Real': savingHorasReal,
       'Saving Horas Escalado': savingHorasEscalado,
       // Justificativa do split (cálculo + gatilhos) — TEXTO: "—" quando não se aplica.
-      'Justificativa Saving Escalado e Real': ouTraco(p.justificativaCargaEscala),
+      'Racional Custo Evitado': ouTraco(p.justificativaCargaEscala),
       // Análise do antiagente (F5) — TEXTO: "—" enquanto não houver análise. Quando o
       // F5 for implementado, escreve o parecer aqui (via syncUpdateToGoogle, como a
       // Complexidade/Observações). Por ora, garante "—" em vez de célula em branco.
@@ -425,6 +528,12 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         p.projeto.classificacao_justificativa as string | null | undefined,
       ),
       'Motivo Reprovado': ouTraco(p.projeto.motivo_reprovacao as string | null | undefined),
+      // ⚠️ GoDocs v2, POR ÚLTIMO de propósito: quando o projeto declarou o ganho pelo
+      // formulário determinístico, estas células SOBRESCREVEM as derivadas do
+      // `saving`/`receita` do chat, que num projeto v2 vêm vazias (não houve chat) e
+      // gravariam ZERO em cima do impacto real. Projeto v1 → `null` → spread vazio →
+      // a linha sai byte a byte como sempre saiu.
+      ...(celulasGanhoV2(p.projeto) ?? {}),
     };
 
     // Pré-aprovação do líder: "Pré-pendente" na abertura da fila; "Pré-aprovado" /

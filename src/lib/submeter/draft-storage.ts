@@ -8,12 +8,8 @@
 //
 // Só vale para rascunhos (nunca em modo edição de projeto já submetido).
 
-import type {
-  FormData,
-  ChatMessage,
-  ChatFase,
-  SavingFormData,
-} from "./constants";
+import type { FormData } from "./constants";
+import type { GanhosFormData } from "./validacao-etapa3";
 
 const DRAFT_KEY = "godocs:rascunho-v1";
 
@@ -35,23 +31,18 @@ export type DraftSnapshot = {
   // a exigência de re-upload. Ausente em rascunhos antigos → default false.
   docExistenteInvalidado?: boolean;
   completedSteps: number[];
-  chatMessages: ChatMessage[];
-  chatFase: ChatFase;
-  chatComplete: boolean;
-  agentTipos: ("saving" | "receita_incremental")[];
   agentMeta: unknown | null;
   agentArquivosSig: string;
-  approvedDocPreview: string | null;
-  approvedSavingPreview: string | null;
-  approvedReceitaPreview: string | null;
-  savingSubmitted: SavingFormData | null;
-  receitaSubmitted: SavingFormData | null;
-  formDraft: SavingFormData;
-  respEspecial: "sim" | "nao" | "";
-  // Qual sub-tela da etapa 3 estava ativa (formulário determinístico vs. chat).
-  // Sem isso, retomar um rascunho na fase de saving/receita caía no chat do agente.
-  showSavingForm: boolean;
-  showReceitaForm: boolean;
+  // ── v2 ──
+  // Os blocos de ganho da Etapa 3. Substituem TODO o estado de conversa que morava aqui
+  // (`chatMessages`/`chatFase`/`chatComplete`/`agentTipos`/os 3 previews aprovados/os 2
+  // snapshots financeiros/`formDraft`/`respEspecial`/as 2 sub-telas): na v2 não há
+  // conversa a retomar (D4), há um formulário a repor.
+  //
+  // ⚠️ OPCIONAL de propósito. Rascunho salvo pela v1 não tem a chave, e quem o lê tem de
+  // sobreviver a isso — o `rehydrateFromLocal` aplica `?? ganhosFormVazio()`. Sem o
+  // default, `/submeter` abria em branco com "This page didn't load" (bug real).
+  ganhos?: GanhosFormData;
 };
 
 // `key` permite separar o rascunho de submissão NOVA (default) do de EDIÇÃO (por
@@ -86,27 +77,26 @@ export function clearDraft(key: string = DRAFT_KEY): void {
 }
 
 /**
- * Guard "servidor manda" para o rascunho de EDIÇÃO. Retorna `true` quando o rascunho
- * local deve ser DESCARTADO em vez de reidratado, porque ele afirma um estágio que o
- * servidor não sustenta: a fase de documentação foi concluída no cliente (preview
- * aprovado ou `chatComplete`) mas o servidor NÃO tem documentação persistida.
+ * Guard "servidor manda" para o rascunho de EDIÇÃO — hoje NEUTRO, e o porquê importa.
  *
- * É um estado impossível — típico de LEGADO que nunca teve o preview de doc aprovado
- * (a linha `documentacao` só é gravada na aprovação). Reidratar aqui ressuscitaria a
- * tela de aprovação final sobre um projeto sem doc: trava a submissão com
- * "Documentação ainda não foi gerada" e impede reauditar do zero (o cliente
- * sobrepunha o servidor incondicionalmente). Descartando, o cliente cai no caminho de
- * re-init (`reset_doc`), que limpa o chat no servidor e recomeça a auditoria limpa.
+ * ⚠️ Na v1 esta função tinha teor: o rascunho local podia afirmar "fase de documentação
+ * concluída" (`chatComplete` ou preview aprovado) sobre um projeto que o servidor tinha
+ * SEM documentação — estado típico de LEGADO, que nunca passou pela aprovação da doc.
+ * Reidratar ali ressuscitava a tela de aprovação final sobre um projeto sem doc e travava
+ * a submissão em "Documentação ainda não foi gerada".
  *
- * NÃO descarta rascunhos legítimos: quem está no meio da fase de doc (ainda sem
- * preview aprovado, `chatComplete=false`) é preservado, assim como edições de projetos
- * que JÁ têm doc no servidor (fluxo normal de reenvio).
+ * Na v2 esse estado deixou de existir: a doc é gerada em BACKGROUND, invisível, sem tela
+ * de aprovação e sem turno de aceite (D6), e projeto cuja doc não terminou não trava —
+ * é reconciliado pelo cron. Não há mais o que o rascunho possa afirmar sobre a doc.
+ *
+ * Por isso devolve `false` SEMPRE: descartar o rascunho de quem está editando passou a
+ * ser puro prejuízo — jogaria fora os blocos de ganho já preenchidos. A função (e o `if`
+ * no seed da edição) fica de propósito: se um novo motivo de descarte aparecer, ele entra
+ * AQUI, declarado e testável, em vez de virar um `if` solto dentro do `submeter.tsx`.
  */
-export function deveDescartarDraftEdicao(args: {
+export function deveDescartarDraftEdicao(_args: {
   serverTemDoc: boolean;
-  draft: Pick<DraftSnapshot, "chatComplete" | "approvedDocPreview">;
+  draft: Pick<DraftSnapshot, "ganhos">;
 }): boolean {
-  const draftDocConcluida =
-    args.draft.chatComplete === true || args.draft.approvedDocPreview != null;
-  return draftDocConcluida && !args.serverTemDoc;
+  return false;
 }

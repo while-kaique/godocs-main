@@ -90,6 +90,88 @@ local (reflexo/cache) via sync bidirecional; a submissão também notifica o Goo
   de `ganho_total_mensal`, sua persistência no SQLite e o sync com o Google Sheets (o valor real continua no
   banco e na planilha).
 
+### Fase 3 — GoDocs v2: submissão determinística sem agente no cliente
+> Plano: `docs/plans/godocs-v2-submissao-deterministica.md` (branch `feat/godocs-v2`, ambiente
+> `godocs-v2-staging` / aba `STAGING-V2`). A v1 em produção **não é alterada** por estes requisitos.
+>
+> **Régua das categorias:** a pergunta que decide é *"esse dinheiro estava saindo do caixa antes desta
+> solução?"*. **Sim → saving efetivado** (a despesa existia e parou; é comprovável, por isso pede evidência
+> e pesa 100%). **Não, ia começar a sair → custo evitado** (a despesa nunca nasceu; não há prova possível,
+> por isso não pede evidência e pesa 50%). Hora liberada de quem continua na folha é **capacidade que se
+> deixou de comprar**, não dinheiro no bolso: é custo evitado.
+
+**Etapa 1 e Etapa 2**
+- **RF-200** — QUANDO a pessoa preenche a Etapa 1, O SISTEMA DEVE não pedir data de criação, e DEVE tratar
+  a **data de submissão** como a data que marca a existência do projeto.
+- **RF-201** — QUANDO a pessoa está na Etapa 2, O SISTEMA DEVE oferecer as 4 categorias de ganho (saving
+  efetivado · custo evitado · receita incremental · ganho imensurável) em seleção múltipla, e DEVE não
+  perguntar se o projeto é especial.
+- **RF-202** — SE a pessoa marca "ganho imensurável", ENTÃO O SISTEMA DEVE desmarcar as outras três; SE ela
+  marca qualquer uma das outras três, ENTÃO O SISTEMA DEVE desmarcar "ganho imensurável".
+- **RF-203** — QUANDO a pessoa conclui a Etapa 2, O SISTEMA DEVE iniciar a compilação da documentação em
+  background, sem exibir progresso, sem pedir aprovação e sem bloquear o avanço para a Etapa 3.
+
+**Etapa 3 — acordeão**
+- **RF-204** — QUANDO a pessoa entra na Etapa 3, O SISTEMA DEVE exibir um bloco por categoria marcada, com
+  o primeiro aberto e os demais fechados.
+- **RF-205** — QUANDO a pessoa completa os campos obrigatórios de um bloco, O SISTEMA DEVE fechá-lo e abrir
+  o próximo bloco ainda pendente.
+- **RF-206** — ENQUANTO a pessoa navega pelo acordeão, O SISTEMA DEVE permitir abrir e fechar cada bloco por
+  teclado, anunciar o estado por rótulo textual (nunca só por cor) e respeitar `prefers-reduced-motion`.
+
+**Etapa 3 — campos por categoria**
+- **RF-207** — QUANDO o bloco de saving efetivado está aberto, O SISTEMA DEVE pedir frequência, valor e
+  evidência, e DEVE não pedir horas antes/depois.
+- **RF-208** — SE a evidência tem anexo mas não tem texto, ENTÃO O SISTEMA DEVE recusar o bloco e explicar
+  que a prova precisa vir acompanhada da explicação de por que aquele número é desta solução.
+- **RF-209** — QUANDO a pessoa preenche a evidência do saving efetivado, O SISTEMA DEVE pedir, no mesmo
+  bloco, desde quando o ganho passou a valer.
+- **RF-210** — QUANDO o bloco de custo evitado está aberto, O SISTEMA DEVE pedir frequência, as horas antes
+  e depois por função, o valor do que não foi contratado e o racional, e DEVE não pedir evidência.
+- **RF-211** — SE a pessoa escolhe "Outro" como função na tabela de horas, ENTÃO O SISTEMA DEVE abrir um
+  campo de descrição e explicar que "Outro" cobre casos como contrato e contratação.
+- **RF-212** — QUANDO o bloco de receita incremental está aberto, O SISTEMA DEVE pedir frequência, valor,
+  racional e tipo de receita.
+- **RF-213** — QUANDO o bloco de ganho imensurável está aberto, O SISTEMA DEVE pedir apenas o racional, pelo
+  mesmo campo de evidência (texto, anexo e imagem colada da área de transferência).
+- **RF-214** — QUANDO a pessoa chega ao fim da Etapa 3, O SISTEMA DEVE pedir, num bloco único fora do
+  acordeão, o custo para rodar a solução, em lista de itens com valor e frequência.
+
+**Cálculo do impacto**
+- **RF-215** — QUANDO o sistema calcula o impacto de um projeto, O SISTEMA DEVE registrar o Impacto Bruto
+  como a soma sem pesos de saving efetivado, custo evitado e receita incremental.
+- **RF-216** — QUANDO o sistema calcula o impacto, O SISTEMA DEVE registrar o Impacto Líquido como
+  `1,0 × saving efetivado + 0,5 × custo evitado + 0,1 × receita incremental − custo para rodar`.
+- **RF-217** — QUANDO o sistema mensaliza um valor, O SISTEMA DEVE dividi-lo pelo divisor da frequência
+  **daquele bloco** (pontual ÷4 · mensal ÷1 · trimestral ÷3 · semestral ÷6), nunca por um divisor único do
+  projeto.
+- **RF-218** — SE uma categoria não foi marcada, ENTÃO O SISTEMA DEVE tratá-la como zero em todas as contas.
+- **RF-219** — SE o projeto é de ganho imensurável, ENTÃO O SISTEMA DEVE registrar impacto zero e não somá-lo
+  a nenhuma das três contas.
+- **RF-220** — QUANDO o GoDocs envia dados de impacto ao Gomoon, O SISTEMA DEVE enviar o Impacto Líquido
+  Mensal.
+
+**Classificação e especial**
+- **RF-221** — QUANDO um projeto é submetido, O SISTEMA DEVE recomendar em background uma estrela de 0 a 10
+  para ele, qualquer que seja a categoria de ganho declarada.
+- **RF-222** — SE um projeto tem estrela maior que zero, ENTÃO O SISTEMA DEVE tratá-lo como especial, sem
+  que a pessoa que submete tenha declarado isso.
+- **RF-223** — SE um projeto já tem nota dada por uma pessoa, ENTÃO O SISTEMA DEVE não reclassificá-lo e
+  DEVE mantê-lo como referência para os demais.
+- **RF-224** — ENQUANTO um projeto é classificado, O SISTEMA DEVE gravar a recomendação em tabela interna e
+  DEVE não escrever a nota na planilha; só o clique de uma pessoa altera a nota.
+
+**Submissão sem IA no caminho crítico**
+- **RF-225** — ENQUANTO a pessoa preenche o formulário, O SISTEMA DEVE não fazer nenhuma chamada de modelo
+  de linguagem que a faça esperar.
+- **RF-226** — SE a documentação ainda não terminou de ser compilada quando a pessoa envia, ENTÃO O SISTEMA
+  DEVE aceitar o envio e reconciliar a documentação depois, sem perdê-la e sem sobrescrever o financeiro.
+
+**Ambiente**
+- **RF-227** — ENQUANTO o sistema roda no ambiente da v2, O SISTEMA DEVE escrever apenas na aba `STAGING-V2`
+  e DEVE não emitir mensagens de Google Chat nem avisos ao Gomoon.
+
+
 ## 5. Invariantes (regras que nunca podem quebrar)
 > Destilados do `CLAUDE.md` (que continua sendo o detalhe). Cada um tem ponto de verdade + guarda.
 
@@ -100,9 +182,11 @@ local (reflexo/cache) via sync bidirecional; a submissão também notifica o Goo
   - Ponto de verdade: memorial duplo (LLM sem R$; `enriquecerMemorial()` injeta R$) + `ocultarReaisSaving`;
     na tela "Meus Projetos", `mapItem` devolve `ganho_total_mensal: null` (RF-108/109 — nem exibe nem serializa).
   - Guarda: `tests/saving-calc*.test.ts`, testes de prompt, teste de `mapItem` (`ganho_total_mensal === null`).
-- **INV-03 — Horas são a fonte da verdade do saving (`linhas`); o total do memorial bate com a soma das linhas.**
+- **INV-03 — Horas são a fonte da verdade do ganho por horas (`linhas`); o total do memorial bate com a soma das linhas.**
   - Ponto de verdade: `recomputarSavingFinanceiro` / `avisarDivergenciaMemorialLinhas`.
   - Guarda: `tests/saving-calc*.test.ts`.
+  - _(v2: as horas deixam de compor o saving e passam a compor o **custo evitado** — ver INV-11. A regra
+    "o texto não é a fonte, as linhas são" permanece intacta, só muda a categoria que elas alimentam.)_
 - **INV-04 — Sync Google mapeia colunas por NOME (cabeçalho real), nunca por posição.**
   - Ponto de verdade: `fetchHeaderMap`/`SHEET_COLUMNS` em `src/lib/google/sheets.ts`.
   - Guarda: `tests/sheets-mapping*.test.ts`.
@@ -122,6 +206,25 @@ local (reflexo/cache) via sync bidirecional; a submissão também notifica o Goo
   - Ponto de verdade: revisão de copy.
   - Guarda: regra 4 do `CLAUDE.md`.
 
+- **INV-10 — A fórmula do impacto tem fonte única; nenhum consumidor a reimplementa.** _(v2)_
+  - Ponto de verdade: `src/lib/impacto.ts` (pesos e divisores como constantes nomeadas).
+  - Guarda: `tests/impacto.test.ts` + ausência de literais `0.5`/`0.1`/`/ 10` espalhados nos consumidores.
+- **INV-11 — Hora liberada é custo evitado (peso 50%), nunca saving efetivado.** _(v2)_
+  - Ponto de verdade: a régua da Fase 3 — saving efetivado exige despesa que já saía do caixa e parou.
+  - Guarda: teste de classificação dos casos-âncora (terceirizado dispensado × vaga não aberta).
+- **INV-12 — Nenhuma chamada de modelo de linguagem bloqueia a submissão.** _(v2)_
+  - Ponto de verdade: compilação da doc em `runBackground` + reconciliação por cron.
+  - Guarda: teste de submissão sem provider de LLM configurado.
+- **INV-13 — O agente nunca escreve a nota "Estrelas"; projeto com nota humana não é reclassificado.**
+  - Ponto de verdade: `especial_avaliacao` / `projeto_avaliacao` (tabelas internas) + os 2 escritores humanos.
+  - Guarda: `tests/especial-classificador.test.ts`.
+- **INV-14 — O ambiente da v2 nunca escreve nas abas `GoDocs`/`STAGING` nem notifica Chat/Gomoon.** _(v2)_
+  - Ponto de verdade: `GODOCS_ENV=v2-staging` + `assertNaoEhDefaultDeProd` (`src/lib/env.ts`).
+  - Guarda: teste do guard + conferência da aba escrita após a primeira submissão.
+- **INV-15 — Coluna nova no recorte do espelho exige bump da `VERSAO_RECORTE_RESUMO` no mesmo commit.**
+  - Ponto de verdade: `src/lib/dashboard-resumo.ts`.
+  - Guarda: sem o bump, o hash impede o re-espelhamento e o campo nasce vazio para sempre.
+
 ## 6. Fora de escopo
 - Reescrever em EARS o que já está em `spec-docs/`/`CLAUDE.md` (decisão do init: SPEC fino).
 
@@ -130,4 +233,9 @@ local (reflexo/cache) via sync bidirecional; a submissão também notifica o Goo
 - **Editor delegado:** participante autorizado pelo dono a editar/reenviar.
 - **Memorial:** texto financeiro padronizado (saving/receita) gerado pelo chat, enriquecido com R$ no backend.
 - **Sync reverso:** importação Sheets→SQLite (`syncSheetsToSqlite` / `syncOwnerRowsFromSheet`).
+- **Saving efetivado** _(v2)_: despesa que já saía do caixa e parou por causa da solução. Comprovável; pesa 100%.
+- **Custo evitado** _(v2)_: despesa que nunca chegou a existir, incluindo horas liberadas de quem continua na folha. Pesa 50%.
+- **Ganho imensurável** _(v2)_: projeto sem valor mensurável; não entra na conta e é representado pela estrela.
+- **Custo para rodar** _(v2)_: o que a empresa paga para a solução funcionar (plataforma, API, SaaS). Subtrai com peso 100%.
+- **Impacto Líquido Mensal** _(v2)_: o impacto líquido com cada bloco mensalizado pela frequência dele. É o que o Gomoon recebe.
 - **Legado:** projeto que entrou via sync reverso (id contém `legado`), sem passar pelo form completo.

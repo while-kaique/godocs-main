@@ -96,15 +96,32 @@ describe('reconciliarDocSePendente — submit garante a doc, preserva financeiro
     expect(vi.mocked(compilarDocumentacao)).not.toHaveBeenCalled();
   });
 
-  it('compilação FALHA → LANÇA (nunca submete doc incompleta)', async () => {
+  // ⚠️ DECISÃO INVERTIDA na T7 do GoDocs v2 (02/09/2026). Este teste cobrava o oposto —
+  // "compilação FALHA → LANÇA (nunca submete doc incompleta)" —, e a razão registrada era
+  // "sem async não há rede que recomponha". As duas metades caíram: no fluxo v2 a doc é
+  // SEMPRE compilada em segundo plano, e a rede (o cron `recompilar-docs-pendentes`, que ao
+  // terminar redispara a análise) roda independente de flag. Com a régua antiga, um soluço do
+  // proxy no submit bloquearia a submissão inteira num fluxo que NÃO TEM MAIS CHAT para
+  // retentar — o usuário veria "documentação ausente" sem saída nenhuma.
+  //
+  // O dente continua: a doc não pode ser dada por PRONTA. Ela tem de permanecer PENDENTE,
+  // que é o que faz o cron voltar nela. Publicar doc incompleta segue sendo o defeito.
+  it('compilação FALHA → NÃO lança, e a doc fica PENDENTE para o cron', async () => {
     const { compilarDocumentacao } = await import('@/lib/agents/doc-compiler');
     vi.mocked(compilarDocumentacao).mockRejectedValueOnce(new Error('IA fora'));
     const { reconciliarDocSePendente } = await import('@/lib/chat.functions');
+    const { precisaCompilarDoc } = await import('@/lib/agents/doc-async');
 
     await seedDoc('r3', { compilacao_pendente: true, coletado_pendente: { nome_projeto: 'X' } });
     const conteudo = await lerDoc('r3');
 
-    await expect(reconciliarDocSePendente('r3', conteudo, projetoFake)).rejects.toThrow();
+    const reconc = await reconciliarDocSePendente('r3', conteudo, projetoFake);
+
+    // Não bloqueia o submit...
+    expect(reconc).toBeTruthy();
+    // ...mas NÃO finge que a doc ficou pronta — senão o cron nunca voltaria nela.
+    expect(precisaCompilarDoc(reconc)).toBe(true);
+    expect(precisaCompilarDoc(await lerDoc('r3'))).toBe(true);
   });
 
   it('repassa o perfil de LLM (fail-fast do submit) ao compilador', async () => {

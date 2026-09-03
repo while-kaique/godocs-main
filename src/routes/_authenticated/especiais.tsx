@@ -123,7 +123,7 @@ const CAMPOS_COMPARACAO = [
   'Nome Completo',
   'Ferramenta',
   'Descrição',
-  'Contexto do Projeto Especial',
+  'Ganho Imensurável',
 ] as const;
 
 function Especiais() {

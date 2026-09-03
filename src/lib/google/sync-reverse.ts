@@ -129,14 +129,14 @@ function parseMembros(v: string | undefined): string[] {
   return parseList(v).filter((s) => s.includes('@'));
 }
 
-// Papel → coluna do Sheets (3). "Participantes" = coexecutor/"Coautor" (retrocompatível:
-// legados tinham todos os membros lá); "Participantes 2" = planejador/"Participante";
+// Papel → coluna do Sheets (3). "Coautor" = coexecutor/"Coautor" (retrocompatível:
+// legados tinham todos os membros lá); "Participante" = planejador/"Participante";
 // "Contribuidor" = contribuidor/"Contribuidor". O `papel` é o `value` INTERNO
 // (`coexecutor`/`planejador` mantidos). A ordem define o desempate quando um e-mail
 // aparece em mais de uma coluna (não deveria — 1 papel por pessoa): a PRIMEIRA vence.
 const COLUNA_PAPEL: ReadonlyArray<{ col: SheetColumn; papel: string }> = [
-  { col: 'Participantes', papel: 'coexecutor' },
-  { col: 'Participantes 2', papel: 'planejador' },
+  { col: 'Coautor', papel: 'coexecutor' },
+  { col: 'Participante', papel: 'planejador' },
   { col: 'Contribuidor', papel: 'contribuidor' },
 ];
 
@@ -185,7 +185,7 @@ function parseEspecialFlag(v: string | undefined): 0 | 1 | null {
   return s.startsWith('s') ? 1 : 0;
 }
 
-// A coluna "Custo Evitado" passou a guardar o VALOR R$ (não mais 'sim'/'não').
+// A coluna "Saving Efetivado" passou a guardar o VALOR R$ (não mais 'sim'/'não').
 // Deriva o flag sim/não para o SQLite: número > 0 → 'sim'; 0 → 'não'; legados
 // antigos com texto 's…/n…' preservados; vazio → null.
 function custoEvitadoFlag(v: string | undefined): string | null {
@@ -201,7 +201,7 @@ function custoEvitadoFlag(v: string | undefined): string | null {
 // ─── Criação de legado (projeto só existe na planilha) ───────────────────────
 
 async function criarLegado(id: string, row: SheetRow): Promise<void> {
-  const tipos = parseList(row['Tipos Projeto']).map((t) => t.toLowerCase());
+  const tipos = parseList(row['Tipos de Ganho']).map((t) => t.toLowerCase());
   const especial = parseEspecial(row['Especial?']);
   const { membros, papeis } = parseParticipantesPapeis(row);
   const status = statusFromLabel(row['Status']);
@@ -226,19 +226,19 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
     tipo_projeto: tipos[0] ?? (especial ? 'especial' : null),
     tipos_projeto: tipos.length ? tipos : especial ? ['especial'] : null,
     descricao_breve: txt(row['Descrição']),
-    saving_horas: parseNum(row['Saving Horas']),
-    saving_reais: parseNum(row['Saving Reais']),
-    tipo_saving: txt(row['Tipo de Saving']),
+    saving_horas: parseNum(row['Custo Evitado Horas']),
+    saving_reais: parseNum(row['Impacto Bruto']),
+    tipo_saving: txt(row['Freq. Custo Evitado']),
     memorial_calculo: txt(row['Memorial de Saving']),
     custo_externo_mensal: parseNum(row['Custo Externo Mensal']),
-    ganho_total_mensal: parseNum(row['Ganho Total']),
+    ganho_total_mensal: parseNum(row['Impacto Líquido']),
     complexidade: txt(row['Complexidade']),
     alguem_fazia: txt(row['Alguém Fazia?']),
     observacoes: txt(row['Observações']),
     especial,
-    contexto_especial: txt(row['Contexto do Projeto Especial']),
-    custo_evitado: custoEvitadoFlag(row['Custo Evitado']),
-    custo_evitado_justificativa: txt(row['Justificativa Custo Evitado']),
+    contexto_especial: txt(row['Ganho Imensurável']),
+    custo_evitado: custoEvitadoFlag(row['Saving Efetivado']),
+    custo_evitado_justificativa: txt(row['Evidência Saving Efetivado']),
     // Legado marcado "Descontinuado" na planilha nasce descontinuado no SQLite.
     descontinuado: ehStatusDescontinuado(row['Status']) ? 1 : 0,
     submitted_at: submittedAt,
@@ -270,18 +270,18 @@ const SAFE_UPDATE_FIELDS: ReadonlyArray<{
   { col: 'Ferramenta', field: 'ferramenta', kind: 'text' },
   { col: 'Escopo', field: 'escopo', kind: 'text' },
   { col: 'Alguém Fazia?', field: 'alguem_fazia', kind: 'text' },
-  { col: 'Saving Horas', field: 'saving_horas', kind: 'num' },
-  { col: 'Saving Reais', field: 'saving_reais', kind: 'num' },
-  { col: 'Tipo de Saving', field: 'tipo_saving', kind: 'text' },
+  { col: 'Custo Evitado Horas', field: 'saving_horas', kind: 'num' },
+  { col: 'Impacto Bruto', field: 'saving_reais', kind: 'num' },
+  { col: 'Freq. Custo Evitado', field: 'tipo_saving', kind: 'text' },
   { col: 'Memorial de Saving', field: 'memorial_calculo', kind: 'text' },
   { col: 'Custo Externo Mensal', field: 'custo_externo_mensal', kind: 'num' },
-  { col: 'Ganho Total', field: 'ganho_total_mensal', kind: 'num' },
+  { col: 'Impacto Líquido', field: 'ganho_total_mensal', kind: 'num' },
   { col: 'Complexidade', field: 'complexidade', kind: 'text' },
   { col: 'Observações', field: 'observacoes', kind: 'text' },
-  // "Custo Evitado" guarda o VALOR R$ (não 'sim/não') e não tem coluna própria no
+  // "Saving Efetivado" guarda o VALOR R$ (não 'sim/não') e não tem coluna própria no
   // SQLite — não é sincronizado de volta para não gravar número no campo flag.
-  { col: 'Justificativa Custo Evitado', field: 'custo_evitado_justificativa', kind: 'text' },
-  { col: 'Contexto do Projeto Especial', field: 'contexto_especial', kind: 'text' },
+  { col: 'Evidência Saving Efetivado', field: 'custo_evitado_justificativa', kind: 'text' },
+  { col: 'Ganho Imensurável', field: 'contexto_especial', kind: 'text' },
   // Mantém o espelho do "Atualizado Em" fresco no SQLite (alimenta o selo de pendentes).
   { col: 'Atualizado Em', field: 'atualizado_em', kind: 'text' },
 ];
@@ -348,7 +348,7 @@ async function atualizarExistente(
     }
   }
 
-  // "Especial?" + "Tipos Projeto": o Sheet é a fonte da verdade do TIPO do projeto.
+  // "Especial?" + "Tipos de Ganho": o Sheet é a fonte da verdade do TIPO do projeto.
   // Ficam FORA de SAFE_UPDATE_FIELDS porque precisam de parse próprio e de efeitos
   // colaterais. Sem isto, uma edição "especial → saving/receita" deixava o SQLite
   // preso em especial=1 / tipos_projeto=['especial'] (o flag nunca voltava do Sheet),
@@ -357,12 +357,12 @@ async function atualizarExistente(
   const especialSheet = parseEspecialFlag(row['Especial?']); // 1 | 0 | null (vazio = não mexe)
   if (especialSheet != null && especialSheet !== (current.especial ?? 0)) {
     if (especialSheet === 0) {
-      // Deixou de ser especial → tipos vêm de "Tipos Projeto"; contexto especial limpa.
+      // Deixou de ser especial → tipos vêm de "Tipos de Ganho"; contexto especial limpa.
       // (o loop SAFE pula "—"/vazio porque txt() → null, então a limpeza é explícita.)
       // Aplica SEMPRE — é o sentido que corrige o "especial sticky" (caso Helen).
       updates['especial'] = 0;
       updates['contexto_especial'] = null;
-      const tipos = parseList(row['Tipos Projeto']).map((t) => t.toLowerCase());
+      const tipos = parseList(row['Tipos de Ganho']).map((t) => t.toLowerCase());
       if (tipos.length) {
         updates['tipos_projeto'] = tipos;
         updates['tipo_projeto'] = tipos[0];
@@ -608,7 +608,7 @@ async function registrarCorrida(
 //
 // Usado ao abrir "Meus Projetos": espelha do Sheets (fonte de verdade) só as
 // linhas onde o usuário é responsável (col "Email") ou participante (col
-// "Participantes"), para o legado aparecer imediatamente sem esperar o cron
+// "Coautor"), para o legado aparecer imediatamente sem esperar o cron
 // horário. Reusa criarLegado/atualizarExistente; nunca propaga erro (o caller
 // deve cair de volta no SQLite se a planilha falhar).
 // `leituraOk` distingue "a planilha respondeu" de "este usuário não tem projeto" —
@@ -643,7 +643,7 @@ export async function syncOwnerRowsFromSheet(
   const doDono = rows.filter((row) => {
     const responsavel = (row['Email'] ?? '').trim().toLowerCase();
     if (responsavel === alvo) return true;
-    // Participante em QUALQUER papel (as 4 colunas), não só "Participantes".
+    // Participante em QUALQUER papel (as 4 colunas), não só "Coautor".
     return parseParticipantesPapeis(row).membros.some((m) => m.toLowerCase() === alvo);
   });
 
