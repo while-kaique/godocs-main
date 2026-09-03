@@ -6,6 +6,7 @@
 // do usuário por decisão de produto). Quórum 2 herdado do agregador da mesa: uma preocupação
 // isolada só pede ajuste quando é dado duro (horas impossíveis ou valor absurdo).
 import { TETO_HORAS_PESSOA, LIMITE_ECONOMIA_ALTA_HORAS } from '@/lib/avaliacao/ferramentas';
+import { ocultarValoresMonetarios } from '@/lib/avaliacao/textos';
 
 export type Mensagem = { role: 'system' | 'user' | 'assistant'; content: string };
 export type DimensaoMerito = 'plausibilidade_horas' | 'financeiro' | 'precedente' | 'evidencia';
@@ -83,13 +84,7 @@ export function buildPromptMerito(args: {
 
 // ── sanitização do que vai ao autor ──────────────────────────────────────────
 
-/** Troca valores monetários e R$/hora por "[valor]". O autor nunca vê o valor/hora dos cargos. */
-export function ocultarValoresMonetarios(texto: string): string {
-  return texto
-    .replace(/R\$\s?[\d.]+(?:,\d+)?(?:\s*\/\s*hora)?/gi, '[valor]')
-    .replace(/\b\d{1,3}(?:\.\d{3})*,\d{2}\s*\/\s*hora\b/gi, '[valor]')
-    .replace(/R\$/g, '[valor]');
-}
+export { ocultarValoresMonetarios } from '@/lib/avaliacao/textos';
 
 function cortar(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
