@@ -3297,6 +3297,10 @@ export async function analisarProjetoFn(rawData: unknown) {
 
   await updateProjeto(projeto_id, {
     complexidade: resultado.complexidade,
+    // Eixo TIPO da categorização (item 5.4). `null` quando nem o LLM nem o palpite
+    // determinístico souberam dizer — indefinido é um estado legítimo, e chutar aqui
+    // envenenaria a agregação por tipo.
+    categoria_projeto: resultado.tipo_projeto ?? null,
     observacoes,
     status: statusFinal,
     // Espelho da classificação de elegibilidade (padrão complexidade/observacoes): serve
@@ -3358,6 +3362,7 @@ export async function analisarProjetoFn(rawData: unknown) {
       projetoId: projeto_id,
       projectName: projeto?.nome ?? "",
       complexidade: resultado.complexidade,
+      tipoProjeto: resultado.tipo_projeto ?? null,
       observacoes: observacoes ?? "",
       status: statusLabel,
       // Colunas "Classificação" (sempre com texto) e "Motivo Reprovado". A

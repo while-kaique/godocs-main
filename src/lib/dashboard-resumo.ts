@@ -112,7 +112,9 @@ export type ProjetoDashboardResumo = {
   ganhoTotal: number | null;
   savingReais: number | null;
   receitaMensal: number | null;
-  complexidade: string | null;
+  complexidade: string | null; // eixo NÍVEL da categorização (item 5.4)
+  /** Eixo TIPO da categorização (item 5.4) — rótulo legível, "—" quando indefinido. */
+  tipoProjeto: string | null;
   tipos: string | null;
   especial: boolean;
   /**
@@ -166,6 +168,7 @@ export const COLUNAS_RESUMO: readonly string[] = [
   // `ProjetoDashboardResumo`), como `Ferramenta` e `Freq. Custo Evitado`.
   'Impacto Líquido Mensal',
   'Complexidade',
+  'Tipo de Projeto',
   'Tipos de Ganho',
   'Especial?',
   'Estrelas',
@@ -186,7 +189,7 @@ export const COLUNAS_RESUMO: readonly string[] = [
 // `linha_resumo` com as chaves da v1 e `mapResumo` leria `undefined` — Ganho/Saving/
 // Receita/Tipos nasceriam VAZIOS na tela, para sempre. Renomear é o mesmo caso de
 // "coluna nova" que este contador existe para cobrir.
-export const VERSAO_RECORTE_RESUMO = 5;
+export const VERSAO_RECORTE_RESUMO = 6;
 
 /**
  * Recorta de uma linha da planilha só as `COLUNAS_RESUMO`.
@@ -237,6 +240,7 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
     savingReais: numero(row['Impacto Bruto']),
     receitaMensal: numero(row['Receita Incremental']),
     complexidade: texto(row['Complexidade']),
+    tipoProjeto: texto(row['Tipo de Projeto']),
     tipos: texto(row['Tipos de Ganho']),
     especial: ehSim(row['Especial?']),
     // ⚠️ Casamento TOLERANTE: o cabeçalho real de prod/staging é "Aprovação do Lider"

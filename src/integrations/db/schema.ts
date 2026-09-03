@@ -911,6 +911,9 @@ const MIGRATIONS = [
   // aquela com `[link]` do resumo da doc e usa o `[0]` para dar upsert no MESMO arquivo
   // do Drive — a evidência guardada lá seria apagada pela chamada seguinte do cliente.
   'ALTER TABLE projetos ADD COLUMN ganho_anexos_links TEXT',
+  // Eixo TIPO da categorização (item 5.4) — slug de `TIPOS_PROJETO`
+  // (@/lib/categoria-projeto). O eixo NÍVEL continua na coluna `complexidade`.
+  'ALTER TABLE projetos ADD COLUMN categoria_projeto TEXT',
   'ALTER TABLE projetos ADD COLUMN impacto_bruto REAL',
   'ALTER TABLE projetos ADD COLUMN impacto_liquido REAL',
   'ALTER TABLE projetos ADD COLUMN impacto_liquido_mensal REAL',

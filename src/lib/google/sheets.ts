@@ -76,6 +76,12 @@ export const SHEET_COLUMNS = [
   'Status',                         // AD
   'Impacto Líquido',                // AE (v2: 1,0·S + 0,5·CE + 0,1·R − C)
   'Complexidade',                   // AF (preenchida pelo analisador)
+  // Eixo TIPO da categorização (item 5.4): o que o projeto É — Agente · Sistema · App ·
+  // Dashboard · Automação. Escrita pelo ANALISADOR (nunca pelo append, que a inicializa em
+  // "—"), rótulo legível vindo de `tipoParaSheet`. ⚠️ NÃO confundir com "Tipos de Ganho"
+  // (as 4 categorias de ganho) nem com "Complexidade" — que é o eixo NÍVEL do mesmo item
+  // 5.4, reaproveitada in-place em vez de virar coluna nova.
+  'Tipo de Projeto',
   'Diff Horas / Antes',             // AG (manual — não escrever)
   'Diff Saving / Antes',            // AH (manual — não escrever)
   'Memorial anterior',              // AI (escrita pelo sistema só na edição)

@@ -84,12 +84,13 @@ const CABECALHO_STAGING_V2 = [
   'Saving Efetivado Agora', // BE ⚠️ NOVA — a 2ª ponta do par
   'Custo Evitado Não Contratado', // BF ⚠️ NOVA — a vaga/consultoria não contratada
   'Impacto Líquido Mensal', // BG ⚠️ NOVA — a normalização no tempo
+  'Tipo de Projeto', // BH ⚠️ NOVA (03/09/2026) — eixo TIPO da categorização (item 5.4)
 ];
 
 describe('cabeçalho real da aba STAGING-V2 (fixture)', () => {
-  it('tem 59 colunas, de A a BG', () => {
-    expect(CABECALHO_STAGING_V2).toHaveLength(59);
-    expect(colLetter(CABECALHO_STAGING_V2.length - 1)).toBe('BG');
+  it('tem 60 colunas, de A a BH', () => {
+    expect(CABECALHO_STAGING_V2).toHaveLength(60);
+    expect(colLetter(CABECALHO_STAGING_V2.length - 1)).toBe('BH');
   });
 
   it('não tem nome repetido (nome ambíguo não recebe valor pelo índice tolerante)', () => {

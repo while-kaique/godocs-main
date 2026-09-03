@@ -19,6 +19,7 @@ import {
   desserializarLinhasHoras,
 } from '@/lib/ganhos';
 import { tituloGanho } from '@/lib/ganhos-rotulos';
+import { normalizarTipo, tipoParaSheet } from '@/lib/categoria-projeto';
 import { moedaBR } from '@/lib/mensagens-submissao';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -188,6 +189,11 @@ export type UpdateSyncParams = {
   complexidade: string;
   observacoes: string;
   status: string;
+  // Eixo TIPO da categorização (item 5.4) → coluna "Tipo de Projeto". Mesma disciplina
+  // das colunas do líder: `undefined` = "não sei, não encoste" (a célula é OMITIDA do
+  // update); `null` = "não se aplica" → "—". Sem isso, um chamador que não conhece a
+  // categorização (o resync) apagaria a classificação já gravada pelo analisador.
+  tipoProjeto?: string | null;
   // Classificação de elegibilidade do analisador → coluna "Classificação" (SEMPRE
   // com texto) e "Motivo Reprovado". `undefined` = não escreve a célula (usado pelo
   // resync, onde o append/update anterior já gravou as duas a partir do projeto).
@@ -528,6 +534,11 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         p.projeto.classificacao_justificativa as string | null | undefined,
       ),
       'Motivo Reprovado': ouTraco(p.projeto.motivo_reprovacao as string | null | undefined),
+      // Eixo TIPO (item 5.4): no append a análise ainda não rodou → "—"; quem escreve é
+      // o analisador, via syncUpdateToGoogle (mesma disciplina de Complexidade/Classificação).
+      'Tipo de Projeto': tipoParaSheet(
+        normalizarTipo((p.projeto as { categoria_projeto?: string | null }).categoria_projeto),
+      ),
       // ⚠️ GoDocs v2, POR ÚLTIMO de propósito: quando o projeto declarou o ganho pelo
       // formulário determinístico, estas células SOBRESCREVEM as derivadas do
       // `saving`/`receita` do chat, que num projeto v2 vêm vazias (não houve chat) e
@@ -693,6 +704,9 @@ export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
       // já a regrava pelo append/update. ⚠️ "Motivo Reenvio" nunca entra (manual).
       if (p.classificacao !== undefined) {
         cells['Classificação'] = derivarClassificacaoSheet(p.classificacao, p.classificacaoJustificativa);
+      }
+      if (p.tipoProjeto !== undefined) {
+        cells['Tipo de Projeto'] = tipoParaSheet(normalizarTipo(p.tipoProjeto));
       }
       if (p.motivoReprovacao !== undefined) {
         // Vazio/null → "—" (padronizarLinha): limpa o motivo quando o projeto deixa

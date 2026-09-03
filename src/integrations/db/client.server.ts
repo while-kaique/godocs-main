@@ -2578,7 +2578,8 @@ export type ProjetoRow = {
   custo_projeto_justificativa: string | null; // texto concatenado dos serviços do projeto
   custo_projeto_itens: string | null; // JSON [{nome,valor,recorrencia,justificativa}] — ABATE
   ganho_total_mensal: number | null;
-  complexidade: string | null;
+  complexidade: string | null; // eixo NÍVEL da categorização (item 5.4)
+  categoria_projeto: string | null; // eixo TIPO da categorização — slug de TIPOS_PROJETO
   alguem_fazia: string | null; // 'sim' | 'nao' — havia trabalho manual antes
   observacoes: string | null; // parecer da análise automática (staff-only)
   especial: number | null; // 1 = projeto especial (altíssimo impacto, validação humana)
