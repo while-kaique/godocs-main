@@ -44,8 +44,18 @@ const varreduraSchema = z.object({
   /** `dry` é o DEFAULT: sem ele a varredura NÃO grava sugestão nenhuma. */
   dry: z.boolean().optional(),
   piso: z.number().min(0).max(1).optional(),
-  /** Teto de projetos julgados nesta passada (o LLM é o caro). */
+  /** Teto de projetos julgados NESTA passada (o LLM é o caro). */
   max: z.number().int().positive().optional(),
+  /**
+   * Quantos projetos com candidato PULAR antes de começar a julgar.
+   *
+   * ⚠️ É o que torna a varredura RESUMÍVEL, e ela precisa ser: ~100 pares × ~2s de LLM são
+   * minutos numa requisição só, e requisição longa morre no Godeploy — a mesma razão de o
+   * disparo de e-mails ser dirigido em lotes pelo FRONT. A lista de candidatos é
+   * DETERMINÍSTICA (TF-IDF + vetores gravados, sem LLM), então recomputá-la a cada lote dá
+   * exatamente a mesma ordem e o `pular` cai sempre no mesmo lugar.
+   */
+  pular: z.number().int().min(0).optional(),
   /** Pula o LLM: devolve só os pares candidatos, para calibrar a régua. */
   somente_pares: z.boolean().optional(),
   /** Desliga a fonte vetorial (só léxico). Útil para medir quanto cada fonte contribui. */
@@ -96,7 +106,9 @@ function paraAglutinavel(p: {
 }
 
 export async function varrerAglutinacao(body: unknown) {
-  const { dry, piso, max, somente_pares, sem_vetor, piso_vetor } = varreduraSchema.parse(body ?? {});
+  const { dry, piso, max, pular, somente_pares, sem_vetor, piso_vetor } = varreduraSchema.parse(
+    body ?? {},
+  );
   const gravar = dry === false;
   const limiar = piso ?? PISO_SIMILARIDADE_AGLUTINACAO;
 
@@ -209,7 +221,11 @@ export async function varrerAglutinacao(body: unknown) {
     };
   }
 
-  const aJulgar = typeof max === 'number' ? comCandidatos.slice(0, max) : comCandidatos;
+  const inicio = pular ?? 0;
+  const aJulgar =
+    typeof max === 'number'
+      ? comCandidatos.slice(inicio, inicio + max)
+      : comCandidatos.slice(inicio);
   const brutas: Sugestao[] = [];
   const falhas: string[] = [];
   for (const { p, cands } of aJulgar) {
@@ -239,6 +255,10 @@ export async function varrerAglutinacao(body: unknown) {
     com_documentacao: projetos.filter((p) => (p.documentacao ?? '').trim()).length,
     com_vetor: vetores.size,
     julgados: aJulgar.length,
+    // Quanto falta para o chamador saber se pede outro lote. `0` = acabou.
+    total_com_candidatos: comCandidatos.length,
+    restantes: Math.max(0, comCandidatos.length - (inicio + aJulgar.length)),
+    proximo_pular: inicio + aJulgar.length,
     // ⚠️ Falha de chamada NÃO é "não é feature": sem este número, uma rajada de 502 do
     // proxy faria a rota responder "0 sugestões" sobre uma base que ninguém analisou.
     falhas: falhas.length,

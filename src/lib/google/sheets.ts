@@ -2,7 +2,7 @@
 
 import { getAccessToken } from './auth';
 import { assertNaoEhDefaultDeProd } from '../env';
-import { chaveColuna } from '../coluna-chave';
+import { chaveColuna, NOME_LEGADO } from '../coluna-chave';
 
 const DEFAULT_SPREADSHEET_ID = '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
 const DEFAULT_SHEET_NAME = 'GoDocs';
@@ -206,8 +206,19 @@ function indexarPorChave<T>(nomes: string[], valor: (nome: string, i: number) =>
  * Resolve a letra da coluna: match EXATO primeiro (comportamento de sempre),
  * tolerante (acento/caixa/espaço) como rede. `undefined` = coluna não existe.
  */
+/**
+ * Nome → letra da coluna. Três tentativas, nesta ordem: nome EXATO, nome normalizado
+ * (acento/caixa — a rede que faz `Aprovação do Lider` casar) e, por último, o NOME LEGADO.
+ *
+ * ⚠️ O legado é a ÚLTIMA tentativa de propósito: numa aba já migrada, o nome novo existe e
+ * o alias nunca é consultado — então migrar a aba não muda comportamento nenhum.
+ */
 export function resolverColunaLetra(map: HeaderMap, nome: string): string | undefined {
-  return map.letterByName[nome] ?? map.letterByKey[chaveColuna(nome)];
+  const direto = map.letterByName[nome] ?? map.letterByKey[chaveColuna(nome)];
+  if (direto) return direto;
+  const legado = NOME_LEGADO[nome];
+  if (!legado) return undefined;
+  return map.letterByName[legado] ?? map.letterByKey[chaveColuna(legado)];
 }
 
 export async function fetchHeaderMap(token: string, spreadsheetId: string, sheetName: string): Promise<HeaderMap> {

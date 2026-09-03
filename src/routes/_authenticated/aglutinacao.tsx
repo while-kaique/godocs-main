@@ -134,6 +134,11 @@ function CartaoSugestao({
   );
 }
 
+/** Pares julgados por requisição. Pequeno o bastante para nenhuma passar de ~30s. */
+const TAMANHO_LOTE = 12;
+/** Teto de voltas — um freio contra laço infinito se o servidor parar de avançar o cursor. */
+const MAX_LOTES = 40;
+
 function AglutinacaoPage() {
   useTituloPagina(SECAO.aglutinacao);
   const [itens, setItens] = useState<Sugestao[]>([]);
@@ -144,6 +149,7 @@ function AglutinacaoPage() {
   const [verDecididos, setVerDecididos] = useState(false);
   const [varrendo, setVarrendo] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
+  const [progresso, setProgresso] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -173,29 +179,52 @@ function AglutinacaoPage() {
     setVarrendo(true);
     setErro(null);
     setResultado(null);
+    setProgresso(null);
     try {
-      const r = await apiFetch<{
-        projetos: number;
-        julgados: number;
-        falhas: number;
-        com_vetor: number;
-        sugestoes: unknown[];
-      }>('/api/admin/aglutinacao/varredura', {
-        method: 'POST',
-        body: JSON.stringify({ dry: false }),
-      });
+      let pular = 0;
+      let julgados = 0;
+      let sugestoes = 0;
+      let falhas = 0;
+      let projetos = 0;
+      // ⚠️ Em LOTES dirigidos pelo FRONT, não numa requisição só: ~100 pares × ~2s de LLM
+      // são minutos, e requisição longa morre no Godeploy — mesma disciplina do disparo de
+      // e-mails. A lista de candidatos é determinística, então o `pular` cai sempre no
+      // mesmo lugar entre um lote e o seguinte.
+      for (let volta = 0; volta < MAX_LOTES; volta++) {
+        const r = await apiFetch<{
+          projetos: number;
+          julgados: number;
+          falhas: number;
+          restantes: number;
+          proximo_pular: number;
+          total_com_candidatos: number;
+          sugestoes: unknown[];
+        }>('/api/admin/aglutinacao/varredura', {
+          method: 'POST',
+          body: JSON.stringify({ dry: false, max: TAMANHO_LOTE, pular }),
+        });
+        projetos = r.projetos;
+        julgados += r.julgados;
+        sugestoes += r.sugestoes?.length ?? 0;
+        falhas += r.falhas ?? 0;
+        pular = r.proximo_pular;
+        setProgresso(
+          `${julgados} de ${r.total_com_candidatos} pares analisados · ${sugestoes} ${sugestoes === 1 ? 'sugestão' : 'sugestões'}`,
+        );
+        await carregar();
+        if (r.restantes === 0 || r.julgados === 0) break;
+      }
       // ⚠️ As falhas aparecem SEMPRE que existem: uma rajada de erro do proxy não pode se
       // parecer com "não achei nada".
       setResultado(
-        `${r.sugestoes?.length ?? 0} ${(r.sugestoes?.length ?? 0) === 1 ? 'sugestão' : 'sugestões'} · ` +
-          `${r.julgados} pares analisados de ${r.projetos} projetos` +
-          (r.falhas ? ` · ⚠️ ${r.falhas} não foram analisados (falha na chamada)` : ''),
+        `${sugestoes} ${sugestoes === 1 ? 'sugestão' : 'sugestões'} · ${julgados} pares analisados de ${projetos} projetos` +
+          (falhas ? ` · ⚠️ ${falhas} não foram analisados (falha na chamada)` : ''),
       );
-      await carregar();
     } catch (e) {
       setErro((e as Error)?.message ?? 'a varredura não completou');
     } finally {
       setVarrendo(false);
+      setProgresso(null);
     }
   }, [carregar]);
 
@@ -258,8 +287,9 @@ function AglutinacaoPage() {
 
       {varrendo ? (
         <p className="mb-4 rounded-md border bg-muted/40 p-3 text-[12.5px] text-muted-foreground">
-          Comparando os projetos e pedindo o parecer do agente para cada par candidato. Leva
-          alguns minutos — dá para sair desta tela e voltar.
+          {progresso ?? 'Comparando os projetos e montando a lista de pares candidatos…'}
+          <br />
+          As sugestões vão aparecendo abaixo conforme cada lote termina.
         </p>
       ) : null}
       {resultado ? (

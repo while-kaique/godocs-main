@@ -14,6 +14,7 @@ import {
   Star,
   ClipboardList,
   Workflow,
+  GitMerge,
 } from "lucide-react";
 
 // Cache do auth no cliente — evita fetch repetido a cada navegação dentro do admin.
@@ -186,6 +187,11 @@ function AuthenticatedLayout() {
             icon={<ClipboardList className="h-4 w-4" />}
           >
             Aprovação de pendentes
+          </NavItem>
+          {/* Vizinho das outras duas telas de decisão (Especiais, Aprovação de pendentes):
+              as três são filas onde um admin julga projeto a projeto. */}
+          <NavItem to="/aglutinacao" icon={<GitMerge className="h-4 w-4" />}>
+            Aglutinação
           </NavItem>
           <NavItem to="/areas" icon={<Building2 className="h-4 w-4" />}>
             Áreas
