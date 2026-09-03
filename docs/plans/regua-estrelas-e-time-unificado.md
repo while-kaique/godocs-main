@@ -577,3 +577,20 @@ consenso, texto ao autor e dossiê de comitê → **forte** (`LLM_MODEL`); embed
 - Não mexer na `feat/godocs-v2`; o dossiê CONSOME os campos dela, não os define.
 - Régua FECHADA (`0c4978f`): mudança só nas constantes, com ok do Luis. Não repropor o que o §4 descartou.
 - Nenhum agente/gate da v1 é apagado (T9 da v2: desligar, não remover).
+
+### 11.7 Diário das rodadas (T19) — o que se aprendeu e o que mudou
+
+Relatórios em `docs/plans/retro-rodadas/<ciclo>.md` (+ `.json` com textos e `-log.json` com a árvore do `agente_log`).
+Harness: `scripts/avaliacao-retro/` (`dump.ts` lê a planilha de prod SÓ-LEITURA; `rodar.ts` roda o time com a
+OpenAI direto — `gpt-5.6-luna` nos especialistas, `gpt-5.6-sol` na estrela e no cético — e grava o log em
+árvore num SQLite EM MEMÓRIA com o schema real). Nada escreve em prod, planilha ou SQLite real.
+
+- **Fumaça (`fumaca-n2`, 03/09):** 2 projetos APROVADOS pela triagem → o time pediu ajuste nos 2, com as
+  4 dimensões preocupadas e o cético refutando por "não auditável / sem evidência independente".
+  Diagnóstico: o material da base legada é SÓ a planilha (sem anexo, sem doc compilada); exigir evidência
+  externa transforma todo projeto em `ajuste` e o time deixa de ser autônomo. **Calibração (variante 2,
+  aplicada aos prompts do MÉRITO e do CÉTICO, régua intacta):** preocupação exige SINAL CONCRETO no
+  dossiê (número implausível, contradição, dupla contagem, duplicata, ganho projetado); ausência de anexo
+  não preocupa por si; 1 pergunta por dimensão, ≤220 chars. Também: perguntas duplicadas entre
+  dimensões (plausibilidade e financeiro perguntaram a mesma coisa) — a consolidação já dedupa exatas;
+  falta dedupe semântico.

@@ -31,13 +31,21 @@ const PERSONA: Record<DimensaoMerito, string> = {
   plausibilidade_horas: `Você é o especialista em PLAUSIBILIDADE DE HORAS (dimensão "plausibilidade_horas") da mesa de avaliação do GoDocs. Você julga se as horas declaradas são críveis para as pessoas e cargos descritos: o teto CLT é ${TETO_HORAS_PESSOA} h por pessoa por mês; uma linha acima disso soma várias pessoas/unidades ou está errada. Economia de ${LIMITE_ECONOMIA_ALTA_HORAS} h/mês ou mais exige que o memorial diga o destino das horas liberadas. Você não reprova: quando algo não fecha, formula a PERGUNTA concreta que o autor precisa responder.`,
   financeiro: `Você é o especialista FINANCEIRO (dimensão "financeiro") da mesa de avaliação do GoDocs. Você audita o VALOR: o ganho declarado é coerente com as horas, os cargos, o custo evitado, a receita e os custos do projeto? Quando o valor é absurdo (fora da curva dos cargos, dupla contagem, receita bruta contada como ganho, custo evitado que já está nas horas), diga "absurdo": true e proponha o valor_sugerido defensável com a justificativa. Sem certeza, deixe valor_sugerido null e explique.`,
   precedente: `Você é o especialista em PRECEDENTE (dimensão "precedente") da mesa de avaliação do GoDocs. Você compara este projeto com os vizinhos já decididos por humanos (aprovados e reprovados): o que a triagem aceitou em casos parecidos, o que ela devolveu, e se este projeto repete um escopo já documentado (duplicata). Nunca copie o veredito do vizinho: nomeie a diferença.`,
-  evidencia: `Você é o especialista em EVIDÊNCIA (dimensão "evidencia") da mesa de avaliação do GoDocs. Você confere se o que o memorial afirma tem base verificável: anexo citado, evidência de medição, sistema/relatório onde o número se confere, coerência entre descrição, documentação e números. Afirmação sem evidência não é falsa, mas é pergunta.`,
+  evidencia: `Você é o especialista em EVIDÊNCIA (dimensão "evidencia") da mesa de avaliação do GoDocs. Você confere a COERÊNCIA do que o dossiê afirma: descrição, memorial, horas e colunas contam a mesma história? O memorial nomeia o processo, quem fazia e onde o número se confere (sistema, relatório, planilha)? Anexo ou evidência externa é bônus, não requisito: a base legada raramente tem anexo, e a ausência dele sozinha não preocupa. Preocupa a contradição, o memorial vazio ou genérico, o ganho descrito como projeção.`,
 };
 
-const FORMATO = `FORMATO DE RESPOSTA — responda APENAS com um objeto JSON:
+const REGUA_DE_PREOCUPACAO = `O QUE É (E O QUE NÃO É) MOTIVO DE PREOCUPAÇÃO:
+- A base legada foi documentada só pela planilha: quase nenhum projeto tem anexo, documentação compilada ou texto de evidência no dossiê. AUSÊNCIA de anexo ou de evidência externa NÃO é motivo de preocupação por si — a triagem humana aprovou centenas de projetos com esse mesmo material.
+- Preocupe-se quando há SINAL CONCRETO no dossiê: número implausível (horas acima do teto por pessoa, valor fora da curva do cargo), contradição interna (memorial diz uma coisa, colunas dizem outra), dupla contagem (custo evitado que já está nas horas, receita bruta contada como ganho), duplicata de escopo já documentado, ganho projetado em vez de medido, ou memorial que não descreve o processo.
+- Na dúvida sem sinal concreto, NÃO preocupe: registre a ressalva no argumento e deixe preocupa=false. O time só pede ajuste ao autor quando tem uma pergunta que ele consegue responder e que muda a decisão.
+- Uma pergunta ao autor é UMA pergunta (uma interrogação, até 220 caracteres), sobre o ponto que mais muda a decisão.`;
+
+const FORMATO = `${REGUA_DE_PREOCUPACAO}
+
+FORMATO DE RESPOSTA — responda APENAS com um objeto JSON:
 {
-  "preocupa": <bool — há algo que impede aprovar como está?>,
-  "argumento": "<até 600 caracteres, o seu raciocínio; pode citar R$>",
+  "preocupa": <bool — há SINAL CONCRETO que impede aprovar como está?>,
+  "argumento": "<até 600 caracteres, o seu raciocínio; pode citar R$; ressalvas sem sinal concreto vão aqui, não em preocupa>",
   "evidencias": ["<citação literal do dossiê>", "..."],
   "pergunta_ao_autor": "<UMA pergunta concreta e respondível pelo autor quando preocupa, senão null. PROIBIDO citar R$ por hora ou o valor/hora de qualquer cargo — o autor não vê esse número>",
   "valor": <só a dimensão financeiro: { "absurdo": bool, "valor_sugerido": number|null, "justificativa": "..." }; as outras dimensões devolvem null>

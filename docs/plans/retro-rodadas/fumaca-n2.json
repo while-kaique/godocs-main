@@ -1,0 +1,245 @@
+{
+ "meta": {
+  "ciclo": "fumaca-n2",
+  "amostra": 2,
+  "modelo": "gpt-5.6-luna (especialistas) + gpt-5.6-sol (estrela, cético)",
+  "variante": "fumaca"
+ },
+ "relatorio": {
+  "total": 2,
+  "por_gabarito": {
+   "nota_humana": 1,
+   "status_assentado": 1,
+   "nao_auditado": 0,
+   "fora": 0
+  },
+  "merito": {
+   "acerto": 0,
+   "conservador": 1,
+   "erro_grave": 0,
+   "sem_base": 1,
+   "acuracia": 0
+  },
+  "acuracia_por_veredito": {
+   "ajuste": {
+    "acerto": 0,
+    "erro_grave": 0,
+    "n": 1
+   }
+  },
+  "estrelas": {
+   "distribuicao_time": {
+    "0": 1,
+    "1": 1,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0
+   },
+   "distribuicao_humana": {
+    "0": 1,
+    "2": 1
+   },
+   "escape": 0,
+   "exato": 0.5,
+   "dentro_de_1": 1,
+   "vies": -0.5,
+   "n_comparaveis": 2
+  },
+  "achatamento": {
+   "suspeito": true,
+   "destino": 1,
+   "proporcao": 1,
+   "total": 1
+  },
+  "calibragem": {
+   "ok": true,
+   "desvio": null,
+   "proporcaoAte3": 1,
+   "proporcaoAcimaDe3": 0,
+   "total": 2
+  },
+  "saidas": {
+   "aprovar": 0,
+   "ajuste": 2,
+   "humano": 0
+  },
+  "humano_pct": 0,
+  "valor": {
+   "absurdos": 0,
+   "auditados": 2
+  },
+  "contestacoes": [
+   {
+    "id": "546988880104067db81665f63481eca1",
+    "nome": "Haileydash",
+    "humana": 2,
+    "time": 1
+   }
+  ],
+  "alertas": [
+   "Achatamento suspeito: 100% das quedas caem no mesmo nível 1. Revisar a régua antes de aceitar qualquer queda (D12)."
+  ]
+ },
+ "custoUsd": 0.06332349999999999,
+ "tokens": {
+  "gpt-5.6-luna": {
+   "in": 25488,
+   "out": 4766
+  },
+  "gpt-5.6-sol": {
+   "in": 10159,
+   "out": 1565
+  }
+ },
+ "resultados": [
+  {
+   "id": "546988880104067db81665f63481eca1",
+   "nome": "Haileydash",
+   "area": "GROWTH",
+   "especial": true,
+   "gabarito": "nota_humana",
+   "merito": "sem_base",
+   "estrela": {
+    "humana": 2,
+    "time": 1,
+    "distancia": 1,
+    "dentro_de_1": true
+   },
+   "escape": false,
+   "saida": "ajuste",
+   "confianca": "alta",
+   "valor_absurdo": false,
+   "contestou": true,
+   "veredito_merito": "ajuste",
+   "criterio": "informa",
+   "desqualificador": null,
+   "evidencias": [
+    "Dashboard em tempo real de performance de influenciadores do GoGroup (Gocase, Ápice, Barbour's, Kokeshi, Lescent e Rituária), desenvolvido para as equipes de Marketing e Growth acompanharem receita, investimento e ROI.",
+    "em vez de descobrir num relatório mensal que uma marca queimou budget sem retorno, o time vê isso no mesmo dia e realoca.",
+    "Este projeto não faz nenhuma das duas coisas diretamente — ele não corta custo nenhum por si só, e não gera uma venda que não existiria de outra forma."
+   ],
+   "racional_estrela": "O Haileydash consolida dados, exibe ROI e dispara alertas, mas a ação consequente — realocar budget — continua com Marketing/Growth. Portanto, informa, abaixo de Hailey e Gocreators (2★), sem evidência de execução ponta a ponta. Não há IA em runtime, dependente nomeado ou bloqueio de erro. Subiria a 2★ se executasse automaticamente a realocação ou outra ação operacional recorrente.",
+   "preocupacoes": [
+    "plausibilidade_horas",
+    "financeiro",
+    "precedente",
+    "evidencia"
+   ],
+   "perguntas": [
+    "Antes do dashboard, quantas pessoas realizavam a consolidação, quantas horas cada uma gastava por ocorrência e com que periodicidade (diária, semanal ou mensal), e como essas horas passaram a ser utilizadas após a automação?",
+    "Qual era a periodicidade do processo manual, quantas pessoas e horas ele consumia por ciclo, e que evidência demonstra o uso recorrente do dashboard ou alguma realocação de budget atribuível a ele?",
+    "Quais funcionalidades, marcas, fontes de dados e usuários do Haileydash não existiam no Hailey, e qual processo foi substituído por cada uma delas?",
+    "Envie documentação ou links acessíveis que mostrem o dashboard em uso, as consultas/fontes InfluHub, Spree, Yampi e Metabase, uma amostra da conferência de ROI e receita contra o Metabase/damidash e evidência comparando o processo manual anterior com o uso atual, incluindo periodicidade e responsáveis."
+   ],
+   "motivos": [
+    "O mérito pede ajuste ao autor com 4 pergunta(s).",
+    "Saída ajuste fica em sombra: a liberação para agir sozinho não está autorizada."
+   ],
+   "divergencias": [],
+   "cetico": {
+    "refuta": true,
+    "motivo": "A aprovação não tem evidência auditável independente: há apenas um link sem conteúdo persistido e o próprio painel/relato como prova, sem documentação, consultas ou ponteiros que confirmem integrações, alertas, uso recorrente ou a alegada acurácia e redução de esforço de 100%.",
+    "sinais": [
+     "evidência é apenas o próprio entregável",
+     "documentação compilada ausente",
+     "afirmações de 100% sem base auditável",
+     "possível sobreposição funcional com Hailey não delimitada",
+     "saving descrito como horas de analista, mas registrado como 0h e sem cadência"
+    ],
+    "fallback": false
+   },
+   "rodadas": 1,
+   "chamadas_llm": 7,
+   "erros": [],
+   "textos": {
+    "interno": "Justificativa interna: Haileydash (id 546988880104067db81665f63481eca1)\nSaída do time: Pedir ajuste. Mérito: ajuste. Estrela: 1 estrela. Confiança alta.\nCritério aplicado: informa.\nEvidências da estrela:\n- Dashboard em tempo real de performance de influenciadores do GoGroup (Gocase, Ápice, Barbour's, Kokeshi, Lescent e Rituária), desenvolvido para as equipes de Marketing e Growth acompanharem receita, investimento e ROI.\n- em vez de descobrir num relatório mensal que uma marca queimou budget sem retorno, o time vê isso no mesmo dia e realoca.\n- Este projeto não faz nenhuma das duas coisas diretamente, ele não corta custo nenhum por si só, e não gera uma venda que não existiria de outra forma.\nRacional da estrela: O Haileydash consolida dados, exibe ROI e dispara alertas, mas a ação consequente, realocar budget, continua com Marketing/Growth. Portanto, informa, abaixo de Hailey e Gocreators (2★), sem evidência de execução ponta a ponta. Não há IA em runtime, dependente nomeado ou bloqueio de erro. Subiria a 2★ se executasse automaticamente a realocação ou outra ação operacional recorrente.\nJulgamentos do mérito:\n- plausibilidade_horas (preocupa): As horas declaradas não fecham com a descrição operacional: o processo anterior “levava horas de analista” e a entrega afirma redução de 100% do esforço manual, mas o financeiro registra 0h de saving e cadência não informada. Não há base para validar a plausibilidade da carga liberada nem quantas pessoas eram envolvidas. Evidências: “algo que levava horas de analista”; “Redução de 100% no esforço manual de consolidação de relatórios”; “Saving em horas: 0h (cadência não informada) · alguém fazia: ”.\n- financeiro (preocupa): O valor financeiro declarado é R$ 0, coerente apenas com a afirmação de que não houve saving ou receita diretamente atribuível. Porém, o dossiê também afirma redução de 100% do esforço manual e uso recorrente, sem informar horas, pessoas ou cadência. Assim, não é possível validar o ganho nem propor valor defensável; a comparação com dashboards aprovados não substitui essa mensuração. Evidências: \"Saving em horas: 0h (cadência não informada)\"; \"Redução de 100% no esforço manual de consolidação de relatórios\"; \"Este projeto não faz nenhuma das duas coisas diretamente, ele não corta custo nenhum por si só, e não gera uma venda que não existiria de outra forma.\".\n- precedente (preocupa): Há precedente favorável para dashboards de performance e monitoramento de creators, como Hailey e Gocreators, DashBoard. Porém, Haileydash pode repetir parcialmente o escopo de Hailey: ambos acompanham performance de influenciadores e apoiam alertas/decisões de marketing. A busca não encontrou duplicata exata, mas falta delimitar o que é novo em relação ao sistema anterior e comprovar a fronteira funcional. Evidências: “Dashboard em tempo real de performance de influenciadores do GoGroup”; “Inclui alertas automáticos de marcos (recordes, metas de ROI e quedas de share)”; “O Hailey é um sistema de alertas para o time de marketing de influenciadores da Gocase.”.\n- evidencia (preocupa): A existência e a finalidade do dashboard são descritas, mas a evidência verificável está incompleta: há apenas um link de anexo, sem documentação compilada nem ponteiros para telas, consultas ou relatórios onde se confirmem as integrações, a validação em centavos, os alertas e a redução do esforço manual. As afirmações de 100% de acurácia e redução de 100% permanecem sem base auditável no dossiê. Evidências: \"validados linha a linha contra o Metabase e damidash com precisão de centavos\"; \"Redução de 100% no esforço manual de consolidação de relatórios e de chamados de outras plataformas\"; \"Anexos (links): https://drive.google.com/file/d/10dGVvUAUHTcjnYdM7FUZs__vXx3cpvYZ/view?usp=drivesdk\"; \"Documentação (documentação compilada ausente)\".\nDivergências: nenhuma.\nMotivos:\n- O mérito pede ajuste ao autor com 4 pergunta(s).\n- Saída ajuste fica em sombra: a liberação para agir sozinho não está autorizada.\nAuditoria de valor: valor declarado plausível. Valor sugerido: não sugerido. R$ 0 não é absurdo, pois o autor declara não haver saving ou receita diretamente atribuível. Contudo, há afirmação de eliminação total do esforço manual e uso recorrente sem horas, cargos, cadência ou evidência mensurável; portanto não há base suficiente para estimar um valor sugerido defensável.\nPerguntas ao autor:\n- Antes do dashboard, quantas pessoas realizavam a consolidação, quantas horas cada uma gastava por ocorrência e com que periodicidade (diária, semanal ou mensal), e como essas horas passaram a ser utilizadas após a automação?\n- Qual era a periodicidade do processo manual, quantas pessoas e horas ele consumia por ciclo, e que evidência demonstra o uso recorrente do dashboard ou alguma realocação de budget atribuível a ele?\n- Quais funcionalidades, marcas, fontes de dados e usuários do Haileydash não existiam no Hailey, e qual processo foi substituído por cada uma delas?\n- Envie documentação ou links acessíveis que mostrem o dashboard em uso, as consultas/fontes InfluHub, Spree, Yampi e Metabase, uma amostra da conferência de ROI e receita contra o Metabase/damidash e evidência comparando o processo manual anterior com o uso atual, incluindo periodicidade e responsáveis.\nContestação registrada para o comitê: {\"notaHumana\":2,\"notaRegua\":1,\"criterioAplicado\":\"informa\",\"gatilhoQueFalhou\":\"A triagem atribuiu 2★, mas o requisito de execução autônoma não se sustenta: “o time vê isso no mesmo dia e realoca.” O próprio dossiê reforça que “ele não corta custo nenhum por si só”.\",\"racional\":\"O Haileydash consolida dados, exibe ROI e dispara alertas, mas a ação consequente, realocar budget, continua com Marketing/Growth. Portanto, informa, abaixo de Hailey e Gocreators (2★), sem evidência de execução ponta a ponta.\",\"evidencia\":\"Dashboard em tempo real de performance de influenciadores do GoGroup (Gocase, Ápice, Barbour's, Kokeshi, Lescent e Rituária), desenvolvido para as equipes de Marketing e Growth acompanharem receita, investimento e ROI.\"}",
+    "ao_autor": "Seu projeto Haileydash está em validação e precisa de um ajuste antes de seguir.\n\nO que precisamos entender:\n- Antes do dashboard, quantas pessoas realizavam a consolidação, quantas horas cada uma gastava por ocorrência e com que periodicidade (diária, semanal ou mensal), e como essas horas passaram a ser utilizadas após a automação?\n- Qual era a periodicidade do processo manual, quantas pessoas e horas ele consumia por ciclo, e que evidência demonstra o uso recorrente do dashboard ou alguma realocação de budget atribuível a ele?\n- Quais funcionalidades, marcas, fontes de dados e usuários do Haileydash não existiam no Hailey, e qual processo foi substituído por cada uma delas?\n- Envie documentação ou links acessíveis que mostrem o dashboard em uso, as consultas/fontes InfluHub, Spree, Yampi e Metabase, uma amostra da conferência de ROI e receita contra o Metabase/damidash e evidência comparando o processo manual anterior com o uso atual, incluindo periodicidade e responsáveis.\n\nPara corrigir: abra o projeto em Meus Projetos, responda aos pontos acima na descrição ou no memorial, anexe a evidência quando houver e reenvie para a triagem.",
+    "comite": null
+   },
+   "duracao_ms": 19929,
+   "vizinhos": [
+    "ecom-metrics-hub (3★, Aprovado, 0.872)",
+    "Gocreators - DashBoard (2★, Aprovado, 0.823)",
+    "Hailey (2★, Aprovado, 0.823)",
+    "Dashboard de Afiliados GoGroup (-★, Aprovado, 0.812)",
+    "Mix Produtos Gobeaute (1★, Aprovado, 0.812)",
+    "Dashboard Lives Gogroup (1★, Aprovado, 0.796)"
+   ]
+  },
+  {
+   "id": "LEGADO-169",
+   "nome": "Ciclo de Compras 2026",
+   "area": "Sourcing & Procurement Gobeaute",
+   "especial": false,
+   "gabarito": "status_assentado",
+   "merito": "conservador",
+   "estrela": {
+    "humana": 0,
+    "time": 0,
+    "distancia": 0,
+    "dentro_de_1": true
+   },
+   "escape": false,
+   "saida": "ajuste",
+   "confianca": "alta",
+   "valor_absurdo": false,
+   "contestou": false,
+   "veredito_merito": "ajuste",
+   "criterio": "experimenta",
+   "desqualificador": "simples_local",
+   "evidencias": [
+    "Automação do ciclo de compras 2026 com tracking e alertas.",
+    "Saving em horas: 8h (mensal)"
+   ],
+   "racional_estrela": "O dossiê comprova apenas tracking e alertas de uma rotina interna, sem evidência de uso recorrente, ação ponta a ponta ou mudança de decisão. Fica abaixo das âncoras de 1★, que sustentam bases ou comparativos informativos. Para subir, precisa demonstrar usuários recorrentes e como a informação produzida orienta o ciclo de compras.",
+   "preocupacoes": [
+    "plausibilidade_horas",
+    "financeiro",
+    "precedente",
+    "evidencia"
+   ],
+   "perguntas": [
+    "Qual pessoa ou cargo realizava essas atividades antes da automação, e qual evidência ou registro demonstra que o trabalho consumia 8 horas por mês?",
+    "Quem realizava a atividade antes da automação e qual evidência demonstra que ela consumia 8 horas por mês, comparando o processo antes e depois?",
+    "Quais etapas do ciclo de compras serão automatizadas, quem executava cada uma antes, quais alertas e tracking serão implantados e que evidência comprova o uso recorrente?",
+    "Apresente uma evidência verificável do processo antes e depois, informando quem executava a atividade, quantas horas mensais eram gastas em cada etapa e em qual sistema ou relatório esses tempos podem ser conferidos."
+   ],
+   "motivos": [
+    "O mérito pede ajuste ao autor com 4 pergunta(s).",
+    "Saída ajuste fica em sombra: a liberação para agir sozinho não está autorizada."
+   ],
+   "divergencias": [],
+   "cetico": {
+    "refuta": true,
+    "motivo": "O saving mensal de 8h e R$441,20 não é auditável: está apenas declarado, sem identificar quem realizava a tarefa, sem cargo/taxa confirmados e sem medição antes/depois ou conteúdo do anexo disponível.",
+    "sinais": [
+     "evidência ausente para as 8h mensais",
+     "campo “alguém fazia” vazio",
+     "taxa de coordenador sem cargo confirmado",
+     "documentação compilada ausente",
+     "anexo indisponível para verificação",
+     "ganho declarado em vez de medido"
+    ],
+    "fallback": false
+   },
+   "rodadas": 1,
+   "chamadas_llm": 10,
+   "erros": [],
+   "textos": {
+    "interno": "Justificativa interna: Ciclo de Compras 2026 (id LEGADO-169)\nSaída do time: Pedir ajuste. Mérito: ajuste. Estrela: sem estrela. Confiança alta.\nCritério aplicado: experimenta (desqualificador simples_local).\nEvidências da estrela:\n- Automação do ciclo de compras 2026 com tracking e alertas.\n- Saving em horas: 8h (mensal)\nRacional da estrela: O dossiê comprova apenas tracking e alertas de uma rotina interna, sem evidência de uso recorrente, ação ponta a ponta ou mudança de decisão. Fica abaixo das âncoras de 1★, que sustentam bases ou comparativos informativos. Para subir, precisa demonstrar usuários recorrentes e como a informação produzida orienta o ciclo de compras.\nJulgamentos do mérito:\n- plausibilidade_horas (preocupa): As 8h mensais estão abaixo do teto de 220h por pessoa e são plausíveis para uma automação de tracking e alertas. Porém, o dossiê não identifica quem executava as atividades nem apresenta documentação ou evidência que sustente a estimativa; o campo “alguém fazia” está vazio. Evidências: Saving em horas: 8h (mensal) · alguém fazia:; Memorial de saving: 8h × R$55,15 (Coord) = R$441,20.; documentação compilada ausente.\n- financeiro (preocupa): O cálculo é aritmeticamente coerente (8h mensais × taxa declarada = R$441,20), sem dupla contagem aparente. Porém, não há identificação de quem executava a atividade, cargo confirmado, linha antes/depois ou evidência que comprove as 8h mensais. Assim, o ganho não é auditável e o valor sugerido fica indeterminado. Evidências: Saving em horas: 8h (mensal) · alguém fazia:; Memorial de saving: 8h × R$55,15 (Coord) = R$441,20.; Anexos (links): https://drive.google.com/file/d/1PJiEA_XBfSe8ug1qp9hREvMDuc9tvSJZ/view?usp=drivesdk.\n- precedente (preocupa): Há precedente favorável para automações operacionais, comparativos, carteira online, separação de processos e atualização de bases foram aprovados. A diferença é que este projeto descreve apenas “tracking e alertas”, sem etapas, usuários, sistema ou resultado verificável; portanto, não demonstra aderência suficiente ao escopo aceito. Não foi encontrada duplicata nominal. Evidências: Automação do ciclo de compras 2026 com tracking e alertas.; Saving em horas: 8h (mensal) · alguém fazia:; (documentação compilada ausente).\n- evidencia (preocupa): O ganho de 8h mensais e R$441,20 está apenas declarado no memorial. Embora exista um link de anexo, seu conteúdo não está disponível para verificação; não há documentação compilada, identificação de quem executava a atividade, nem sistema/relatório com medição antes/depois. Assim, a base verificável do saving e sua periodicidade são insuficientes. Evidências: \"Anexos (links): https://drive.google.com/file/d/1PJiEA_XBfSe8ug1qp9hREvMDuc9tvSJZ/view?usp=drivesdk\"; \"Saving em horas: 8h (mensal) · alguém fazia: \"; \"Memorial de saving: 8h × R$55,15 (Coord) = R$441,20.\"; \"documentação compilada ausente\"; \"texto dos anexos não é persistido (só os links)\".\nDivergências: nenhuma.\nMotivos:\n- O mérito pede ajuste ao autor com 4 pergunta(s).\n- Saída ajuste fica em sombra: a liberação para agir sozinho não está autorizada.\nAuditoria de valor: valor declarado plausível. Valor sugerido: não sugerido. O valor de R$441,20 é matematicamente consistente com as 8h declaradas, mas não há dados verificáveis sobre a pessoa, o cargo, as horas antes/depois ou a periodicidade observada. Sem essa comprovação, não é possível sugerir um valor defensável.\nPerguntas ao autor:\n- Qual pessoa ou cargo realizava essas atividades antes da automação, e qual evidência ou registro demonstra que o trabalho consumia 8 horas por mês?\n- Quem realizava a atividade antes da automação e qual evidência demonstra que ela consumia 8 horas por mês, comparando o processo antes e depois?\n- Quais etapas do ciclo de compras serão automatizadas, quem executava cada uma antes, quais alertas e tracking serão implantados e que evidência comprova o uso recorrente?\n- Apresente uma evidência verificável do processo antes e depois, informando quem executava a atividade, quantas horas mensais eram gastas em cada etapa e em qual sistema ou relatório esses tempos podem ser conferidos.",
+    "ao_autor": "Seu projeto Ciclo de Compras 2026 está em validação e precisa de um ajuste antes de seguir.\n\nO que precisamos entender:\n- Qual pessoa ou cargo realizava essas atividades antes da automação, e qual evidência ou registro demonstra que o trabalho consumia 8 horas por mês?\n- Quem realizava a atividade antes da automação e qual evidência demonstra que ela consumia 8 horas por mês, comparando o processo antes e depois?\n- Quais etapas do ciclo de compras serão automatizadas, quem executava cada uma antes, quais alertas e tracking serão implantados e que evidência comprova o uso recorrente?\n- Apresente uma evidência verificável do processo antes e depois, informando quem executava a atividade, quantas horas mensais eram gastas em cada etapa e em qual sistema ou relatório esses tempos podem ser conferidos.\n\nPara corrigir: abra o projeto em Meus Projetos, responda aos pontos acima na descrição ou no memorial, anexe a evidência quando houver e reenvie para a triagem.",
+    "comite": null
+   },
+   "duracao_ms": 20354,
+   "vizinhos": [
+    "SPG · Comparativos Automáticos (1★, Aprovado, 0.8)",
+    "SPG · Carteira de Pedidos Online (-★, Aprovado, 0.784)",
+    "SPG · Agente Comparativo Automático IA (-★, Aprovado, 0.775)",
+    "Automação Separação de Processos de Importação (-★, Aprovado, 0.766)",
+    "Gestão de Endereçamento Logístico (1★, Aprovado, 0.752)",
+    "Atualização de base de Operações B2B (1★, Aprovado, 0.744)"
+   ]
+  }
+ ]
+}
