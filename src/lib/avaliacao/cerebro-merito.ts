@@ -144,6 +144,40 @@ export function julgamentoFallback(dimensao: DimensaoMerito, motivo: string): Ju
   };
 }
 
+/** Tokens comparáveis de uma pergunta: sem acento, minúsculas, só palavras com 4+ letras. */
+function tokensDe(p: string): Set<string> {
+  return new Set(
+    p
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 4),
+  );
+}
+
+/** Limiar do coeficiente de sobreposição (interseção ÷ menor conjunto) acima do qual duas perguntas são a MESMA pergunta com outras palavras. Jaccard foi testado e ficava em 0,38 nas duplicatas reais da fumaça. */
+export const LIMIAR_PERGUNTA_REPETIDA = 0.5;
+
+/** Remove perguntas repetidas (exatas ou quase: sobreposição ≥ limiar), mantendo a primeira. */
+export function dedupePerguntas(perguntas: string[]): string[] {
+  const out: string[] = [];
+  const vistos: Set<string>[] = [];
+  for (const p of perguntas) {
+    const t = tokensDe(p);
+    const repetida = vistos.some((v) => {
+      const inter = [...t].filter((x) => v.has(x)).length;
+      const menor = Math.min(t.size, v.size);
+      return menor > 0 && inter / menor >= LIMIAR_PERGUNTA_REPETIDA;
+    });
+    if (!repetida) {
+      out.push(p);
+      vistos.push(t);
+    }
+  }
+  return out;
+}
+
 export type SaidaMerito = {
   veredito: 'aprovar' | 'ajuste' | 'humano';
   julgamentos: JulgamentoMerito[];
@@ -161,7 +195,7 @@ export function consolidarMerito(julgamentos: JulgamentoMerito[], ctx: { temVizi
   const validos = julgamentos.filter((j) => !j.fallback).sort((a, b) => ordem(a.dimensao) - ordem(b.dimensao));
   const preocupantes = validos.filter((j) => j.preocupa);
   const preocupacoes = preocupantes.map((j) => j.dimensao);
-  const perguntas_ao_autor = [...new Set(preocupantes.map((j) => j.pergunta_ao_autor).filter((p): p is string => !!p))];
+  const perguntas_ao_autor = dedupePerguntas(preocupantes.map((j) => j.pergunta_ao_autor).filter((p): p is string => !!p));
   const financeiro = validos.find((j) => j.dimensao === 'financeiro');
   const valor = financeiro?.valor ?? null;
   const sinais = { temEvidenciaCitada: validos.some((j) => j.evidencias.length > 0), temVizinhos: ctx.temVizinhos };
