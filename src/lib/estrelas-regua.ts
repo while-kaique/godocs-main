@@ -191,16 +191,22 @@ export const FAIXA_ESCAPE = { min: TETO_AGENTE + 1, max: NOTA_MAX } as const;
  * indica a faixa, e **o comitê humano define o número por critério comparativo** contra os
  * projetos que já estão nela. Não reintroduzir os cinco níveis sem decisão do dono do produto.
  */
+/**
+ * ⚠️ **Revisão de 03/09/2026 (Luis):** saiu o traço *"Substitui humanos de maneira clara e
+ * inequívoca"*. Ele era o mais duro de provar — quase nenhum projeto da base substitui gente de
+ * forma inequívoca, e o traço acabava lido como requisito, empurrando candidatos legítimos para
+ * fora da faixa. O que ficou descreve o EFEITO (revoluciona o trabalho, move KPI e resultado,
+ * abre frente nova), não a contrapartida em pessoas.
+ */
 export const ESCAPE_MUDA_O_JOGO = {
   verbo: 'Muda o Jogo',
   criterio:
     'Revoluciona como a área — ou a empresa — trabalha. O agente INDICA a faixa; quem define o número é o comitê humano, comparando com os projetos que já estão em 6★–10★.',
   /** Os traços que descrevem a faixa. São a leitura do dono do produto, não um checklist somado. */
   tracos: [
+    'Revoluciona como a área — ou a empresa — trabalha.',
     'Sistema agêntico com impacto direto nos KPIs e no resultado financeiro.',
-    'Abre uma nova frente de receita ou de saving, não uma melhoria da frente que já existia.',
-    'Substitui humanos de maneira clara e inequívoca.',
-    'Muda o jeito de trabalhar da área inteira, não a velocidade de uma rotina.',
+    'Abre novas frentes de receita ou de saving.',
   ],
 } as const;
 
@@ -335,6 +341,18 @@ export function descreverEscape(): string {
     '',
     'Como a faixa se parece:',
     tracos,
+    '',
+    '',
+    'O CASO DA PLATAFORMA — leia com atenção, é onde mais se erra:',
+    'Quando OUTRO projeto ou processo, NOMEADO, roda em cima deste (consome API, MCP, integração)',
+    'e nasceu depois dele, os DOIS gatilhos estão satisfeitos por esse mesmo fato:',
+    '  · gatilho 1 — o projeto dependente É a atividade que não existiria sem ele;',
+    '  · gatilho 2 — o dependente não tem "jeito antigo" para onde voltar, porque nunca existiu sem ele.',
+    'A citação é a frase do dossiê que NOMEIA o dependente. NÃO exija uma confissão literal do tipo',
+    '"o processo antigo foi abandonado": memorial nenhum escreve isso, e cobrá-la reprova plataforma',
+    'legítima. Um dependente nomeado basta; dois ou mais tornam o caso evidente.',
+    '⚠️ Isso NÃO vale para "poderá ser usado por", "abre portas para" ou dependente sem nome — aí',
+    'não há atividade em curso, e a nota fica em 5★.',
     '',
     `Você indica a FAIXA e cita a evidência de cada gatilho. NÃO escolha o número entre ${FAIXA_ESCAPE.min} e ${FAIXA_ESCAPE.max}: isso é do comitê humano.`,
   ].join('\n');

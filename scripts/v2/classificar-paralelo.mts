@@ -103,6 +103,18 @@ async function trabalhar(fila: typeof projetos): Promise<void> {
 const fila = [...projetos];
 await Promise.all(Array.from({ length: CONCORRENCIA }, () => trabalhar(fila)));
 
+// ⚠️ REPESCAGEM. Concorrência alta satura o gateway e devolve 502 — e um 502 NÃO é "nota
+// baixa", é "ninguém perguntou". Sem esta volta, subir a concorrência trocaria tempo por
+// buracos silenciosos no relatório. Uma passada só, com metade da concorrência.
+if (falhas.length) {
+  console.log(`\n\nrepescando ${falhas.length} falhas com concorrência ${Math.ceil(CONCORRENCIA / 2)}…`);
+  const refazer = falhas.map((f) => projetos.find((p) => p.id === f.id)!).filter(Boolean);
+  falhas.length = 0;
+  feitos = 0;
+  const fila2 = [...refazer];
+  await Promise.all(Array.from({ length: Math.ceil(CONCORRENCIA / 2) }, () => trabalhar(fila2)));
+}
+
 console.log(`\n\nfeitos em ${Math.round((Date.now() - t0) / 1000)}s · falhas: ${falhas.length}`);
 const dist = [...notas.entries()].sort((a, b) => a[0] - b[0]);
 console.log(`distribuição: ${dist.map(([k, v]) => `${k}*:${v}`).join(' · ')}`);
