@@ -38,6 +38,8 @@ const REGUA_DE_PREOCUPACAO = `O QUE É (E O QUE NÃO É) MOTIVO DE PREOCUPAÇÃO
 - A base legada foi documentada só pela planilha: quase nenhum projeto tem anexo, documentação compilada ou texto de evidência no dossiê. AUSÊNCIA de anexo ou de evidência externa NÃO é motivo de preocupação por si — a triagem humana aprovou centenas de projetos com esse mesmo material.
 - Preocupe-se quando há SINAL CONCRETO no dossiê: número implausível (horas acima do teto por pessoa, valor fora da curva do cargo), contradição interna (memorial diz uma coisa, colunas dizem outra), dupla contagem (custo evitado que já está nas horas, receita bruta contada como ganho), duplicata de escopo já documentado, ganho projetado em vez de medido, ou memorial que não descreve o processo.
 - Na dúvida sem sinal concreto, NÃO preocupe: registre a ressalva no argumento e deixe preocupa=false. O time só pede ajuste ao autor quando tem uma pergunta que ele consegue responder e que muda a decisão.
+- A seção "Fontes ausentes" do dossiê diz o que o SISTEMA não guardou (documentação, texto dos anexos, versões). Ausência listada ali é do sistema, não do autor: não vira preocupação nem pergunta.
+- Projeto ESPECIAL (Especial: sim) não tem memorial financeiro por definição: saving 0, receita 0 e 0 h NÃO são sinal de nada. Audite valor só quando há valor declarado.
 - Uma pergunta ao autor é UMA pergunta (uma interrogação, até 220 caracteres), sobre o ponto que mais muda a decisão.`;
 
 const FORMATO = `${REGUA_DE_PREOCUPACAO}
@@ -221,7 +223,17 @@ export function consolidarMerito(julgamentos: JulgamentoMerito[], ctx: { temVizi
   if (preocupantes.length === 0) {
     veredito = 'aprovar';
   } else if (preocupantes.length >= QUORUM_AJUSTE) {
-    veredito = perguntas_ao_autor.length ? 'ajuste' : 'humano';
+    // Quórum de preocupações MOLES (evidência, precedente, financeiro sem valor absurdo) não basta
+    // sozinho: medido na rodada 2 do retroativo, 13 dos 26 ajustes vinham só delas, em projetos que a
+    // triagem humana aprovou. Ajuste com 2 preocupações exige pelo menos um DADO DURO; com 3 ou mais
+    // preocupações o quórum vale por si.
+    const temDadoDuro = preocupantes.some((j) => DADO_DURO.has(j.dimensao) || (j.dimensao === 'financeiro' && j.valor?.absurdo === true));
+    if (temDadoDuro || preocupantes.length >= QUORUM_AJUSTE + 1) {
+      veredito = perguntas_ao_autor.length ? 'ajuste' : 'humano';
+    } else {
+      veredito = 'aprovar';
+      for (const j of preocupantes) ressalvas.push(`Ressalva em ${j.dimensao}: ${j.argumento}`);
+    }
   } else {
     const unica = preocupantes[0];
     const dadoDuro = DADO_DURO.has(unica.dimensao) || (unica.dimensao === 'financeiro' && unica.valor?.absurdo === true);

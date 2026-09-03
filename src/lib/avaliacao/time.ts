@@ -106,6 +106,34 @@ export function normalizarCetico(bruto: unknown): ResultadoCetico | null {
   return { refuta, motivo, sinais, fallback: false };
 }
 
+/**
+ * Trava determinística: projeto ESPECIAL sem número declarado não pode ter preocupação FINANCEIRA
+ * (não há valor a auditar). Medido na rodada 2: o financeiro preocupava em especiais com R\$ 0
+ * dizendo "não há ganho para auditar". Prompt não segura; a trava segura.
+ */
+export function aplicarTravaEspecialSemNumero(j: JulgamentoMerito, dossie: Dossie): JulgamentoMerito {
+  const semNumero =
+    !(dossie.financeiro.saving_reais && dossie.financeiro.saving_reais > 0) &&
+    !(dossie.financeiro.receita_mensal && dossie.financeiro.receita_mensal > 0) &&
+    !(dossie.financeiro.custo_evitado_reais && dossie.financeiro.custo_evitado_reais > 0);
+  if (j.dimensao === 'financeiro' && j.preocupa && dossie.classificacao.especial && semNumero) {
+    return { ...j, preocupa: false, pergunta_ao_autor: null, argumento: `${j.argumento} [trava: especial sem número declarado, nada a auditar]` };
+  }
+  return j;
+}
+
+/** Refutação que só reclama de MATERIAL ausente (anexo, documentação, "não auditável") sem citar número não vale. */
+const REFUTA_POR_MATERIAL = /anexo|documenta[çc][ãa]o (compilada|ausente|inexist)|n[ãa]o (é |e )?(audit[áa]vel|verific[áa]vel)|evid[êe]ncia (independente|externa|verific)|sem (registro|export|log|comprova)/i;
+export function aplicarTravaCeticoMaterial(c: ResultadoCetico): ResultadoCetico {
+  if (!c.refuta || !c.motivo) return c;
+  const temNumero = /\d/.test(c.motivo);
+  const soMaterial = REFUTA_POR_MATERIAL.test(c.motivo) && !temNumero;
+  if (soMaterial) {
+    return { ...c, refuta: false, sinais: [...c.sinais, 'refutação por falta de material ignorada (a base legada não tem anexo)'] };
+  }
+  return c;
+}
+
 function ceticoFallback(): ResultadoCetico {
   return { refuta: false, motivo: null, sinais: [], fallback: true };
 }
@@ -213,6 +241,7 @@ export async function avaliarComTime(args: {
       erros.push(erro);
       julgamento = julgamentoFallback(dimensao, erro);
     }
+    julgamento = aplicarTravaEspecialSemNumero(julgamento, dossie);
     const noId = await registrarSeguro(
       {
         pai_id: paiId,
@@ -243,6 +272,7 @@ export async function avaliarComTime(args: {
     try {
       const raw = await chamar('cetico')(buildPromptCetico({ dossieTexto, julgamentos, estrela }));
       cet = normalizarCetico(extrairJsonSeguro(raw));
+      if (cet) cet = aplicarTravaCeticoMaterial(cet);
       if (!cet) erro = 'cético: saída inválida';
     } catch (e) {
       erro = `cético: ${e instanceof Error ? e.message : String(e)}`;

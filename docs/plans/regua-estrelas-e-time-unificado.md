@@ -605,3 +605,15 @@ OpenAI direto — `gpt-5.6-luna` nos especialistas, `gpt-5.6-sol` na estrela e n
   "impede fraude de avançar") mas também zera por "não comprova operação atual" (Gocreators 3★→0★),
   a mesma falha de material — ajuste na DISCIPLINA do prompt da estrela (não na régua): "fora_de_uso"
   só quando o dossiê DIZ que parou.
+- **Rodada 2 (`r02-n30-v2`, mesma amostra, variante 2, US$ 1,38):** **3 aprovar · 26 ajuste · 1 humano**;
+  mérito 4 acertos (acurácia 29%, aprovar 100% em 2, 0 erro grave); estrelas exato **38%** (era 23%),
+  dentro de 1 = 69%, viés +0,31. Por dimensão: evidência 26/30, financeiro 18/30, plausibilidade 12/30,
+  precedente 11/30; cético refutou 25/30; 8 réplicas, só 1 debate não fechou. **Prompt sozinho não
+  segurou** (3ª vez neste repo): metade dos 26 ajustes (13) vinha SÓ de preocupações moles (evidência ·
+  precedente · financeiro sem valor absurdo), e o financeiro preocupava em ESPECIAIS com R$ 0 ("não há
+  ganho para auditar"). **Variante 3 = travas ESTRUTURAIS (não prompt):** (a) `consolidarMerito`: ajuste
+  com 2 preocupações exige pelo menos um DADO DURO (horas ou valor absurdo); com 3+ o quórum vale; pares
+  moles viram aprovar com ressalvas; (b) `aplicarTravaEspecialSemNumero`: especial sem saving/receita/custo
+  evitado declarados não pode ter preocupação financeira; (c) `aplicarTravaCeticoMaterial`: refutação do
+  cético que só reclama de material ausente (anexo, documentação, "não auditável") sem citar número é
+  ignorada; (d) prompts citam a seção "Fontes ausentes" (ausência é do sistema, não do autor).
