@@ -277,6 +277,7 @@ const pinecone = {
   namespacePinecone: vi.fn(() => 'prod'),
 };
 const lerResumosEspelho = vi.fn();
+const lerLinhaEspelho = vi.fn();
 const classificarEspecial = vi.fn();
 const gerarEmbeddingsLote = vi.fn();
 
@@ -305,7 +306,10 @@ vi.mock('@/lib/pinecone', () => ({
   garantirIndice: (...a: unknown[]) => pinecone.garantirIndice(...a),
   namespacePinecone: () => pinecone.namespacePinecone(),
 }));
-vi.mock('@/lib/sheet-espelho', () => ({ lerResumosEspelho: () => lerResumosEspelho() }));
+vi.mock('@/lib/sheet-espelho', () => ({
+  lerResumosEspelho: () => lerResumosEspelho(),
+  lerLinhaEspelho: (id: string) => lerLinhaEspelho(id),
+}));
 vi.mock('@/lib/especiais-view', () => ({
   apenasEspeciais: (l: { especial: boolean }[]) => l.filter((p) => p.especial),
 }));
@@ -372,6 +376,7 @@ describe('recuperação de vizinhos — Pinecone primeiro, SQLite como fallback'
     db.getDocumentacaoConteudo.mockResolvedValue({
       conteudo: JSON.stringify({ o_que_faz: 'classifica notas' }),
     });
+    lerLinhaEspelho.mockResolvedValue(null);
     db.getAvaliacoesEspeciais.mockResolvedValue([]);
     db.getEmbeddingEspecial.mockResolvedValue(null);
     db.getEmbeddingsEspeciais.mockResolvedValue([
@@ -468,6 +473,51 @@ describe('recuperação de vizinhos — Pinecone primeiro, SQLite como fallback'
     expect(r.projeto_id).toBe('legado-049');
   });
 
+  /**
+   * Memorial degenerado dos legados importados à mão.
+   *
+   * ⚠️ Medido em prod (03/09/2026): nesses 30 projetos o "Memorial de Saving" é a CONTA que a
+   * triagem escreveu (mediana 57 caracteres, contra 1.903 dos memoriais do app) e o texto do
+   * AUTOR ficou em "Memorial anterior". Lendo só a conta, **30 de 30 saíram 0★, sendo 15 com nota
+   * humana 1**, contra uma taxa base de 50% de zeros nessa faixa. Não era veredito sobre os
+   * projetos, era ausência de dossiê.
+   */
+  it('memorial que é só uma CONTA é complementado com o texto do autor', async () => {
+    pinecone.consultarVizinhos.mockResolvedValue([]);
+    db.getProjetoContextoData.mockResolvedValue({
+      nome: 'SofIA do FP&A', area: 'FP&A', contexto_especial: null,
+      descricao_breve: 'consolida DREs', submitted_at: null,
+      memorial_calculo: '8 análises/mês × ~19min = 2,5h/mês × R$82,10/h = R$205,25.',
+    });
+    lerLinhaEspelho.mockResolvedValue({
+      'Memorial anterior': 'Essa automação reduz tempo de consultas frequentes de valores históricos feitas de forma recorrente pela diretoria. Quantidade de análises mensais: 8.',
+    });
+
+    await classificarEspecialProjeto('P0', { dry: true });
+
+    const [alvo] = classificarEspecial.mock.calls[0] as [{ memorial: string | null }];
+    expect(alvo.memorial).toContain('R$205,25');
+    expect(alvo.memorial).toContain('recorrente pela diretoria');
+  });
+
+  // ⚠️ Em projeto do app, "Memorial anterior" é a versão ANTERIOR do memorial: juntar as duas
+  // colocaria números velhos ao lado dos novos no mesmo texto.
+  it('memorial CHEIO não é complementado', async () => {
+    pinecone.consultarVizinhos.mockResolvedValue([]);
+    const cheio = 'Memorial de Cálculo. Contexto: ' + 'x'.repeat(400);
+    db.getProjetoContextoData.mockResolvedValue({
+      nome: 'Alvo', area: 'Fiscal', contexto_especial: null, descricao_breve: 'faz coisa',
+      submitted_at: null, memorial_calculo: cheio,
+    });
+    lerLinhaEspelho.mockResolvedValue({ 'Memorial anterior': 'versão velha com números antigos' });
+
+    await classificarEspecialProjeto('P0', { dry: true });
+
+    const [alvo] = classificarEspecial.mock.calls[0] as [{ memorial: string | null }];
+    expect(alvo.memorial).toBe(cheio);
+    expect(alvo.memorial).not.toContain('números antigos');
+  });
+
   it('upsert no índice falhando NÃO derruba a classificação (best-effort)', async () => {
     pinecone.upsertVetores.mockResolvedValue({ ok: false, enviados: 0, namespace: 'prod', motivo: 'boom' });
     pinecone.consultarVizinhos.mockResolvedValue([{ id: 'P1', score: 0.9 }]);
@@ -486,6 +536,7 @@ describe('backfill do índice (T5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     lerResumosEspelho.mockResolvedValue({ linhas: [resumo('P1', 3), resumo('P2', null)] });
+    lerLinhaEspelho.mockResolvedValue(null);
     db.getAvaliacoesEspeciais.mockResolvedValue([]);
     pinecone.descreverIndice.mockResolvedValue({
       nome: 'godocs-especiais',
@@ -548,6 +599,7 @@ describe('re-auditoria (T6) — relatório, nunca escrita', () => {
     lerResumosEspelho.mockResolvedValue({
       linhas: [resumo('A1', 4), resumo('A2', 1), resumo('A3', null)],
     });
+    lerLinhaEspelho.mockResolvedValue(null);
     db.getAvaliacoesEspeciais.mockResolvedValue([]);
     db.getEmbeddingEspecial.mockImplementation(async (id: string) => linhaEmbedding(id, [1, 0]));
     pinecone.descreverIndice.mockResolvedValue({

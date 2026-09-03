@@ -77,6 +77,14 @@ if (process.env.APROVADOS === '1') {
   ).json()) as { projetos?: Alvo[] };
   projetos = lista.projetos ?? [];
 }
+// Recorte por id: completar uma baseline exige rodar SÓ o que faltou, sem repassar por cima
+// dos que já têm nota (a rodada é cara e reescrever o que já está medido apaga a comparação).
+if (process.env.SOMENTE_IDS) {
+  const alvo = new Set(process.env.SOMENTE_IDS.split(/[,\s]+/).filter(Boolean).map((x) => x.toLowerCase()));
+  projetos = projetos.filter((p) => alvo.has(p.id.toLowerCase()));
+  console.log(`recorte SOMENTE_IDS: ${projetos.length} de ${alvo.size} ids pedidos`);
+}
+
 console.log(`${projetos.length} projetos · concorrência adaptativa ${CONC_INICIAL}→${CONC_MAX} (piso ${CONC_MIN}) · ${VALENDO ? 'VALENDO' : 'ENSAIO'}\n`);
 
 const notas = new Map<number, number>();

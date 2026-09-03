@@ -26,7 +26,7 @@ import {
   parseJson,
   type EspecialEmbeddingRow,
 } from "@/integrations/db/client.server";
-import { lerResumosEspelho } from "@/lib/sheet-espelho";
+import { lerResumosEspelho, lerLinhaEspelho } from "@/lib/sheet-espelho";
 import { chaveProjeto } from "@/lib/projeto-chave";
 import { apenasEspeciais } from "@/lib/especiais-view";
 import { mapResumo, type ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
@@ -156,6 +156,48 @@ function oQueFazDoc(conteudoJson: string | null | undefined): string | null {
  * existe no espelho (legado ainda não criado no SQLite), cai no resumo — embedding mais fraco,
  * mas ainda agrupa por nome/área.
  */
+/**
+ * Piso abaixo do qual o "Memorial de Saving" não é um memorial, é uma CONTA.
+ *
+ * Medido na base (03/09/2026): os 30 legados importados à mão têm mediana de **57 caracteres**
+ * nessa coluna (`"22h × R$21,29 (Jr) = R$468,38."`), contra **1.903** dos memoriais gerados pelo
+ * app. 300 fica confortavelmente entre os dois.
+ */
+const MEMORIAL_DEGENERADO_MAX = 300;
+
+/**
+ * Completa o memorial com a coluna **"Memorial anterior"** quando a principal só tem a conta.
+ *
+ * ⚠️ Por que existe: nos legados importados à mão, o "Memorial de Saving" é a aritmética que a
+ * triagem escreveu, e o texto do AUTOR (o que o projeto faz, para quem, com que frequência) ficou
+ * em "Memorial anterior". O agente lia só a conta e concluía, corretamente para o que viu, "só
+ * calcula economia de tempo, não comprova uso recorrente": **30 de 30 desses projetos saíram 0★,
+ * sendo 15 com nota humana 1** — contra uma taxa base de 50% de zeros nessa faixa. Não era
+ * veredito sobre os projetos, era ausência de dossiê. 26 dos 30 têm esse texto, com mediana de
+ * 308 caracteres.
+ *
+ * ⚠️ **Só COMPLEMENTA, nunca substitui**, e só quando a principal é degenerada: em projeto
+ * submetido pelo app essa coluna guarda a versão ANTERIOR do memorial, e juntar as duas colocaria
+ * números velhos ao lado dos novos no mesmo texto.
+ *
+ * ⚠️ **"Observações" fica de FORA de propósito.** É a coluna mais rica dessas linhas e é a mais
+ * proibida: ela guarda o parecer da TRIAGEM ("Saving OK", "Conservador", "convincente"). Dar ao
+ * agente a opinião do humano que ele está sendo comparado contra não melhora a nota, contamina a
+ * medição.
+ */
+async function memorialComplementado(chave: string, memorial: string | null): Promise<string | null> {
+  const atual = (memorial ?? '').trim();
+  if (atual.length > MEMORIAL_DEGENERADO_MAX) return memorial;
+  try {
+    const linha = await lerLinhaEspelho(chave);
+    const anterior = String(linha?.['Memorial anterior'] ?? '').trim();
+    if (!anterior || anterior === '—' || anterior.length < 40) return memorial;
+    return atual ? `${atual}\n\n${anterior}` : anterior;
+  } catch {
+    return memorial; // fonte acessória: falhar aqui não pode derrubar a classificação
+  }
+}
+
 async function montarEntradaSemantica(
   projetoId: string,
   resumo?: ProjetoDashboardResumo,
@@ -178,7 +220,7 @@ async function montarEntradaSemantica(
   const tipos = resumo?.tipos ?? ctx?.tipos_projeto ?? null;
   const contexto_especial = ctx?.contexto_especial ?? null;
   const descricao = ctx?.descricao_breve ?? null;
-  const memorial = ctx?.memorial_calculo ?? null;
+  const memorial = await memorialComplementado(chave, ctx?.memorial_calculo ?? null);
 
   if (!ctx && !resumo) return null;
 
