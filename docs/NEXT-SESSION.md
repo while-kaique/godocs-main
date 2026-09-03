@@ -1,23 +1,32 @@
 # NEXT-SESSION
 
 ## Plano ativo
-`docs/plans/mesa-avaliacao-parecer-raciocinado.md` — mesa de avaliação de eco-de-gate a auditor raciocinado (escopo B, time LLM em SOMBRA). **Em execução via /ggsd:code.** T1–T7 concluídos e commitados; falta a revisão §9 fechar + o deploy do Luis.
+`docs/plans/regua-estrelas-e-time-unificado.md` — **§11 "Time AUTÔNOMO de triagem"** (direção do Luis,
+03/09/2026): dossiê + agentes com ferramentas + debate com teto + consenso com 3 saídas + retroativo
+iterativo por amostragem. Tarefas **T11–T20** (§11.3), ordem T11 → T12 → T13/T14 → T16 → T15 → T17 → T18 →
+T19 → T20 → T10. **Pronto para `/ggsd:code`.**
 
-## O que esta sessão fez (29/08) — T5, T6 e T7 fechados no código
-- **T5 (fiação da mesa LLM)** em `src/lib/avaliacao-normais.functions.ts`, gated por `especialistasMesaLlmLigados()` (`AVALIACAO_MESA_LLM`, DEFAULT OFF):
-  - `computarVotos`: quando LIGADO, monta `TextoProjeto` (via `montarEntradaSemanticaNormal`, `?? ''`) + `vizinhosTexto` (`nome — area`), roda `montarEntradasEspecialistas` (ponte T5) → `Promise.all(julgarComEspecialista)` (nunca lança) → `conciliarJulgamentos` como `conciliado` EFETIVO; `ceticoRefuta` = cético LLM `.preocupa`. OFF → determinístico byte-idêntico.
-  - `VotosPainel` += `julgamentos?`/`ceticoRefuta`. `serializarVotos` EXPORTADO + grava julgamentos ENXUTOS (`dimensao/preocupa/confianca/origem`, sem `argumento`/R$; chave só quando há julgamentos → OFF byte-idêntico).
-  - `avaliarComContexto` e `avancarDeliberacoesPendentes`: `ceticoRefuta` efetivo no sinal da deliberação + histórico grava o PARECER argumentado quando LIGADO; redator determinístico é PULADO no modo LLM (`&& !modoLlm`).
-- **T6 (rodadas na ficha)**: `montarAvaliacaoSombra` deixou de descartar `historico` + novo `parseHistoricoDeliberacao` (fail-soft) em `dashboard-admin.functions.ts`; tipo `avaliacaoSombra.deliberacao.historico[]`; render das rodadas em `projeto-detalhe-dialog.tsx` (só quando ≥2 rodadas). Lote passa `undefined→[]` (mantém o invariante de NÃO `SELECT historico` em lote — 32 MiB RPC).
-- **T7 (retroativo = rede)**: confirmado POR CONSTRUÇÃO — `avaliacao-retroativa.functions.ts` já roda `computarVotosDoProjeto` → mede a MESA NOVA (LLM) contra o veredito humano. Só o comentário-cabeçalho foi tornado explícito.
-- Testes novos: `tests/mesa-fiada-serializacao.test.ts` (4) + `tests/mesa-historico-rodadas.test.ts` (5). **Suíte cheia 2293 verde**; `tsc` só os 7 erros pré-existentes (chat.functions/submeter/especiais-painel). `worker.js` rebuildado (regra 1).
+## Estado (03/09/2026)
+- Branch `feat/avaliadores-unificados`, worktree `~/godocs-wt-avaliadores`, base `origin/main` `51f3fd2`.
+  ⚠️ O shell reseta o cwd para `~/godocs-main` (outra frente, `feat/godocs-v2`): **todo comando começa com
+  `cd ~/godocs-wt-avaliadores`**.
+- Suíte 2396 verde. Régua FECHADA em `0c4978f` e conferida contra o texto do Luis (D20).
+- Feito: T1 (validação cega), T2 (`estrelas-regua.ts`), 5.4 (`categorizacao-projeto.ts`). Aberto: T3–T10 e
+  T11–T20.
+- Pendência não commitada do painel irmão (`w14:p2`): variante `e` em `scripts/regua-t1/aplicar.ts`
+  (diagnóstico). Não vazar para a régua; commitar ou descartar é indiferente.
+
+## Decisões que não se reabrem
+- **D20**: nenhum critério da régua muda; o agente raciocina em cima (gate determinístico, leitura
+  raciocinada). Tirar `apenas_mensuravel` do piso e tirar ML do gate do 4★ foram **rejeitados**.
+- D13 aprovação autônoma, humano é exceção · D14 raciocínio livre, fecho medido · D15 debate ≤ 2 rodadas ·
+  D16 escape com dossiê de comitê · D17 sem logs de chat · D18 padrões = plausibilidade com ferramenta ·
+  D19 aprendizado sobre régua/prompt por mão humana.
+
+## Perguntas ainda abertas para o Luis (§11.5)
+- (c) metas de liberação da tabela 11.4 · (d) onde o texto ao autor aterrissa na v2 · (e) auditoria humana
+  de ~50 projetos não avaliados para o gabarito.
 
 ## Próximo passo
-**§9 FECHADA E LIMPA** (conformidade=`conforme` 0.92 · qualidade=`limpo` 0.86; 1 observação BAIXA não-bloqueante: render das rodadas só com ≥2 — decisão de UX consciente, deixada como está). Próximo é o **deploy**: **staging (`edf400b4`) → validar num projeto de receita real + um absurdo (500h) com `AVALIACAO_MESA_LLM` ligado SÓ na staging → prod (`674a3710`) → PR (`LuisEduardo100`)** + atualizar CLAUDE.md/spec. `/ggsd:ship` está liberado pela §9.
-
-## Pendências / avisos
-- **§9 do T5–T7 — QUALIDADE=`limpo` (0.86, zero achados), CONFORMIDADE ainda em background** ao fechar a sessão. Colher o veredito de conformidade antes do ship (o `/ggsd:ship` barra até `.review-status` fechar).
-- **Byte-idêntico obrigatório com `AVALIACAO_MESA_LLM` OFF** — prod roda `AVALIACAO_NORMAIS` ON em sombra determinística; a fiação não pode alterar isso (testado em `mesa-fiada-serializacao`).
-- **Custo aceito**: com a mesa LLM ligada são N chamadas LLM/rodada × até 5 rodadas em background (sombra, cron-bounded) — Decisão 2 do plano.
-- **T6 no lote**: a ficha aberta pelo LOTE do /dashboard NÃO mostra as rodadas (historico não vem no lote); só a ficha individual (`getProjetoDashboard`) as traz. Decisão consciente (32 MiB RPC).
-- Ordem restante: **§9 → staging/prod/PR → CLAUDE.md/spec**.
+`/ggsd:code` começando por **T11 (dossiê)**, que todos os outros consomem. Retroativo sempre em `dry`, sombra
+em tudo, prod e staging v1 intocados.

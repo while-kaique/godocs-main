@@ -387,3 +387,164 @@ oscilar entre rodadas, o tipo sai de uma cascata de sinais binários com **prece
 - **Prod (`674a3710`) e staging v1 (`edf400b4`) não são tocados nesta frente.**
 - Não misturar com a `feat/godocs-v2` (submissão determinística) — a régua é insumo dela, não o inverso.
 - Descontinuado fora de tudo (D7). Ressubmissão não pontua (D8).
+
+---
+
+## 11. Time AUTÔNOMO de triagem — direção do Luis (03/09/2026) e plano da sessão de código
+
+**Alvo declarado pelo dono do produto:** aprovação de projetos **autônoma**. Ninguém gasta tempo com
+triagem. Humano só na EXCEÇÃO. Os agentes raciocinam **como gente** (leem tudo, consultam, discutem,
+podem ir contra o dado quando têm motivo), com critérios e guias, sem checklist engessado. O time
+**aprende** das rodadas de retroativo: o output volta para quem ajusta prompt, exemplos e régua.
+
+**Alinhamento com o painel irmão (`w14:p2`, 03/09):** HEAD `0c4978f`; suíte 2396 verde; única pendência
+não commitada é a variante `e` do harness `scripts/regua-t1/aplicar.ts` (diagnóstico; **não** vazar para a
+régua). Medição final nos 84 auditados de verdade: régua commitada = 10% exato / 79% ±1 / viés −0,94 /
+**63 de 84 zerados pelo piso**; sem `apenas_mensuravel` no piso = 23% / 88% / −0,08; + ML fora do gate do
+4★ = **30% / 88% / +0,07**. Nos 21 que escapam do piso: 38% exato / 81% ±1 → **a escada 1–5 funciona; o
+portão na frente dela é que não**. 8 das 11 âncoras caem onde o Luis as pôs; Robo orçamento e GoBrands
+caem em 2★ em toda variante (falta de MATERIAL: dependente nomeado não está na doc).
+
+### 11.1 Decisões novas (D13–D19)
+
+- **D13 — Aprovação autônoma é o alvo; humano é exceção.** Três saídas do time: `aprovar` ·
+  `ajuste` (texto ao autor dizendo o que falta e por quê) · `humano` (só escape 6–10 e divergência que o
+  debate não fechou). O modo SOMBRA deixa de ser fronteira e vira **fase 1**.
+- **D14 — Raciocínio LIVRE, fecho MEDIDO.** Cada agente é um LLM com ferramentas, lê o dossiê inteiro,
+  pode discordar e mudar de ideia. Quem autoriza o veredito a sair **sem humano** é a `politicaDeLiberacao`:
+  lê a acurácia MEDIDA no retroativo por tipo de veredito e libera um por um. A confiança do agente é VOTO;
+  a confiança do SISTEMA é histórico de acerto. Motivo: este repo mediu 3× que "prompt não segura" quando
+  o agente decide sozinho sobre texto livre, e teve 2 loops entre agentes.
+- **D15 — Debate com TETO.** Réplica do cético → resposta dos especialistas → consenso. **Máximo 2
+  rodadas**, sobre a máquina de deliberação que já existe (`avancarDeliberacoesPendentes`, cron). O proxy
+  dá ~60 s por chamada e um request não cabe um loop; o debate atravessa tiques de cron.
+- **D16 — Escape 6–10 vai ao humano COM dossiê de comitê.** O agente indica a faixa (nunca a posição) e
+  entrega: resumo do projeto, o gatilho de escape com evidência citada, os pares já notados em 6–10 (as 4
+  âncoras congeladas, D9) lado a lado, e a frase "o time lê como acima/abaixo de X porque…". O comitê
+  escolhe o número por comparação.
+- **D17 — Sem logs de chat na v2.** O dossiê não depende de `chat_messages`. Fontes: campos determinísticos
+  da v2 (`saving_efetivado_*`, `custo_evitado_nao_contratado`, `ganho_imensuravel_racional`, `custo_rodar_itens`,
+  receita) + **texto extraído dos ANEXOS/evidências** + documentação gerada em background + `form_events` +
+  `projeto_versions` + espelho da planilha + TeamGuide (cargo, time). Para a base v1 (retroativo) entram
+  também memorial e `documentacao.conteudo`. O dossiê é **tolerante às duas formas**.
+- **D18 — Critérios dos PADRÕES = plausibilidade com FERRAMENTA, não gate.** O padrão não tem estrela; o
+  que se julga é mérito e valor: horas por pessoa × cargo × teto 220h, saving vs custo de rodar, receita
+  incremental vs base, custo evitado vs contrato citado, duplicata (D8), evidência anexada sustenta o
+  número. O agente **pergunta** ("500 h para uma pessoa: como?") via `ajuste`, não reprova calado.
+- **D19 — Aprendizado é sobre a RÉGUA e o PROMPT, por mão humana.** Cada rodada de retroativo gera
+  relatório; quem lê os erros ajusta constantes de `estrelas-regua.ts`, exemplos e prompts; o corpus do RAG
+  cresce **só com nota humana** (`rotuloExemplar`). Nunca auto-treino sobre a própria saída (D12b).
+
+- **D20 — A RÉGUA É GATE DETERMINÍSTICO E NENHUM CRITÉRIO MUDA (Luis, 03/09/2026).** Palavras dele:
+  *"não quero que UM desses critérios seja diferente. O agente pode raciocinar em cima deles, mas não podem
+  ser diferentes do que está aí como gate determinístico; raciocinar em cima disso e concluir através de um
+  racional que faça sentido dado o contexto está ok."* Consequências: **(1)** o texto vigente é o de
+  `estrelas-regua.ts` em `0c4978f` (conferido item a item contra o texto enviado pelo Luis: 7 desqualificadores
+  do 0★ `Experimenta`, 1★ Informa · 2★ Executa · 3★ Garante · 4★ Decide · 5★ Assume, 6–10 `Muda o Jogo` com
+  nota final humana por comparação); **(2)** as propostas do painel irmão — tirar `apenas_mensuravel` do piso e
+  tirar ML do gate do 4★ — estão **REJEITADAS**; não repropor; **(3)** o que o agente PODE fazer é ler o
+  "APENAS" com raciocínio: só zera quando argumenta, com citação do dossiê, que o projeto **se resume** ao número
+  — ter saving não zera; **(4)** o custo medido de manter o critério fica registrado com honestidade: às cegas
+  e sem dossiê, o piso zerou 63 de 84 auditados. **O caminho para fechar essa distância é MATERIAL e
+  RACIOCÍNIO** (dossiê completo, `ganho_imensuravel_racional` da v2, evidências anexadas, vizinhos com nota
+  humana, tools), medido em T19 — nunca afrouxar a régua. Se depois de T19 a distância persistir, o
+  relatório mostra ONDE e o Luis decide; o agente não decide.
+
+### 11.2 Arquitetura (o que muda em relação ao §7)
+
+```
+dossiê(projeto) ──► Cérebro A (mérito+valor)  ──┐
+   │                 especialistas c/ tools      │
+   │                 + cético                    ├──► debate (≤2 rodadas) ──► Cérebro C (consenso)
+   └──────────────► Cérebro B (estrela)  ────────┘                              │
+                     régua nova + RAG humano                          ┌─────────┼──────────┐
+                                                                   aprovar   ajuste    humano
+                                                                   (interno) (texto    (dossiê de
+                                                                             ao autor)  comitê)
+                                            politicaDeLiberacao ◄── acurácia medida por veredito
+```
+
+**Ferramentas dos agentes** (`src/lib/avaliacao/ferramentas.ts`, catálogo JSON, execução server-side,
+puras/idempotentes, **máx. 4 chamadas por agente por rodada**): `consultar_vizinhos` (RAG, só nota humana) ·
+`consultar_cargo` (TeamGuide espelho, fail-safe) · `historico_versoes` (o que mudou entre reenvios) ·
+`buscar_duplicata` (D8, mesmo nome/escopo com ganho medido) · `checar_plausibilidade_horas` (teto 220h,
+multiplicadores, jornada) · `calcular_impacto` (`impacto.ts`, bruto × líquido × mensal) ·
+`ler_evidencia` (texto extraído de um anexo específico).
+
+**Modelo por agente** (envs lidas LAZY, opt-in como o roteamento por fase): extração do dossiê,
+especialistas por dimensão e lentes → **leve** (`LLM_MODEL_FAST`, `reasoning_effort=low`); cético,
+consenso, texto ao autor e dossiê de comitê → **forte** (`LLM_MODEL`); embeddings → **direto na OpenAI**
+(`text-embedding-3-large`, nunca no proxy). `minimal` segue proibido (502).
+
+### 11.3 Tarefas da sessão de código (T11–T20; T1–T10 do §10 seguem válidas)
+
+- **T11 — Dossiê** (`src/lib/avaliacao/dossie.ts` PURO + `dossie.functions.ts`): monta o contexto
+  completo (D17), v1 e v2, sem chat; anexos com texto extraído (reusa `extract-text`); `form_events` e
+  `projeto_versions` sem blobs em massa (teto 32 MiB RPC — por PK). *Aceite:* teste monta dossiê de um
+  legado v1 e de uma linha v2 com os mesmos campos preenchidos/ausentes declarados.
+- **T12 — Ferramentas** (`ferramentas.ts` + loop de tool-use bounded em `llm.ts` ou wrapper): catálogo
+  acima; cada tool é função pura testável; o loop para em 4 chamadas ou no 1º erro e devolve o que tem.
+  *Aceite:* teste do loop com tool que falha (agente conclui com o parcial) e do teto de 4.
+- **T13 — Cérebro B na régua nova** (= T4): `especial-classificador.ts` monta o prompt de
+  `descreverReguaAgente()`+`descreverEscape()`+`categorizacao-projeto.ts`, com tools; saída obrigatória
+  `criterio_aplicado` · `evidencias[]` citadas · `tipo` · `nivel` · `escape?`; confiança por
+  `confiancaDe()`, **nunca do modelo**. A régua entra INTACTA (D20): o ganho de acurácia tem de vir do
+  dossiê, das ferramentas e do RAG com nota humana, não de mexer no critério.
+- **T14 — Cérebro A com tools + auditoria de valor** (= T6 + D18): especialistas de
+  `especialista-avaliacao.ts` recebem o dossiê e o catálogo; o Financeiro emite `valor_sugerido` +
+  justificativa; entra a dimensão **plausibilidade** (horas × cargo × teto). *Aceite:* caso sintético
+  "500 h, 1 pessoa" sai `ajuste` com pergunta concreta, não `reprovar`.
+- **T15 — Debate com teto** (D15): réplica do cético e resposta dos especialistas como rodadas da
+  deliberação existente; `MAX_RODADAS_DEBATE = 2`; teste de simulação com agentes que nunca concordam
+  prova que fecha em 2 e cai em `humano`.
+- **T16 — Cérebro C consenso** (= T5) `consenso-avaliacao.ts` PURO + `.functions` que nunca lança:
+  concilia A×B, produz o objeto do §7 + `saida ∈ aprovar|ajuste|humano`; `politicaDeLiberacao(veredito,
+  acuraciaMedida)` decide se a saída pode agir sozinha (D14). Sem medição → tudo em sombra.
+- **T17 — Três textos prontos** (`avaliacao-textos.ts` PURO para o esqueleto, LLM forte para a prosa):
+  justificativa interna · texto ao autor **sem R$ por hora** e terminando em "Para corrigir…"
+  (mesma disciplina de `mensagens-submissao.ts`) · dossiê de comitê (D16). Teste varre o texto ao autor
+  por `R$` de valor/hora.
+- **T18 — Retroativo de 3 saídas + gabarito limpo** (= T7 + T9): estrela recomendada × nota humana,
+  mérito × Status, auditoria de valor; **gabarito = só quem foi auditado** (nota ≥1, ou Status assentado
+  em mês com triagem ativa; **os 221 de julho ficam FORA**); detector de achatamento (D12) e fila de
+  contestações (D11) no relatório. Descontinuado fora (D7). Roda em `dry`, nunca grava
+  `projeto_avaliacao` nem abre deliberação real.
+- **T19 — Protocolo de iteração** (`scripts/avaliacao-retro/`): amostragem **estratificada** e
+  reprodutível por seed → relatório JSON + MD por rodada em `docs/plans/retro-rodadas/`. Ordem obrigatória:
+  **30** (10 especiais com nota humana · 10 padrões aprovados · 5 com ajuste/reprovado · 5 absurdos
+  sintéticos) → ajustar até bater as metas → **100** → **300** → **base inteira**. Cada rodada registra
+  modelo, variante da régua, custo e as metas. **Uma rodada no modelo forte antes de concluir qualquer
+  teto** (o mini oscila entre corridas: Ticket Creator deu 5★ e 2★ em variantes vizinhas).
+- **T20 — Painel sombra + liberação por veredito** (= T8): ficha do `/dashboard` mostra saída, critério,
+  evidências, confiança e o texto que iria ao autor; flags `AVALIACAO_LIBERAR_APROVAR` /
+  `AVALIACAO_LIBERAR_AJUSTE` (default OFF) só passam a agir quando a `politicaDeLiberacao` autoriza.
+  "Estrelas" e "Status" continuam **só por clique humano** até a liberação.
+
+**Ordem:** T11 → T12 → T13/T14 (paralelas) → T16 → T15 → T17 → T18 → T19 (rodadas) → T20 → T10.
+
+### 11.4 Metas (proposta — o Luis fixa os números)
+
+| veredito | meta para LIBERAR sem humano | onde se mede |
+|---|---|---|
+| `aprovar` | ≥ 90% acerto e **0 `erro_grave`** em 300 auditados | T18 mérito × Status |
+| `ajuste` | ≥ 85% dos ajustes pedidos coincidem com o que a triagem pediu | T18 × `Motivo Reenvio` |
+| estrela 1–5 | ≥ 85% dentro de ±1 nos auditados; **sem achatamento** (D12) | T18 estrela × nota |
+| escape 6–10 | recall 4/4 nas âncoras congeladas; ≤ 2 falsos positivos em 300 | T18 |
+| `humano` | ≤ 10% dos projetos (é exceção) | T18 |
+
+### 11.5 Perguntas que BLOQUEIAM (decisão do Luis, não do agente)
+
+- **(a)** ~~Tirar `apenas_mensuravel` do piso 0★?~~ **RESPONDIDO pelo Luis (03/09): NÃO.** Ver D20.
+- **(b)** ~~ML/estocástico sai do gate do 4★?~~ **RESPONDIDO pelo Luis (03/09): NÃO.** Ver D20.
+- **(c)** Os números da tabela 11.4.
+- **(d)** Onde o texto ao autor aterrissa na v2 (coluna `Motivo Reenvio`, campo próprio, ou só ficha).
+- **(e)** Auditoria humana de ~50 projetos ao acaso entre os NÃO avaliados (maior alavanca: sem ela o
+  retroativo mede contra "ninguém olhou").
+
+### 11.6 Fronteiras
+
+- Fase 1 é **SOMBRA**: nada grava "Estrelas" nem "Status" até a `politicaDeLiberacao` autorizar por veredito.
+- Prod (`674a3710`) e staging v1 (`edf400b4`) **não são tocados**; retroativo lê espelho/SQLite e roda `dry`.
+- Não mexer na `feat/godocs-v2`; o dossiê CONSOME os campos dela, não os define.
+- Régua FECHADA (`0c4978f`): mudança só nas constantes, com ok do Luis. Não repropor o que o §4 descartou.
+- Nenhum agente/gate da v1 é apagado (T9 da v2: desligar, não remover).
