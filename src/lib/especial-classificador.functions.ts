@@ -27,6 +27,7 @@ import {
   type EspecialEmbeddingRow,
 } from "@/integrations/db/client.server";
 import { lerResumosEspelho } from "@/lib/sheet-espelho";
+import { chaveProjeto } from "@/lib/projeto-chave";
 import { apenasEspeciais } from "@/lib/especiais-view";
 import { mapResumo, type ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 import type { DocumentacaoGerada } from "@/lib/agents/types";
@@ -159,8 +160,15 @@ async function montarEntradaSemantica(
   projetoId: string,
   resumo?: ProjetoDashboardResumo,
 ): Promise<{ entrada: EntradaSemantica; alvo: AlvoClassificacao } | null> {
-  const ctx = await getProjetoContextoData(projetoId);
-  const docRow = await getDocumentacaoConteudo(projetoId);
+  // ⚠️ A planilha guarda o id do legado em MAIÚSCULA (`LEGADO-049`) e o sync reverso cria a
+  // linha em `projetos` sempre em minúscula (`sync-reverse.ts`). Como o `=` do SQLite é
+  // sensível a caixa, ler cru deixava 30 aprovados **invisíveis** ("projeto sem contexto para
+  // classificar") e, no caso do especial — onde o resumo do espelho salva a chamada —, montava
+  // um dossiê SILENCIOSAMENTE truncado, sem memorial nem documentação. Match por id é
+  // case-insensitive em todo o resto do repo; aqui não era.
+  const chave = chaveProjeto(projetoId);
+  const ctx = await getProjetoContextoData(chave);
+  const docRow = await getDocumentacaoConteudo(chave);
   const doc = resumoDocParaTexto(docRow?.conteudo);
   const oQueFaz = oQueFazDoc(docRow?.conteudo);
 
@@ -446,14 +454,18 @@ export type ResultadoClassificacao = {
  * agente. `forcar` reabre isso (uso manual explícito), nunca o caminho automático.
  */
 export async function classificarEspecialProjeto(
-  projetoId: string,
+  projetoIdBruto: string,
   opts: { dry?: boolean; forcar?: boolean } = {},
 ): Promise<ResultadoClassificacao> {
+  // Chave canônica: o id chega da planilha (`LEGADO-049`) ou do app (hex minúsculo) e daqui
+  // para baixo ele endereça o SQLite, o embedding, o Pinecone e a linha de `especial_avaliacao`.
+  // Normalizar UMA vez, na entrada, é o que impede leitura e escrita de divergirem de caixa.
+  const projetoId = chaveProjeto(projetoIdBruto);
   const { linhas } = await lerResumosEspelho();
   const especiais = apenasEspeciais(
     linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null),
   );
-  const resumoPorId = new Map(especiais.map((p) => [p.id, p]));
+  const resumoPorId = new Map(especiais.map((p) => [chaveProjeto(p.id), p]));
 
   const resumoAlvo = resumoPorId.get(projetoId);
   if (!opts.forcar && resumoAlvo?.estrelas != null) {

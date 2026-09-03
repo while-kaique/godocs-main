@@ -427,8 +427,45 @@ describe('recuperação de vizinhos — Pinecone primeiro, SQLite como fallback'
     await classificarEspecialProjeto('P0', { dry: true });
     expect(pinecone.upsertVetores).toHaveBeenCalledTimes(1);
     const [vetores] = pinecone.upsertVetores.mock.calls[0];
-    expect(vetores[0].id).toBe('P0');
+    // Minúsculo: o id é canonicalizado na ENTRADA de `classificarEspecialProjeto`, então
+    // SQLite, embedding, Pinecone e `especial_avaliacao` endereçam sempre a mesma chave.
+    expect(vetores[0].id).toBe('p0');
     expect(vetores[0].metadata.tem_nota_humana).toBe(false);
+  });
+
+  // ⚠️ Regressão dos 30 aprovados invisíveis (run 1 da calibragem, 03/09/2026): a planilha
+  // guarda o id do legado em MAIÚSCULA e o sync reverso cria a linha em `projetos` sempre em
+  // minúscula, e o `=` do SQLite é sensível a caixa. `LEGADO-049` devolvia "projeto sem
+  // contexto para classificar" enquanto `legado-049` passava — sem erro, sem aviso. O mock
+  // abaixo é sensível à caixa DE PROPÓSITO: é a falha de produção, não uma aproximação dela.
+  it('id MAIÚSCULO da planilha endereça o SQLite pela chave canônica (minúscula)', async () => {
+    pinecone.consultarVizinhos.mockResolvedValue([]);
+    db.getProjetoContextoData.mockImplementation(async (id: string) =>
+      id === 'legado-049'
+        ? {
+            nome: 'SofIA do FP&A',
+            area: 'FP&A',
+            contexto_especial: null,
+            descricao_breve: 'faz coisa',
+            memorial_calculo: null,
+            submitted_at: null,
+          }
+        : null,
+    );
+    db.getDocumentacaoConteudo.mockImplementation(async (id: string) =>
+      id === 'legado-049' ? { conteudo: JSON.stringify({ o_que_faz: 'classifica notas' }) } : null,
+    );
+
+    // Não está entre os especiais do espelho — é um APROVADO normal, como os 30 do run 1.
+    // Sem o resumo para salvar a chamada, quem decide é a leitura do SQLite.
+    const r = await classificarEspecialProjeto('LEGADO-049', { dry: true });
+
+    expect(r.ok).toBe(true);
+    expect(r.motivo).toBeUndefined();
+    expect(db.getProjetoContextoData).toHaveBeenCalledWith('legado-049');
+    // E a chave canônica vale para a IDA e a VOLTA: o que se grava tem de endereçar o mesmo
+    // projeto que se leu, senão nasce uma segunda identidade em `especial_avaliacao`.
+    expect(r.projeto_id).toBe('legado-049');
   });
 
   it('upsert no índice falhando NÃO derruba a classificação (best-effort)', async () => {

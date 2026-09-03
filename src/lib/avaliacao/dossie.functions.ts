@@ -8,6 +8,7 @@ import {
   getFormEventsByProjeto,
 } from '@/integrations/db/client.server';
 import { lerLinhaEspelho } from '@/lib/sheet-espelho';
+import { chaveProjeto } from '@/lib/projeto-chave';
 import { getCargoDe } from '@/lib/areas/teamguide.server';
 import { montarDossie, type Dossie, type FontesDossie } from '@/lib/avaliacao/dossie';
 
@@ -20,7 +21,12 @@ async function tenta<T>(p: () => Promise<T>, fallback: T): Promise<T> {
   }
 }
 
-export async function carregarDossie(projetoId: string): Promise<Dossie | null> {
+export async function carregarDossie(projetoIdBruto: string): Promise<Dossie | null> {
+  // ⚠️ Id do legado chega da planilha em MAIÚSCULA (`LEGADO-049`) e o sync reverso grava a
+  // linha em minúscula. O `lerLinhaEspelho` normaliza sozinho, os 3 leitores do SQLite não —
+  // então, sem isto, o dossiê de um legado nasce SÓ com o espelho: sem `projetos`, sem
+  // documentação, sem versões. Lacuna silenciosa, e o agente julga o que sobrou.
+  const projetoId = chaveProjeto(projetoIdBruto);
   const projeto = (await tenta(async () => (await getProjetoById(projetoId)) ?? null, null)) as
     | Record<string, unknown>
     | null;
