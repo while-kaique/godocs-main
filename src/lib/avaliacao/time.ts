@@ -253,7 +253,7 @@ export async function avaliarComTime(args: {
         rodada,
         entrada: `dimensão ${dimensao}${outros ? ' (réplica)' : ''}`,
         saida: json(julgamento),
-        tools_chamadas: loop.passos.map((p) => ({ nome: p.nome, args: p.args, retorno: p.retorno, erro: p.erro })),
+        tools_chamadas: loop.passos.map((p) => ({ nome: p.nome, erro: p.erro })), // o retorno vive no nó filho (tool); não duplicar (teto de 32 MiB)
         veredito: julgamento.fallback ? 'fallback' : julgamento.preocupa ? 'preocupa' : 'ok',
         erro,
         duracao_ms: Date.now() - ini,
@@ -317,7 +317,7 @@ export async function avaliarComTime(args: {
         tipo: 'cerebro',
         rodada: 1,
         saida: json(estrela),
-        tools_chamadas: loop.passos.map((p) => ({ nome: p.nome, args: p.args, retorno: p.retorno, erro: p.erro })),
+        tools_chamadas: loop.passos.map((p) => ({ nome: p.nome, erro: p.erro })), // o retorno vive no nó filho (tool); não duplicar (teto de 32 MiB)
         veredito: `${estrela.nota}`,
         erro,
         duracao_ms: Date.now() - ini,

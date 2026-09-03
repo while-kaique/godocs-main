@@ -3581,7 +3581,7 @@ export async function insertAgenteLog(reg: {
     `INSERT INTO agente_log
        (id, ciclo_id, pai_id, caminho, profundidade, projeto_id, agente, tipo, rodada, entrada, saida,
         tools_chamadas, confianca, veredito, modelo, tokens_in, tokens_out, custo_usd, duracao_ms, erro, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))`,
     [
       reg.id, reg.ciclo_id, reg.pai_id, reg.caminho, reg.profundidade, reg.projeto_id, reg.agente, reg.tipo,
       reg.rodada ?? null, reg.entrada ?? null, reg.saida ?? null, reg.tools_chamadas ?? null,
@@ -3601,11 +3601,12 @@ export async function getAgenteLogNo(
 export async function queryAgenteLogPorCiclo(cicloId: string, projetoId?: string): Promise<AgenteLogRow[]> {
   if (projetoId) {
     return queryAll<AgenteLogRow>(
-      `SELECT * FROM agente_log WHERE ciclo_id = ? AND projeto_id = ? ORDER BY created_at, id`,
+      `SELECT * FROM agente_log WHERE ciclo_id = ? AND projeto_id = ? ORDER BY created_at, id LIMIT 2000`,
       [cicloId, projetoId],
     );
   }
-  return queryAll<AgenteLogRow>(`SELECT * FROM agente_log WHERE ciclo_id = ? ORDER BY created_at, id`, [
+  // Teto explícito: ciclo multi-projeto (cron/retroativo) sem LIMIT bateria no teto de 32 MiB de RPC.
+  return queryAll<AgenteLogRow>(`SELECT * FROM agente_log WHERE ciclo_id = ? ORDER BY created_at, id LIMIT 2000`, [
     cicloId,
   ]);
 }

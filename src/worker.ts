@@ -895,11 +895,21 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // "Estrelas"/"Status"; devolve o resultado e registra o log em árvore (agente_log).
     if (pathname === "/api/admin/avaliacao/time" && method === "POST") {
       await requireAdmin(request);
-      const body = (await request.json().catch(() => ({}))) as { projetoId?: string; cicloId?: string | null };
+      const body = (await request.json().catch(() => ({}))) as { projetoId?: string; cicloId?: string | null; sincrono?: boolean };
       if (!body.projetoId) return errorJson("projetoId é obrigatório", 400);
-      return json(await avaliarProjetoComTime(body.projetoId, { cicloId: body.cicloId ?? null, gatilho: "manual" }), 200, {
-        "Cache-Control": "no-store",
-      });
+      // Default em BACKGROUND (até ~30 chamadas LLM; uma request cortada deixaria o ciclo 'aberto').
+      // Resultado sai em GET /api/admin/agentes/ciclos e /api/admin/agentes/arvore?ciclo=&projeto=.
+      if (body.sincrono === true) {
+        return json(await avaliarProjetoComTime(body.projetoId, { cicloId: body.cicloId ?? null, gatilho: "manual" }), 200, {
+          "Cache-Control": "no-store",
+        });
+      }
+      runBackground(
+        avaliarProjetoComTime(body.projetoId, { cicloId: body.cicloId ?? null, gatilho: "manual" }).then((r) =>
+          console.log("[avaliacao-time]", body.projetoId, r.ok ? `ok ciclo=${r.ciclo_id}` : `falhou: ${r.motivo}`),
+        ),
+      );
+      return json({ ok: true, agendado: true, projetoId: body.projetoId }, 202, { "Cache-Control": "no-store" });
     }
 
     // ── Memória e LOG dos agentes avaliadores (T21) — leitura em árvore, só admin ──
