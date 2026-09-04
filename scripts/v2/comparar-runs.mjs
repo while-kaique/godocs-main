@@ -42,7 +42,7 @@ function pct(a, b) {
 // ⚠️ A confiança só VALE se "alta" acertar mais que "média". Se as três faixas acertam igual,
 // ela é decorativa, e qualquer limiar construído em cima dela é falso.
 console.log('\n' + '='.repeat(78));
-console.log('ACERTO POR FAIXA DE CONFIANÇA (dentro de ±1 da nota humana)');
+console.log('ADERÊNCIA POR FAIXA DE CONFIANÇA (dentro de ±1 da nota da planilha)');
 for (const r of runs) {
   const c = r.linhas.filter(comparavel).filter((l) => l.confianca);
   if (!c.length) {
@@ -64,7 +64,7 @@ for (const r of runs) {
 // duro que o humano. São defeitos OPOSTOS e não se corrigem com o mesmo ajuste, então a tabela
 // abaixo é a que diz o que calibrar.
 console.log('\n' + '='.repeat(78));
-console.log('ONDE O ERRO MORA (por nota humana, última run)');
+console.log('ONDE A DIVERGÊNCIA MORA (por nota da planilha, última run)');
 {
   const r = runs[runs.length - 1];
   const c = r.linhas.filter(comparavel);

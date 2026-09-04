@@ -228,7 +228,7 @@ tr.insuf td.h{color:var(--ink3)}
   <p class="sub">Todos os projetos <b>aprovados</b>, com a estrela que o agente indica e o porquê. A nota humana aparece quando existe, e o agente nunca a escreve. De 6 a 10 ele declara a faixa: o número é do comitê.</p>
   <div class="kpis">
     <div class="kpi"><b id="k-total">—</b><span>projetos avaliados</span></div>
-    <div class="kpi"><b id="k-humana">—</b><span id="k-humana-sub">com nota humana</span></div>
+    <div class="kpi"><b id="k-humana">—</b><span id="k-humana-sub">com nota na planilha</span></div>
     <div class="kpi"><b id="k-ident">—</b><span>nota idêntica</span></div>
     <div class="kpi"><b id="k-perto">—</b><span>dentro de 1★</span></div>
     <div class="kpi" id="k-falhas-box" hidden><b id="k-falhas">—</b><span>falhas de chamada</span></div>
@@ -253,6 +253,7 @@ tr.insuf td.h{color:var(--ink3)}
       <li><b>5 Assume</b> — está no caminho até o cliente, sem humano no meio</li>
       <li><b>6–10 Muda o Jogo</b> — o agente indica a faixa; o número é do comitê</li>
     </ul>
+    <p style="margin:10px 0 0;font-size:12.5px"><b>Sobre a nota da planilha:</b> a coluna "Estrelas" tem procedência MISTA. Parte foi cravada por gente na triagem, parte foi escrita em lote por um agente em rodadas anteriores. Por isso a página fala em <b>aderência</b>, não em acerto: é medida de consistência, não gabarito. O corpus de julgamento humano é o que estas rodadas estão construindo.</p>
     <p style="margin:10px 0 0;font-size:12.5px">A estrela é o <b>pagamento</b> do projeto. Por isso a página também serve para revisar quem <b>já foi pago</b>: o filtro <b>Contestações de preço</b> mostra os projetos que a triagem já estrelou e que o agente lê 2★ ou mais longe. A nota humana não muda por isso, e o agente nunca a escreve.</p>
   </div>
 </div>
@@ -294,7 +295,7 @@ var STATS=__STATS__;
     var s=stat(runAtual);
     document.getElementById('k-total').textContent=s.total;
     document.getElementById('k-humana').textContent=s.comHumana;
-    document.getElementById('k-humana-sub').textContent='com nota humana ('+s.espComHumana+' especiais, '+s.normComHumana+' normais)';
+    document.getElementById('k-humana-sub').textContent='com nota na planilha ('+s.espComHumana+' especiais, '+s.normComHumana+' normais)';
     document.getElementById('k-ident').textContent=pct(s.iguais,s.comparaveis);
     document.getElementById('k-perto').textContent=pct(s.perto,s.comparaveis);
     var fb=document.getElementById('k-falhas-box');
