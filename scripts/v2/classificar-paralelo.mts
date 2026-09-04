@@ -32,6 +32,14 @@ const CONC_MIN = Number(process.env.CONC_MIN ?? 4);
 const TIMEOUT_MS = 180_000;
 
 type Rec = { estrelas_recomendada?: number; confianca?: string; leitura?: string; contestada?: boolean };
+type Auditoria = {
+  ok?: boolean;
+  motivo?: string;
+  ajustaria?: boolean;
+  valor_declarado?: number | null;
+  valor_sugerido?: number | null;
+  justificativa?: string;
+};
 type Saida = {
   ok?: boolean;
   recomendacao?: Rec;
@@ -51,6 +59,16 @@ type Saida = {
  * comparação entre as duas rodadas passaria a medir a diferença entre os scripts.
  */
 const JUIZ = (process.env.JUIZ ?? 'AGENTE').toUpperCase() === 'TIME' ? 'TIME' : 'AGENTE';
+
+/**
+ * Auditoria do VALOR declarado, além da estrela.
+ *
+ * ⚠️ Projeto NORMAL tem impacto em R$, e a estrela não diz nada sobre ele. A pergunta que
+ * importa nesses é outra: o número que a pessoa submeteu se sustenta, ou o agente recomendaria
+ * ajuste? Custa uma chamada a mais por projeto, então é OPT-IN. Só LÊ: a rota não grava nada, e
+ * a sugestão do auditor só desce ou confirma.
+ */
+const AUDITAR_VALOR = process.env.AUDITAR_VALOR === '1';
 const ROTA = JUIZ === 'TIME' ? '/api/admin/especiais/painel-projeto' : '/api/admin/especiais/classificar';
 
 async function post<T>(rota: string, corpo: unknown): Promise<T> {
@@ -108,7 +126,7 @@ if (process.env.SOMENTE_IDS) {
   console.log(`recorte SOMENTE_IDS: ${projetos.length} de ${alvo.size} ids pedidos`);
 }
 
-console.log(`juiz ${JUIZ} (${ROTA})`);
+console.log(`juiz ${JUIZ} (${ROTA})${AUDITAR_VALOR ? ' + auditoria de VALOR nos normais' : ''}`);
 if (VALENDO) {
   const comNota = projetos.filter((p) => p.estrelas != null).length;
   console.log(`GRAVANDO recomendação em especial_avaliacao para os ${projetos.length}, incluindo ${comNota} que já têm nota humana (a coluna "Estrelas" NÃO é tocada)`);
@@ -119,6 +137,7 @@ const notas = new Map<number, number>();
 const linhas: Array<{
   id: string; nome: string; area: string; humana: number | null; especial?: boolean; agente: number | null;
   confianca?: string | null; leitura: string;
+  valor_declarado?: number | null; valor_sugerido?: number | null; ajustaria?: boolean; auditoria?: string;
   base?: number | null; delta?: number; ajuste?: string; lentes?: { l: string; n: number; piso: string | null }[];
 }> = [];
 const falhas: Array<{ id: string; erro: string }> = [];
@@ -163,6 +182,23 @@ async function classificar(p: Alvo): Promise<void> {
           }
         : {}),
     });
+
+    // ⚠️ A auditoria vem DEPOIS e é isolada: falha nela não pode derrubar a estrela, que já
+    // custou uma chamada. Sem isso, um 502 no auditor apagaria a nota do projeto inteiro.
+    if (AUDITAR_VALOR && !p.especial) {
+      try {
+        const a = await post<Auditoria>('/api/admin/auditar-valor', { projetoId: p.id });
+        const alvo = linhas[linhas.length - 1];
+        if (alvo && alvo.id === p.id && a.ok) {
+          alvo.valor_declarado = a.valor_declarado ?? null;
+          alvo.valor_sugerido = a.valor_sugerido ?? null;
+          alvo.ajustaria = a.ajustaria ?? false;
+          alvo.auditoria = a.justificativa ?? '';
+        }
+      } catch {
+        /* auditoria é acessória: sem ela o projeto fica sem a coluna, não sem nota */
+      }
+    }
   } catch (e) {
     // ⚠️ Falha NÃO é nota 0: sem esta lista, uma rajada de 502 viraria "a base é toda baixa".
     // O pool re-tenta a saturação sozinho; o que chega aqui já esgotou as tentativas.

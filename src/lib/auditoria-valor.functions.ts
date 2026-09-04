@@ -27,6 +27,7 @@ import { dossieParaTexto, type Dossie } from '@/lib/avaliacao/dossie';
 import { buildPromptMerito, normalizarJulgamentoMerito, type JulgamentoMerito } from '@/lib/avaliacao/cerebro-merito';
 import { extrairJson } from '@/lib/agents/especial-classificador';
 import { chaveProjeto } from '@/lib/projeto-chave';
+import { lerLinhaEspelho } from '@/lib/sheet-espelho';
 
 export type ResultadoAuditoriaValor = {
   ok: boolean;
@@ -40,16 +41,35 @@ export type ResultadoAuditoriaValor = {
   julgamento?: JulgamentoMerito;
 };
 
+/** Número em pt-BR da planilha ("R$ 14.593,00", "1.952,77") ou já numérico. */
+function numeroPtBR(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const n = Number(String(v ?? '').replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
  * O ganho que o projeto declara, que é o número sob auditoria.
  *
- * ⚠️ Vem do bloco `financeiro` do próprio dossiê, JÁ NORMALIZADO. A primeira versão foi ler a
- * célula crua do espelho, e voltou `null` nos quatro projetos do primeiro teste: `Dossie` não
- * expõe a linha da planilha, ele expõe os números já tratados. Com `null` ali, `ajustaria`
- * ficava sempre falso e a auditoria inteira virava decorativa — dizia o valor sugerido e nunca
- * marcava ninguém para revisão.
+ * ⚠️ A PLANILHA vem primeiro, e isso levou duas tentativas para acertar. Ler só a célula crua do
+ * espelho falhou (o `Dossie` não expõe a linha); ler só o bloco `financeiro` do dossiê também
+ * falhou, porque em legado o `ganho_total_mensal` fica nulo no SQLite (o campo é `soV1` no sync
+ * reverso, então não acompanha quem já existia). O agente enxergava o número — a auditoria dele
+ * cita "do total declarado de R$ 14.593" — e nós é que ficávamos sem ele.
+ *
+ * Com `null` aqui, `ajustaria` fica sempre falso e a auditoria vira decorativa: calcula o valor,
+ * escreve a conta, e nunca marca ninguém para revisão. É o defeito mais caro possível numa
+ * ferramenta cujo trabalho é apontar quem revisar.
  */
-function ganhoDeclarado(dossie: Dossie): number | null {
+async function ganhoDeclarado(projetoId: string, dossie: Dossie): Promise<number | null> {
+  try {
+    const linha = await lerLinhaEspelho(projetoId);
+    const daPlanilha =
+      numeroPtBR(linha?.['Impacto Líquido Mensal']) ?? numeroPtBR(linha?.['Impacto Líquido']);
+    if (daPlanilha != null) return daPlanilha;
+  } catch {
+    /* cai no dossiê */
+  }
   const f = dossie.financeiro;
   return f.ganho_total_mensal ?? f.saving_reais ?? null;
 }
@@ -70,7 +90,7 @@ export async function auditarValorProjeto(projetoIdBruto: string): Promise<Resul
     return { ok: false, projeto_id: projetoId, motivo: 'LLM não devolveu auditoria utilizável' };
   }
 
-  const declarado = ganhoDeclarado(dossie);
+  const declarado = await ganhoDeclarado(projetoId, dossie);
   const sugerido = julgamento.valor?.valor_sugerido ?? null;
   // "Ajustaria" é quando há NÚMERO proposto e ele difere do declarado. Repetir o declarado é
   // resposta válida e esperada: quer dizer "auditei e o número se sustenta".
