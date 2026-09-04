@@ -253,6 +253,7 @@ tr.insuf td.h{color:var(--ink3)}
       <li><b>5 Assume</b> — está no caminho até o cliente, sem humano no meio</li>
       <li><b>6–10 Muda o Jogo</b> — o agente indica a faixa; o número é do comitê</li>
     </ul>
+    <p style="margin:10px 0 0;font-size:12.5px">A estrela é o <b>pagamento</b> do projeto. Por isso a página também serve para revisar quem <b>já foi pago</b>: o filtro <b>Contestações de preço</b> mostra os projetos que a triagem já estrelou e que o agente lê 2★ ou mais longe. A nota humana não muda por isso, e o agente nunca a escreve.</p>
   </div>
 </div>
 
@@ -260,7 +261,7 @@ tr.insuf td.h{color:var(--ink3)}
 
 <div class="ferramentas">
   <input type="search" id="q" placeholder="Buscar projeto, área ou motivo…" aria-label="Buscar">
-  <button class="tog" id="soDiv" aria-pressed="false">Só divergências de 2★+</button>
+  <button class="tog" id="soDiv" aria-pressed="false" title="Projetos que já receberam estrela da triagem e que o agente avalia 2★ ou mais longe. A nota humana não muda por isto: é lista para revisão de gente.">Contestações de preço (2★+)</button>
   <span class="conta" id="conta"></span>
 </div>
 

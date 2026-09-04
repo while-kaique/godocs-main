@@ -81,6 +81,30 @@ console.log('ONDE O ERRO MORA (por nota humana, última run)');
     );
   }
 }
+// ── CONTESTAÇÕES: onde o PREÇO já pago talvez esteja errado ──────────────────
+// ⚠️ A estrela é o pagamento do projeto especial, e projeto já aprovado JÁ FOI PAGO. Quando o
+// agente diverge por 2 ou mais de uma nota que a triagem cravou, isso não é erro do agente a ser
+// silenciado: é um caso para gente reabrir. O agente NÃO reescreve a nota (a coluna "Estrelas" só
+// muda por clique humano) e a run nem grava recomendação por cima dela — o que ele faz é APONTAR,
+// e apontar só serve se sair numa lista que alguém lê.
+console.log('\n' + '='.repeat(78));
+{
+  const r = runs[runs.length - 1];
+  const cont = r.linhas
+    .filter(comparavel)
+    .filter((l) => Math.abs(l.agente - l.humana) >= 2)
+    .sort((a, b) => Math.abs(b.agente - b.humana) - Math.abs(a.agente - a.humana));
+  const paraCima = cont.filter((l) => l.agente > l.humana).length;
+  console.log(`CONTESTAÇÕES DE PREÇO: ${cont.length} projetos já avaliados divergem por 2★ ou mais`);
+  console.log(`  o agente pagaria MAIS em ${paraCima} e MENOS em ${cont.length - paraCima}`);
+  console.log('  (a nota humana não muda por isto; é lista para revisão de gente)\n');
+  cont.slice(0, 20).forEach((l) => {
+    const sinal = l.agente > l.humana ? 'subiria' : 'baixaria';
+    console.log(`  humano ${l.humana} → agente ${l.agente}  (${sinal})  ${l.nome.slice(0, 46)}`);
+    console.log(`     ${(l.leitura || '').slice(0, 160)}`);
+  });
+  if (cont.length > 20) console.log(`  … e mais ${cont.length - 20}. Lista inteira no artefato, filtro "Só divergências de 2★+".`);
+}
 // ── O que MUDOU entre a última e a penúltima ─────────────────────────────────
 if (runs.length >= 2) {
   const a = runs[runs.length - 2];
