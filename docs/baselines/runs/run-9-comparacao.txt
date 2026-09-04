@@ -1,0 +1,167 @@
+==============================================================================
+run 1 · agente, RAG vazio          n=646  idêntica  47%  ±1  76%  acima 200  abaixo 59
+  distribuição: 0★:306 1★:150 2★:119 3★:39 4★:11 5★:16 6★:4 7★:1
+run 2 · agente + RAG restaurado    n=230  idêntica  58%  ±1  78%  acima 51  abaixo 23
+  distribuição: 0★:130 1★:45 2★:27 3★:12 4★:3 5★:11 7★:1 8★:1
+run 3 · agente + RAG + auditoria (amostra 196) n=182  idêntica  42%  ±1  78%  acima 38  abaixo 44
+  distribuição: 0★:88 1★:30 2★:31 3★:14 4★:6 5★:10 6★:1 7★:1 8★:1
+run 4 · TIME de 5 lentes + auditoria (58) n= 58  idêntica  40%  ±1  73%  acima 12  abaixo 19
+  distribuição: 0★:25 1★:10 2★:3 3★:9 4★:9 5★:1 7★:1
+run 5 · TIME + auditoria · base inteira (grava) n=573  idêntica  52%  ±1  76%  acima 145  abaixo 61
+  distribuição: 0★:311 1★:81 2★:97 3★:45 4★:29 5★:8 7★:2
+run 6 · TIME + coerência + caixa + pendência (196) n=179  idêntica  38%  ±1  71%  acima 43  abaixo 44
+  distribuição: 0★:74 1★:27 2★:28 3★:28 4★:17 5★:4 7★:1
+run 7 · TIME + verificações + concorrência destravada (196) n=188  idêntica  36%  ±1  70%  acima 49  abaixo 45
+  distribuição: 0★:75 1★:29 2★:33 3★:30 4★:14 5★:2 6★:1 7★:1 8★:3
+run 8 · TIME + ajustes finos · base inteira n=612  idêntica  53%  ±1  74%  acima 154  abaixo 63
+  distribuição: 0★:330 1★:95 2★:87 3★:55 4★:34 5★:8 7★:3
+run 9 · TIME 4 lentes · lentes só sobem · faixa sem número n=637  idêntica  52%  ±1  76%  acima 168  abaixo 61
+  distribuição: 0★:336 1★:106 2★:88 3★:58 4★:27 5★:15 6★:7
+
+==============================================================================
+ADERÊNCIA POR FAIXA DE CONFIANÇA (dentro de ±1 da nota da planilha)
+run 1 · agente, RAG vazio: sem confiança gravada nesta run
+run 2 · agente + RAG restaurado: sem confiança gravada nesta run
+run 3 · agente + RAG + auditoria (amostra 196):
+  alta   n= 23  ±1  78%
+  media  n= 12  ±1  58%
+  baixa  n=107  ±1  80%
+run 4 · TIME de 5 lentes + auditoria (58):
+  alta   n=  7  ±1 100%
+  media  n= 12  ±1  92%
+  baixa  n= 33  ±1  61%
+run 5 · TIME + auditoria · base inteira (grava):
+  alta   n= 64  ±1  94%
+  media  n=150  ±1  89%
+  baixa  n=211  ±1  60%
+run 6 · TIME + coerência + caixa + pendência (196):
+  alta   n= 16  ±1  94%
+  media  n= 45  ±1  84%
+  baixa  n= 80  ±1  59%
+run 7 · TIME + verificações + concorrência destravada (196):
+  alta   n= 21  ±1  86%
+  media  n= 44  ±1  84%
+  baixa  n= 83  ±1  59%
+run 8 · TIME + ajustes finos · base inteira:
+  alta   n= 69  ±1  94%
+  media  n=157  ±1  86%
+  baixa  n=232  ±1  59%
+run 9 · TIME 4 lentes · lentes só sobem · faixa sem número:
+  alta   n= 85  ±1  96%
+  media  n=176  ±1  84%
+  baixa  n=218  ±1  62%
+
+==============================================================================
+ONDE A DIVERGÊNCIA MORA (por nota da planilha, última run)
+  humana   n   idêntica   agente ACIMA   agente ABAIXO   nota média do agente
+      0  360    63%       134             0              0.72
+      1   46    17%        14            24              1.00
+      2   31    16%        11            15              2.00
+      3   25    24%         7            12              2.72
+      4    9    33%         2             4              2.89
+      5    4    50%         0             2              2.75
+      7    2     0%         0             2              4.50
+      8    1     0%         0             1              5.00
+     10    1     0%         0             1              6.00
+
+==============================================================================
+CONTESTAÇÕES DE PREÇO: 113 projetos já avaliados divergem por 2★ ou mais
+  o agente pagaria MAIS em 92 e MENOS em 21
+  (a nota humana não muda por isto; é lista para revisão de gente)
+
+  humano 0 → agente 6  (subiria)  Banco de Dados de Supply Gogroup
+     A base unifica os dados das oito empresas e sustenta cinco painéis em produção, além da Torre de Controle e das análises semanais. Essas rotinas foram construíd
+  humano 5 → agente 0  (baixaria)  Prisma
+     O Prisma promete criar, publicar e otimizar anúncios com vários agentes. Diferente da CTR Machine, o memorial não comprova campanhas em execução, uso recorrente
+  humano 0 → agente 5  (subiria)  IARA + Central RA: Autoatendimento e Gestão de
+     A IARA resolve reclamações diretamente com o cliente, enquanto a Central RA executa a gestão e os disparos, com resultados reais em produção. Fica em 5 porque a
+  humano 0 → agente 5  (subiria)  Resposta Pública - Gocase e Kokeshi
+     A automação gera, publica e registra respostas no Reclame Aqui, com impacto direto no cliente e uso recorrente comprovado. Fica em 5 porque nenhum novo processo
+  humano 4 → agente 0  (baixaria)  Prazo Otimizado
+     O modelo recalibra prazos de entrega para melhorar a conversão. O material comprova apenas um piloto antigo e traz receita projetada, sem mostrar operação recor
+  humano 0 → agente 4  (subiria)  Konduto - Alerta + Travamento
+     Nota 4: sobe 1 pelas lentes. A automação monitora alertas da Konduto, registra os casos, tenta impedir que pedidos suspeitos avancem no Factory e informa a equi
+  humano 0 → agente 4  (subiria)  Stock Request
+     Nota 4: sobe 1 pelas lentes. O Stock Request consulta o WMS, separa os materiais por canal e aprova solicitações sozinho conforme o estoque disponível. Fica em 
+  humano 0 → agente 4  (subiria)  Feedback time operacional
+     Nota 4: sobe 1 pelas lentes. A plataforma sustenta o feedback mensal do time operacional e guarda os registros em banco centralizado e painel protegido. Fica em
+  humano 10 → agente 6  (baixaria)  PIAPP
+     O PIAPP centraliza a geração de conteúdo com IA para mais de 10 times e oferece API e MCP para projetos internos. O Prisma já opera sobre essa infraestrutura, c
+  humano 2 → agente 6  (subiria)  Boletos Itaú via Proxy Bancária
+     A proxy conecta o bot do RCA ao Itaú e entrega o boleto completo em segundos, sem participação do financeiro. Ela sustenta diretamente esse atendimento automati
+  humano 0 → agente 4  (subiria)  Rankings de Gamificação Tiktok Shop
+     Nota 4: sobe 1 pelas lentes. O projeto publicou rankings usados nas gamificações de Barbours, Rituária e Lescent. Ele foi aplicado de fato em três marcas, mas n
+  humano 0 → agente 4  (subiria)  FullControl360°
+     Nota 4: sobe 1 pelas lentes. O FullControl360° acompanha mensalmente faturas, contestações, pagamentos e vencimentos, com histórico de execução no portal. A not
+  humano 0 → agente 4  (subiria)  Trocas e Devoluções - Lojas Físicas
+     Nota 4: sobe 1 pelas lentes. O Troca Lojas Físicas trata cerca de 40 protocolos por mês, controla prazos e registra as decisões no Controle para consulta da lid
+  humano 2 → agente 6  (subiria)  Integração com Operador Logístico - Life of Co
+     Integra Shopify e eStore Logistics, levando pedidos, estoque, cancelamentos e rastreios até a entrega. A operação atual da Life of Colour foi criada sobre esse 
+  humano 1 → agente 5  (subiria)  Esteira de Hits - Google
+     A Esteira escolhe os vídeos, publica no YouTube e cria anúncios no Google Ads sem intervenção humana. Fica em 5, como o «Robo subir vídeos em teste», pois atua 
+  humano 4 → agente 0  (baixaria)  GoPrice
+     Nota 0: zerado pelo piso (experimentacao). O GoPrice escolhe quais SKUs devem ter aumento ou redução, usando estoque, elasticidade e preço atual, em vez de apen
+  humano 5 → agente 1  (baixaria)  GoHunter
+     Nota 1: sobe 1 (as lentes sustentavam 5, e o ajuste por rodada é de um degrau). O GoHunter mantém uma base pontuada que as recruiters de R&S consultam continuam
+  humano 8 → agente 5  (baixaria)  [VERSTA] Robo orçamento - {Marca}
+     O robô controla diretamente os orçamentos de Facebook Ads, aplicando regras 24 horas por dia sem intervenção do gestor. Fica em 5, como Robô orçamento e Robô su
+  humano 4 → agente 1  (baixaria)  Benchmark de Estampas
+     Nota 1: sobe 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O Benchmark de Estampas identifica produtos mais vendidos, cria prompts e gera n
+  humano 0 → agente 3  (subiria)  Torre de Controle Gobeaute
+     Nota 3: sobe 1 (as lentes sustentavam 4, e o ajuste por rodada é de um degrau). A automação atualiza diariamente a base de SLA usada pela equipe de logística pa
+  … e mais 93. Lista inteira no artefato, filtro "Só divergências de 2★+".
+
+==============================================================================
+MUDARAM DE NOTA: 178 de 602 comparáveis
+  saltos de 2★ ou mais: 48
+  aproximaram do humano: 61 · afastaram: 63
+
+OS 12 MAIORES MOVIMENTOS (leia o motivo, não o número):
+
+  0 → 4  (humano 1)  Hub de Importação
+    antes: Nota 0: desce 1 pelas lentes. Por eixo: .
+    agora: O Hub reúne o cronograma e recomenda adiantar, atrasar ou manter embarques com base em estoque, forecast e vendas. Fica próximo do Smart Replan, mas n
+
+  4 → 0  (humano 2)  [CX] GOCASE - Envio retirada nos correios
+    antes: Nota 4: desce 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). A automação envia pelo WhatsApp as instruções de retirada aos cliente
+    agora: Nota 0: zerado pelo piso (simples_local). O n8n consulta o pedido da Gocase, registra a execução e envia pelo WhatsApp as informações de retirada nos 
+
+  3 → 0  (humano 0)  Brand Keepers Framework
+    antes: Nota 3: sobe 1 pelas lentes. O framework valida conteúdos de nove marcas e já opera em dossiês da Gobeaute. O reuso entre marcas sustenta a nota, mas 
+    agora: Nota 0: zerado pelo piso (so_o_autor). O Brand Keepers Framework valida conteúdos em quatro camadas antes que cheguem ao destinatário. Ele impede que 
+
+  1 → 4  (humano 3)  Avaliador - Case Bom Gosto v2
+    antes: Nota 1: sobe 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O Avaliador usa o Claude para analisar os cases e definir automaticame
+    agora: A IA analisa os cases e recomenda aprovação ou reprovação, substituindo uma avaliação diária especializada. Fica junto de Cases IA, mas não há prova d
+
+  4 → 1  (humano 2)  Automação de envio Reinf
+    antes: Nota 4: desce 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O sistema lê XMLs do Google Drive, identifica retenções, prepara even
+    agora: Nota 1: sobe 1 (as lentes sustentavam 4, e o ajuste por rodada é de um degrau). A automação envia mensalmente a EFD REINF das 17 empresas e guarda arq
+
+  3 → 6  (humano 2)  Boletos Itaú via Proxy Bancária
+    antes: Nota 3: sobe 1 pelas lentes. O serviço atende continuamente o bot do RCA e devolve os boletos consultados no Itaú. Fica em 3 porque o RCA usa a saída 
+    agora: A proxy conecta o bot do RCA ao Itaú e entrega o boleto completo em segundos, sem participação do financeiro. Ela sustenta diretamente esse atendiment
+
+  1 → 4  (humano 4)  Agente precificador
+    antes: Nota 1: sobe 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O agente escolhe quais alterações de preço recomendar e ajusta as próx
+    agora: O agente recomenda preços, aprende com os resultados e, após aprovação humana, altera a loja. Fica junto do GoPrice, pois escolhe uma ação que afeta v
+
+  3 → 0  (humano 0)  Análise de BADs de Atendimento por IA
+    antes: Nota 3: sobe 1 (as lentes sustentavam 4, e o ajuste por rodada é de um degrau). A automação analisa cada atendimento e escolhe se a avaliação baixa fo
+    agora: Nota 0: zerado pelo piso (marginal). A automação analisa diariamente os atendimentos mal avaliados, registra os resultados no Google Sheets e envia um
+
+  0 → 3  (humano 0)  Robô DARF — Captura automática de guias e abertura d
+    antes: Nota 0: zerado pelo piso (marginal). O robô valida os dados e impede que uma mesma guia seja processada duas vezes antes de abrir o chamado no GoServi
+    agora: O robô extrai, valida e registra mensalmente 96 guias, bloqueia duplicidades e mantém logs antes da abertura dos chamados. Fica próximo do Fluxo Autom
+
+  4 → 1  (humano —)  Hub de Cases
+    antes: Nota 4: sobe 1 (as lentes sustentavam 5, e o ajuste por rodada é de um degrau). O Hub sincroniza dados continuamente e sustenta rotinas de Supply Chai
+    agora: O Hub centraliza dados e mantém análises de estoque, vendas e custos prontas para Supply Chain, Growth e Produto. Fica em 1 porque informa decisões re
+
+  0 → 3  (humano —)  Portal de devoluções de CX
+    antes: Nota 0: zerado pelo piso (marginal). O Portal automatiza a preparação dos disparos e impede contatos duplicados antes do envio. Ele não escolhe como t
+    agora: O Portal consolida devoluções, evita contatos duplicados, registra a auditoria e entrega a fila pronta, indo além dos alertas de 2 estrelas. Não sobe 
+
+  3 → 0  (humano 4)  GoPrice
+    antes: Nota 3: desce 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O GoPrice escolhe quais SKUs devem ter aumento ou redução de preço us
+    agora: Nota 0: zerado pelo piso (experimentacao). O GoPrice escolhe quais SKUs devem ter aumento ou redução, usando estoque, elasticidade e preço atual, em v

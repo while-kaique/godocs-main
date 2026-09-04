@@ -152,7 +152,17 @@ const linhasHtml = RUNS.map((run) => {
       // abaixo do rótulo "6-10", e isso se lê como o agente SUGERINDO uma estrela dentro da faixa.
       // Além de confundir quem decide, é falso: não houve mudança de nível nenhuma. O que continua
       // aparecendo é o que importa de verdade, a travessia da fronteira ("5→6-10", "6-10→4").
-      const mudou = anterior != null && rotuloNota(anterior) !== rotuloNota(l.agente);
+      // ⚠️ O delta NÃO aparece em nada que envolva a faixa 6-10, nem entrando nem saindo.
+      //
+      // Primeiro ele comparava o número cru, e um projeto que foi de 8 para 7 aparecia como '8→7'
+      // debaixo do rótulo '6-10': lia-se como o agente sugerindo uma estrela dentro da faixa, e
+      // ainda era falso, porque 8 e 7 são o mesmo nível. Comparar NÍVEIS matou esse caso, mas
+      // sobrou '3→6-10', que lê pior ainda: parece que alguém empurrou o projeto para a faixa.
+      // A faixa é o veredito mais forte que o agente emite e ela tem de aparecer sozinha, sem uma
+      // seta ao lado insinuando de onde ela veio. Quem quiser comparar rodadas usa o seletor de
+      // run no topo, que mostra a página inteira de cada uma.
+      const naFaixa = anterior >= 6 || l.agente >= 6;
+      const mudou = anterior != null && !naFaixa && rotuloNota(anterior) !== rotuloNota(l.agente);
       return `<tr data-run="${run.id}" data-n="${l.agente}" data-b="${esc(semAcento(l.nome + ' ' + l.area + ' ' + l.leitura))}"${classes ? ` class="${classes}"` : ''} hidden>
 <td class="n"><span class="pill p${l.agente}">${rotuloNota(l.agente)}</span>${mudou ? `<span class="delta" title="na run anterior era ${rotuloNota(anterior)}">${rotuloNota(anterior)}→${rotuloNota(l.agente)}</span>` : ''}</td>
 <td class="h">${l.humana != null ? l.humana : '<span class="vazio">—</span>'}${insuf ? '<span class="tag" title="O memorial deste projeto é só a conta do saving: não há dossiê que sustente veredito, então ele fica fora da concordância.">sem dossiê</span>' : ''}</td>
