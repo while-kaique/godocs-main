@@ -29,7 +29,7 @@ import {
 import { lerResumosEspelho, lerLinhaEspelho } from "@/lib/sheet-espelho";
 import { chaveProjeto } from "@/lib/projeto-chave";
 import { TETO_AGENTE, ehEscape } from "@/lib/estrelas-regua";
-import { ajustarNotaComPainel, type AjustePainel } from "@/lib/especiais-ajuste";
+import { ajustarNotaComPainel, confiancaPorConsenso, type AjustePainel } from "@/lib/especiais-ajuste";
 import { apenasEspeciais } from "@/lib/especiais-view";
 import { mapResumo, type ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 import type { DocumentacaoGerada } from "@/lib/agents/types";
@@ -1617,12 +1617,20 @@ export async function julgarProjetoComPainel(
     .filter(Boolean)
     .join(" ");
 
+  // ⚠️ A confiança gravada é a do CONSENSO, não a que o painel declarou sozinho: se as lentes
+  // divergiram entre si, ou se a base e elas discordaram, a nota sai com a certeza que ela de
+  // fato tem. É o que permite construir um limiar em cima dela mais tarde.
+  const confianca = confiancaPorConsenso(julgamento.confianca, {
+    notasDasLentes: julgamento.avaliacoes.map((a) => a.nota),
+    deltaAjuste: ajustada.delta,
+  });
+
   let gravado = false;
   if (!dry) {
     await upsertAvaliacaoEspecial({
       projeto_id: projetoId,
       estrelas_recomendada: notaFinal,
-      confianca: julgamento.confianca,
+      confianca,
       leitura,
       contestada,
       origem: ORIGEM_PAINEL,
@@ -1633,7 +1641,7 @@ export async function julgarProjetoComPainel(
   return {
     ok: true,
     projeto_id: projetoId,
-    julgamento: { ...julgamento, nota: notaFinal, contestada },
+    julgamento: { ...julgamento, nota: notaFinal, contestada, confianca },
     base: { nota: base.estrelas_recomendada, leitura: base.leitura },
     ajuste: ajustada,
     escape: ehEscape(notaFinal) ? { nota: notaFinal, leitura, evidencias: base.evidencias } : null,

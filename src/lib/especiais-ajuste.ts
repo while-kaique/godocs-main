@@ -15,7 +15,7 @@
  * ter cinco olhares não estava em produzir outro número: está em **enxergar por eixo** e em
  * explicar melhor, que é o que a triagem lê.
  */
-import { TETO_AGENTE, ehEscape } from '@/lib/estrelas-regua';
+import { TETO_AGENTE, ehEscape, type Confianca } from '@/lib/estrelas-regua';
 
 /**
  * O quanto as lentes podem mover a nota do run 1, para cima ou para baixo.
@@ -74,4 +74,47 @@ export function ajustarNotaComPainel(base: number, sinal: SinalDoPainel): Ajuste
       ? `${verbo} ${Math.abs(nota - base)} (as lentes sustentavam ${querido}, e o ajuste por rodada é de um degrau)`
       : `${verbo} ${Math.abs(nota - base)} pelas lentes`,
   };
+}
+
+// ─── Confiança vinda do CONSENSO ─────────────────────────────────────────────
+
+/**
+ * Amplitude entre as lentes que já indica projeto ambíguo por natureza.
+ *
+ * ⚠️ Com 5 eixos numa escala de 0 a 5, uma amplitude de 3 quer dizer que um eixo viu quase o
+ * topo e outro viu quase o piso do MESMO projeto. Isso é informação honesta, não erro: projeto
+ * que sustenta 5 em alcance e 0 em risco é ambíguo de verdade. O que não se pode é devolver
+ * essa nota com a mesma cara de uma em que os cinco olharam e concordaram.
+ */
+export const DISPERSAO_AMBIGUA = 3;
+
+const ORDEM: Confianca[] = ['alta', 'media', 'baixa'];
+
+/** Desce UM degrau. Nunca sobe: consenso não cria certeza, só a desmente. */
+function rebaixar(c: Confianca): Confianca {
+  return ORDEM[Math.min(ORDEM.length - 1, ORDEM.indexOf(c) + 1)];
+}
+
+/**
+ * Ajusta a confiança pelo que os agentes de fato concordaram.
+ *
+ * Dois sinais, ambos OBSERVADOS, nenhum auto-declarado pelo modelo (medido no T1: ele se disse
+ * "alta" em 456 de 484, então perguntar a confiança a ele não mede nada):
+ *
+ * 1. **as 5 lentes divergiram entre si** — amplitude ≥ `DISPERSAO_AMBIGUA`;
+ * 2. **a base e as lentes discordaram** — o ajuste precisou mexer na nota. É o sinal mais forte
+ *    que existe aqui, porque são dois julgamentos independentes sobre o mesmo dossiê.
+ *
+ * ⚠️ Só REBAIXA. Consenso não prova que a nota está certa (cinco agentes podem errar juntos, e
+ * erram, quando o dossiê é ruim); o que ele faz é desmentir a certeza quando não existe.
+ */
+export function confiancaPorConsenso(
+  base: Confianca,
+  sinais: { notasDasLentes: number[]; deltaAjuste: number },
+): Confianca {
+  let c = base;
+  const notas = sinais.notasDasLentes;
+  if (notas.length >= 2 && Math.max(...notas) - Math.min(...notas) >= DISPERSAO_AMBIGUA) c = rebaixar(c);
+  if (sinais.deltaAjuste !== 0) c = rebaixar(c);
+  return c;
 }

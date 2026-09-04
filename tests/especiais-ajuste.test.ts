@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ajustarNotaComPainel, AJUSTE_MAX_PAINEL } from '@/lib/especiais-ajuste';
+import { ajustarNotaComPainel, confiancaPorConsenso, AJUSTE_MAX_PAINEL } from '@/lib/especiais-ajuste';
 import { TETO_AGENTE } from '@/lib/estrelas-regua';
 
 /**
@@ -53,5 +53,45 @@ describe('ajuste fino da nota do run 1', () => {
   it('nunca sai da escala', () => {
     expect(ajustarNotaComPainel(0, semPiso(0)).nota).toBe(0);
     expect(ajustarNotaComPainel(0, semPiso(5)).nota).toBe(1);
+  });
+});
+
+/**
+ * Confiança vinda do CONSENSO.
+ *
+ * ⚠️ Perguntar a confiança ao modelo não mede nada: medido no T1, ele se declarou "alta" em 456
+ * de 484. O que mede é o que os agentes de fato concordaram, e isso o time produz de graça.
+ */
+describe('confiança pelo consenso dos agentes', () => {
+  const semDivergencia = { notasDasLentes: [2, 2, 3, 2, 2], deltaAjuste: 0 };
+
+  it('lentes de acordo e ajuste zero: a confiança não muda', () => {
+    expect(confiancaPorConsenso('alta', semDivergencia)).toBe('alta');
+    expect(confiancaPorConsenso('media', semDivergencia)).toBe('media');
+  });
+
+  it('lentes muito divergentes entre si rebaixam um degrau', () => {
+    // um eixo viu quase o topo e outro quase o piso do MESMO projeto
+    expect(confiancaPorConsenso('alta', { notasDasLentes: [5, 1, 3, 5, 0], deltaAjuste: 0 })).toBe('media');
+  });
+
+  it('base e lentes discordando rebaixam um degrau', () => {
+    expect(confiancaPorConsenso('alta', { notasDasLentes: [2, 2, 2, 2, 2], deltaAjuste: -1 })).toBe('media');
+  });
+
+  it('os dois sinais juntos rebaixam dois degraus', () => {
+    expect(confiancaPorConsenso('alta', { notasDasLentes: [5, 0, 3, 4, 1], deltaAjuste: 1 })).toBe('baixa');
+  });
+
+  // ⚠️ Consenso não PROVA que a nota está certa: cinco agentes podem errar juntos, e erram
+  // quando o dossiê é ruim. Ele só desmente a certeza quando ela não existe.
+  it('nunca SOBE a confiança, por mais que todos concordem', () => {
+    expect(confiancaPorConsenso('baixa', semDivergencia)).toBe('baixa');
+    expect(confiancaPorConsenso('media', semDivergencia)).toBe('media');
+  });
+
+  it('não quebra com lente faltando ou lista vazia', () => {
+    expect(confiancaPorConsenso('alta', { notasDasLentes: [], deltaAjuste: 0 })).toBe('alta');
+    expect(confiancaPorConsenso('alta', { notasDasLentes: [3], deltaAjuste: 0 })).toBe('alta');
   });
 });
