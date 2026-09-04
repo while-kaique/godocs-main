@@ -37,6 +37,16 @@ node scripts/v2/comparar-runs.mjs "${ANTERIORES[@]}" | tee "docs/baselines/runs/
 echo "── 4. regerando o artefato com todas as rodadas ──"
 node scripts/v2/gerar-artefato.mjs "$ARTEFATO" "${ANTERIORES[@]}"
 
+# ⚠️ A cópia para o Downloads do Windows é PASSO DO SCRIPT, não lembrança minha.
+# O arquivo mora no WSL; quem abre é o navegador do Windows. Já aconteceu de eu regerar a
+# página, dizer que estava pronta, e a pessoa ficar dando F5 numa cópia velha do Downloads.
+DOWNLOADS="/mnt/c/Users/Notebook/Downloads/estrelas-da-base.html"
+if [ -d "$(dirname "$DOWNLOADS")" ]; then
+  cp "$ARTEFATO" "$DOWNLOADS"
+  echo "── 5. copiado para o Downloads do Windows ──"
+  echo "   $DOWNLOADS  (Ctrl+F5 no navegador se vier a versão antiga)"
+fi
+
 echo
 echo "pronto. falta: escrever docs/baselines/runs/run-${N}.md (o log do que mudou e por quê)"
 echo "e publicar $ARTEFATO no artefato (favicon ⭐ explícito)."
