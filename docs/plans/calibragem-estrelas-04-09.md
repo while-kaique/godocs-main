@@ -50,6 +50,38 @@ mas o Prisma não pontua" era cobertura de índice, não critério.
   é o que estas rodadas constroem.
 - **~7% ainda voltam sem nota** na run 3. Caiu de 65%, não é zero.
 
+## O resultado das 5 rodadas
+
+**A confiança por consenso é a entrega da noite**, e se sustentou em escala (run 5, n=425):
+
+| confiança | aderência ±1 |
+|---|---:|
+| alta (n=64) | **94%** |
+| média (n=150) | **89%** |
+| baixa (n=211) | **60%** |
+
+Contra a autodeclarada, que estava INVERTIDA (alta 78%, baixa 80%). Dá para usar **hoje**:
+filtrar por "alta" entrega recomendação com 94% de aderência.
+
+**O que o time ganha:** confiança calibrada, cobertura (100% em lote pequeno contra 93% do
+agente) e o porquê por eixo.
+
+**O que o time PERDE, e por isso ele não vira decisor ainda:** ele esmaga o topo mais que o
+agente sozinho.
+
+| nota da planilha | agente (run 3) | time (run 5) |
+|---|---:|---:|
+| 10 | 7,00 | **4,00** |
+| 8 | 5,00 | **4,00** |
+
+Quem derruba é o piso mais a lente estrutural como teto. O **GoPrice**, exemplo de 4★ da própria
+régua, foi zerado duas vezes na mesma noite por `experimentacao` — a segunda já com trecho
+citado. A exigência de citação reduziu o estrago de 5,2% para 0,9%, e 79% dos zerados concordam
+com a planilha, mas o topo continua vulnerável.
+
+**Próximo passo óbvio:** exigir que o piso seja corroborado por mais de uma lente, ou proibi-lo
+quando a base entrou alta. É o mesmo remédio que funcionou no escape.
+
 ## Para você decidir de manhã
 
 1. **Apagar o secret `EMBEDDINGS_SOMENTE_LEITURA`** do app `674a3710`. Enquanto existir, especial
