@@ -18,6 +18,7 @@ import {
 import {
   extrairJson,
   recuperarDeProsa,
+  acharCamposRecomendacao,
   normalizarRecomendacao,
   anexarEvidencia,
   buildSystemPromptEspecial,
@@ -444,5 +445,43 @@ describe('recuperação de resposta em prosa', () => {
     expect(r.leitura).not.toMatch(/[—–]/);
     expect(r.leitura).not.toMatch(/\*\*/);
     expect(r.leitura).toContain('ninguém além do autor usa');
+  });
+});
+
+/**
+ * Formas de JSON que o modelo devolve na prática.
+ *
+ * ⚠️ Colhidas dos logs de prod em 03/09/2026 — todas JSON VÁLIDO que o parse antigo descartava
+ * como "não devolveu recomendação utilizável", tirando o projeto da rodada como se ninguém
+ * tivesse perguntado. Structured Outputs está morta no proxy: o formato é pedido, não garantido.
+ */
+describe('formas alternativas do JSON', () => {
+  const REAIS: { nome: string; json: unknown; nota: number }[] = [
+    { nome: 'chave "recomendacao" com número', json: { recomendacao: 1, confianca: 'baixa', leitura: 'Coleta cotações.' }, nota: 1 },
+    { nome: 'recomendacao aninhada', json: { recomendacao: { estrelas: 0, justificativa: 'A automação ajusta o Flex.' } }, nota: 0 },
+    { nome: 'chave "nota"', json: { nota: 3, confianca: 'media', leitura: 'x' }, nota: 3 },
+    { nome: 'canônica', json: { estrelas_recomendada: 2, confianca: 'alta', leitura: 'y' }, nota: 2 },
+  ];
+
+  it('aceita os apelidos e a nota chega inteira', () => {
+    for (const c of REAIS) {
+      const campos = acharCamposRecomendacao(c.json);
+      expect(campos, c.nome).not.toBeNull();
+      expect(normalizarRecomendacao(campos)!.estrelas_recomendada, c.nome).toBe(c.nota);
+    }
+  });
+
+  it('a justificativa vira o porquê quando o modelo não usa "leitura"', () => {
+    const r = normalizarRecomendacao(acharCamposRecomendacao(REAIS[1].json))!;
+    expect(r.leitura).toContain('ajusta o Flex');
+  });
+
+  // ⚠️ O prompt manda um objeto `projeto`, e às vezes o modelo devolve ele de volta em vez de
+  // responder. Isso é FALHA: eco da entrada não é julgamento, e aceitar um objeto só porque ele
+  // é um objeto inventaria nota.
+  it('eco da entrada continua sendo falha, não nota', () => {
+    expect(acharCamposRecomendacao({ projeto: {} })).toBeNull();
+    expect(acharCamposRecomendacao({ projeto: { nome: 'X', area: 'TECNOLOGIA' } })).toBeNull();
+    expect(acharCamposRecomendacao({ comentario: 'nada a dizer' })).toBeNull();
   });
 });

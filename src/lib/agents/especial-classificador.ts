@@ -288,6 +288,63 @@ function prosaComoLeitura(texto: string): string {
 }
 
 /**
+ * Encontra os campos da recomendação sob os APELIDOS que o modelo usa na prática.
+ *
+ * ⚠️ Colhido dos logs de prod em 03/09/2026, todas respostas de JSON VÁLIDO que o parse antigo
+ * descartava como "não devolveu recomendação utilizável":
+ *   {"recomendacao": 1, "confianca": "baixa", "leitura": "..."}
+ *   {"recomendacao": {"estrelas": 0, "justificativa": "..."}}
+ *   {"projeto": {"nome": "...", "area": "..."}}          ← ecoou a ENTRADA, não respondeu
+ *
+ * Structured Outputs está morta no proxy, então o formato é pedido e não garantido. O que não
+ * pode acontecer é a resposta existir e o projeto sair da rodada como se ninguém tivesse
+ * perguntado. ⚠️ O último caso continua sendo FALHA de propósito: eco da entrada não é
+ * julgamento, e aceitar um objeto só porque ele é um objeto inventaria nota.
+ */
+export function acharCamposRecomendacao(bruto: unknown): Record<string, unknown> | null {
+  if (!bruto || typeof bruto !== "object") return null;
+  const o = bruto as Record<string, unknown>;
+
+  // Eco da entrada: o prompt manda um objeto `projeto`, e o modelo às vezes devolve ele de volta.
+  if ("projeto" in o && !("estrelas_recomendada" in o)) return null;
+
+  const numero = (v: unknown): number | null => {
+    const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // A nota, sob qualquer um dos nomes vistos, no topo ou um nível abaixo.
+  const ninhos: Record<string, unknown>[] = [o];
+  for (const k of ["recomendacao", "recomendação", "resultado", "avaliacao"]) {
+    const v = o[k];
+    if (v && typeof v === "object" && !Array.isArray(v)) ninhos.push(v as Record<string, unknown>);
+  }
+  const chavesNota = ["estrelas_recomendada", "estrelas", "nota", "recomendacao", "recomendação", "estrela"];
+  let nota: number | null = null;
+  for (const ninho of ninhos) {
+    for (const c of chavesNota) {
+      if (!(c in ninho)) continue;
+      const n = numero(ninho[c]);
+      if (n != null) { nota = n; break; }
+    }
+    if (nota != null) break;
+  }
+  if (nota == null) return null;
+
+  const buscar = (chaves: string[]): unknown => {
+    for (const ninho of ninhos) for (const c of chaves) if (ninho[c] != null) return ninho[c];
+    return undefined;
+  };
+
+  return {
+    estrelas_recomendada: nota,
+    confianca: buscar(["confianca", "confiança"]),
+    leitura: buscar(["leitura", "justificativa", "porque", "por_que", "racional", "motivo"]),
+    evidencias: buscar(["evidencias", "evidências"]) ?? {},
+  };
+}
+
+/**
  * Normaliza + aplica o GUARD determinístico sobre a saída crua do LLM:
  * - clampa a nota em [0, NOTA_MAX] e arredonda para inteiro;
  * - confiança inválida vira 'baixa' (conservador);
@@ -400,11 +457,12 @@ export async function classificarEspecial(
   // Resposta em prosa não é resposta ausente: recuperar é a diferença entre "o agente avaliou
   // e nós perdemos" e "o projeto não foi avaliado". O `ajuste_guard` deixa a recuperação
   // VISÍVEL — sem isso a rodada não teria como saber com que frequência isso acontece.
-  const recuperado = json == null;
-  const rec = normalizarRecomendacao(json ?? recuperarDeProsa(raw));
+  const campos = acharCamposRecomendacao(json);
+  const recuperado = campos == null;
+  const rec = normalizarRecomendacao(campos ?? recuperarDeProsa(raw));
   if (!rec) return null;
   const marcado = recuperado
-    ? { ...rec, ajuste_guard: [rec.ajuste_guard, 'nota recuperada de resposta em prosa'].filter(Boolean).join(' · ') }
+    ? { ...rec, ajuste_guard: [rec.ajuste_guard, 'nota recuperada de resposta fora do formato'].filter(Boolean).join(' · ') }
     : rec;
   return anexarEvidencia(aplicarGuardVizinhoDivergente(marcado, vizinhos));
 }
