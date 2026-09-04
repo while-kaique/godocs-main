@@ -65,7 +65,14 @@ import {
   importarAvaliacoesEspeciais,
 } from "@/lib/especiais.functions";
 import {
+  varrerAglutinacao,
+  listarAglutinacoes,
+  decidirSugestaoAglutinacao,
+  avaliarAglutinacaoDaSubmissao,
+} from "@/lib/aglutinacao.functions";
+import {
   classificarEspecialProjeto,
+  julgarProjetoComPainel,
   classificarEspeciaisPendentes,
   classificarEspecialEmBackground,
   prepararIndicePinecone,
@@ -86,6 +93,7 @@ import { avaliarRetroativo } from "@/lib/avaliacao-retroativa.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
 import { getSugestoesParticipantes } from "@/lib/participantes.functions";
+import { buscarProjetosPorNome } from "@/lib/projetos-busca.functions";
 import { syncSheetsToSqlite } from "@/lib/google/sync-reverse";
 import { statusEspelho } from "@/lib/sheet-espelho";
 import {
@@ -148,6 +156,7 @@ import {
 import { registrarAtividade, listarAtividades } from "@/lib/atividades.functions";
 import { listarCiclos, lerArvore, listarLog } from "@/lib/agentes-log.functions";
 import { avaliarProjetoComTime } from "@/lib/avaliacao/time.functions";
+import { auditarValorProjeto } from "@/lib/auditoria-valor.functions";
 import {
   notificarLideresPendentes,
   notificarLideresDoProjeto,
@@ -232,6 +241,10 @@ function processarPosSubmissao(projetoId: string): Promise<unknown> {
     analisarEmBackground(projetoId),
     classificarEspecialEmBackground(projetoId),
     avaliarProjetoNormalEmBackground(projetoId),
+    // "Este projeto é, na verdade, uma feature de um que já existe?" — 1 chamada de LLM,
+    // ao lado do analisador. ⚠️ Só SUGERE: o vínculo na planilha continua nascendo do
+    // aceite humano no painel. Quem já declarou o pai na Etapa 1 fica de fora.
+    avaliarAglutinacaoDaSubmissao(projetoId),
   ]);
 }
 
@@ -295,6 +308,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // ── Sugestões de participantes (autocomplete da etapa 1; lista da TeamGuide) ──
     if (pathname === "/api/participantes/sugestoes" && method === "GET") {
       return json(await getSugestoesParticipantes());
+    }
+
+    // ── Busca de projetos por nome (autocomplete do PAI — feature de outro projeto) ──
+    // Autenticado (edge OAuth + e-mail do header). Lê o ESPELHO, nunca o Sheets.
+    if (pathname === "/api/projetos/buscar" && method === "GET") {
+      if (!getEmailFromRequest(request)) return errorJson("Não autorizado.", 401);
+      const q = url.searchParams.get("q") ?? "";
+      return json(await buscarProjetosPorNome(q));
     }
 
     // ── Cron: sincroniza áreas da TeamGuide (chamado pela plataforma Godeploy) ──
@@ -966,6 +987,25 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // Ver src/lib/especiais.functions.ts: lê o MESMO espelho da triagem, só que agrupado por
     // NÍVEL, com a recomendação da auditoria por projeto. A nota segue na
     // coluna manual "Estrelas" da planilha — a rota de estrelas escreve SÓ ela.
+    // ── Aglutinação (item 5.3): "este projeto é feature daquele?" ──────────
+    // Ver src/lib/aglutinacao.functions.ts. A varredura NÃO escreve na planilha e `dry` é o
+    // DEFAULT; quem grava o vínculo (`ID Pai`/`ID Feature`) é o ACEITE humano, mais nada.
+    if (pathname === "/api/admin/aglutinacao/varredura" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody(request);
+      return json(await varrerAglutinacao(body));
+    }
+    if (pathname === "/api/admin/aglutinacao" && method === "GET") {
+      await requireAdmin(request);
+      const estado = url.searchParams.get("estado") ?? undefined;
+      return json(await listarAglutinacoes(estado));
+    }
+    if (pathname === "/api/admin/aglutinacao/decidir" && method === "POST") {
+      const { email: adminEmail } = await requireAdmin(request);
+      const body = await readBody(request);
+      return json(await decidirSugestaoAglutinacao(body, adminEmail));
+    }
+
     if (pathname === "/api/admin/especiais" && method === "GET") {
       await requireAdmin(request);
       return json(await listarEspeciais());
@@ -1132,6 +1172,35 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // ⚠️ Paginado E limitado por CUSTO: ~8 chamadas de LLM por projeto, ~30–50 s de relógio cada,
     // então a corrida para no `tetoChamadas` e devolve `proximo_offset` de onde continuar.
     // `soComNotaHumana:true` julga exatamente o test set do T7.
+    // Painel de lentes em UM projeto. ⚠️ Espelha o `/classificar`: a rota de LOTE roda em série,
+    // e a rodada de calibragem na base inteira só termina com a concorrência no cliente.
+    // Auditoria do VALOR declarado de UM projeto: a dimensão financeira da mesa, sozinha.
+    // ⚠️ Só LÊ e devolve. Não grava em lugar nenhum, e a sugestão só desce ou confirma.
+    if (pathname === "/api/admin/auditar-valor" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { projetoId?: string };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
+      return json(await auditarValorProjeto(body.projetoId));
+    }
+
+    if (pathname === "/api/admin/especiais/painel-projeto" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as {
+        projetoId?: string;
+        dry?: boolean;
+        forcar?: boolean;
+        lentes?: string[];
+      };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
+      return json(
+        await julgarProjetoComPainel(body.projetoId, {
+          dry: body.dry,
+          forcar: body.forcar,
+          lentes: body.lentes,
+        }),
+      );
+    }
+
     if (pathname === "/api/admin/especiais/painel" && method === "POST") {
       await requireAdmin(request);
       const body = (await readBody(request)) as {

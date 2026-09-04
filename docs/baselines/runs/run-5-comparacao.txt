@@ -1,0 +1,143 @@
+==============================================================================
+run 1 · agente, RAG vazio          n=646  idêntica  47%  ±1  76%  acima 200  abaixo 59
+  distribuição: 0★:306 1★:150 2★:119 3★:39 4★:11 5★:16 6★:4 7★:1
+run 2 · agente + RAG restaurado    n=230  idêntica  58%  ±1  78%  acima 51  abaixo 23
+  distribuição: 0★:130 1★:45 2★:27 3★:12 4★:3 5★:11 7★:1 8★:1
+run 3 · agente + RAG + auditoria (amostra 196) n=182  idêntica  42%  ±1  78%  acima 38  abaixo 44
+  distribuição: 0★:88 1★:30 2★:31 3★:14 4★:6 5★:10 6★:1 7★:1 8★:1
+run 4 · TIME de 5 lentes + auditoria (58) n= 58  idêntica  40%  ±1  73%  acima 12  abaixo 19
+  distribuição: 0★:25 1★:10 2★:3 3★:9 4★:9 5★:1 7★:1
+run 5 · TIME + auditoria · base inteira (grava) n=573  idêntica  52%  ±1  76%  acima 145  abaixo 61
+  distribuição: 0★:311 1★:81 2★:97 3★:45 4★:29 5★:8 7★:2
+
+==============================================================================
+ADERÊNCIA POR FAIXA DE CONFIANÇA (dentro de ±1 da nota da planilha)
+run 1 · agente, RAG vazio: sem confiança gravada nesta run
+run 2 · agente + RAG restaurado: sem confiança gravada nesta run
+run 3 · agente + RAG + auditoria (amostra 196):
+  alta   n= 23  ±1  78%
+  media  n= 12  ±1  58%
+  baixa  n=107  ±1  80%
+run 4 · TIME de 5 lentes + auditoria (58):
+  alta   n=  7  ±1 100%
+  media  n= 12  ±1  92%
+  baixa  n= 33  ±1  61%
+run 5 · TIME + auditoria · base inteira (grava):
+  alta   n= 64  ±1  94%
+  media  n=150  ±1  89%
+  baixa  n=211  ±1  60%
+
+==============================================================================
+ONDE A DIVERGÊNCIA MORA (por nota da planilha, última run)
+  humana   n   idêntica   agente ACIMA   agente ABAIXO   nota média do agente
+      0  319    63%       118             0              0.69
+      1   40    13%        12            23              0.95
+      2   26    31%         9             9              2.19
+      3   25    16%         5            16              2.36
+      4    8    13%         1             6              2.75
+      5    3     0%         0             3              3.00
+      7    2     0%         0             2              4.50
+      8    1     0%         0             1              4.00
+     10    1     0%         0             1              4.00
+
+==============================================================================
+CONTESTAÇÕES DE PREÇO: 104 projetos já avaliados divergem por 2★ ou mais
+  o agente pagaria MAIS em 86 e MENOS em 18
+  (a nota humana não muda por isto; é lista para revisão de gente)
+
+  humano 10 → agente 4  (baixaria)  PIAPP
+     ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. Plataforma
+  humano 0 → agente 5  (subiria)  IARA + Central RA: Autoatendimento e Gestão de
+     ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. A IARA res
+  humano 2 → agente 7  (subiria)  Integração com Operador Logístico - Life of Co
+     A integração conduz cada pedido da Life of Colour entre a loja e o armazém, incluindo estoque, expedição e rastreio. Fica em 7, ao lado do GoBrands, por sustent
+  humano 0 → agente 4  (subiria)  Lab Gobeaute · Sistema de P&D, Fórmulas e Cada
+     ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. É uma plat
+  humano 0 → agente 4  (subiria)  CX Hub — Plataforma Central de Operações de Ba
+     O Hub já executa reenvios no Cosmos e abre tickets logísticos sem intervenção após o acionamento, com mais de 13 mil ocorrências mensais automatizadas. Fica em 
+  humano 4 → agente 0  (baixaria)  Prazo Otimizado
+     O modelo recalibra prazos por transportadora e região para buscar conversão sem perder SLA. Fica em 0 porque há evidência apenas de um piloto passado, com resul
+  humano 0 → agente 4  (subiria)  Feedback time operacional
+     A plataforma formaliza os feedbacks, exige registros assinados e cria uma trilha auditável antes de desligamentos, medidas disciplinares ou promoções. Fica acim
+  humano 5 → agente 1  (baixaria)  Prisma
+     O Prisma foi desenhado para criar, publicar e otimizar criativos automaticamente, em escopo semelhante ao CTR Machine. Porém, o memorial não comprova que esteja
+  humano 0 → agente 4  (subiria)  Banco de Dados de Supply Gogroup
+     O projeto consolida e atualiza automaticamente dados críticos de supply de oito empresas, com histórico idempotente e bloqueio do forecast após o dia 15. Fica a
+  humano 0 → agente 4  (subiria)  Gestão da Transparência Supply
+     A aplicação concilia automaticamente compras corporativas com notas fiscais e sustenta a auditoria feita pelo Financeiro. Fica acima do Fluxo Automatizado de NF
+  humano 4 → agente 0  (baixaria)  GoPrice
+     O GoPrice recomenda preços diariamente com base em elasticidade, estoque e risco de ruptura, assumindo uma decisão econômica que afeta margem e giro. Fica em 4★
+  humano 8 → agente 4  (baixaria)  [VERSTA] Robo orçamento - {Marca}
+     O robô controla sozinho 100% do orçamento de mídia do grupo, alterando gastos 24 horas por dia conforme regras de cada marca. Fica em 5, alinhado ao Robo orçame
+  humano 3 → agente 0  (baixaria)  Margem Diaria - Gobeaute (vendas yampi)
+     Captura, trata e envia relatórios diários de margem para orientar ajustes comerciais. Mantém 3 estrelas por ser o próprio projeto usado como referência dessa no
+  humano 0 → agente 3  (subiria)  Não Classificadas - Versão Final
+     A automação executa de ponta a ponta uma rotina diária de classificação de notas fiscais, atualiza a planilha e notifica o time, restando apenas o download e ac
+  humano 0 → agente 3  (subiria)  Torre de Controle Gobeaute
+     O script executa diariamente a coleta, o tratamento, o cruzamento e o cálculo dos indicadores, como a Análise Inteligente de Prazos. Fica em 2 porque entrega a 
+  humano 0 → agente 3  (subiria)  Dashboard - Gocase Performance Produtos
+     Centraliza dados de produto e abastece, com atualização semanal ou quinzenal, reuniões das três squads e o comitê de lançamentos. Fica acima do Dashboard Gobeau
+  humano 0 → agente 3  (subiria)  TFA Flow — Portal de Registro e Resolução de F
+     Assim como o Fluxo Automatizado de NFSE, o TFA Flow executa uma rotina operacional recorrente, centralizando registros, acionamentos, cobranças e relatórios. Nã
+  humano 1 → agente 4  (subiria)  Gocase B2B Service Desk (RMA E CADASTROS)
+     O sistema executa automaticamente casos simples de RMA, centraliza cadastros e reduz trabalho manual recorrente. Vai além dos vizinhos de 1 estrela porque não a
+  humano 4 → agente 7  (subiria)  CTR Machine Gocase - Admaker
+     O Admaker cria, publica e mede testes de CTR, alimentando o Gerador de Briefing e o Color Drop. Recomendo 7, alinhado à CTR Machine já avaliada; não chega a 8 p
+  humano 0 → agente 3  (subiria)  Controle de bonificações
+     O BoniTrack registra solicitações, exige aprovação gerencial e mantém histórico auditável antes de a bonificação seguir. Fica acima do Controle de Orçamentos po
+  … e mais 84. Lista inteira no artefato, filtro "Só divergências de 2★+".
+
+==============================================================================
+MUDARAM DE NOTA: 24 de 51 comparáveis
+  saltos de 2★ ou mais: 9
+  aproximaram do humano: 7 · afastaram: 16
+
+OS 12 MAIORES MOVIMENTOS (leia o motivo, não o número):
+
+  0 → 4  (humano 7)  Ferramenta de testes de novos produtos ctr com agent
+    antes: O agente encontra produtos, cria embalagens e imagens e publica os testes no Facebook sem intervenção humana. Fica em 5, abaixo da CTR Machine já aval
+    agora: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+
+  4 → 1  (humano 5)  Prisma
+    antes: O Prisma escolhe produtos, adapta criativos, publica campanhas e usa o desempenho para se ajustar sozinho. Fica em 5, acima do CTR Machine Gocase Adma
+    agora: O Prisma foi desenhado para criar, publicar e otimizar criativos automaticamente, em escopo semelhante ao CTR Machine. Porém, o memorial não comprova 
+
+  0 → 3  (humano 1)  GoPilot
+    antes: O GoPilot executa automaticamente a consolidação e a previsão mensal por linha e SKU, deixando para o time apenas exceções e decisões. Fica ao lado da
+    agora: Automatiza mensalmente a preparação dos dados, a previsão por linha e SKU e o acompanhamento do realizado. Fica ao lado da Análise Inteligente de Praz
+
+  1 → 4  (humano 5)  GoHunter
+    antes: ⚠ Conferir na triagem: «Cases IA | Lógica» (similaridade 0.76) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a di
+    agora: Padroniza a avaliação de candidatos com critérios auditáveis, já aplicados a mais de 24 mil perfis, e integra o resultado à InHire. Fica ao lado de Ca
+
+  1 → 3  (humano 2)  Controle de Pedidos de Compra Gobeaute
+    antes: O painel consulta pedidos no Protheus, notifica aprovadores e prepara o envio aos fornecedores. Assim como a Plataforma de Cadastro de Produtos GoBeau
+    agora: O painel consulta o Protheus, cobra aprovadores e prepara ou envia comunicações aos fornecedores, com redução operacional já declarada após a automaçã
+
+  0 → 2  (humano 0)  Ordens Travadas/Em Espera | Metabase -> Chat
+    antes: ⚠ Conferir na triagem: «Alerta de Pedidos Travados por Responsável» (similaridade 0.89) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a
+    agora: ⚠ Conferir na triagem: «Alerta de Pedidos Travados por Responsável» (similaridade 0.89) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a
+
+  3 → 5  (humano 3)  GDI - Gestão de Industrialização
+    antes: O GDI executa de forma recorrente a consulta de endereços e grande parte dos lançamentos de produção e etiquetas, com redução comprovada de 132 para 8
+    agora: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+
+  0 → 2  (humano 0)  Automação de Nfs via Python
+    antes: Baixa, converte, organiza e arquiva diariamente as notas fiscais sem início humano, como a Automação de Inputs de Saída. Não sobe porque apenas execut
+    agora: Executa diariamente toda a rotina de baixar, converter, organizar e arquivar as notas fiscais sem início humano. Fica em 2, como Automação de Inputs d
+
+  4 → 2  (humano 2)  Automação de envio Reinf
+    antes: Envia mensalmente os eventos fiscais de 17 CNPJs à Receita Federal, assina lotes, trata retornos e arquiva comprovantes. Diferente das automações de I
+    agora: Processa XMLs, monta, assina e envia mensalmente eventos da REINF à Receita para 17 CNPJs, além de organizar os retornos. Como Automação de Inputs de 
+
+  0 → 1  (humano 0)  Skill Cronômetro de tempo
+    antes: A skill reúne pauta, agenda e cronômetro para eventos internos. Fica em 0, como os painéis locais já avaliados, porque atende ocasiões pontuais e seu 
+    agora: O painel exibe pauta, agenda e cronômetro sincronizado em eventos internos. Fica em 0 porque resolve uma tarefa pontual e o benefício relatado se limi
+
+  0 → 1  (humano 0)  Gostream
+    antes: Registra automaticamente no Google Sheets cada mudança de etapa dos candidatos no InHire. Fica em 2, como o HireFlow, porque executa uma rotina recorr
+    agora: O Gostream copia movimentações do InHire para a planilha e elimina o preenchimento manual, em escopo muito próximo à Automação de preenchimento das va
+
+  0 → 1  (humano 1)  Análise de convergência  - premissas de AVD
+    antes: A análise consolida dados e apresenta premissas para apoiar as calibrações da AVD. Como o Dashboard de resultados AVD 2025, fica em 0 porque há apenas
+    agora: O projeto prepara análises e premissas para apoiar as calibrações da AVD. Como no Dashboard de resultados AVD 2025, o memorial mostra apenas economia 

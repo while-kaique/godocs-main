@@ -39,9 +39,10 @@ import {
 } from '@/integrations/db/client.server';
 
 /** Chave do espelho: o "ID Projeto" em minúsculas (legado na planilha vem em MAIÚSCULAS). */
-export function chaveProjeto(id: string): string {
-  return String(id ?? '').trim().toLowerCase();
-}
+// Reexportado para não quebrar os ~10 call sites que já o importavam daqui; a régua mora
+// no módulo PURO (ver `projeto-chave.ts` para o porquê).
+import { chaveProjeto } from '@/lib/projeto-chave';
+export { chaveProjeto };
 
 /**
  * Impressão digital do conteúdo da linha — é ela que evita escrita à toa: com o cron de 5

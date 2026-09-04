@@ -15,7 +15,7 @@
  */
 import type { SheetRow } from '@/lib/google/sheets';
 import { parseDataFlexivel } from '@/lib/format-date';
-import { valorDaColuna, chaveColuna } from '@/lib/coluna-chave';
+import { valorDaColuna, chaveColuna, NOME_LEGADO } from '@/lib/coluna-chave';
 import { COLUNA_ESTADO_LIDER } from '@/lib/aprovacoes-parecer';
 
 // ─── Parsers de célula ───────────────────────────────────────────────────────
@@ -112,7 +112,9 @@ export type ProjetoDashboardResumo = {
   ganhoTotal: number | null;
   savingReais: number | null;
   receitaMensal: number | null;
-  complexidade: string | null;
+  complexidade: string | null; // eixo NÍVEL da categorização (item 5.4)
+  /** Eixo TIPO da categorização (item 5.4) — rótulo legível, "—" quando indefinido. */
+  tipoProjeto: string | null;
   tipos: string | null;
   especial: boolean;
   /**
@@ -166,6 +168,7 @@ export const COLUNAS_RESUMO: readonly string[] = [
   // `ProjetoDashboardResumo`), como `Ferramenta` e `Freq. Custo Evitado`.
   'Impacto Líquido Mensal',
   'Complexidade',
+  'Tipo de Projeto',
   'Tipos de Ganho',
   'Especial?',
   'Estrelas',
@@ -186,7 +189,7 @@ export const COLUNAS_RESUMO: readonly string[] = [
 // `linha_resumo` com as chaves da v1 e `mapResumo` leria `undefined` — Ganho/Saving/
 // Receita/Tipos nasceriam VAZIOS na tela, para sempre. Renomear é o mesmo caso de
 // "coluna nova" que este contador existe para cobrir.
-export const VERSAO_RECORTE_RESUMO = 5;
+export const VERSAO_RECORTE_RESUMO = 6;
 
 /**
  * Recorta de uma linha da planilha só as `COLUNAS_RESUMO`.
@@ -198,10 +201,29 @@ export const VERSAO_RECORTE_RESUMO = 5;
 export function recortarResumo(row: SheetRow): Record<string, string> {
   const campos = row as Record<string, string>;
   const alvos = new Set(COLUNAS_RESUMO.map((c) => chaveColuna(c)));
+  // ⚠️ Numa aba AINDA NÃO MIGRADA (a `GoDocs` de produção), a linha crua vem com os nomes
+  // da v1: `Ganho Total`, `Saving Reais`, `Receita Mensal`… O `mapResumo` logo abaixo lê
+  // pelos nomes da v2, então sem esta ponte ele acharia `undefined` e a tela mostraria
+  // **R$ 0 para todo projeto**. Aqui a célula legada é recortada JÁ SOB O NOME NOVO — quem
+  // está a jusante (mapResumo, rollup) fala só v2, e a origem pode ser v1 ou v2.
+  // ⚠️ O valor sob o nome NOVO sempre vence: numa aba migrada este mapa nunca é usado.
+  const legadoParaNovo = new Map<string, string>();
+  for (const [novo, legado] of Object.entries(NOME_LEGADO) as Array<[string, string]>) {
+    if (alvos.has(chaveColuna(novo))) legadoParaNovo.set(chaveColuna(legado), novo);
+  }
   const out: Record<string, string> = {};
+  const vindosDeLegado: Record<string, string> = {};
   for (const [chaveReal, valor] of Object.entries(campos)) {
     if (valor == null) continue;
-    if (alvos.has(chaveColuna(chaveReal))) out[chaveReal] = valor;
+    const chave = chaveColuna(chaveReal);
+    if (alvos.has(chave)) out[chaveReal] = valor;
+    else {
+      const nomeNovo = legadoParaNovo.get(chave);
+      if (nomeNovo) vindosDeLegado[nomeNovo] = valor;
+    }
+  }
+  for (const [nomeNovo, valor] of Object.entries(vindosDeLegado)) {
+    if (!(nomeNovo in out)) out[nomeNovo] = valor;
   }
   return out;
 }
@@ -237,6 +259,7 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
     savingReais: numero(row['Impacto Bruto']),
     receitaMensal: numero(row['Receita Incremental']),
     complexidade: texto(row['Complexidade']),
+    tipoProjeto: texto(row['Tipo de Projeto']),
     tipos: texto(row['Tipos de Ganho']),
     especial: ehSim(row['Especial?']),
     // ⚠️ Casamento TOLERANTE: o cabeçalho real de prod/staging é "Aprovação do Lider"

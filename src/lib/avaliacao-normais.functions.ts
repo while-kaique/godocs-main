@@ -35,6 +35,7 @@ import {
   type ProjetoRow,
 } from '@/integrations/db/client.server';
 import { lerResumosEspelho } from '@/lib/sheet-espelho';
+import { chaveProjeto } from '@/lib/projeto-chave';
 import { mapResumo, type ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
 import { ehLideranca } from '@/lib/areas/teamguide.server';
 import type { DocumentacaoGerada } from '@/lib/agents/types';
@@ -129,8 +130,11 @@ async function montarEntradaSemanticaNormal(
   projetoId: string,
   resumo?: ProjetoDashboardResumo,
 ): Promise<EntradaSemantica | null> {
-  const ctx = await getProjetoContextoData(projetoId);
-  const docRow = await getDocumentacaoConteudo(projetoId);
+  // Mesma armadilha do classificador de especiais: id de legado vem MAIÚSCULO da planilha e a
+  // linha em `projetos` é minúscula — ler cru devolve `ctx` nulo e o dossiê fica só com o resumo.
+  const chave = chaveProjeto(projetoId);
+  const ctx = await getProjetoContextoData(chave);
+  const docRow = await getDocumentacaoConteudo(chave);
   if (!ctx && !resumo) return null;
   return {
     nome: ctx?.nome ?? resumo?.nome ?? null,

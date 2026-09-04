@@ -17,7 +17,10 @@ import {
 } from '@/lib/especial-corpus';
 import {
   extrairJson,
+  recuperarDeProsa,
+  acharCamposRecomendacao,
   normalizarRecomendacao,
+  anexarEvidencia,
   buildSystemPromptEspecial,
   aplicarGuardVizinhoDivergente,
   type RecomendacaoEspecial,
@@ -215,19 +218,48 @@ describe('agente — extrairJson', () => {
 
 describe('agente — normalizarRecomendacao (guard)', () => {
   it('clampa e arredonda a nota', () => {
-    expect(normalizarRecomendacao({ estrelas_recomendada: 12 })?.estrelas_recomendada).toBe(10);
+    // ⚠️ 12 clampa em 10, mas 10 é ESCAPE: sem evidência citada o guard o devolve a 5★.
+    // Com lastro, o 10 sobrevive — é o mesmo clamp de sempre, agora com o freio do escape.
+    expect(
+      normalizarRecomendacao({ estrelas_recomendada: 12, evidencias: { nao_existiria: 'a fila do Fiscal roda hoje só por causa dele', sem_volta: 'o processo manual foi desligado e ninguém o mantém' } })
+        ?.estrelas_recomendada,
+    ).toBe(10);
+    expect(normalizarRecomendacao({ estrelas_recomendada: 12 })?.estrelas_recomendada).toBe(5);
     expect(normalizarRecomendacao({ estrelas_recomendada: -3 })?.estrelas_recomendada).toBe(0);
     expect(normalizarRecomendacao({ estrelas_recomendada: 1.7 })?.estrelas_recomendada).toBe(2);
   });
-  it('nota ≥3 força confiança ≤ média e marca contestada', () => {
-    const r = normalizarRecomendacao({ estrelas_recomendada: 4, confianca: 'alta' });
+  it('⚠️ é a faixa 6-10 que marca contestada, não ≥3 (régua v2, 03/09/2026)', () => {
+    // Sob a régua ANTIGA, ≥3★ era top 4% e por isso pedia segundo olhar. Sob a v2, 3★ é
+    // "Garante" — um nível com definição e exemplos, nada raro entre especiais (41,7%).
+    // O que exige gente agora é o ESCAPE: quem crava o número de 6 a 10 é humano.
+    const r = normalizarRecomendacao({
+      estrelas_recomendada: 7,
+      confianca: 'alta',
+      evidencias: { nao_existiria: 'a fila do Fiscal roda hoje só por causa dele', sem_volta: 'o processo manual foi desligado e ninguém o mantém' },
+    });
     expect(r?.confianca).toBe('media');
     expect(r?.contestada).toBe(true);
+    expect(Object.keys(r?.evidencias ?? {})).toHaveLength(2);
   });
-  it('nota <3 preserva confiança alta e não contesta', () => {
-    const r = normalizarRecomendacao({ estrelas_recomendada: 2, confianca: 'alta' });
-    expect(r?.confianca).toBe('alta');
-    expect(r?.contestada).toBe(false);
+  it('nota da faixa do agente preserva confiança alta e não contesta', () => {
+    for (const nota of [2, 4, 5]) {
+      const r = normalizarRecomendacao({ estrelas_recomendada: nota, confianca: 'alta' });
+      expect(r?.confianca).toBe('alta');
+      expect(r?.contestada).toBe(false);
+      expect(r?.evidencias).toEqual({});
+    }
+  });
+  it('⚠️ escape sem evidência CITADA volta para 5★ e diz o que houve na leitura', () => {
+    const r = normalizarRecomendacao({
+      estrelas_recomendada: 9,
+      confianca: 'alta',
+      leitura: 'muda o jogo',
+      // só UM gatilho citado: o escape exige os DOIS
+      evidencias: { nao_existiria: 'a fila do Fiscal roda hoje só por causa dele' },
+    });
+    expect(r?.estrelas_recomendada).toBe(5);
+    expect(r?.ajuste_guard).toMatch(/sem citação da doc/);
+    expect(r?.leitura).toMatch(/⚠/);
   });
   it('confiança inválida → baixa (conservador)', () => {
     expect(normalizarRecomendacao({ estrelas_recomendada: 1, confianca: 'xpto' })?.confianca).toBe(
@@ -247,10 +279,28 @@ describe('agente — normalizarRecomendacao (guard)', () => {
 describe('agente — prompt de sistema (fonte única da régua)', () => {
   it('carrega a régua e a curva no system prompt', () => {
     const p = buildSystemPromptEspecial();
-    expect(p).toContain('top 4%'); // curva
-    expect(p).toContain('Recorrência real'); // critério da régua
+    expect(p).toContain('Muda o Jogo'); // a faixa 6-10 EXISTE no prompt
+    expect(p).toContain('Experimenta'); // 0★ é nível nomeado
+    expect(p).toContain('Godash'); // os exemplos reais ancoram os níveis
+    // ⚠️ a régua vem de estrelas-regua.ts — a MESMA do time de avaliação. Se alguém
+    // recriar uma régua paralela "dos especiais", estes literais saem daqui.
+    expect(p).toContain('Assume'); // 5★ com o verbo da fonte única
     expect(p).toContain('JSON'); // formato forçado
     expect(p).toMatch(/0 a 10/); // escala
+  });
+
+  it('⚠️ a curva do prompt é a dos ESPECIAIS, não a da base inteira', () => {
+    // Este teste substitui um que exigia o literal "top 4%" — a âncora ERRADA, que ele
+    // prendia no lugar. Medido em 03/09/2026: na base inteira ≥3★ é 6,2% e ≥5★ é 1,5%;
+    // entre os especiais auditados (a população que este agente julga) é 41,7% e 12,5%.
+    // O agente recebia uma régua anti-inflação ~7× apertada demais e rebaixava o topo.
+    const p = buildSystemPromptEspecial();
+    expect(p).toContain('ESPECIAIS JÁ AUDITADOS');
+    expect(p).toMatch(/≥3★ são 4\d%/); // a curva dos especiais, não os 4% da base
+    expect(p).not.toMatch(/≥3★ é top 4% da base/);
+    // A menção à base inteira SOBREVIVE, mas só como contraste explícito — é ela que
+    // impede o modelo de confundir as duas populações.
+    expect(p).toMatch(/Não confunda com a base inteira/);
   });
   it('instrui a igualar a faixa de um vizinho quase idêntico com nota maior', () => {
     expect(buildSystemPromptEspecial()).toMatch(/vizinho quase idêntico/i);
@@ -281,6 +331,8 @@ function rec(over: Partial<RecomendacaoEspecial>): RecomendacaoEspecial {
     confianca: 'baixa',
     leitura: 'memorial magro, parece POC',
     contestada: false,
+    evidencias: {},
+    ajuste_guard: null,
     ...over,
   };
 }
@@ -316,5 +368,213 @@ describe('agente — aplicarGuardVizinhoDivergente', () => {
       viz({ similaridade: 0.8, estrela_efetiva: 5 }),
     ]);
     expect(r.estrelas_recomendada).toBe(1);
+  });
+});
+
+describe('agente — evidência do escape chega ao painel', () => {
+  it('a citação é costurada na leitura (é a única coluna que a tela mostra)', () => {
+    const rec = {
+      estrelas_recomendada: 8,
+      confianca: 'media' as const,
+      leitura: 'muda o jogo na área',
+      contestada: true,
+      evidencias: { nao_existiria: 'a fila do Fiscal roda hoje só por causa dele', sem_volta: 'o processo manual foi desligado e ninguém o mantém' },
+      ajuste_guard: null,
+    };
+    expect(anexarEvidencia(rec).leitura).toContain('Evidência do escape');
+    expect(anexarEvidencia(rec).leitura).toContain('a fila do Fiscal');
+  });
+
+  it('fora da faixa 6-10 não mexe em nada', () => {
+    const rec = {
+      estrelas_recomendada: 3,
+      confianca: 'alta' as const,
+      leitura: 'garante',
+      contestada: false,
+      evidencias: {},
+      ajuste_guard: null,
+    };
+    expect(anexarEvidencia(rec)).toEqual(rec);
+  });
+});
+
+/**
+ * Resposta em PROSA não é resposta ausente.
+ *
+ * ⚠️ Medido em prod (03/09/2026, `getAppLogs`): o modelo devolvia a avaliação COMPLETA em
+ * Markdown (`**Recomendação: 0★ — Experimenta**`) e o parse dizia "LLM não devolveu recomendação
+ * utilizável". O projeto sumia da rodada como se ninguém tivesse perguntado — a mesma perda
+ * silenciosa dos 502, por outro caminho. Structured Outputs está morta no proxy, então o formato
+ * é pedido, não garantido: quem tem de aguentar a variação é o parse.
+ */
+describe('recuperação de resposta em prosa', () => {
+  const REAIS = [
+    { texto: '**Recomendação: 0★ — Experimenta**  \n**Confiança: baixa**, por falta de comprovação.\n\n**Passo 1 — Muda o jogo?** Não.\n- **Gatilho 1:** não há processo citado.\nO projeto gera um relatório e ninguém além do autor usa.', nota: 0, conf: 'baixa' },
+    { texto: '## Recomendação: **0★ — Experimenta**\n\n### Passo 1 — Muda o jogo?\n**Não.**\n\n- **Gatilho 1:** nada nomeado.\nEle roda uma vez por mês e alimenta uma planilha.', nota: 0, conf: 'baixa' },
+    { texto: '## Recomendação: **3★ Garante**\nConfiança: média\nBloqueia pedidos com erro antes de seguir.', nota: 3, conf: 'media' },
+  ];
+
+  it('recupera nota e confiança do Markdown que prod realmente devolveu', () => {
+    for (const c of REAIS) {
+      const r = normalizarRecomendacao(recuperarDeProsa(c.texto));
+      expect(r, c.texto.slice(0, 40)).not.toBeNull();
+      expect(r!.estrelas_recomendada).toBe(c.nota);
+      expect(r!.confianca).toBe(c.conf);
+    }
+  });
+
+  // ⚠️ A trava que importa: trocar "perdi a resposta" por "inventei a nota" seria PIOR, porque o
+  // primeiro aparece no relatório de falhas e o segundo entra na base como se fosse avaliação.
+  it('NÃO inventa nota a partir de número solto na prosa', () => {
+    for (const t of [
+      'O projeto economiza 12 horas por mês e roda desde 2024.',
+      'Foram 3 pessoas envolvidas e 5 integrações.',
+      'Sem informação suficiente para avaliar.',
+      '',
+    ]) {
+      expect(recuperarDeProsa(t)).toBeNull();
+    }
+  });
+
+  // O porquê recuperado passa pelas MESMAS regras de escrita do gerado: sem o andaime do
+  // raciocínio e sem travessão, senão o fallback reintroduz na tela o que o prompt proibiu.
+  it('o porquê recuperado sai limpo, sem andaime e sem travessão', () => {
+    const r = normalizarRecomendacao(recuperarDeProsa(REAIS[0].texto))!;
+    expect(r.leitura).not.toMatch(/gatilho/i);
+    expect(r.leitura).not.toMatch(/passo\s*\d/i);
+    expect(r.leitura).not.toMatch(/[—–]/);
+    expect(r.leitura).not.toMatch(/\*\*/);
+    expect(r.leitura).toContain('ninguém além do autor usa');
+  });
+});
+
+/**
+ * Formas de JSON que o modelo devolve na prática.
+ *
+ * ⚠️ Colhidas dos logs de prod em 03/09/2026 — todas JSON VÁLIDO que o parse antigo descartava
+ * como "não devolveu recomendação utilizável", tirando o projeto da rodada como se ninguém
+ * tivesse perguntado. Structured Outputs está morta no proxy: o formato é pedido, não garantido.
+ */
+describe('formas alternativas do JSON', () => {
+  const REAIS: { nome: string; json: unknown; nota: number }[] = [
+    { nome: 'chave "recomendacao" com número', json: { recomendacao: 1, confianca: 'baixa', leitura: 'Coleta cotações.' }, nota: 1 },
+    { nome: 'recomendacao aninhada', json: { recomendacao: { estrelas: 0, justificativa: 'A automação ajusta o Flex.' } }, nota: 0 },
+    { nome: 'chave "nota"', json: { nota: 3, confianca: 'media', leitura: 'x' }, nota: 3 },
+    { nome: 'canônica', json: { estrelas_recomendada: 2, confianca: 'alta', leitura: 'y' }, nota: 2 },
+  ];
+
+  it('aceita os apelidos e a nota chega inteira', () => {
+    for (const c of REAIS) {
+      const campos = acharCamposRecomendacao(c.json);
+      expect(campos, c.nome).not.toBeNull();
+      expect(normalizarRecomendacao(campos)!.estrelas_recomendada, c.nome).toBe(c.nota);
+    }
+  });
+
+  it('a justificativa vira o porquê quando o modelo não usa "leitura"', () => {
+    const r = normalizarRecomendacao(acharCamposRecomendacao(REAIS[1].json))!;
+    expect(r.leitura).toContain('ajusta o Flex');
+  });
+
+  // ⚠️ O prompt manda um objeto `projeto`, e às vezes o modelo devolve ele de volta em vez de
+  // responder. Isso é FALHA: eco da entrada não é julgamento, e aceitar um objeto só porque ele
+  // é um objeto inventaria nota.
+  it('eco da entrada continua sendo falha, não nota', () => {
+    expect(acharCamposRecomendacao({ projeto: {} })).toBeNull();
+    expect(acharCamposRecomendacao({ projeto: { nome: 'X', area: 'TECNOLOGIA' } })).toBeNull();
+    expect(acharCamposRecomendacao({ comentario: 'nada a dizer' })).toBeNull();
+  });
+});
+
+/**
+ * O bug de 65% da run 2.
+ *
+ * ⚠️ O prompt manda `PROJETO A AVALIAR: {"projeto": {...}}`, e o modelo frequentemente devolve o
+ * projeto JUNTO com a resposta. Rejeitar pela mera presença da chave `projeto` jogava fora
+ * resposta boa por causa de uma chave a mais: 418 de 648 projetos saíram sem nota.
+ */
+describe('eco da entrada convivendo com a resposta', () => {
+  it('aceita quando o eco vem JUNTO com a nota, sob qualquer apelido', () => {
+    const casos: [string, unknown, number][] = [
+      ['eco + recomendacao', { projeto: { nome: 'X' }, recomendacao: 3, leitura: 'faz coisa' }, 3],
+      ['eco + nota', { projeto: { nome: 'X' }, nota: 1, leitura: 'y' }, 1],
+      ['eco + canônica', { projeto: { nome: 'X' }, estrelas_recomendada: 4, leitura: 'z' }, 4],
+      ['eco aninhado', { projeto: { nome: 'X' }, recomendacao: { estrelas: 0, justificativa: 'w' } }, 0],
+    ];
+    for (const [nome, json, esperado] of casos) {
+      const campos = acharCamposRecomendacao(json);
+      expect(campos, nome).not.toBeNull();
+      expect(normalizarRecomendacao(campos)!.estrelas_recomendada, nome).toBe(esperado);
+    }
+  });
+
+  it('eco SEM nota nenhuma continua sendo falha', () => {
+    expect(acharCamposRecomendacao({ projeto: { nome: 'X', area: 'Y' } })).toBeNull();
+    expect(acharCamposRecomendacao({ projeto: {} })).toBeNull();
+  });
+
+  // A recuperação de prosa não pode rodar sobre JSON: dali só sai o próprio JSON picado virando
+  // justificativa, e foi assim que a leitura do PIAPP saiu com `{ "projeto` no meio.
+  it('não tenta ler prosa de uma resposta que é JSON', () => {
+    expect(recuperarDeProsa('{"projeto":{"nome":"PIAPP"},"algo":5}')).toBeNull();
+    expect(recuperarDeProsa('[{"a":1}]')).toBeNull();
+    expect(recuperarDeProsa('**Recomendação: 2★ — Executa** roda sozinho')).not.toBeNull();
+  });
+});
+
+/**
+ * Apelidos da chave da nota: régua, não lista fechada.
+ *
+ * ⚠️ Colhido de prod: `{"projeto":"Robo subir vídeos em teste","nota_recomendada":5,...}`. A
+ * lista de apelidos não tinha `nota_recomendada`, e a resposta virava falha. Caçar apelido um a
+ * um é jogo perdido contra um formato que não é garantido.
+ */
+describe('a chave da nota é reconhecida por régua', () => {
+  it('aceita o nome que veio de prod e outros do mesmo feitio', () => {
+    const casos: [unknown, number][] = [
+      [{ projeto: 'Robo subir vídeos', nota_recomendada: 5, justificativa: 'x' }, 5],
+      [{ estrela_sugerida: 2, leitura: 'y' }, 2],
+      [{ recomendacao_estrelas: 3 }, 3],
+      [{ resultado: { nota_final: 1 } }, 1],
+    ];
+    for (const [json, esperado] of casos) {
+      const c = acharCamposRecomendacao(json);
+      expect(c, JSON.stringify(json)).not.toBeNull();
+      expect(normalizarRecomendacao(c)!.estrelas_recomendada).toBe(esperado);
+    }
+  });
+
+  // ⚠️ Nome parecido com valor fora da escala não é a nota. As duas condições juntas são o que
+  // impede um contador qualquer de virar a estrela do projeto.
+  it('nome parecido mas valor fora da escala NÃO vira nota', () => {
+    expect(acharCamposRecomendacao({ notas_dos_vizinhos: 12 })).toBeNull();
+    expect(acharCamposRecomendacao({ total_de_estrelas_da_base: 646 })).toBeNull();
+  });
+
+  it('a chave canônica ganha de uma genérica na mesma resposta', () => {
+    const c = acharCamposRecomendacao({ notas_consideradas: 4, estrelas_recomendada: 1 });
+    expect(normalizarRecomendacao(c)!.estrelas_recomendada).toBe(1);
+  });
+});
+
+/**
+ * A nota pode estar aninhada em qualquer lugar, inclusive dentro do eco.
+ *
+ * ⚠️ A segurança não vem de restringir ONDE olhar, vem das duas condições sobre o que serve como
+ * nota: o nome da chave fala de nota, e o valor cabe na escala.
+ */
+describe('a nota é achada em qualquer objeto um nível abaixo', () => {
+  it('acha dentro do próprio projeto ecoado', () => {
+    const c = acharCamposRecomendacao({
+      projeto: { nome: '[Supply] GLPI', area: 'Supply', nota_recomendada: 2, justificativa: 'roda sozinho' },
+    });
+    expect(c).not.toBeNull();
+    const r = normalizarRecomendacao(c)!;
+    expect(r.estrelas_recomendada).toBe(2);
+    expect(r.leitura).toContain('roda sozinho');
+  });
+
+  it('continua recusando eco sem nota nenhuma, por mais fundo que seja', () => {
+    expect(acharCamposRecomendacao({ projeto: { nome: 'X', area: 'Y', ferramenta: 'n8n' } })).toBeNull();
   });
 });

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  rotuloNotaAgente,
+  normalizarEscape,
+  NOTA_ESCAPE,
+  descreverEscape,
   TETO_AGENTE,
   NOTA_MAX,
   FAIXA_ESCAPE,
@@ -169,11 +173,22 @@ describe('render para o prompt', () => {
     expect(t).toMatch(/PISTA/i);
   });
 
-  it('o escape exige os dois gatilhos e devolve o NÚMERO ao comitê', () => {
+  // ⚠️ Decisão do Luis, 03/09/2026: o agente RECOMENDA um número de 6 a 10 com o porquê, mas o
+  // veredito registrado continua sendo a FAIXA. Antes o prompt dizia "NÃO escolha o número" e
+  // mesmo assim exigia um inteiro no JSON, então ele escolhia às cegas e ninguém via o
+  // raciocínio. O comitê ganha um ponto de partida; o poder de cravar a nota não muda de mãos.
+  it('o escape exige os dois gatilhos, registra a FAIXA e PROÍBE escolher número dentro dela', () => {
     const t = descreverEscape();
     for (const g of GATILHOS_ESCAPE) expect(t).toContain(g.texto);
     expect(t).toMatch(/comitê humano/);
-    expect(t).toMatch(/NÃO escolha o número/);
+    // o veredito é a faixa, e é SÓ a faixa
+    expect(t).toMatch(/O VEREDITO é a FAIXA/);
+    // ⚠️ 04/09/2026: pedir a recomendação foi tentado e REVERTIDO (ver `NOTA_ESCAPE`). A régua
+    // descreve os cinco verbos de 0 a 5 e para aí, então não há critério que separe um 7 de um 8:
+    // o modelo preenchia o número com prosa plausível e sem lastro. Voltar tem de ser decisão.
+    expect(t).toMatch(/NÃO escolha um número dentro da faixa/);
+    expect(t).not.toMatch(/RECOMENDE um número/);
+    expect(t).not.toMatch(/por que esse e não o vizinho/);
   });
 
   it('a distribuição esperada NÃO vai para o prompt — seria cota, não critério', () => {
@@ -289,5 +304,59 @@ describe('achatamento (D12)', () => {
   it('desempata pelo nível menor (o pior caso é o achatamento para baixo)', () => {
     const r = detectarAchatamento([1, 1, 4, 4]);
     expect(r.destino).toBe(1);
+  });
+});
+
+/**
+ * Como a nota do agente aparece para quem decide.
+ *
+ * ⚠️ Decisão do Luis (03/09/2026): na faixa alta o agente DECLARA "6-10" e SUGERE onde encaixar,
+ * com o porquê. A estrela específica é humana, comparando com quem já está na faixa. Mostrar "6★"
+ * na tela apaga a diferença e convida a triagem a aplicar o número com um clique.
+ */
+describe('rótulo da nota do agente', () => {
+  it('de 0 a 5 mostra o número; de 6 a 10 mostra a FAIXA, e SÓ a faixa', () => {
+    for (let n = 0; n <= TETO_AGENTE; n++) {
+      expect(rotuloNotaAgente(n)).toEqual({ rotulo: String(n), sugestao: null });
+    }
+    for (let n = TETO_AGENTE + 1; n <= NOTA_MAX; n++) {
+      const r = rotuloNotaAgente(n);
+      expect(r.rotulo).toBe(`${TETO_AGENTE + 1}-${NOTA_MAX}`);
+      // ⚠️ nunca um número ao lado do rótulo: ele competiria com a faixa na tela e a triagem
+      // aplicaria com um clique o que é decisão do comitê.
+      expect(r.sugestao).toBeNull();
+    }
+  });
+});
+
+/**
+ * ⚠️ 04/09/2026 — a faixa de escape é um NÍVEL, não um trecho de escala.
+ *
+ * Pedir ao agente que recomendasse 6, 7, 8, 9 ou 10 foi tentado e revertido: não existe critério
+ * na régua que separe um 7 de um 8 (os cinco verbos descrevem 0 a 5 e param aí), então o modelo
+ * preenchia o número com prosa plausível e sem lastro, e ele aparecia competindo com o rótulo da
+ * faixa. Quem crava o número é o comitê humano.
+ */
+describe('faixa de escape: um nível, não cinco posições', () => {
+  it('o rótulo é a faixa e NÃO acompanha sugestão de número', () => {
+    for (const n of [6, 7, 8, 9, 10]) {
+      const r = rotuloNotaAgente(n);
+      expect(r.rotulo).toBe('6-10');
+      expect(r.sugestao).toBeNull();
+    }
+  });
+
+  it('qualquer valor da faixa colapsa na marca única, para o nível ser UM balde', () => {
+    for (const n of [6, 7, 8, 9, 10]) expect(normalizarEscape(n)).toBe(NOTA_ESCAPE);
+  });
+
+  it('nota de 0 a 5 passa intacta', () => {
+    for (let n = 0; n <= TETO_AGENTE; n++) expect(normalizarEscape(n)).toBe(n);
+  });
+
+  it('o prompt PROÍBE escolher um número dentro da faixa', () => {
+    const t = descreverEscape();
+    expect(t).toMatch(/NÃO escolha um número dentro da faixa/i);
+    expect(t).not.toMatch(/RECOMENDE um número/i);
   });
 });

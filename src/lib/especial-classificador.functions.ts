@@ -26,7 +26,11 @@ import {
   parseJson,
   type EspecialEmbeddingRow,
 } from "@/integrations/db/client.server";
-import { lerResumosEspelho } from "@/lib/sheet-espelho";
+import { lerResumosEspelho, lerLinhaEspelho } from "@/lib/sheet-espelho";
+import { chaveProjeto } from "@/lib/projeto-chave";
+import { TETO_AGENTE, ehEscape, normalizarEscape} from "@/lib/estrelas-regua";
+import { ajustarNotaComPainel, confiancaPorConsenso, type AjustePainel } from "@/lib/especiais-ajuste";
+import { verificarCoerencia, removerNumerosDivergentes } from "@/lib/coerencia-leitura";
 import { apenasEspeciais } from "@/lib/especiais-view";
 import { mapResumo, type ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 import type { DocumentacaoGerada } from "@/lib/agents/types";
@@ -86,6 +90,7 @@ import {
   avaliarComLentes,
   LENTES,
   LENTE_GATE,
+  lentePorChave,
   type AvaliacaoLente,
 } from "@/lib/agents/especiais-lentes";
 import {
@@ -155,12 +160,61 @@ function oQueFazDoc(conteudoJson: string | null | undefined): string | null {
  * existe no espelho (legado ainda não criado no SQLite), cai no resumo — embedding mais fraco,
  * mas ainda agrupa por nome/área.
  */
+/**
+ * Piso abaixo do qual o "Memorial de Saving" não é um memorial, é uma CONTA.
+ *
+ * Medido na base (03/09/2026): os 30 legados importados à mão têm mediana de **57 caracteres**
+ * nessa coluna (`"22h × R$21,29 (Jr) = R$468,38."`), contra **1.903** dos memoriais gerados pelo
+ * app. 300 fica confortavelmente entre os dois.
+ */
+const MEMORIAL_DEGENERADO_MAX = 300;
+
+/**
+ * Completa o memorial com a coluna **"Memorial anterior"** quando a principal só tem a conta.
+ *
+ * ⚠️ Por que existe: nos legados importados à mão, o "Memorial de Saving" é a aritmética que a
+ * triagem escreveu, e o texto do AUTOR (o que o projeto faz, para quem, com que frequência) ficou
+ * em "Memorial anterior". O agente lia só a conta e concluía, corretamente para o que viu, "só
+ * calcula economia de tempo, não comprova uso recorrente": **30 de 30 desses projetos saíram 0★,
+ * sendo 15 com nota humana 1** — contra uma taxa base de 50% de zeros nessa faixa. Não era
+ * veredito sobre os projetos, era ausência de dossiê. 26 dos 30 têm esse texto, com mediana de
+ * 308 caracteres.
+ *
+ * ⚠️ **Só COMPLEMENTA, nunca substitui**, e só quando a principal é degenerada: em projeto
+ * submetido pelo app essa coluna guarda a versão ANTERIOR do memorial, e juntar as duas colocaria
+ * números velhos ao lado dos novos no mesmo texto.
+ *
+ * ⚠️ **"Observações" fica de FORA de propósito.** É a coluna mais rica dessas linhas e é a mais
+ * proibida: ela guarda o parecer da TRIAGEM ("Saving OK", "Conservador", "convincente"). Dar ao
+ * agente a opinião do humano que ele está sendo comparado contra não melhora a nota, contamina a
+ * medição.
+ */
+async function memorialComplementado(chave: string, memorial: string | null): Promise<string | null> {
+  const atual = (memorial ?? '').trim();
+  if (atual.length > MEMORIAL_DEGENERADO_MAX) return memorial;
+  try {
+    const linha = await lerLinhaEspelho(chave);
+    const anterior = String(linha?.['Memorial anterior'] ?? '').trim();
+    if (!anterior || anterior === '—' || anterior.length < 40) return memorial;
+    return atual ? `${atual}\n\n${anterior}` : anterior;
+  } catch {
+    return memorial; // fonte acessória: falhar aqui não pode derrubar a classificação
+  }
+}
+
 async function montarEntradaSemantica(
   projetoId: string,
   resumo?: ProjetoDashboardResumo,
 ): Promise<{ entrada: EntradaSemantica; alvo: AlvoClassificacao } | null> {
-  const ctx = await getProjetoContextoData(projetoId);
-  const docRow = await getDocumentacaoConteudo(projetoId);
+  // ⚠️ A planilha guarda o id do legado em MAIÚSCULA (`LEGADO-049`) e o sync reverso cria a
+  // linha em `projetos` sempre em minúscula (`sync-reverse.ts`). Como o `=` do SQLite é
+  // sensível a caixa, ler cru deixava 30 aprovados **invisíveis** ("projeto sem contexto para
+  // classificar") e, no caso do especial — onde o resumo do espelho salva a chamada —, montava
+  // um dossiê SILENCIOSAMENTE truncado, sem memorial nem documentação. Match por id é
+  // case-insensitive em todo o resto do repo; aqui não era.
+  const chave = chaveProjeto(projetoId);
+  const ctx = await getProjetoContextoData(chave);
+  const docRow = await getDocumentacaoConteudo(chave);
   const doc = resumoDocParaTexto(docRow?.conteudo);
   const oQueFaz = oQueFazDoc(docRow?.conteudo);
 
@@ -170,7 +224,7 @@ async function montarEntradaSemantica(
   const tipos = resumo?.tipos ?? ctx?.tipos_projeto ?? null;
   const contexto_especial = ctx?.contexto_especial ?? null;
   const descricao = ctx?.descricao_breve ?? null;
-  const memorial = ctx?.memorial_calculo ?? null;
+  const memorial = await memorialComplementado(chave, ctx?.memorial_calculo ?? null);
 
   if (!ctx && !resumo) return null;
 
@@ -257,12 +311,21 @@ function montarCorpus(
  * score). Nome/área/leitura/notas continuam vindo da fonte da verdade: o espelho da planilha e a
  * tabela `especial_avaliacao`, não da metadata do índice (decisão 6).
  */
+/** Só o recorte de `especial_avaliacao` que o mapa de exemplares usa. */
+function avaliacoesParaExemplar(
+  rows: { projeto_id: string; estrelas_recomendada: number; leitura: string | null }[],
+): Map<string, { estrelas_recomendada: number; leitura: string | null }> {
+  return new Map(
+    rows.map((a) => [a.projeto_id, { estrelas_recomendada: a.estrelas_recomendada, leitura: a.leitura }]),
+  );
+}
+
 function mapaExemplares(
-  especiais: ProjetoDashboardResumo[],
+  projetos: ProjetoDashboardResumo[],
   avaliacoes: Map<string, { estrelas_recomendada: number; leitura: string | null }>,
 ): Map<string, ExemplarSemVetor> {
   const mapa = new Map<string, ExemplarSemVetor>();
-  for (const p of especiais) {
+  for (const p of projetos) {
     const av = avaliacoes.get(p.id);
     mapa.set(p.id, {
       projeto_id: p.id,
@@ -380,6 +443,17 @@ async function garantirEmbeddings(
   embeddings: MapaEmbedding,
   opts: { capGeracao?: number } = {},
 ): Promise<{ mapa: MapaEmbedding; gerados: number }> {
+  // ⚠️ TRAVA DE CUSTO. As chamadas de LLM vão pelo ai-proxy e são baratas de testar; EMBEDDING é
+  // outra coisa: vai direto na OpenAI, com chave própria, e se paga por chamada. Com
+  // `EMBEDDINGS_SOMENTE_LEITURA` ligada, nada é gerado — os vetores que existem seguem sendo
+  // LIDOS normalmente e quem não tem vetor simplesmente fica sem vizinho.
+  //
+  // Existe para rodada de calibragem, que repassa a base inteira várias vezes: ali qualquer
+  // mudança no texto do dossiê (um complemento de memorial, por exemplo) muda o hash e
+  // re-embeddaria o lote todo sem ninguém pedir. Env lida em RUNTIME, nunca em escopo de módulo.
+  if (String(process.env.EMBEDDINGS_SOMENTE_LEITURA ?? "") === "1") {
+    return { mapa: embeddings, gerados: 0 };
+  }
   const cap = opts.capGeracao ?? 40; // teto por corrida (custo + tempo do cron)
   // Modelo-alvo: vetor gerado por OUTRO modelo é "velho" mesmo com o texto igual (troca de
   // `-small`→`-large` muda a dimensão, e cosseno entre dims diferentes é 0 → o vizinho some).
@@ -437,38 +511,57 @@ export type ResultadoClassificacao = {
 };
 
 /**
- * Classifica UM especial. `dry` não grava — devolve a recomendação e os vizinhos usados
- * (é o que a rota manual/o cron em modo seco mostram).
+ * Resolve o ALVO e os VIZINHOS de um projeto — o preparo comum ao classificador de 1 agente e ao
+ * painel de lentes.
  *
- * ⚠️ **Projeto que JÁ tem nota humana (coluna "Estrelas") NÃO é reclassificado** — a nota de
- * gente é a verdade e a âncora; gerar uma recomendação competindo com ela (ex.: o agente sugerir
- * 3 para o PIAPP, que é 10) é só ruído no cartão. Ele segue no corpus como EXEMPLAR, ensinando o
- * agente. `forcar` reabre isso (uso manual explícito), nunca o caminho automático.
+ * ⚠️ Existe para os dois caminhos não divergirem em silêncio. Se cada um montasse o próprio
+ * dossiê e a própria vizinhança, a comparação entre eles deixaria de medir o JULGAMENTO e passaria
+ * a medir a diferença de preparo, que é a forma mais fácil de uma troca de arquitetura se
+ * disfarçar de mudança de nota.
  */
-export async function classificarEspecialProjeto(
+type AlvoPreparado = {
+  alvo: AlvoClassificacao;
+  vizinhos: Vizinho[];
+  origem: OrigemVizinhos;
+  /** Nomes dos OUTROS projetos da base — é contra eles que se confere um dependente nomeado. */
+  nomesDaBase: string[];
+};
+
+async function prepararAlvo(
   projetoId: string,
-  opts: { dry?: boolean; forcar?: boolean } = {},
-): Promise<ResultadoClassificacao> {
+  opts: { forcar?: boolean } = {},
+): Promise<AlvoPreparado | { ok: boolean; motivo: string }> {
   const { linhas } = await lerResumosEspelho();
-  const especiais = apenasEspeciais(
-    linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null),
-  );
-  const resumoPorId = new Map(especiais.map((p) => [p.id, p]));
+  const todos = linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null);
+  const especiais = apenasEspeciais(todos);
+  const resumoPorId = new Map(especiais.map((p) => [chaveProjeto(p.id), p]));
+
+  // ⚠️ VIZINHOS SAEM DA BASE INTEIRA, não só dos especiais.
+  //
+  // O índice devolve id + score, e quem hidrata o resto é este mapa. Montado só com os 59
+  // especiais, todo vizinho NORMAL era descartado em silêncio — medido em prod: projeto normal
+  // recebia 0 vizinhos enquanto um especial recebia 6. A memória certa para posicionar um
+  // projeto é a base toda, e são 459 normais com nota humana dada pela triagem contra 59
+  // especiais: jogar fora os 459 era jogar fora quase toda a memória que existe.
+  //
+  // Continua valendo o anti-feedback-loop: `rotuloExemplar` prefere a nota HUMANA à recomendada,
+  // então o que ensina o agente é a decisão de gente, não a opinião dele mesmo.
+  const avaliacoesRows = await getAvaliacoesEspeciais();
+  const avaliacoes = avaliacoesParaExemplar(avaliacoesRows);
+  const exemplares = mapaExemplares(todos, avaliacoes);
 
   const resumoAlvo = resumoPorId.get(projetoId);
+  // Nota humana é VERDADE e âncora: recomendar por cima dela é ruído no cartão e, pior, alimenta
+  // o corpus com opinião do próprio agente (o anti-feedback-loop).
   if (!opts.forcar && resumoAlvo?.estrelas != null) {
     return {
       ok: true,
-      projeto_id: projetoId,
       motivo: `já tem nota humana (${resumoAlvo.estrelas}★) — vira âncora, não é reclassificado`,
-      gravado: false,
     };
   }
 
   const montado = await montarEntradaSemantica(projetoId, resumoAlvo);
-  if (!montado) {
-    return { ok: false, projeto_id: projetoId, motivo: "projeto sem contexto para classificar" };
-  }
+  if (!montado) return { ok: false, motivo: "projeto sem contexto para classificar" };
 
   // Embedding do ALVO — 1 linha, não a tabela inteira. Ler todos os vetores por classificação é
   // exatamente o que encosta no teto de 32 MiB de RPC do Godeploy; com o Pinecone no ar, a tabela
@@ -484,32 +577,52 @@ export async function classificarEspecialProjeto(
   ).mapa;
   const alvoEmb = mapa.get(projetoId);
 
-  const avaliacoesRows = await getAvaliacoesEspeciais();
-  const avaliacoes = new Map(
-    avaliacoesRows.map((a) => [
-      a.projeto_id,
-      { estrelas_recomendada: a.estrelas_recomendada, leitura: a.leitura },
-    ]),
-  );
-
   // O alvo também vira memória para os próximos — best-effort, nunca derruba a classificação.
   await indexarPinecone([projetoId], mapa, resumoPorId, avaliacoes);
 
   const recuperado = alvoEmb
     ? await recuperarVizinhos(alvoEmb.vetor, {
         excluirId: projetoId,
-        exemplarPorId: mapaExemplares(especiais, avaliacoes),
+        exemplarPorId: exemplares,
         corpusFallback: async () =>
           montarCorpus(
-            especiais,
+            todos,
             avaliacoes,
             decodificarEmbeddings(await getEmbeddingsEspeciais()),
           ),
       })
     : { vizinhos: [] as Vizinho[], origem: "sqlite" as OrigemVizinhos };
-  const vizinhos = recuperado.vizinhos;
 
-  const recomendacao = await classificarEspecial(montado.alvo, vizinhos);
+  return {
+    alvo: montado.alvo,
+    vizinhos: recuperado.vizinhos,
+    origem: recuperado.origem,
+    nomesDaBase: todos.filter((p) => chaveProjeto(p.id) !== projetoId).map((p) => p.nome ?? "").filter((n): n is string => n.length > 0),
+  };
+}
+
+/**
+ * Classifica UM especial. `dry` não grava — devolve a recomendação e os vizinhos usados
+ * (é o que a rota manual/o cron em modo seco mostram).
+ *
+ * ⚠️ **Projeto que JÁ tem nota humana (coluna "Estrelas") NÃO é reclassificado** — a nota de
+ * gente é a verdade e a âncora; gerar uma recomendação competindo com ela (ex.: o agente sugerir
+ * 3 para o PIAPP, que é 10) é só ruído no cartão. Ele segue no corpus como EXEMPLAR, ensinando o
+ * agente. `forcar` reabre isso (uso manual explícito), nunca o caminho automático.
+ */
+export async function classificarEspecialProjeto(
+  projetoIdBruto: string,
+  opts: { dry?: boolean; forcar?: boolean } = {},
+): Promise<ResultadoClassificacao> {
+  // Chave canônica: o id chega da planilha (`LEGADO-049`) ou do app (hex minúsculo) e daqui
+  // para baixo ele endereça o SQLite, o embedding, o Pinecone e a linha de `especial_avaliacao`.
+  // Normalizar UMA vez, na entrada, é o que impede leitura e escrita de divergirem de caixa.
+  const projetoId = chaveProjeto(projetoIdBruto);
+  const pronto = await prepararAlvo(projetoId, { forcar: opts.forcar });
+  if ("motivo" in pronto) return { ok: pronto.ok, projeto_id: projetoId, motivo: pronto.motivo, gravado: false };
+  const { alvo, vizinhos, origem } = pronto;
+
+  const recomendacao = await classificarEspecial(alvo, vizinhos);
   if (!recomendacao) {
     return { ok: false, projeto_id: projetoId, motivo: "LLM não devolveu recomendação utilizável" };
   }
@@ -533,7 +646,7 @@ export async function classificarEspecialProjeto(
     projeto_id: projetoId,
     recomendacao,
     gravado,
-    origem_vizinhos: recuperado.origem,
+    origem_vizinhos: origem,
     vizinhos: vizinhos.map((v) => ({
       nome: v.nome,
       estrela: v.estrela_efetiva,
@@ -1436,6 +1549,187 @@ export type OpcoesPainelLote = {
   tetoChamadas?: number;
   redigirLeitura?: boolean;
 };
+
+/**
+ * Julga UM projeto com o painel de lentes, resolvendo alvo e vizinhos pelo MESMO preparo do
+ * classificador de 1 agente (`prepararAlvo`).
+ *
+ * ⚠️ Existe pelo motivo já documentado no `/classificar`: **a rota de LOTE processa em SÉRIE**, e
+ * uma rodada de painel na base inteira em série não termina. Com uma entrada por projeto, a
+ * concorrência mora no cliente, onde dá para limitá-la e recuar quando o gateway reclama.
+ *
+ * ⚠️ **`dry` é o DEFAULT**, como em todo o caminho do painel: gravar exige `{dry:false}`
+ * explícito, e mesmo gravando escreve só em `especial_avaliacao`, NUNCA na coluna "Estrelas".
+ */
+/** Afirmou dependentes e não escapou: vai ao humano, porque a afirmação ficou sem resposta. */
+function pendenteDependenteFlag(incs: ReturnType<typeof verificarCoerencia>): boolean {
+  return incs.some((i) => i.tipo === "dependente_sem_escape");
+}
+
+export async function julgarProjetoComPainel(
+  projetoIdBruto: string,
+  opts: { dry?: boolean; forcar?: boolean; lentes?: string[] } = {},
+): Promise<{
+  ok: boolean;
+  projeto_id: string;
+  motivo?: string;
+  julgamento?: JulgamentoPainel;
+  /** A nota do run 1, que é o ponto de partida — fica visível para o ajuste ser auditável. */
+  base?: { nota: number; leitura: string };
+  /** O porquê final, já composto e verificado — é o que vai ao banco e à tela. */
+  leitura?: string;
+  ajuste?: AjustePainel;
+  /** O que a verificação de coerência achou. Vazio = texto e nota dizem a mesma coisa. */
+  incoerencias?: string[];
+  escape?: { nota: number; leitura: string; evidencias: Record<string, string> } | null;
+  gravado?: boolean;
+}> {
+  const projetoId = chaveProjeto(projetoIdBruto);
+  const dry = opts.dry ?? true;
+  const pronto = await prepararAlvo(projetoId, { forcar: opts.forcar });
+  if ("motivo" in pronto) return { ok: pronto.ok, projeto_id: projetoId, motivo: pronto.motivo };
+
+  // ── A BASE É O RUN 1. O TIME AJUSTA FINO EM CIMA DELA. ──────────────────────────────────
+  //
+  // ⚠️ Desenho refeito em 03/09/2026 depois de MEDIR, e a medição é o argumento inteiro. Com o
+  // painel decidindo sozinho, o PIAPP saiu **2, 5, 3, 7, 8 e 3** em seis chamadas idênticas, mesmo
+  // código e mesma entrada. As lentes até que variavam pouco; o que explodia era o resultado,
+  // porque a nota consolidada caía num degrau (encostar ou não no teto decidia se o escape era
+  // sequer perguntado) e um eixo oscilando 2 movia a nota final em 5 estrelas.
+  //
+  // Cinco chamadas de LLM não são cinco medidas do mesmo número: consolidar por mínimo e máximo
+  // AMPLIFICA a variação em vez de diluí-la, ao contrário de uma média (que este painel evita de
+  // propósito, e por bons motivos, ver `consolidarLentes`).
+  //
+  // Então a arquitetura passa a ser a que o produto pediu: o classificador de 1 agente dá a NOTA
+  // BASE, que é a de sempre, com o escape que já funciona; as lentes entram para **ajustar fino**
+  // e, principalmente, para melhorar o PORQUÊ, que é o ganho real de ter cinco olhares. O ajuste é
+  // limitado a `AJUSTE_MAX_PAINEL`: acima disso não é calibragem, é outro juiz.
+  const base = await classificarEspecial(pronto.alvo, pronto.vizinhos);
+  if (!base) return { ok: false, projeto_id: projetoId, motivo: "LLM não devolveu recomendação utilizável" };
+
+  const julgamento = await julgarUmEspecialComPainel(pronto.alvo, pronto.vizinhos, {
+    lentes: opts.lentes,
+  });
+
+  const pisoNomeado = julgamento.avaliacoes.find((a) => a.piso != null)?.piso ?? null;
+  const ajustada = ajustarNotaComPainel(base.estrelas_recomendada, {
+    nota_lentes: julgamento.nota_lentes,
+    piso: pisoNomeado,
+    notas_das_lentes: julgamento.avaliacoes.map((a) => a.nota),
+  });
+  // ⚠️ A faixa de escape é UM nível, não cinco posições: qualquer valor dela vira a marca única.
+  const notaFinal = normalizarEscape(ajustada.nota);
+  // O PORQUÊ é o ganho real de ter cinco olhares: a base explica o projeto, e as lentes dizem em
+  // que eixo ele para. Sem isto o time custaria cinco chamadas para devolver o mesmo texto.
+  const porEixo = julgamento.avaliacoes
+    .slice()
+    .sort((a, b) => b.nota - a.nota)
+    .map((a) => `${lentePorChave(a.lente)?.rotulo ?? a.lente} ${a.nota}`)
+    .join(", ");
+  // ⚠️ Quando o time MOVE a nota, o veredito vem PRIMEIRO. A leitura da base foi escrita para
+  // defender a nota DELA, e ela diz isso em letras ("Fica em 5★"). Deixá-la abrindo o texto sob
+  // um título que diz 4 faz a justificativa contradizer o número — medido na run 5, e é
+  // exatamente o que faz a triagem desconfiar do resto. Quando nada se moveu, a base abre
+  // normalmente: não há contradição a desfazer.
+  // ⚠️ Quando a nota MUDA, o texto da base é DESCARTADO, não reordenado.
+  //
+  // Ele foi escrito para defender a nota DELE e diz isso em letras ("Fica em 5★"). Reordenar não
+  // resolve: a frase contraditória continua lá dentro, e foi por isso que a run 5 ainda saiu com
+  // 39% de leituras que contradizem a própria nota (contra 3% do agente sozinho). No lugar dele
+  // entram as justificativas das LENTES, que falam por eixo e não cravam número global — que é,
+  // afinal, o que o time tem de melhor a dizer.
+  const justificativaDasLentes = julgamento.avaliacoes
+    .slice()
+    .sort((a, b) => b.nota - a.nota)
+    .map((a) => a.justificativa)
+    .filter((t) => t && t.length > 20)
+    .slice(0, 2)
+    .join(" ");
+  // ⚠️ Quando a base não justificou, quem fala são as LENTES — nunca o texto de reserva.
+  //
+  // Medido no run 7: 7 projetos (4%) chegaram à tela com "Sem leitura, o modelo não justificou a
+  // nota". Um deles é o «ecom-metrics-hub», que entrou na faixa de escape com uma citação boa e
+  // apareceu sem uma linha de texto. É a pior falha possível aqui: a triagem lê o porquê, e um
+  // veredito sem porquê não é auditável, é palpite. O material para o texto já existia no mesmo
+  // turno (as justificativas por eixo), só não estava sendo usado neste ramo.
+  const baseTemLeitura = (base.leitura ?? "").trim().length > 30 && !/^Sem leitura/i.test(base.leitura ?? "");
+  const leituraCrua =
+    ajustada.delta !== 0
+      ? [`Nota ${notaFinal}: ${ajustada.motivo}.`, justificativaDasLentes, `Por eixo: ${porEixo}.`]
+          .filter(Boolean)
+          .join(" ")
+      : [baseTemLeitura ? base.leitura : justificativaDasLentes, `Por eixo: ${porEixo}.`]
+          .filter(Boolean)
+          .join(" ");
+
+  // Rede final, em CÓDIGO: nenhuma frase que crave um número diferente do veredito sobrevive.
+  // As quatro etapas de verificação do time (lentes, consolidação, revisor, consenso) não olham
+  // para isto — o revisor ataca a ALTURA da nota, o consenso mede divergência entre eixos.
+  const incoerencias = verificarCoerencia(leituraCrua, notaFinal, TETO_AGENTE, pronto.nomesDaBase);
+  const semNumeroErrado = incoerencias.some((i) => i.tipo === "numero_divergente")
+    ? removerNumerosDivergentes(leituraCrua, notaFinal)
+    : leituraCrua;
+
+  // ⚠️ A pendência do DEPENDENTE tem consequência, não é carimbo.
+  //
+  // Quando o texto afirma que outros projetos dependem deste e a nota não escapou, o agente
+  // escreveu a prova do escape e não a usou. São 60 casos na run 5, e é o caso PIAPP. Aqui isso
+  // vira duas coisas concretas: a pendência aparece ESCRITA para quem lê, e o projeto passa a
+  // ir ao comitê (`contestada`), que é a rota de quem precisa de olho humano.
+  //
+  // ⚠️ NÃO promove a nota sozinho. Entrar na faixa 6-10 exige as duas citações e é decisão do
+  // comitê; o que não pode é a afirmação morrer sem ninguém responder a ela.
+  const pendenteDependente = incoerencias.find((i) => i.tipo === "dependente_sem_escape");
+  const leitura = pendenteDependente
+    ? `${semNumeroErrado} ⚠ Conferir: o texto diz que «${pendenteDependente.tipo === "dependente_sem_escape" ? pendenteDependente.nomeado : ""}» depende deste projeto, e a nota ficou em ${notaFinal}. Um dependente nomeado é a prova da faixa 6-10, mas não a garante sozinho: ou faltam as duas citações, ou a dependência não sustenta a faixa.`
+    : semNumeroErrado;
+
+  const contestada =
+    ehEscape(notaFinal) || base.contestada || julgamento.contestada || pendenteDependente != null;
+
+  // ⚠️ A confiança gravada é a do CONSENSO, não a que o painel declarou sozinho: se as lentes
+  // divergiram entre si, ou se a base e elas discordaram, a nota sai com a certeza que ela de
+  // fato tem. É o que permite construir um limiar em cima dela mais tarde.
+  const confianca = confiancaPorConsenso(julgamento.confianca, {
+    notasDasLentes: julgamento.avaliacoes.map((a) => a.nota),
+    deltaAjuste: ajustada.delta,
+  });
+
+  let gravado = false;
+  if (!dry) {
+    await upsertAvaliacaoEspecial({
+      projeto_id: projetoId,
+      estrelas_recomendada: notaFinal,
+      confianca,
+      leitura,
+      contestada,
+      origem: ORIGEM_PAINEL,
+      modelo: modeloChatConfigurado(),
+    });
+    gravado = true;
+  }
+  return {
+    ok: true,
+    projeto_id: projetoId,
+    // ⚠️ A pendência sai no resultado em vez de morrer: "o texto afirma que outros dependem
+    // deste projeto e a nota não escapou" é justamente o caso PIAPP, e são 60 na run 5.
+    // ⚠️ A leitura COMPOSTA sai na resposta. Sem isso o relatório da rodada só via a leitura da
+    // BASE e media a versão que a correção existe para substituir — foi assim que eu concluí
+    // que o conserto de coerência falhara, quando na verdade eu olhava outro campo.
+    leitura,
+    incoerencias: incoerencias.map((i) =>
+      i.tipo === "numero_divergente"
+        ? `texto cravava ${i.noTexto}`
+        : `nomeia «${i.nomeado}» como dependente ("${i.pista}") e não escapou`,
+    ),
+    julgamento: { ...julgamento, nota: notaFinal, contestada, confianca },
+    base: { nota: base.estrelas_recomendada, leitura: base.leitura },
+    ajuste: ajustada,
+    escape: ehEscape(notaFinal) ? { nota: notaFinal, leitura, evidencias: base.evidencias } : null,
+    gravado,
+  };
+}
 
 /**
  * O painel em LOTE (T6). Três fases, nesta ordem:

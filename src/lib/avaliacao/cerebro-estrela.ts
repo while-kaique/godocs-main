@@ -17,6 +17,7 @@ import {
   aplicarPromocao,
   escapeValido,
   montarContestacao,
+  REGRAS_DO_PORQUE,
   contarFrases,
   CONTESTACAO_MAX_FRASES,
   type ChavePisoZero,
@@ -50,19 +51,21 @@ export const NOTA_ANCORA_CONGELADA = 6;
 
 const FORMATO_JSON = `FORMATO DE RESPOSTA — responda APENAS com um objeto JSON, sem texto fora dele:
 {
-  "nota": <inteiro 0 a ${TETO_AGENTE}>,
+  "nota": <inteiro 0 a ${TETO_AGENTE} quando escape.indicado=false; quando true, a nota que você acha dentro de 6 a 10 — o comitê humano decide o número final>,
   "criterio_aplicado": "<verbo do nível: Experimenta | Informa | Executa | Garante | Decide | Assume>",
   "desqualificador": "<quando nota 0: a chave do piso — ${PISO_ZERO.map((p) => p.chave).join(' | ')} — senão null>",
   "evidencias": ["<citação LITERAL do dossiê que sustenta o critério>", "..."],
   "dependente_nomeado": "<nome do projeto/processo que depende deste como fonte, ou null>",
-  "escape": { "indicado": <bool>, "evidencias": { "${GATILHOS_ESCAPE[0].chave}": "<citação>", "${GATILHOS_ESCAPE[1].chave}": "<citação>" } },
+  "escape": { "indicado": <bool>, "por_que_nao": "<OBRIGATÓRIO quando indicado=false: qual gatilho falta e por quê, em uma frase>", "evidencias": { "${GATILHOS_ESCAPE[0].chave}": "<citação>", "${GATILHOS_ESCAPE[1].chave}": "<citação>" } },
   "tipo": "<dashboard | app | automacao | agente | sistema>",
   "nivel": "<deterministico | inteligente | autonomo>",
-  "racional": "<até 600 caracteres: por que este nível, por que não o de cima, o que faria subir>",
+  "racional": "<2 a 3 frases curtas, até 600 caracteres, em português comum: o que o projeto faz, por que este nível e não o de cima, o que faria subir. Sem o vocabulário interno da régua — ver COMO ESCREVER O PORQUÊ.>",
   "gatilho_que_falhou": "<só quando o dossiê traz uma nota humana MAIOR que a sua: qual critério/gatilho dela não se sustenta, com a citação>"
 }`;
 
-const DISCIPLINA = `DISCIPLINA:
+const DISCIPLINA = `${REGRAS_DO_PORQUE}
+
+DISCIPLINA:
 - Raciocine em cima da régua, mas NÃO a reescreva: cada nível é o texto acima, e você conclui a partir dele com um racional que faça sentido no contexto deste projeto.
 - Ter saving medido NÃO zera. Só zera se o projeto se RESUME ao número (ou cai em outro item do piso).
 - O dossiê da base legada vem SÓ da planilha: não ter anexo, documentação compilada ou "prova de uso" nele NÃO é sinal de que o projeto está parado. "fora_de_uso" só vale quando o dossiê DIZ que parou, está em staging, é POC ou foi descontinuado. Julgue o que o projeto faz pelo que está descrito; a triagem humana avaliou com esse mesmo material.
@@ -70,19 +73,42 @@ const DISCIPLINA = `DISCIPLINA:
 - A classe do artefato é pista, não decisão. Os exemplos reais de cada nível são âncoras de comparação.
 - Promoção +1 só com o dependente NOMEADO (nome do projeto/processo). "Poderá ser consultado" não é dependente.
 - Escape 6–10: você só INDICA a faixa, citando os DOIS gatilhos. O número dentro de 6–10 é do comitê humano, nunca seu.
+- ⚠️ O PASSO 1 é obrigatório e a resposta dele vai no JSON SEMPRE. Recusar o escape sem dizer qual gatilho falta é resposta incompleta.
+- ⚠️ Uma PLATAFORMA (outros projetos a consomem por API, MCP, integração; vários times constroem sobre ela) é o caso em que a régua de 0–5 mede a coisa errada: ela não "assume um processo", ela SUSTENTA muitos. Avalie-a pelo escape.
 - Se o dossiê traz nota humana maior que a sua, não a copie: registre em "gatilho_que_falhou" o que não se sustenta, com citação. A decisão fica com o comitê.`;
 
 export function buildPromptEstrela(args: {
   dossieTexto: string;
   vizinhos: VizinhoTexto[];
   ferramentasTexto?: string | null;
+  /**
+   * A objeção do CÉTICO DA ESTRELA, na segunda volta. ⚠️ É uma objeção a RESPONDER, não uma
+   * ordem: o cérebro pode manter a nota se tiver evidência — o que ele não pode é ignorá-la.
+   * Sem isto, a "volta" seria a mesma pergunta ao mesmo modelo e daria a mesma resposta.
+   */
+  objecaoDoCetico?: string | null;
 }): Mensagem[] {
   const system = [
-    'Você é o avaliador de ESTRELAS do GoDocs: lê o dossiê de um projeto de automação/IA do Gogroup e recomenda a estrela (0 a 5) pela régua abaixo, com evidência citada. A estrela paga o impacto que a fórmula financeira não vê.',
+    // ⚠️ **A ORDEM aqui é o conserto de um defeito MEDIDO** (03/09/2026, 65 especiais de
+    // produção): a abertura dizia "recomenda a estrela (0 a 5)" e o escape vinha DEPOIS da
+    // régua, como apêndice. Resultado: só 8 das 65 leituras sequer o mencionaram — o modelo
+    // resolvia a nota dentro da cadeia 1–5 e parava. O «PIAPP» (10★ humano), uma plataforma
+    // sobre a qual 10 times constroem, saiu com **2★**: forçado no eixo da cadeia, virou
+    // "produz insumo, alguém usa" = Informa + promoção.
+    // ⚠️ E os dois eixos são DIFERENTES: a cadeia mede quanto de UM processo o projeto assume;
+    // o escape mede QUANTOS processos existem por causa dele. Plataforma não cabe no primeiro.
+    // Por isso o escape virou o PASSO 1, com resposta obrigatória — inclusive quando é "não".
+    'Você é o avaliador de ESTRELAS do GoDocs: lê o dossiê de um projeto de automação/IA do Gogroup e recomenda a estrela de 0 a 10, com evidência citada. A estrela paga o impacto que a fórmula financeira não vê.',
     '',
-    descreverReguaAgente(),
+    'VOCÊ DECIDE EM DOIS PASSOS, NESTA ORDEM:',
+    '',
+    'PASSO 1 — este projeto MUDA O JOGO (faixa 6–10)? Responda isso ANTES de pensar em qualquer nível de 0 a 5. São réguas DIFERENTES: a de 0–5 mede quanto de UM processo o projeto assume; a de 6–10 mede QUANTOS processos existem por causa dele e quão irreversível é essa dependência. Uma plataforma sobre a qual outros times constroem não cabe na primeira — ela é candidata natural à segunda.',
     '',
     descreverEscape(),
+    '',
+    'PASSO 2 — se o PASSO 1 for "não", só então posicione o projeto de 0 a 5 pela régua abaixo. Em "escape.indicado": false, o campo "escape.por_que_nao" é OBRIGATÓRIO: diga em uma frase qual dos dois gatilhos falta e por quê. Não é permitido pular o PASSO 1 em silêncio.',
+    '',
+    descreverReguaAgente(),
     '',
     descreverCategorizacao(),
     '',
@@ -107,6 +133,14 @@ export function buildPromptEstrela(args: {
     '',
     'DOSSIÊ DO PROJETO:',
     args.dossieTexto,
+    ...(args.objecaoDoCetico
+      ? [
+          '',
+          'OBJEÇÃO DO CÉTICO À SUA NOTA ANTERIOR — responda a ela:',
+          args.objecaoDoCetico,
+          'Se a objeção procede, corrija a nota. Se não procede, MANTENHA a nota e diga no racional qual evidência do dossiê a derruba. Concordar sem evidência é pior que discordar com ela.',
+        ]
+      : []),
     '',
     'Recomende a estrela deste projeto no formato pedido.',
   ].join('\n');

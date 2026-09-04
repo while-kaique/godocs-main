@@ -1,0 +1,161 @@
+==============================================================================
+run 1 · agente, RAG vazio          n=646  idêntica  47%  ±1  76%  acima 200  abaixo 59
+  distribuição: 0★:306 1★:150 2★:119 3★:39 4★:11 5★:16 6★:4 7★:1
+run 2 · agente + RAG restaurado    n=230  idêntica  58%  ±1  78%  acima 51  abaixo 23
+  distribuição: 0★:130 1★:45 2★:27 3★:12 4★:3 5★:11 7★:1 8★:1
+run 3 · agente + RAG + auditoria (amostra 196) n=182  idêntica  42%  ±1  78%  acima 38  abaixo 44
+  distribuição: 0★:88 1★:30 2★:31 3★:14 4★:6 5★:10 6★:1 7★:1 8★:1
+run 4 · TIME de 5 lentes + auditoria (58) n= 58  idêntica  40%  ±1  73%  acima 12  abaixo 19
+  distribuição: 0★:25 1★:10 2★:3 3★:9 4★:9 5★:1 7★:1
+run 5 · TIME + auditoria · base inteira (grava) n=573  idêntica  52%  ±1  76%  acima 145  abaixo 61
+  distribuição: 0★:311 1★:81 2★:97 3★:45 4★:29 5★:8 7★:2
+run 6 · TIME + coerência + caixa + pendência (196) n=179  idêntica  38%  ±1  71%  acima 43  abaixo 44
+  distribuição: 0★:74 1★:27 2★:28 3★:28 4★:17 5★:4 7★:1
+run 7 · TIME + verificações + concorrência destravada (196) n=188  idêntica  36%  ±1  70%  acima 49  abaixo 45
+  distribuição: 0★:75 1★:29 2★:33 3★:30 4★:14 5★:2 6★:1 7★:1 8★:3
+
+==============================================================================
+ADERÊNCIA POR FAIXA DE CONFIANÇA (dentro de ±1 da nota da planilha)
+run 1 · agente, RAG vazio: sem confiança gravada nesta run
+run 2 · agente + RAG restaurado: sem confiança gravada nesta run
+run 3 · agente + RAG + auditoria (amostra 196):
+  alta   n= 23  ±1  78%
+  media  n= 12  ±1  58%
+  baixa  n=107  ±1  80%
+run 4 · TIME de 5 lentes + auditoria (58):
+  alta   n=  7  ±1 100%
+  media  n= 12  ±1  92%
+  baixa  n= 33  ±1  61%
+run 5 · TIME + auditoria · base inteira (grava):
+  alta   n= 64  ±1  94%
+  media  n=150  ±1  89%
+  baixa  n=211  ±1  60%
+run 6 · TIME + coerência + caixa + pendência (196):
+  alta   n= 16  ±1  94%
+  media  n= 45  ±1  84%
+  baixa  n= 80  ±1  59%
+run 7 · TIME + verificações + concorrência destravada (196):
+  alta   n= 21  ±1  86%
+  media  n= 44  ±1  84%
+  baixa  n= 83  ±1  59%
+
+==============================================================================
+ONDE A DIVERGÊNCIA MORA (por nota da planilha, última run)
+  humana   n   idêntica   agente ACIMA   agente ABAIXO   nota média do agente
+      0   56    66%        19             0              0.75
+      1   33    21%        13            13              1.27
+      2   24    17%        11             9              2.42
+      3   20    20%         5            11              2.60
+      4    8    13%         1             6              2.88
+      5    4    25%         0             3              3.50
+      7    1     0%         0             1              4.00
+      8    1     0%         0             1              4.00
+     10    1     0%         0             1              8.00
+
+==============================================================================
+CONTESTAÇÕES DE PREÇO: 44 projetos já avaliados divergem por 2★ ou mais
+  o agente pagaria MAIS em 30 e MENOS em 14
+  (a nota humana não muda por isto; é lista para revisão de gente)
+
+  humano 2 → agente 8  (subiria)  Integração com Operador Logístico - Life of Co
+     A integração conduz pedidos, estoque, rastreio e cancelamentos entre a Life of Colour e a eStore, sustentando toda a operação da loja. Recomendo 8, acima do GoB
+  humano 3 → agente 8  (subiria)  ecom-metrics-hub
+     Sem leitura — o modelo não justificou a nota.
+
+Evidência do escape:
+• Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não exis
+  humano 8 → agente 4  (baixaria)  [VERSTA] Robo orçamento - {Marca}
+     Nota 4: desce 1 (as lentes sustentavam 3, e o ajuste por rodada é de um degrau). O robô monitora campanhas e altera diretamente seus limites de gasto no Faceboo
+  humano 4 → agente 0  (baixaria)  Prazo Otimizado
+     O modelo recalibra prazos para aumentar conversão, mas o material comprova apenas um piloto antigo e apresenta o ganho nacional como projeção. Diferente do GoPr
+  humano 2 → agente 6  (subiria)  Boletos Itaú via Proxy Bancária
+     A proxy sustenta o bot do RCA, que consulta o Itaú e entrega o boleto sem envolver o financeiro. Fica em 6, e não 7, porque há apenas uma integração citada e um
+  humano 5 → agente 1  (baixaria)  Prisma
+     Nota 1: sobe 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O Prisma escolhe produtos e criativos, adapta conteúdo para cada marca, publica 
+  humano 0 → agente 4  (subiria)  Gohelp
+     Nota 4: desce 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O GoHelp interpreta dúvidas e responde candidatos sozinho, usando uma base estr
+  humano 4 → agente 1  (baixaria)  Benchmark de Estampas
+     Nota 1: sobe 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O Benchmark de Estampas identifica produtos mais vendidos, cria prompts e gera i
+  humano 0 → agente 3  (subiria)  CX Hub — Plataforma Central de Operações de Ba
+     Nota 3: sobe 1 (as lentes sustentavam 4, e o ajuste por rodada é de um degrau). O CX Hub centraliza a execução de reenvios, reembolsos e tickets logísticos pela
+  humano 0 → agente 3  (subiria)  Controle de bonificações
+     O BoniTrack obriga aprovação gerencial, registra o histórico e impede que bonificações avancem pelo fluxo informal. Fica em 3, acima de BONIFICAÇÃO ADM, porque 
+  humano 4 → agente 7  (subiria)  CTR Machine Gocase - Admaker
+     O Admaker cria, publica e mede testes de produto, além de alimentar Gerador de Briefing, Color Drop e PDP. Recebe 7, como a CTR Machine já avaliada, mas não 8 p
+  humano 3 → agente 0  (baixaria)  Gocreators
+     O Gocreators reúne gamificação, métricas e aulas para incentivar criadores de conteúdo. Fica abaixo do Gocreators - DashBoard porque o memorial traz apenas melh
+  humano 7 → agente 4  (baixaria)  Ferramenta de testes de novos produtos ctr com
+     Nota 4: desce 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O agente escolhe produtos promissores, cria as peças e publica os testes no Fac
+  humano 0 → agente 3  (subiria)  Automação de Nfs via Python
+     Nota 3: sobe 1 pelas lentes. A automação baixa e organiza notas fiscais de cinco empresas nomeadas do grupo. Ela alcança Gocase, BB Indústria, GOB, GP e GR, mas
+  humano 0 → agente 3  (subiria)  Agente Estoque Custo
+     Nota 3: sobe 1 (as lentes sustentavam 5, e o ajuste por rodada é de um degrau). O Agent-EstCusto executa conciliações e reservas em horários definidos, registra
+  humano 0 → agente 3  (subiria)  Classificação Automática de NPS e Review por I
+     Nota 3: sobe 1 pelas lentes. A automação interpreta cada comentário, escolhe o motivo na taxonomia e grava a classificação no Supabase. Ela não responde pelo re
+  humano 3 → agente 0  (baixaria)  Cupons Yampi
+     A automação facilita a edição em massa de cupons na Yampi, mas o memorial não comprova uso recorrente nem execução sem acionamento humano. Por eixo: Recorrência
+  humano 0 → agente 3  (subiria)  Automação das Solicitações de Pagamento
+     Nota 3: sobe 1 pelas lentes. O agente consulta WebGex e Protheus, confirma o pagamento, responde no GoService e encerra o chamado sem intervenção humana. Não ch
+  humano 3 → agente 0  (baixaria)  Sistema de memória de M&A
+     Organiza aprendizados de M&A para orientar negociações futuras. Fica em 0, como o Master Memory, porque começa vazio e ainda não há uso recorrente nem decisão r
+  humano 1 → agente 4  (subiria)  Esteira de Hits - Google
+     Nota 4: desce 1 pelas lentes. A Esteira seleciona os vídeos, publica no YouTube e cria os anúncios diretamente nas campanhas do Google Ads. Como todo o fluxo te
+  … e mais 24. Lista inteira no artefato, filtro "Só divergências de 2★+".
+
+==============================================================================
+MUDARAM DE NOTA: 54 de 173 comparáveis
+  saltos de 2★ ou mais: 15
+  aproximaram do humano: 18 · afastaram: 17
+
+OS 12 MAIORES MOVIMENTOS (leia o motivo, não o número):
+
+  0 → 4  (humano 0)  Gohelp
+    antes: O GoHelp responde dúvidas de candidatos de forma autônoma e já assumiu o atendimento antes feito por seis recrutadoras. Fica abaixo dos Gohelp de Infl
+    agora: Nota 4: desce 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O GoHelp interpreta dúvidas e responde candidatos sozinho, usando uma
+
+  4 → 0  (humano 0)  Trocas e Devoluções - Lojas Físicas
+    antes: Padroniza o fluxo, aplica a política, registra decisões e monitora prazos, reduzindo protocolos esquecidos e estornos indevidos. Fica acima de Abastec
+    agora: Nota 0: zerado pelo piso (marginal). O Troca Lojas Físicas processa cerca de 40 protocolos mensais, registra cada decisão e acompanha prazos legais. A
+
+  4 → 8  (humano 10)  PIAPP
+    antes: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+    agora: O PIAPP centraliza a geração de conteúdo para mais de dez times e sustenta o Prisma por integração. Para subir, precisa comprovar outras integrações e
+
+  3 → 6  (humano 2)  Boletos Itaú via Proxy Bancária
+    antes: A proxy busca o boleto no Itaú e o entrega ao bot do RCA, eliminando a consulta do Financeiro. Fica em 2 porque responde a uma solicitação interna e n
+    agora: A proxy sustenta o bot do RCA, que consulta o Itaú e entrega o boleto sem envolver o financeiro. Fica em 6, e não 7, porque há apenas uma integração c
+
+  0 → 3  (humano 0)  Automação das Solicitações de Pagamento
+    antes: O agente consulta dois ERPs, confirma o pagamento, responde ao solicitante e encerra o chamado automaticamente. Supera os vizinhos de 0 estrela porque
+    agora: Nota 3: sobe 1 pelas lentes. O agente consulta WebGex e Protheus, confirma o pagamento, responde no GoService e encerra o chamado sem intervenção huma
+
+  0 → 3  (humano —)  Agente de Waitlists
+    antes: Monitora as filas, escolhe a próxima cor, executa a troca e confirma que ela persistiu, impedindo falhas operacionais; por isso acompanha a referência
+    agora: Sem leitura — o modelo não justificou a nota. Por eixo: Função na cadeia 3, Complexidade e autonomia 3, Recorrência, rastro e contrafactual 2, Alcance
+
+  3 → 0  (humano —)  Vencimentos UNILOG
+    antes: A automação extrai as bases semanalmente, identifica vencidos e quarentenas e envia solicitações de mudança de classe. Fica acima do Controle de Venci
+    agora: Nota 0: zerado pelo piso (simples_local). A automação extrai dados do TitanBI, identifica os itens que exigem tratamento e envia solicitações de mudan
+
+  5 → 8  (humano 2)  Integração com Operador Logístico - Life of Colour
+    antes: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+    agora: A integração conduz pedidos, estoque, rastreio e cancelamentos entre a Life of Colour e a eStore, sustentando toda a operação da loja. Recomendo 8, ac
+
+  5 → 2  (humano —)  Quiz de Vendas Apice
+    antes: Entrega ao cliente uma recomendação personalizada e acionável, com inclusão da rotina completa no carrinho, e já registrou 12.727 conclusões e 619 ped
+    agora: Nota 2: sobe 1 (as lentes sustentavam 4, e o ajuste por rodada é de um degrau). O quiz nativo atende clientes e é usado pelos times de CRO e mídia pag
+
+  5 → 8  (humano 3)  ecom-metrics-hub
+    antes: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+    agora: Sem leitura — o modelo não justificou a nota.
+
+Evidência do escape:
+• Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta"
+
+  3 → 1  (humano 2)  V.I.S.I.O.N. — Visão Integrada de Supervisão Intelig
+    antes: O V.I.S.I.O.N. reúne e atualiza diariamente oito indicadores de CX, com conferência semanal. Fica em 2 porque executa a consolidação recorrente, indo 
+    agora: Nota 1: sobe 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau). O V.I.S.I.O.N. automatiza a atualização diária dos indicadores de CX e
+
+  0 → 2  (humano 1)  Resumo Executivo - Diretoria, Head/Gerente e Gerente
+    antes: Automatiza a geração e o envio recorrente de indicadores para diferentes níveis da liderança, mas o memorial comprova apenas a economia de horas, sem 
+    agora: Nota 2: sobe 1 (as lentes sustentavam 3, e o ajuste por rodada é de um degrau). O Resumo Executivo roda por agendamento e entrega indicadores no Googl

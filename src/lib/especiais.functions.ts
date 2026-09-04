@@ -11,6 +11,7 @@
  * nada de "Status", nada de "Atualizado Em" (carimbo do sistema, que regulariza legado).
  */
 import { z } from 'zod';
+import { MOTIVO_MAX } from '@/lib/correcoes';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { lerResumosEspelho, espelharEscrita, statusEspelho, lerLinhaEspelho } from '@/lib/sheet-espelho';
 import { registrarAtividade } from '@/lib/atividades.functions';
@@ -231,6 +232,15 @@ export async function importarAvaliacoesEspeciais(raw: unknown) {
 const estrelasSchema = z.object({
   projeto_id: z.string().min(1).max(120),
   estrelas: z.number().int().min(0).max(MAX_ESTRELAS_GRAVAVEL),
+  /**
+   * Por que a triagem mudou a nota. OPCIONAL de propósito: exigir texto para mover um cartão
+   * faria a pessoa escrever "ok" para se livrar do campo, e "ok" é pior que vazio.
+   *
+   * ⚠️ É o campo que separa aprender de decorar. Sem ele o agente só vê que a nota mudou e
+   * aprende "concorde com o humano"; com ele aprende a PROPRIEDADE que passou batida, e essa
+   * generaliza para projeto que não se parece nada com este. Ver `correcoes.ts`.
+   */
+  motivo: z.string().trim().max(MOTIVO_MAX).optional(),
 });
 
 /**
@@ -241,11 +251,26 @@ const estrelasSchema = z.object({
  * razão documentada em `definirStatusProjeto`).
  */
 export async function definirEstrelasEspecial(raw: unknown, adminEmail: string) {
-  const { projeto_id, estrelas } = estrelasSchema.parse(raw);
+  const { projeto_id, estrelas, motivo } = estrelasSchema.parse(raw);
   const linha = await lerLinhaEspelho(projeto_id);
   const estrelasAnterior = linha
     ? Number(String((linha as Record<string, unknown>)['Estrelas'] ?? '') || 0) || 0
     : null;
+  // O que o agente tinha recomendado — sem isto a correção não diz de ONDE a nota veio, e
+  // "estava 5 e virou 8" não distingue "o agente errou" de "a triagem mudou de ideia".
+  // ⚠️ Guarda a nota E o texto: o motivo que a pessoa escreve é quase sempre uma RÉPLICA a uma
+  // frase do agente ("você disse que caiu para 0 porque antes ninguém fazia, mas dá para
+  // escalar"). Sem o argumento original, a réplica é metade de uma conversa.
+  const doAgente = await (async () => {
+    try {
+      const rows = await getAvaliacoesEspeciais();
+      const a = rows.find((x) => x.projeto_id === projeto_id);
+      return { nota: a?.estrelas_recomendada ?? null, leitura: a?.leitura ?? null };
+    } catch {
+      return { nota: null, leitura: null };
+    }
+  })();
+
   const updates = { Estrelas: String(estrelas) };
   await updateRowByProjectId(projeto_id, updates);
   // Remendo do espelho com carimbo: um sync que COMEÇOU antes desta escrita não a desfaz.
@@ -259,8 +284,19 @@ export async function definirEstrelasEspecial(raw: unknown, adminEmail: string) 
     projeto_nome: linha
       ? String((linha as Record<string, unknown>)['Projeto'] ?? '').trim() || null
       : null,
-    detalhe: `${estrelas} ${estrelas === 1 ? 'estrela' : 'estrelas'}`,
-    meta: { estrelas, estrelas_anterior: estrelasAnterior },
+    detalhe: motivo
+      ? `${estrelas} ${estrelas === 1 ? 'estrela' : 'estrelas'} — ${motivo}`
+      : `${estrelas} ${estrelas === 1 ? 'estrela' : 'estrelas'}`,
+    // ⚠️ `meta` guarda a correção INTEIRA (antes, depois, motivo e o que o agente havia
+    // recomendado) porque é daqui que as lições saem depois. `admin_activity_log` é
+    // append-only, então a correção fica com a data em que foi feita.
+    meta: {
+      estrelas,
+      estrelas_anterior: estrelasAnterior,
+      motivo: motivo || null,
+      recomendado_pelo_agente: doAgente.nota,
+      leitura_do_agente: doAgente.leitura,
+    },
   });
 
   return { ok: true, projeto_id, estrelas };

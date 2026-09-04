@@ -26,6 +26,7 @@ function resumo(
     savingReais: null,
     receitaMensal: null,
     complexidade: null,
+  tipoProjeto: null,
     tipos: null,
     especial: over.especial ?? false,
     aprovacaoLider: null,

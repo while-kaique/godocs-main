@@ -6,6 +6,7 @@ import type { FormData, FieldErrors, PapelParticipante } from "./constants";
 import {
   SectionTitle, FormGroup, FormLabel, FormInput,
   RadioGroup, GridCheckboxGroup, InfoTooltip, ParticipantesPapeisInput, LegendaPapeis,
+  ProjetoPaiInput,
 } from "./form-components";
 import { useSugestoesParticipantes, prefetchSugestoesParticipantes } from "./participantes-sugestoes";
 
@@ -142,6 +143,70 @@ export function Step1({
         </div>
       )}
     </FormGroup>
+  );
+
+  // Bloco do VÍNCULO (projeto novo × feature de um projeto existente) — só na submissão
+  // NOVA (o vínculo é criado uma vez; na edição vira referência read-only). Vale nos 3
+  // fluxos (padrão/especial/liderança), que compartilham este formulário.
+  const blocoVinculo = (
+    <div
+      className="relative mb-6 rounded-xl p-4"
+      style={{ background: "rgba(199,233,253,0.3)", border: "1px solid rgba(0,89,169,0.08)" }}
+    >
+      <div className="mb-3.5 flex items-center gap-2 text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+        Este projeto é novo ou uma feature de um projeto existente?
+        <InfoTooltip>
+          <strong className="mb-1 block text-white">Projeto novo vs. Feature</strong>
+          <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
+            <strong style={{ color: "var(--go-lime)" }}>Projeto novo</strong> — uma automação
+            independente, submetida do zero.
+          </span>
+          <span className="block" style={{ color: "rgba(255,255,255,0.85)" }}>
+            <strong style={{ color: "var(--go-lime)" }}>Feature</strong> — um incremento
+            implementado dentro de um projeto que já existe. Você escolhe o projeto pai; o
+            ganho documentado é o desta feature.
+          </span>
+        </InfoTooltip>
+      </div>
+      <RadioGroup
+        name="vinculo"
+        value={form.vinculo || "novo"}
+        onChange={(v) => {
+          updateField("vinculo", v as FormData["vinculo"]);
+          if (v !== "feature") {
+            updateField("paiId", "");
+            updateField("paiNome", "");
+            clearError("paiId");
+          }
+        }}
+        error={errors.vinculo}
+        options={[
+          { value: "novo", label: "🆕 Projeto novo" },
+          { value: "feature", label: "🧩 Feature de um projeto existente" },
+        ]}
+      />
+      {form.vinculo === "feature" && (
+        <div className="mt-3.5" style={{ animation: "go-slide-down 0.25s ease" }}>
+          <FormLabel required>Qual é o projeto pai?</FormLabel>
+          {/* Sem pergunta de produção aqui: o pai é escolhido DENTRO da nossa base, e todo
+              projeto da base já passou pelo gate de produção da Etapa 1 na própria submissão.
+              Repetir a pergunta só adicionava um passo cuja resposta já é conhecida — e podia
+              contradizer o que a base afirma. O gate de produção que vale é o DESTA feature,
+              logo acima. */}
+          <ProjetoPaiInput
+            paiId={form.paiId}
+            paiNome={form.paiNome}
+            onSelect={(id, nome) => {
+              updateField("paiId", id);
+              updateField("paiNome", nome);
+              clearError("paiId");
+            }}
+            onClear={() => { updateField("paiId", ""); updateField("paiNome", ""); }}
+            error={errors.paiId}
+          />
+        </div>
+      )}
+    </div>
   );
 
   // Opções do seletor = a lista canônica + qualquer valor LEGADO que o projeto já
@@ -308,10 +373,13 @@ export function Step1({
             ? "Pronto, sem uso"
             : "—";
     // A ferramenta SAIU desta lista (virou campo editável abaixo) — só escopo e status
-    // continuam fixos na edição.
+    // continuam fixos na edição. O vínculo de FEATURE é read-only (criado na submissão).
     const linhasProjeto = [
       { rotulo: "Escopo", valor: escopoLabel },
       { rotulo: "Status", valor: statusLabel },
+      ...(form.vinculo === "feature"
+        ? [{ rotulo: "Feature do projeto", valor: form.paiNome || form.paiId || "—" }]
+        : []),
     ];
 
     return (
@@ -461,6 +529,14 @@ export function Step1({
               </div>
             )}
           </div>
+
+          {/* ── Vínculo: projeto novo × feature de um projeto existente ──
+              ⚠️ Vem DEPOIS do gate de produção de propósito. Estando antes, quem
+              escolhia "Projeto novo" não via pergunta nenhuma sobre produção logo em
+              seguida — só bem mais abaixo, depois do escopo —, enquanto quem escolhia
+              "Feature" era perguntado na hora sobre o PAI. A ordem certa é: este
+              projeto está em produção? → é novo ou feature? → (se feature) e o pai? */}
+          {blocoVinculo}
 
           <SectionTitle icon="👤">Dados do Responsável</SectionTitle>
 

@@ -84,5 +84,6 @@ export const SECAO = {
   fluxos: "Demonstração",
   testes: "Testes",
   prompts: "Prompts da IA",
+  aglutinacao: "Aglutinação",
   cenarios: "Cenários",
 } as const;

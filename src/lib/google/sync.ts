@@ -19,6 +19,7 @@ import {
   desserializarLinhasHoras,
 } from '@/lib/ganhos';
 import { tituloGanho } from '@/lib/ganhos-rotulos';
+import { normalizarTipo, tipoParaSheet } from '@/lib/categoria-projeto';
 import { moedaBR } from '@/lib/mensagens-submissao';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -45,7 +46,6 @@ const COLUNAS_NUMERICAS = new Set<SheetColumn>([
   'Custo Evitado Horas Reais',
   'Saving Efetivado',
   'Impacto Bruto',
-  'Custo Externo Mensal',
   'Custo para Rodar',
   'Receita Incremental',
   'Impacto Líquido',
@@ -180,6 +180,9 @@ export type SubmitSyncParams = {
   // sem líder / TeamGuide fora). Repassada ao `buildSubmitMessage`; só faz sentido
   // junto de `notificarChat: true`.
   notaPreAprovacao?: string | null;
+  // Vínculo de FEATURE → coluna "ID Pai" (linha do FILHO): id do projeto PAI, ou null →
+  // "—" (projeto novo). A coluna "ID Feature" (lista no PAI) é escrita à parte (cross-row).
+  idPai?: string | null;
 };
 
 export type UpdateSyncParams = {
@@ -188,6 +191,11 @@ export type UpdateSyncParams = {
   complexidade: string;
   observacoes: string;
   status: string;
+  // Eixo TIPO da categorização (item 5.4) → coluna "Tipo de Projeto". Mesma disciplina
+  // das colunas do líder: `undefined` = "não sei, não encoste" (a célula é OMITIDA do
+  // update); `null` = "não se aplica" → "—". Sem isso, um chamador que não conhece a
+  // categorização (o resync) apagaria a classificação já gravada pelo analisador.
+  tipoProjeto?: string | null;
   // Classificação de elegibilidade do analisador → coluna "Classificação" (SEMPRE
   // com texto) e "Motivo Reprovado". `undefined` = não escreve a célula (usado pelo
   // resync, onde o append/update anterior já gravou as duas a partir do projeto).
@@ -484,7 +492,6 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Impacto Bruto': savingReais,
       'Freq. Custo Evitado': ouTraco(p.saving?.tipo_saving as string | undefined),
       'Memorial de Saving': ouTraco(p.memorialLimpo),
-      'Custo Externo Mensal': p.projeto.custo_externo_mensal ?? 0,
       'Receita Incremental': receitaValor,
       'Freq. Receita': ouTraco(p.receita?.tipo_saving as string | undefined),
       'Racional Receita': ouTraco(p.receitaMemorialLimpo),
@@ -504,6 +511,8 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         p.projeto.usa_ai_proxy === 'sim' ? 'Sim'
           : p.projeto.usa_ai_proxy === 'nao' ? 'Não'
             : '—',
+      // Link do app no GoDeploy — opcional; sem link a célula fica "—" (padronizarLinha).
+      'URL Godeploy': ouTraco(p.projeto.url_godeploy as string | null | undefined),
       // Custos do projeto (serviços pagos que a solução consome pra rodar — ABATE).
       'Custo para Rodar': custoProjetoReais, // numérico: 0 quando não há (padrão)
       'Justificativa Custo para Rodar': ouTraco(p.projeto.custo_projeto_justificativa),
@@ -528,6 +537,11 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         p.projeto.classificacao_justificativa as string | null | undefined,
       ),
       'Motivo Reprovado': ouTraco(p.projeto.motivo_reprovacao as string | null | undefined),
+      // Eixo TIPO (item 5.4): no append a análise ainda não rodou → "—"; quem escreve é
+      // o analisador, via syncUpdateToGoogle (mesma disciplina de Complexidade/Classificação).
+      'Tipo de Projeto': tipoParaSheet(
+        normalizarTipo((p.projeto as { categoria_projeto?: string | null }).categoria_projeto),
+      ),
       // ⚠️ GoDocs v2, POR ÚLTIMO de propósito: quando o projeto declarou o ganho pelo
       // formulário determinístico, estas células SOBRESCREVEM as derivadas do
       // `saving`/`receita` do chat, que num projeto v2 vêm vazias (não houve chat) e
@@ -550,6 +564,18 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     }
     if (p.justificativaAprovacaoLider !== undefined || p.modo !== 'edicao') {
       row['Justificativa Aprovação do Líder'] = ouTraco(p.justificativaAprovacaoLider);
+    }
+
+    // "ID Pai": vínculo de FEATURE — na linha do FILHO, o id do projeto PAI. Reflete o
+    // estado do SQLite (não é editável pela triagem). ⚠️ Mesma régua `undefined` ≠ `null`
+    // das 2 colunas do líder acima: `null` = "não se aplica" → grava "—"; **`undefined` =
+    // "não sei, não encoste"** e OMITE a coluna. Como a coluna NÃO está em
+    // SAFE_UPDATE_FIELDS, nada a restaura pelo sync reverso — um chamador que rode
+    // `syncSubmitToGoogle({modo:'edicao'})` sem passar `idPai` (o resyncGoogle antes deste
+    // fix) zerava o vínculo do pai a cada resync. O APPEND nasce agora → célula com "—".
+    // A coluna "ID Feature" (lista do PAI) é cross-row, escrita à parte (nunca aqui).
+    if (p.idPai !== undefined || p.modo !== 'edicao') {
+      row['ID Pai'] = ouTraco(p.idPai);
     }
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em
@@ -693,6 +719,9 @@ export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
       // já a regrava pelo append/update. ⚠️ "Motivo Reenvio" nunca entra (manual).
       if (p.classificacao !== undefined) {
         cells['Classificação'] = derivarClassificacaoSheet(p.classificacao, p.classificacaoJustificativa);
+      }
+      if (p.tipoProjeto !== undefined) {
+        cells['Tipo de Projeto'] = tipoParaSheet(normalizarTipo(p.tipoProjeto));
       }
       if (p.motivoReprovacao !== undefined) {
         // Vazio/null → "—" (padronizarLinha): limpa o motivo quando o projeto deixa

@@ -19,6 +19,7 @@
 import { describe, it, expect } from "vitest";
 import {
   CRITERIOS_GLOBAIS,
+  CRITERIOS_SO_DA_BASE,
   LENTES,
   LENTE_GATE,
   MARGEM_ACIMA_DO_GATE,
@@ -36,13 +37,23 @@ import {
   type AvaliacaoLente,
   type Evidencia,
 } from "@/lib/agents/especiais-lentes";
-import { CRITERIOS, NIVEIS, NOTA_MAX, definicaoDe } from "@/lib/especiais-regua";
+import { EIXOS, pisoDaLente } from "@/lib/agents/especiais-lentes";
+import {
+  NIVEL_ZERO,
+  CRITERIOS_ESTRELA,
+  ESCAPE_MUDA_O_JOGO,
+  PISO_ZERO,
+  NOTA_MAX,
+  TETO_AGENTE,
+} from "@/lib/estrelas-regua";
 import type { AlvoClassificacao } from "@/lib/agents/especial-classificador";
 import type { Vizinho } from "@/lib/especial-corpus";
 
 function av(lente: string, nota: number, evidencia: Evidencia = "nomeada"): AvaliacaoLente {
   return {
     lente,
+    piso: null,
+    ancora: null,
     nota,
     evidencia,
     confianca: "media",
@@ -80,17 +91,29 @@ describe("as lentes são declaradas e distintas", () => {
   });
 
   it("todo critério referenciado EXISTE na régua (nada é redigitado aqui)", () => {
-    const titulos = CRITERIOS.map((c) => c.titulo);
+    const titulos = EIXOS.map((c) => c.titulo);
     for (const l of LENTES) {
       for (const t of l.criterios) expect(titulos).toContain(t);
     }
     for (const t of CRITERIOS_GLOBAIS) expect(titulos).toContain(t);
   });
 
-  it("lentes + globais COBREM a régua inteira — critério novo esquecido aqui falha", () => {
-    const cobertos = new Set<string>([...LENTES.flatMap((l) => l.criterios), ...CRITERIOS_GLOBAIS]);
-    const orfaos = CRITERIOS.map((c) => c.titulo).filter((t) => !cobertos.has(t));
+  it("lentes + globais + a lista da base COBREM a régua inteira — critério novo esquecido aqui falha", () => {
+    const cobertos = new Set<string>([
+      ...LENTES.flatMap((l) => l.criterios),
+      ...CRITERIOS_GLOBAIS,
+      ...CRITERIOS_SO_DA_BASE,
+    ]);
+    const orfaos = EIXOS.map((c) => c.titulo).filter((t) => !cobertos.has(t));
     expect(orfaos).toEqual([]);
+  });
+
+  // ⚠️ A saída fica ESTREITA de propósito: o que sai do painel tem de estar DECLARADO, e o teste
+  // trava o tamanho para "criar lista de exceção" não virar a saída fácil da próxima remoção.
+  it("a lista do que só a base julga é curta e não repete o que já tem lente", () => {
+    expect(CRITERIOS_SO_DA_BASE.length).toBeLessThanOrEqual(2);
+    const comLente = new Set(LENTES.flatMap((l) => l.criterios));
+    for (const t of CRITERIOS_SO_DA_BASE) expect(comLente.has(t)).toBe(false);
   });
 
   it("`outrosEixos` devolve os rótulos das OUTRAS lentes, nunca o da própria", () => {
@@ -129,20 +152,76 @@ describe("prompt de cada lente", () => {
     const gate = lentePorChave(GATE)!;
     const p = buildSystemPromptLente(gate);
     // o texto do seu próprio critério está lá…
-    const meu = CRITERIOS.find((c) => c.titulo === gate.criterios[0])!;
+    const meu = EIXOS.find((c) => c.titulo === gate.criterios[0])!;
     expect(p).toContain(meu.texto);
     // …e o texto de um critério de OUTRA lente, não.
-    const alheio = CRITERIOS.find((c) => c.titulo === "Alcance e reuso")!;
+    const alheio = EIXOS.find((c) => c.titulo === "Alcance e reuso")!;
     expect(p).not.toContain(alheio.texto);
     // o bloco de "não julgo" nomeia as outras lentes
     for (const r of outrosEixos(gate.chave)) expect(p).toContain(r);
   });
 
-  it("traz a régua, a curva e o teto da escala (importados, não redigitados)", () => {
+  // ⚠️ Repoint de 03/09/2026 para a régua nova (`estrelas-regua.ts`). Duas mudanças de contrato:
+  //  1. o teto da LENTE é `TETO_AGENTE`, não `NOTA_MAX` — a faixa 6-10 não sai de eixo isolado,
+  //     exige duas citações e o comitê humano;
+  //  2. a CURVA saiu do prompt da lente, e a saída não deve voltar por engano: ela dizia "≥3★ é
+  //     top 4% da base" sobre a base INTEIRA, e está na lista do que já foi medido e reprovado
+  //     (nenhuma lente passava de 2★ em 48 especiais).
+  it("o teto da lente é o do AGENTE, e a curva da base NÃO entra no prompt", () => {
     const p = buildSystemPromptLente(LENTES[1]);
-    expect(p).toContain(`0–${NOTA_MAX}`);
-    expect(p).toContain("top 4%");
-    expect(p).toContain("0★:"); // a curva real
+    expect(p).toContain(`0 a ${TETO_AGENTE}`);
+    expect(p).toContain(`${TETO_AGENTE + 1} a ${NOTA_MAX}`); // diz que o escape existe, e que não é dela
+    expect(p).not.toContain("top 4%");
+    expect(p).not.toContain("0★:");
+  });
+
+  // O piso deixa de ser prosa: a lente tem de NOMEAR o desqualificador que aplicou. É o defeito
+  // medido no run 1 (nenhuma das 173 notas que subiram citou um item do piso sequer).
+  it("o piso entra com as chaves da régua e é campo obrigatório da resposta", () => {
+    const p = buildSystemPromptLente(LENTES[0]);
+    for (const chave of pisoDaLente(LENTES[0].chave)) expect(p).toContain(chave);
+    expect(p).toContain('"piso"');
+    expect(p).toMatch(/piso.{0,40}OBRIGATÓRIO/s);
+  });
+
+  /**
+   * ⚠️ Medido no 1º teste do painel repointado: com a lista inteira em todas as lentes,
+   * `apenas_mensuravel` disparou em 4 das 5 num relatório diário comum. Todo projeto normal TEM
+   * número, e a lente de risco não tem como saber se o projeto se RESUME a ele.
+   */
+  it("cada lente só vê os itens do piso do PRÓPRIO eixo", () => {
+    for (const l of LENTES) {
+      const p = buildSystemPromptLente(l);
+      const meus = pisoDaLente(l.chave);
+      for (const item of PISO_ZERO) {
+        if (meus.includes(item.chave)) expect(p, `${l.chave} deveria ver ${item.chave}`).toContain(item.chave);
+        else expect(p, `${l.chave} NÃO deveria ver ${item.chave}`).not.toContain(item.chave);
+      }
+    }
+  });
+
+  it("cada item do piso tem exatamente UMA lente dona — nenhum fica órfão nem duplicado", () => {
+    const donos = LENTES.flatMap((l) => pisoDaLente(l.chave));
+    expect([...donos].sort()).toEqual(PISO_ZERO.map((x) => x.chave).sort());
+  });
+
+  it("chave de piso de OUTRO eixo é descartada na normalização", () => {
+    // `so_o_autor` é da lente de alcance: a de função não pode zerar o projeto com ela.
+    // ⚠️ Os dois casos levam sustentação, senão o teste mediria a regra do trecho e não a do eixo.
+    const trecho = "o memorial diz que só o autor usa a ferramenta, ninguém mais foi citado";
+    const av = normalizarAvaliacaoLente(
+      { nota: 3, piso: "so_o_autor", sustentacao: trecho },
+      "funcao_cadeia",
+    )!;
+    expect(av.piso).toBeNull();
+    expect(av.nota).toBe(3);
+    // e a dona dela zera normalmente
+    const dona = normalizarAvaliacaoLente(
+      { nota: 3, piso: "so_o_autor", sustentacao: trecho },
+      "alcance_reuso",
+    )!;
+    expect(dona.piso).toBe("so_o_autor");
+    expect(dona.nota).toBe(0);
   });
 
   it("traz as âncoras DO EIXO da lente, e não as de outra lente", () => {
@@ -162,16 +241,21 @@ describe("prompt de cada lente", () => {
     // 28/08/2026 em docs/plans/painel-agentes-especiais.md.
     for (const l of LENTES) {
       const p = buildSystemPromptLente(l);
-      for (let nota = 3; nota <= NOTA_MAX; nota++) {
-        const global = definicaoDe(nota)!;
-        expect(p).not.toContain(global);
+      // ⚠️ Vale inclusive para a lente de FUNÇÃO, cujo eixo É a espinha da régua: ela usa o
+      // VERBO de cada nível (fonte única) com definição LOCAL, contendo só a parte de função.
+      // O texto global do 3★ cobra "recai sobre OUTRA área", que é alcance — e é essa mistura
+      // que fazia toda lente parar em 1 ou 2.
+      for (const n of CRITERIOS_ESTRELA) {
+        if (n.nota < 3) continue;
+        expect(p).not.toContain(n.criterio);
       }
     }
   });
 
   it("traz a escala global só em TÍTULOS, para ler a nota dos vizinhos", () => {
     const p = buildSystemPromptLente(LENTES[0]);
-    for (const n of NIVEIS) expect(p).toContain(`${n.nota} ${n.titulo}`);
+    for (const n of [NIVEL_ZERO, ...CRITERIOS_ESTRELA]) expect(p).toContain(`${n.nota} ${n.verbo}`);
+    expect(p).toContain(ESCAPE_MUDA_O_JOGO.verbo);
   });
 
   it("dois prompts de lentes diferentes NÃO são o mesmo texto", () => {
@@ -211,7 +295,8 @@ describe("mensagem de usuário", () => {
 
 describe("normalização e guards da saída", () => {
   it("nota fora da escala é clampada e arredondada", () => {
-    expect(normalizarAvaliacaoLente({ nota: 99 }, GATE)!.nota).toBe(NOTA_MAX);
+    // Clampa no teto do AGENTE: uma lente que devolve 7 está opinando sobre o escape.
+    expect(normalizarAvaliacaoLente({ nota: 99 }, GATE)!.nota).toBe(TETO_AGENTE);
     expect(normalizarAvaliacaoLente({ nota: -4 }, GATE)!.nota).toBe(0);
     expect(normalizarAvaliacaoLente({ nota: 2.6 }, GATE)!.nota).toBe(3);
   });
@@ -315,15 +400,37 @@ describe("consolidação — sem média, gate como teto", () => {
     expect(c.nota_preliminar).toBe(5);
   });
 
-  it("projeto de topo não é comprimido: gate 7 + alcance 8 sustenta 8", () => {
-    const c = consolidarLentes([av(GATE, 7, "nomeada"), av(VALOR[1], 8)]);
-    expect(c.nota_preliminar).toBe(8);
+  // O ponto original continua valendo: eixo forte não é comprimido pela média dos fracos. O que
+  // mudou com a régua nova é a altura em que isso acontece — o topo do painel é 5, e 6 a 10 é
+  // outra decisão, com duas citações e comitê humano.
+  it("projeto de topo não é comprimido: gate 4 + alcance 5 sustenta 5", () => {
+    const c = consolidarLentes([av(GATE, 4, "nomeada"), av(VALOR[1], 5)]);
+    expect(c.nota_preliminar).toBe(5);
   });
 
-  it("nunca passa do teto da escala", () => {
-    const c = consolidarLentes([av(GATE, NOTA_MAX, "nomeada"), av(VALOR[0], NOTA_MAX)]);
-    expect(c.teto).toBe(NOTA_MAX);
-    expect(c.nota_preliminar).toBe(NOTA_MAX);
+  it("nunca passa do TETO DO AGENTE, mesmo com todas as lentes no máximo", () => {
+    const c = consolidarLentes([av(GATE, TETO_AGENTE, "nomeada"), av(VALOR[0], TETO_AGENTE)]);
+    expect(c.teto).toBe(TETO_AGENTE);
+    expect(c.nota_preliminar).toBe(TETO_AGENTE);
+  });
+
+  /**
+   * O piso é do PROJETO, não do eixo: "ninguém além do autor usa" não é uma verdade sobre
+   * alcance, é uma verdade sobre o projeto. Sem esta regra, uma lente diria "0, está parado" e as
+   * outras quatro fariam média por cima dela.
+   */
+  it("uma lente que NOMEIA um item do piso zera o conjunto, e a explicação diz qual", () => {
+    const comPiso: AvaliacaoLente = { ...av(VALOR[1], 4, "nomeada"), piso: "so_o_autor" };
+    const c = consolidarLentes([av(GATE, 3, "nomeada"), comPiso]);
+    expect(c.nota_preliminar).toBe(0);
+    expect(c.explicacao).toContain("so_o_autor");
+    expect(c.explicacao).toContain(VALOR[1]);
+  });
+
+  it("sem piso nomeado, nada muda", () => {
+    const c = consolidarLentes([av(GATE, 3, "nomeada"), av(VALOR[1], 4)]);
+    expect(c.nota_preliminar).toBeGreaterThan(0);
+    expect(c.explicacao).not.toContain("piso");
   });
 
   it("gate sozinho vale a própria nota (sem lente de valor não zera o projeto)", () => {
@@ -354,5 +461,74 @@ describe("consolidação — sem média, gate como teto", () => {
     const a = consolidarLentes(entrada).nota_preliminar;
     const b = consolidarLentes([...entrada].reverse()).nota_preliminar;
     expect(a).toBe(b);
+  });
+});
+
+/**
+ * A ressalva da PLATAFORMA na lente estrutural.
+ *
+ * ⚠️ Medido em 03/09/2026: no PIAPP (10★ humano) esta lente escreveu "usado continuamente por
+ * mais de dez times e abastece a geração automática do Prisma" e ainda assim respondeu 1 com
+ * prova "vaga". Como ela é o TETO das outras, o projeto fechou em 2★ mesmo com alcance 5 provado
+ * por nome. Faltava dizer o que a régua já declara para o escape: numa plataforma, o dependente
+ * NOMEADO é o lugar de conferir.
+ */
+describe("ressalva da plataforma na lente estrutural", () => {
+  it("só a lente estrutural a recebe, e ela entra no prompt", () => {
+    const gate = lentePorChave(LENTE_GATE)!;
+    expect(gate.observacao).toBeDefined();
+    expect(buildSystemPromptLente(gate)).toContain("PLATAFORMA");
+    for (const l of LENTES) {
+      if (l.chave === LENTE_GATE) continue;
+      expect(buildSystemPromptLente(l), l.chave).not.toContain("PLATAFORMA");
+    }
+  });
+
+  // A ressalva ABRE uma porta, não derruba a trava: sem nome próprio a prova segue vaga, senão
+  // meia base volta a se declarar plataforma (é o que `PROMOCAO_DEPENDENTE_NOMEADO` já barra).
+  it("a ressalva exige nome próprio e recusa a promessa", () => {
+    const obs = lentePorChave(LENTE_GATE)!.observacao!;
+    expect(obs).toContain("NOMEADO");
+    expect(obs).toContain("poderá ser usado por");
+    expect(obs).toContain("vaga");
+  });
+});
+
+/**
+ * Zerar exige citação.
+ *
+ * ⚠️ Medido na run 4: o piso derrubou a 0 três projetos de nota alta, entre eles o **GoPrice**,
+ * que é o exemplo de 4★ da PRÓPRIA régua, alegando `experimentacao`. Nenhum precisou apontar um
+ * trecho do dossiê. Zerar é a afirmação mais forte que uma lente faz, e ela passa por cima das
+ * outras quatro: tem de ser conferível, pela mesma razão que o escape exige duas citações.
+ */
+describe('o piso exige o trecho que o sustenta', () => {
+  it('piso sem sustentação é ignorado, e sobra a nota do eixo', () => {
+    const av = normalizarAvaliacaoLente(
+      { nota: 4, piso: 'experimentacao', evidencia: 'vaga', sustentacao: '' },
+      'recorrencia_rastro',
+    )!;
+    expect(av.piso).toBeNull();
+    expect(av.nota).toBe(4);
+  });
+
+  it('piso COM o trecho copiado zera normalmente', () => {
+    const av = normalizarAvaliacaoLente(
+      {
+        nota: 4,
+        piso: 'experimentacao',
+        evidencia: 'nomeada',
+        sustentacao: 'o memorial diz que o projeto é uma POC para testar a ideia',
+      },
+      'recorrencia_rastro',
+    )!;
+    expect(av.piso).toBe('experimentacao');
+    expect(av.nota).toBe(0);
+  });
+
+  it('o prompt pede a citação junto do piso', () => {
+    const p = buildSystemPromptLente(lentePorChave(LENTE_GATE)!);
+    expect(p).toMatch(/Zerar é a afirmação mais forte/);
+    expect(p).toMatch(/COPIAR em/);
   });
 });

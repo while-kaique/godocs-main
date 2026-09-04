@@ -296,7 +296,11 @@ export type CriterioResult = {
   justificativa: string;
 };
 
-export type Complexidade = "automacao" | "inteligencia" | "autonomia";
+// ⚠️ NÍVEL do projeto (item 5.4 do plano). Os 3 primeiros valores são os LEGADOS da coluna
+// "Complexidade" — não renomear: 578 linhas da planilha os guardam e o `parseCategoria` do
+// Gomoon casa por eles. O 4º degrau (`agentico`) entrou em 03/09/2026. Rótulos de exibição
+// (Determinístico · Inteligente · Autônomo · Agêntico) e guards em `@/lib/categoria-projeto`.
+export type Complexidade = "automacao" | "inteligencia" | "autonomia" | "agentico";
 
 export type ResultadoAnalise = {
   resultado: "aprovado" | "rejeitado";
@@ -306,6 +310,12 @@ export type ResultadoAnalise = {
   resumo: string;
   complexidade: Complexidade;
   complexidade_justificativa?: string;
+  // EIXO TIPO (item 5.4) — o que o projeto É (agente/sistema/app/dashboard/automacao).
+  // Independente da complexidade, que diz COMO o trabalho acontece. Normalizado por
+  // `resolverTipoProjeto` (@/lib/categoria-projeto): o LLM decide, o palpite determinístico
+  // é a rede quando ele cala, e o guard só rebaixa (agente sem IA em runtime → automação).
+  tipo_projeto?: string | null;
+  tipo_projeto_justificativa?: string;
   // EIXO IA (automacao ↔ inteligencia): o LLM declara se o produto final usa IA como
   // funcionalidade (IA usada só para construir/desenvolver NÃO conta). false → não pode
   // ser inteligencia; true → pelo menos inteligencia (a não ser que tome a ação → autonomia).
@@ -379,6 +389,8 @@ export type RevisaoContexto = {
 // ─── Contexto do projeto (vem do formulário + doc enviado) ──────────────────
 
 export type ProjetoContexto = {
+  /** Link do app no GoDeploy (Etapa 2, opcional). */
+  url_godeploy?: string | null;
   responsavel_nome: string;
   responsavel_email: string;
   area: string | null;

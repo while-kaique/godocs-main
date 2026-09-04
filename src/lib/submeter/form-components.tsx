@@ -9,6 +9,7 @@ import {
 } from "./constants";
 import type { PapelParticipante, AfetadoTipo } from "./constants";
 import { filtrarSugestoes, type SugestaoParticipante } from "./participantes-sugestoes";
+import { useBuscaProjetos, type ProjetoSugestao } from "./projeto-pai-sugestoes";
 
 export function SectionTitle({ icon, children }: { icon: string; children: React.ReactNode }) {
   return (
@@ -1570,6 +1571,132 @@ export function SummaryRow({
           value || "—"
         )}
       </span>
+    </div>
+  );
+}
+
+/**
+ * Autocomplete de SELEÇÃO ÚNICA do projeto PAI (feature de outro projeto). Busca no
+ * servidor (debounced) via `useBuscaProjetos`. Selecionado → mostra o projeto escolhido
+ * com botão de limpar; vazio → input com dropdown de resultados. Estado por rótulo+ícone,
+ * navegável por teclado (setas/Enter/Esc).
+ */
+export function ProjetoPaiInput({
+  paiId, paiNome, onSelect, onClear, error,
+}: {
+  paiId: string;
+  paiNome: string;
+  onSelect: (id: string, nome: string) => void;
+  onClear: () => void;
+  error?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { resultados, loading } = useBuscaProjetos(query);
+
+  // ⚠️ NÃO exigir `resultados.length > 0` aqui: a lista abaixo tem um estado "Nenhum
+  // projeto encontrado" que, com essa condição, era CÓDIGO MORTO — busca sem resultado
+  // não abria nada e a pessoa ficava sem saber se o campo estava quebrado ou se o projeto
+  // não existe. Com 2+ caracteres e foco, a lista abre SEMPRE e diz o que aconteceu.
+  const open = focused && !dismissed && query.trim().length >= 2;
+
+  useEffect(() => { setActiveIndex(0); }, [resultados.length]);
+
+  function escolher(p: ProjetoSugestao) {
+    onSelect(p.id, p.nome);
+    setQuery("");
+    setDismissed(true);
+  }
+
+  // Projeto PAI JÁ escolhido: mostra a seleção com ✕ para trocar.
+  if (paiId) {
+    return (
+      <>
+        <div
+          className="flex items-center gap-2 rounded-xl px-3.5 py-3"
+          style={{ background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.15)" }}
+        >
+          <span aria-hidden="true">🧩</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--go-blue)" }}>
+              Feature do projeto
+            </div>
+            <div className="truncate text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+              {paiNome || paiId}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => { onClear(); setQuery(""); setDismissed(false); }}
+            className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold"
+            style={{ color: "var(--go-blue)", background: "rgba(0,89,169,0.08)" }}
+            aria-label="Trocar o projeto pai"
+          >
+            Trocar
+          </button>
+        </div>
+        <FieldError message={error} />
+      </>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        className={cn("go-input", error && "go-input-invalid")}
+        placeholder="Digite o nome do projeto existente…"
+        value={query}
+        role="combobox"
+        aria-expanded={open}
+        aria-autocomplete="list"
+        onChange={(e) => { setQuery(e.currentTarget.value); setDismissed(false); }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 150)}
+        onKeyDown={(e) => {
+          if (!open || resultados.length === 0) return;
+          if (e.key === "ArrowDown") { e.preventDefault(); setActiveIndex((i) => (i + 1) % resultados.length); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIndex((i) => (i - 1 + resultados.length) % resultados.length); }
+          else if (e.key === "Enter") { e.preventDefault(); escolher(resultados[Math.min(activeIndex, resultados.length - 1)]); }
+          else if (e.key === "Escape") { e.preventDefault(); setDismissed(true); }
+        }}
+      />
+      <FieldError message={error} />
+      {open && (
+        <ul
+          role="listbox"
+          className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl py-1 shadow-lg"
+          style={{ background: "#fff", border: "1px solid rgba(0,89,169,0.15)" }}
+        >
+          {loading && resultados.length === 0 && (
+            <li className="px-3 py-2 text-[12px]" style={{ color: "#8b8b9a" }}>Buscando…</li>
+          )}
+          {!loading && resultados.length === 0 && (
+            <li className="px-3 py-2 text-[12px]" style={{ color: "#8b8b9a" }}>Nenhum projeto encontrado</li>
+          )}
+          {resultados.map((p, i) => (
+            <li key={p.id} role="option" aria-selected={i === activeIndex} data-ativa={i === activeIndex}>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); escolher(p); }}
+                onMouseEnter={() => setActiveIndex(i)}
+                className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left"
+                style={{ background: i === activeIndex ? "rgba(0,89,169,0.07)" : "transparent" }}
+              >
+                <span className="truncate text-[13px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                  {p.nome}
+                </span>
+                {p.autor && (
+                  <span className="truncate text-[11px]" style={{ color: "#8b8b9a" }}>{p.autor}</span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

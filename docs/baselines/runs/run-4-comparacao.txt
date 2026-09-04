@@ -1,0 +1,124 @@
+==============================================================================
+run 1 · agente, RAG vazio          n=646  idêntica  47%  ±1  76%  acima 200  abaixo 59
+  distribuição: 0★:306 1★:150 2★:119 3★:39 4★:11 5★:16 6★:4 7★:1
+run 2 · agente + RAG restaurado    n=230  idêntica  58%  ±1  78%  acima 51  abaixo 23
+  distribuição: 0★:130 1★:45 2★:27 3★:12 4★:3 5★:11 7★:1 8★:1
+run 3 · agente + RAG + auditoria (amostra 196) n=182  idêntica  42%  ±1  78%  acima 38  abaixo 44
+  distribuição: 0★:88 1★:30 2★:31 3★:14 4★:6 5★:10 6★:1 7★:1 8★:1
+run 4 · TIME de 5 lentes + auditoria (58) n= 58  idêntica  40%  ±1  73%  acima 12  abaixo 19
+  distribuição: 0★:25 1★:10 2★:3 3★:9 4★:9 5★:1 7★:1
+
+==============================================================================
+ADERÊNCIA POR FAIXA DE CONFIANÇA (dentro de ±1 da nota da planilha)
+run 1 · agente, RAG vazio: sem confiança gravada nesta run
+run 2 · agente + RAG restaurado: sem confiança gravada nesta run
+run 3 · agente + RAG + auditoria (amostra 196):
+  alta   n= 23  ±1  78%
+  media  n= 12  ±1  58%
+  baixa  n=107  ±1  80%
+run 4 · TIME de 5 lentes + auditoria (58):
+  alta   n=  7  ±1 100%
+  media  n= 12  ±1  92%
+  baixa  n= 33  ±1  61%
+
+==============================================================================
+ONDE A DIVERGÊNCIA MORA (por nota da planilha, última run)
+  humana   n   idêntica   agente ACIMA   agente ABAIXO   nota média do agente
+      0   17    76%         4             0              0.41
+      1    9    33%         2             4              1.00
+      2    7    14%         3             3              2.14
+      3    7    57%         2             1              3.00
+      4    5     0%         1             4              2.60
+      5    4     0%         0             4              3.25
+      7    1     0%         0             1              0.00
+      8    1     0%         0             1              4.00
+     10    1     0%         0             1              5.00
+
+==============================================================================
+CONTESTAÇÕES DE PREÇO: 14 projetos já avaliados divergem por 2★ ou mais
+  o agente pagaria MAIS em 6 e MENOS em 8
+  (a nota humana não muda por isto; é lista para revisão de gente)
+
+  humano 7 → agente 0  (baixaria)  Ferramenta de testes de novos produtos ctr com
+     O agente encontra produtos, cria embalagens e imagens e publica os testes no Facebook sem intervenção humana. Fica em 5, abaixo da CTR Machine já avaliada, porq
+  humano 10 → agente 5  (baixaria)  PIAPP
+     ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. O Piapp ge
+  humano 4 → agente 0  (baixaria)  Benchmark de Estampas
+     Analisa semanalmente as estampas mais vendidas e gera novas artes para o portfólio, como o Gerador de Estampas Best Sellers já avaliado em 3 estrelas. Não sobe 
+  humano 8 → agente 4  (baixaria)  [VERSTA] Robo orçamento - {Marca}
+     Parece automatizar a operação de Google Ads e fica próxima do Robô subir vídeos em teste, já avaliado em 5 estrelas. Não vai acima porque o material só calcula 
+  humano 0 → agente 4  (subiria)  Agente Estoque Custo
+     O agente calcula o custo médio, faz lançamentos contábeis e concilia estoques de oito empresas em rotinas automáticas e auditáveis. Fica em 3, ao lado do Estoqu
+  humano 4 → agente 0  (baixaria)  GoPrice
+     O GoPrice recomenda preços usando elasticidade, estoque e aprendizado contínuo, como o Agente precificador já avaliado em 4 estrelas. Não chega a 5 porque apena
+  humano 5 → agente 1  (baixaria)  GoHunter
+     ⚠ Conferir na triagem: «Cases IA | Lógica» (similaridade 0.76) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. O
+  humano 4 → agente 7  (subiria)  CTR Machine Gocase - Admaker
+     O Admaker cria e publica testes no Meta e alimenta o Gerador de Briefing, o Color Drop e o padrão de PDP. Recomendo 7, igual ao CTR Machine já avaliado, pois su
+  humano 2 → agente 0  (baixaria)  Gerador de Vistas
+     Gera vistas coloridas em escala, mas ainda deixa ajustes e validação visual com a equipe. Como o GoRender, o valor demonstrado se limita às horas economizadas, 
+  humano 1 → agente 3  (subiria)  Gocase B2B Service Desk (RMA E CADASTROS)
+     Automatiza cadastros e casos simples de RMA, além de centralizar o acompanhamento do B2B. Fica em 2 porque já executa parte recorrente do fluxo, mas validações,
+  humano 2 → agente 4  (subiria)  Automação de envio Reinf
+     Envia mensalmente os eventos fiscais de 17 CNPJs à Receita Federal, assina lotes, trata retornos e arquiva comprovantes. Diferente das automações de Inputs de S
+  humano 2 → agente 4  (subiria)  Portal de Jornada do Cliente B2B
+     O portal coordena devoluções entre sete áreas, aplica regras de encaminhamento, monitora SLA e mantém histórico auditável. Fica em 3, como o Portal de devoluçõe
+  humano 1 → agente 3  (subiria)  Mix Produtos Gobeaute
+     Consolida vendas, metas, margem e estoque das oito marcas e alimenta o relatório semanal do board. Como o Haileydash, automatiza a base e orienta decisões, mas 
+  humano 3 → agente 1  (baixaria)  Ressarcimento CX
+     Sem leitura — o modelo não justificou a nota.
+
+==============================================================================
+MUDARAM DE NOTA: 35 de 54 comparáveis
+  saltos de 2★ ou mais: 14
+  aproximaram do humano: 13 · afastaram: 19
+
+OS 12 MAIORES MOVIMENTOS (leia o motivo, não o número):
+
+  5 → 0  (humano 7)  Ferramenta de testes de novos produtos ctr com agent
+    antes: Encontra produtos promissores, cria embalagem e imagens e publica o teste no Facebook de forma automatizada. Fica em 5, acima do Agente precificador, 
+    agora: O agente encontra produtos, cria embalagens e imagens e publica os testes no Facebook sem intervenção humana. Fica em 5, abaixo da CTR Machine já aval
+
+  0 → 4  (humano 5)  Prisma
+    antes: O Prisma cria, publica e otimiza criativos com vários agentes. Embora seja parecido com a CTR Machine, o memorial não cita campanha ativa, volume prod
+    agora: O Prisma escolhe produtos, adapta criativos, publica campanhas e usa o desempenho para se ajustar sozinho. Fica em 5, acima do CTR Machine Gocase Adma
+
+  8 → 4  (humano 3)  ecom-metrics-hub
+    antes: O dashROI unifica dados de sete marcas e sustenta três projetos em operação. Fica em 8, acima do GoBrands de 7 pela amplitude de 19 rotinas e três pro
+    agora: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+
+  4 → 0  (humano 4)  GoPrice
+    antes: O GoPrice recomenda preços com base em elasticidade, estoque e aprendizado contínuo, fazendo o mesmo tipo de escolha do Agente precificador. Fica em 4
+    agora: O GoPrice recomenda preços usando elasticidade, estoque e aprendizado contínuo, como o Agente precificador já avaliado em 4 estrelas. Não chega a 5 po
+
+  3 → 0  (humano 4)  Benchmark de Estampas
+    antes: Gera semanalmente novas estampas com base no desempenho do mercado, em linha com o Gerador de Estampas Best Sellers já avaliado em 3★. Não sobe porque
+    agora: Analisa semanalmente as estampas mais vendidas e gera novas artes para o portfólio, como o Gerador de Estampas Best Sellers já avaliado em 3 estrelas.
+
+  2 → 0  (humano 0)  Gostream
+    antes: O Gostream executa automaticamente uma rotina recorrente de atualização da planilha de R&S a cada movimentação no InHire, eliminando a iniciação e o p
+    agora: Registra automaticamente no Google Sheets cada mudança de etapa dos candidatos no InHire. Fica em 2, como o HireFlow, porque executa uma rotina recorr
+
+  2 → 4  (humano 2)  Automação de envio Reinf
+    antes: Automatiza a preparação, assinatura e transmissão mensal da EFD-REINF à Receita Federal, em linha com o Fluxo Automatizado de NFSE. Fica em 2 porque e
+    agora: Envia mensalmente os eventos fiscais de 17 CNPJs à Receita Federal, assina lotes, trata retornos e arquiva comprovantes. Diferente das automações de I
+
+  5 → 7  (humano 4)  CTR Machine Gocase - Admaker
+    antes: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+    agora: O Admaker cria e publica testes no Meta e alimenta o Gerador de Briefing, o Color Drop e o padrão de PDP. Recomendo 7, igual ao CTR Machine já avaliad
+
+  7 → 5  (humano 10)  PIAPP
+    antes: O Piapp fornece geração multimídia por API e MCP para mais de dez times. Fica em 7, acima do Prisma e do Gocontent Machine, pois o Prisma já opera sob
+    agora: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+
+  2 → 0  (humano 0)  Automação de Nfs via Python
+    antes: Baixa diariamente as NF-e, gera os DANFEs e arquiva tudo no Drive sem intervenção, como a Automação de Inputs de Saída. Fica em 2 porque apenas execut
+    agora: Baixa, converte, organiza e arquiva diariamente as notas fiscais sem início humano, como a Automação de Inputs de Saída. Não sobe porque apenas execut
+
+  2 → 0  (humano 1)  GoPilot
+    antes: Sem leitura — o modelo não justificou a nota.
+    agora: O GoPilot executa automaticamente a consolidação e a previsão mensal por linha e SKU, deixando para o time apenas exceções e decisões. Fica ao lado da
+
+  2 → 4  (humano 0)  Agente Estoque Custo
+    antes: Automatiza rotinas recorrentes de custeio, lançamentos e conciliações sem depender de acionamento manual. Fica abaixo do Estoque ao vivo Gobeaute porq
+    agora: O agente calcula o custo médio, faz lançamentos contábeis e concilia estoques de oito empresas em rotinas automáticas e auditáveis. Fica em 3, ao lado

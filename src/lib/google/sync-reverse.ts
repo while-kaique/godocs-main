@@ -230,7 +230,10 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
     saving_reais: parseNum(row['Impacto Bruto']),
     tipo_saving: txt(row['Freq. Custo Evitado']),
     memorial_calculo: txt(row['Memorial de Saving']),
-    custo_externo_mensal: parseNum(row['Custo Externo Mensal']),
+    // ⚠️ `Custo Externo Mensal` saiu do SHEET_COLUMNS (fundida em `Custo para Rodar`, D3),
+    // mas a coluna ainda EXISTE na aba de prod com 1 linha de dado — daí a leitura solta,
+    // por índice de string, em vez do acesso tipado.
+    custo_externo_mensal: parseNum((row as Record<string, string | undefined>)['Custo Externo Mensal']),
     ganho_total_mensal: parseNum(row['Impacto Líquido']),
     complexidade: txt(row['Complexidade']),
     alguem_fazia: txt(row['Alguém Fazia?']),
@@ -276,7 +279,10 @@ const SAFE_UPDATE_FIELDS: ReadonlyArray<{
   { col: 'Impacto Bruto', field: 'saving_reais', kind: 'num' , soV1: true },
   { col: 'Freq. Custo Evitado', field: 'tipo_saving', kind: 'text' , soV1: true },
   { col: 'Memorial de Saving', field: 'memorial_calculo', kind: 'text' },
-  { col: 'Custo Externo Mensal', field: 'custo_externo_mensal', kind: 'num' },
+  // ⚠️ `Custo Externo Mensal` saiu do SHEET_COLUMNS (fundida em `Custo para Rodar`, D3) e
+  // da aba da v2. Ela ainda existe na aba de PROD, com 1 linha de dado — a leitura fica,
+  // por chave solta, para não perder esse valor no sync reverso.
+  { col: 'Custo Externo Mensal' as never, field: 'custo_externo_mensal', kind: 'num' },
   { col: 'Impacto Líquido', field: 'ganho_total_mensal', kind: 'num' , soV1: true },
   { col: 'Complexidade', field: 'complexidade', kind: 'text' },
   { col: 'Observações', field: 'observacoes', kind: 'text' },

@@ -1,0 +1,131 @@
+==============================================================================
+run 1 · agente, RAG vazio          n=646  idêntica  47%  ±1  76%  acima 200  abaixo 59
+  distribuição: 0★:306 1★:150 2★:119 3★:39 4★:11 5★:16 6★:4 7★:1
+run 2 · agente + RAG restaurado    n=230  idêntica  58%  ±1  78%  acima 51  abaixo 23
+  distribuição: 0★:130 1★:45 2★:27 3★:12 4★:3 5★:11 7★:1 8★:1
+run 3 · agente + RAG + auditoria (amostra 196) n=182  idêntica  42%  ±1  78%  acima 38  abaixo 44
+  distribuição: 0★:88 1★:30 2★:31 3★:14 4★:6 5★:10 6★:1 7★:1 8★:1
+
+==============================================================================
+ADERÊNCIA POR FAIXA DE CONFIANÇA (dentro de ±1 da nota da planilha)
+run 1 · agente, RAG vazio: sem confiança gravada nesta run
+run 2 · agente + RAG restaurado: sem confiança gravada nesta run
+run 3 · agente + RAG + auditoria (amostra 196):
+  alta   n= 23  ±1  78%
+  media  n= 12  ±1  58%
+  baixa  n=107  ±1  80%
+
+==============================================================================
+ONDE A DIVERGÊNCIA MORA (por nota da planilha, última run)
+  humana   n   idêntica   agente ACIMA   agente ABAIXO   nota média do agente
+      0   56    70%        17             0              0.45
+      1   30    13%         8            18              0.87
+      2   22    32%         8             7              2.14
+      3   18    28%         3            10              2.50
+      4    9    33%         2             4              3.11
+      5    4    50%         0             2              3.25
+      7    1     0%         0             1              5.00
+      8    1     0%         0             1              5.00
+     10    1     0%         0             1              7.00
+
+==============================================================================
+CONTESTAÇÕES DE PREÇO: 31 projetos já avaliados divergem por 2★ ou mais
+  o agente pagaria MAIS em 15 e MENOS em 16
+  (a nota humana não muda por isto; é lista para revisão de gente)
+
+  humano 5 → agente 0  (baixaria)  Prisma
+     O Prisma cria, publica e otimiza criativos com vários agentes. Embora seja parecido com a CTR Machine, o memorial não cita campanha ativa, volume produzido ou r
+  humano 3 → agente 8  (subiria)  ecom-metrics-hub
+     O dashROI unifica dados de sete marcas e sustenta três projetos em operação. Fica em 8, acima do GoBrands de 7 pela amplitude de 19 rotinas e três projetos cons
+  humano 4 → agente 0  (baixaria)  Prazo Otimizado
+     O projeto testou um modelo estatístico para encurtar prazos prometidos por transportadora e região. Fica em 0 porque a evidência vem de um piloto antigo, a esca
+  humano 4 → agente 0  (baixaria)  Gopilot – playson de Google Ads
+     ⚠ Conferir na triagem: «[VERSTA] Robo orçamento - {Marca}» (similaridade 0.76) é quase idêntico e vale 8★ — a nota 0★ diverge muito; iguale a faixa ou justifiqu
+  humano 2 → agente 6  (subiria)  Integração com Operador Logístico - Life of Co
+     Conecta Shopify e eStore em produção e conduz pedidos, estoque e rastreio até a entrega. Fica em 6, acima do CX Ticket Creator pelo papel indispensável na opera
+  humano 1 → agente 5  (subiria)  Esteira de Hits - Google
+     A esteira seleciona criativos e os coloca em veiculação no Google Ads sem operação humana recorrente. Faz o mesmo tipo de entrega final do Robo subir vídeos em 
+  humano 8 → agente 5  (baixaria)  [VERSTA] Robo orçamento - {Marca}
+     Controla todo o orçamento de anúncios e altera gastos no mercado sem intervenção humana, como o Robô subir vídeos. Fica em 5, não em 8, porque substitui uma ges
+  humano 3 → agente 0  (baixaria)  Gocreators
+     A plataforma pretende treinar e incentivar creators, acompanhar métricas e impulsionar a geração de conteúdo. Fica abaixo do Gocreators - DashBoard porque o mem
+  humano 2 → agente 5  (subiria)  Boletos Itaú via Proxy Bancária
+     ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. A proxy su
+  humano 10 → agente 7  (baixaria)  PIAPP
+     O Piapp fornece geração multimídia por API e MCP para mais de dez times. Fica em 7, acima do Prisma e do Gocontent Machine, pois o Prisma já opera sobre ele; nã
+  humano 1 → agente 4  (subiria)  Hub de Importação
+     O projeto não só consolida dados, mas recomenda priorizações de embarque que influenciam risco de ruptura e alocação de estoque, aproximando-se do GoPrice e do 
+  humano 2 → agente 5  (subiria)  Carga diária de chargeback nos antifraudes (Ko
+     Extrai, formata e envia diariamente os chargebacks à Konduto e à ClearSale, inclusive confirmando os lotes sem intervenção humana. Fica acima da Automação de Ch
+  humano 3 → agente 0  (baixaria)  Sistema de memória de M&A
+     ⚠ Conferir na triagem: «GoDocs» (similaridade 0.75) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. É uma infrae
+  humano 2 → agente 0  (baixaria)  Máquina de Criação de CTRs
+     A ferramenta gera criativos padronizados, mas ainda depende de pessoas para inserir dados, revisar e exportar cada arte. Como a Central de Estampas e o Gocase C
+  humano 1 → agente 3  (subiria)  B2B DW
+     Automatiza pipelines recorrentes de dados e sustenta o fluxo DashB2B, indo além de uma base informativa como o Dashboard Analytics Gerencial Gobeaute. Fica em 3
+  humano 0 → agente 2  (subiria)  Torre de Controle Gobeaute
+     A automação executa diariamente a coleta, tratamento e consolidação dos dados de SLA, como a Análise Inteligente de Prazos. Fica em 2 porque entrega indicadores
+  humano 0 → agente 2  (subiria)  Gostream
+     O Gostream executa automaticamente uma rotina recorrente de atualização da planilha de R&S a cada movimentação no InHire, eliminando a iniciação e o preenchimen
+  humano 0 → agente 2  (subiria)  CX Hub — Plataforma Central de Operações de Ba
+     Automatiza reenvios e tickets logísticos após o acionamento das agentes, com uso mensal comprovado em milhares de ocorrências. Fica abaixo do Portal de devoluçõ
+  humano 0 → agente 2  (subiria)  Razão Contábil Consolidado
+     Processa automaticamente os arquivos mensais, aplica regras contábeis e consolida o resultado, em papel semelhante ao RV/RB Coorte. Fica em 2 porque ainda há re
+  humano 3 → agente 1  (baixaria)  Portal de Reembolsos (Gobeaute)
+     ⚠ Conferir na triagem: «Portal de devoluções de CX» (similaridade 0.87) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a dif
+  … e mais 11. Lista inteira no artefato, filtro "Só divergências de 2★+".
+
+==============================================================================
+MUDARAM DE NOTA: 23 de 69 comparáveis
+  saltos de 2★ ou mais: 12
+  aproximaram do humano: 9 · afastaram: 8
+
+OS 12 MAIORES MOVIMENTOS (leia o motivo, não o número):
+
+  5 → 0  (humano 0)  Cadastro de Análise de Crédito RCA
+    antes: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+    agora: Preenche e envia formulários de análise de crédito, mas depende de execução manual via run.bat e atende uma rotina local de apenas um analista, como o
+
+  1 → 5  (humano —)  Quiz de Vendas Apice
+    antes: { "projeto": "Quiz de Vendas Apice", "area": "TECNOLOGIA", "estrelas": 1, "faixa": "1★, Informa", "muda o jogo": false, "justificativa": "O quiz recom
+    agora: O quiz recomenda produtos diretamente à cliente, monta a rotina e a leva ao carrinho, com uso e conversão medidos. Fica em 5 porque responde pela expe
+
+  5 → 2  (humano 0)  Sucesso.AI
+    antes: O Sucesso.AI detecta insucessos, consulta o cliente sobre reenvio ou reembolso e acompanha a tratativa automaticamente. Recebe 5 porque atua diretamen
+    agora: O Sucesso.AI detecta insucessos e contata o cliente automaticamente para obter sua escolha. Fica em 2, acima dos Disparos de Reenvio, porque executa o
+
+  1 → 4  (humano 1)  Hub de Importação
+    antes: ⚠ Conferir na triagem: «Shipping hub» (similaridade 0.77) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferen
+    agora: O projeto não só consolida dados, mas recomenda priorizações de embarque que influenciam risco de ruptura e alocação de estoque, aproximando-se do GoP
+
+  2 → 0  (humano 1)  Classificação BADS do BOT
+    antes: Classifica automaticamente as avaliações negativas do bot a cada três horas e registra os motivos na planilha, substituindo a leitura manual. É 2 estr
+    agora: ⚠ Conferir na triagem: «Gohelp - Influenciadores Gobeauty» (similaridade 0.83) é quase idêntico e vale 5★ — a nota 0★ diverge muito; iguale a faixa ou
+
+  0 → 2  (humano 2)  [BRUNA] Automação NFs Gobeaute
+    antes: ⚠ Conferir na triagem: «Automação no Download e Encaminhamento de XML's» (similaridade 0.90) é quase idêntico e vale 5★ — a nota 0★ diverge muito; igu
+    agora: A automação monitora e-mails, extrai dados de XMLs e registra as notas em planilha sem acionamento humano, assumindo uma rotina recorrente ponta a pon
+
+  0 → 2  (humano 0)  Razão Contábil Consolidado
+    antes: A automação classifica e consolida razões contábeis para o FP&A. Fica em 0 porque o memorial registra apenas a economia calculada, sem histórico de ex
+    agora: Processa automaticamente os arquivos mensais, aplica regras contábeis e consolida o resultado, em papel semelhante ao RV/RB Coorte. Fica em 2 porque a
+
+  3 → 5  (humano 2)  Boletos Itaú via Proxy Bancária
+    antes: O serviço consulta o Itaú e entrega os dados do boleto ao bot do RCA. Fica acima da automação de chamados, pois esse bot depende da API, mas abaixo do
+    agora: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+
+  5 → 7  (humano 10)  PIAPP
+    antes: ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. 
+    agora: O Piapp fornece geração multimídia por API e MCP para mais de dez times. Fica em 7, acima do Prisma e do Gocontent Machine, pois o Prisma já opera sob
+
+  2 → 0  (humano 0)  Automação das Solicitações de Pagamento
+    antes: O agente consulta os ERPs, responde solicitações de pagamento e encerra os chamados automaticamente, em linha com a Automação de Despesas Fiscais. Fic
+    agora: Sem leitura — o modelo não justificou a nota.
+
+  2 → 0  (humano —)  Central de Estampas
+    antes: A Central de Estampas aplica estampas em lote e já produz 48 criativos mensais, reduzindo o trabalho manual de duas pessoas. Fica no mesmo patamar da 
+    agora: A Central de Estampas aplica estampas em lote, mas ainda é operada e corrigida por duas pessoas. Como o Pzerify, resolve uma tarefa local e seu valor 
+
+  0 → 2  (humano —)  Vencimentos UNILOG
+    antes: O app acompanha vencimentos e solicita mudanças de classe a partir das planilhas da UNILOG. Como o Controle de Vencimentos, fica em 0 porque atende um
+    agora: A automação extrai os dados, analisa vencimentos e envia semanalmente as solicitações de mudança de classe, sem trabalho residual do Supervisor. Super

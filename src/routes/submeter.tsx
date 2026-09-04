@@ -109,6 +109,10 @@ type AgentMeta = {
   descricaoBreve: string;
   // Usa o AI Proxy interno? Entra no meta para que uma mudança dispare metaChanged.
   usaAiProxy: "sim" | "nao" | "";
+  // App no GoDeploy (Etapa 2, opcional) — no meta pelo mesmo motivo: colar o link no meio
+  // do fluxo tem de disparar metaChanged e ser persistido via `atualizar-metadados`.
+  temAppGodeploy: "sim" | "nao" | "";
+  urlGodeploy: string;
   // Contrafactual (Etapa 2). `contrafactualAfetados` viaja SERIALIZADO
   // ("pessoa:a@x;b@y") para a comparação de metaChanged ser estável — é o mesmo formato
   // gravado no SQLite.
@@ -639,6 +643,19 @@ export function SubmeterPageContent({
           usaAiProxy: ((data.usa_ai_proxy as string) ?? "") as FormData["usaAiProxy"],
           contrafactualAfetadosTipo: afetadosSeed.tipo,
           contrafactualAfetados: afetadosSeed.lista,
+          // Vínculo de FEATURE é read-only na edição (só a submissão nova o cria). O
+          // prefixo "[feature de <pai>]" no nome já mostra o vínculo; aqui só semeamos o
+          // estado para o step1 exibir a referência.
+          // ⚠️ Os campos do ESPECIAL que a branch de origem semeava aqui NÃO voltaram: a v2
+          // os removeu do formulário (D5 — especial passou a ser derivado da estrela).
+          vinculo: (data.projeto_pai_id as string | null) ? "feature" : "novo",
+          paiId: (data.projeto_pai_id as string | null) ?? "",
+          // O NOME do pai não vem no seed (o backend devolve só o id) — e não precisa: o
+          // prefixo "[feature de <pai>]" já está no nome do projeto, e na edição o vínculo
+          // é read-only.
+          paiNome: "",
+          temAppGodeploy: (data.url_godeploy as string | null) ? "sim" : "",
+          urlGodeploy: (data.url_godeploy as string | null) ?? "",
         };
 
         setForm(newForm);
@@ -709,6 +726,8 @@ export function SubmeterPageContent({
             newForm.participantesContribuicoes,
           ),
           descricaoBreve: newForm.descricaoBreve.trim(),
+          temAppGodeploy: newForm.temAppGodeploy,
+          urlGodeploy: newForm.urlGodeploy,
           usaAiProxy: newForm.usaAiProxy,
           contrafactualAfetados: serializarAfetados(
             newForm.contrafactualAfetadosTipo,
@@ -887,8 +906,13 @@ export function SubmeterPageContent({
     ganhoCategorias: [],
     descricaoBreve: "",
     usaAiProxy: "",
+    temAppGodeploy: "",
+    urlGodeploy: "",
     contrafactualAfetadosTipo: "pessoa",
     contrafactualAfetados: [],
+    vinculo: "novo",
+    paiId: "",
+    paiNome: "",
   });
 
   // Título da aba. Esta tela é a MESMA em dois modos (nova submissão × edição), e é
@@ -1107,6 +1131,8 @@ export function SubmeterPageContent({
   }, [form.escopo, form.servicoExterno]);
 
   const snapshotMeta = useCallback((): AgentMeta => ({
+    temAppGodeploy: form.temAppGodeploy,
+    urlGodeploy: form.urlGodeploy,
     nomeProjeto: form.nomeProjeto.trim(),
     ferramenta: computeFerramenta(),
     participantes: form.participantes,
@@ -1166,8 +1192,10 @@ export function SubmeterPageContent({
             // ⚠️ SEM `data_criacao`: o campo saiu do formulário na v2 (a data que vale é a
             // de SUBMISSÃO). E sem tipos/categorias: a fase de doc não depende delas — o
             // ganho declarado é gravado no envio, pela rota própria.
+            projeto_pai_id: form.vinculo === "feature" && form.paiId ? form.paiId : undefined,
             descricao_breve: form.descricaoBreve.trim() || undefined,
             usa_ai_proxy: form.usaAiProxy || undefined,
+            url_godeploy: form.temAppGodeploy === "sim" ? form.urlGodeploy.trim() || undefined : undefined,
             contrafactual_afetados:
               serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
               undefined,
@@ -1375,6 +1403,7 @@ export function SubmeterPageContent({
         membros_contribuicoes: meta.participantesContribuicoes,
         descricao_breve: meta.descricaoBreve,
         usa_ai_proxy: meta.usaAiProxy || undefined,
+        url_godeploy: meta.temAppGodeploy === "sim" ? meta.urlGodeploy.trim() || undefined : undefined,
         contrafactual_afetados: meta.contrafactualAfetados || undefined,
         ...(docs ? { docs } : {}),
       });

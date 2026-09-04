@@ -23,18 +23,25 @@ import {
   type SaidaMerito,
   type JulgamentoMerito,
   type DimensaoMerito,
-} from '@/lib/avaliacao/cerebro-merito';
+  conservarSugestaoDeValor,} from '@/lib/avaliacao/cerebro-merito';
 import {
   buildPromptEstrela,
   normalizarSaidaEstrela,
   saidaEstrelaFallback,
   type SaidaEstrela,
 } from '@/lib/avaliacao/cerebro-estrela';
+import {
+  buildPromptCeticoEstrela,
+  normalizarCeticoEstrela,
+  ceticoEstrelaFallback,
+  travaEscapeSemCitacao,
+  type ResultadoCeticoEstrela,
+} from '@/lib/avaliacao/cetico-estrela';
 import { conciliar, type Consenso, type Liberacao } from '@/lib/avaliacao/consenso';
 import { textoJustificativaInterna, textoAoAutor, dossieDeComite, ocultarValoresMonetarios } from '@/lib/avaliacao/textos';
 import type { TipoNo } from '@/lib/agentes-log';
 
-export type Papel = 'especialista' | 'estrela' | 'cetico';
+export type Papel = 'especialista' | 'estrela' | 'cetico' | 'cetico_estrela';
 export type ChamarLlm = (mensagens: Mensagem[], papel: Papel) => Promise<string>;
 export type Executor = (nome: NomeFerramenta, args: Record<string, unknown>) => Promise<unknown>;
 export type NoParaRegistrar = {
@@ -266,6 +273,11 @@ export async function avaliarComTime(args: {
       julgamento = julgamentoFallback(dimensao, erro);
     }
     julgamento = aplicarTravaEspecialSemNumero(julgamento, dossie);
+    // ⚠️ A sugestão do financeiro só DESCE, e só com justificativa conferível — ver
+    // `conservarSugestaoDeValor`. Um time que aumenta o ganho declarado por conta própria é a
+    // única coisa que este pipeline não pode fazer.
+    if (julgamento.dimensao === 'financeiro')
+      julgamento = { ...julgamento, valor: conservarSugestaoDeValor(julgamento.valor, dossie.financeiro.ganho_total_mensal) };
     const noId = await registrarSeguro(
       {
         pai_id: paiId,
@@ -316,10 +328,9 @@ export async function avaliarComTime(args: {
   let julgamentos = await rodarRodada(raizId, 1);
 
   // ── cérebro B ──
-  let estrela: SaidaEstrela;
-  {
+  async function rodarEstrela(rodada: number, objecaoDoCetico: string | null): Promise<SaidaEstrela> {
     const ini = Date.now();
-    const prompt = buildPromptEstrela({ dossieTexto, vizinhos: vizinhosEstrela, ferramentasTexto });
+    const prompt = buildPromptEstrela({ dossieTexto, vizinhos: vizinhosEstrela, ferramentasTexto, objecaoDoCetico });
     const loop = await loopComFerramentas({ chamarLlm: chamar('estrela'), mensagensIniciais: prompt, executar: args.executar, maxChamadas: maxTools });
     const ctx = { temVizinhos, notaHumana: args.notaHumana };
     let erro: string | null = null;
@@ -330,22 +341,76 @@ export async function avaliarComTime(args: {
       erros.push(erro);
       saida = saidaEstrelaFallback(erro, ctx);
     }
-    estrela = saida;
     const noId = await registrarSeguro(
       {
         pai_id: raizId,
         agente: 'cerebro-estrela',
         tipo: 'cerebro',
-        rodada: 1,
-        saida: json(estrela),
+        rodada,
+        entrada: objecaoDoCetico ? `réplica ao cético da estrela: ${objecaoDoCetico}` : undefined,
+        saida: json(saida),
         tools_chamadas: loop.passos.map((p) => ({ nome: p.nome, erro: p.erro })), // o retorno vive no nó filho (tool); não duplicar (teto de 32 MiB)
-        veredito: `${estrela.nota}`,
+        veredito: `${saida.nota}`,
         erro,
         duracao_ms: Date.now() - ini,
       },
       true,
     );
     await registrarTools(noId, loop.passos);
+    return saida;
+  }
+
+  /**
+   * O SEGUNDO cético da mesa: ataca a ALTURA da nota, não o mérito (03/09/2026).
+   *
+   * ⚠️ A trava determinística vem ANTES do LLM: escape indicado sem as duas citações já é
+   * refutação por régua (`escapeValido` é a fonte única), e pedir opinião ao modelo sobre algo
+   * que a régua decide só gastaria uma chamada para às vezes discordar dela.
+   */
+  async function rodarCeticoEstrela(
+    est: SaidaEstrela,
+    paiId: string | null,
+    rodada: number,
+  ): Promise<ResultadoCeticoEstrela> {
+    const porRegua = travaEscapeSemCitacao(est);
+    if (porRegua) {
+      await registrarSeguro(
+        { pai_id: paiId, agente: 'cetico-estrela', tipo: 'cetico', rodada, saida: json(porRegua), veredito: 'refuta (régua)', duracao_ms: 0 },
+        true,
+      );
+      return porRegua;
+    }
+    const ini = Date.now();
+    let res: ResultadoCeticoEstrela | null = null;
+    let erro: string | null = null;
+    try {
+      const raw = await chamar('cetico_estrela')(
+        buildPromptCeticoEstrela({ dossieTexto, estrela: est, vizinhos: vizinhosEstrela }),
+      );
+      res = normalizarCeticoEstrela(extrairJsonSeguro(raw), est.nota);
+      if (!res) erro = 'cético da estrela: saída inválida';
+    } catch (e) {
+      erro = `cético da estrela: ${e instanceof Error ? e.message : String(e)}`;
+    }
+    if (!res) {
+      erros.push(erro ?? 'cético da estrela: falhou');
+      res = ceticoEstrelaFallback(est.nota);
+    }
+    await registrarSeguro(
+      { pai_id: paiId, agente: 'cetico-estrela', tipo: 'cetico', rodada, saida: json(res), veredito: res.fallback ? 'fallback' : res.refuta ? `refuta → ${res.nota_sugerida}` : 'aceita', erro, duracao_ms: Date.now() - ini },
+      true,
+    );
+    return res;
+  }
+
+  let estrela = await rodarEstrela(1, null);
+  // ⚠️ UMA volta, e só quando o cético refuta com motivo nomeado. O teto é o mesmo do debate do
+  // mérito (`MAX_RODADAS_DEBATE`) e existe pela mesma razão: sem teto, dois modelos discordando
+  // não convergem — eles alternam. Se o cético insistir depois da volta, quem decide é o consenso.
+  let ceticoEstrela = await rodarCeticoEstrela(estrela, raizId, 1);
+  if (ceticoEstrela.refuta && ceticoEstrela.motivo) {
+    estrela = await rodarEstrela(2, ceticoEstrela.motivo);
+    ceticoEstrela = await rodarCeticoEstrela(estrela, raizId, 2);
   }
 
   // ── consolida + cético (+ réplica com teto) ──
@@ -377,7 +442,13 @@ export async function avaliarComTime(args: {
   const debateFechou = !(cetico.refuta && merito.veredito === 'aprovar');
 
   // ── consenso ──
-  const consenso = conciliar(merito, estrela, { debateFechou, ceticoRefuta: cetico.refuta, liberacao: args.liberacao });
+  const consenso = conciliar(merito, estrela, {
+    debateFechou,
+    ceticoRefuta: cetico.refuta,
+    ceticoEstrelaRefuta: ceticoEstrela.refuta,
+    ceticoEstrelaMotivo: ceticoEstrela.motivo,
+    liberacao: args.liberacao,
+  });
   await registrarSeguro(
     { pai_id: raizId, agente: 'consenso', tipo: 'consenso', rodada: rodadas, saida: json(consenso), veredito: consenso.saida, confianca: consenso.confianca, duracao_ms: Date.now() - t0 },
     true,

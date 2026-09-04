@@ -116,14 +116,18 @@ type Cenario = {
   especialista?: (ctx: CtxEspecialista) => string | Promise<string>;
   estrela?: (ctx: { ultima: string; n: number }) => string | Promise<string>;
   cetico?: (ctx: { n: number }) => string | Promise<string>;
+  cetico_estrela?: (ctx: { n: number }) => string | Promise<string>;
 };
 
 /**
  * LLM fake que decide pelo PAPEL e pela última mensagem: a dimensão sai do system do
  * `buildPromptMerito` (`dimensão "<nome>"`), a réplica sai do user (`RÉPLICA`/`debate`).
  */
+/** Resposta padrão do cético da ESTRELA: não refuta, mantém a nota proposta. */
+const ceticoEstrelaAceita = () => JSON.stringify({ refuta: false, nota_sugerida: 0, motivo: null, sinais: [] });
+
 function fakeLlm(c: Cenario = {}) {
-  const contagem: Record<Papel, number> = { especialista: 0, estrela: 0, cetico: 0 };
+  const contagem: Record<Papel, number> = { especialista: 0, estrela: 0, cetico: 0, cetico_estrela: 0 };
   const chamadas: { papel: Papel; mensagens: Mensagem[] }[] = [];
   const fn = vi.fn(async (mensagens: Mensagem[], papel: Papel): Promise<string> => {
     contagem[papel]++;
@@ -137,6 +141,10 @@ function fakeLlm(c: Cenario = {}) {
       return (c.especialista ?? (() => concluirEspecialista()))({ dimensao, replica, ultima, n: contagem.especialista, user });
     }
     if (papel === 'estrela') return (c.estrela ?? (() => concluirEstrela()))({ ultima, n: contagem.estrela });
+    // O 2º cético (o da ESTRELA) aceita por padrão — como o do mérito. Cenário que quiser
+    // exercitar a volta passa `cetico_estrela`.
+    if (papel === 'cetico_estrela')
+      return (c.cetico_estrela ?? ceticoEstrelaAceita)({ n: contagem.cetico_estrela });
     return (c.cetico ?? ceticoAceita)({ n: contagem.cetico });
   });
   return { fn: fn as unknown as ChamarLlm, mock: fn, contagem, chamadas };
@@ -187,8 +195,9 @@ describe('avaliarComTime — caminho feliz (4 especialistas + estrela + cético,
     const r = await rodar({ chamarLlm: llm.fn });
 
     expect(r.projeto_id).toBe('T15-TIME-001');
-    expect(r.chamadas_llm).toBe(6);
-    expect(llm.contagem).toEqual({ especialista: 4, estrela: 1, cetico: 1 });
+    // 7 = 4 especialistas + 1 estrela + 1 cético do mérito + 1 cético da ESTRELA (03/09/2026).
+    expect(r.chamadas_llm).toBe(7);
+    expect(llm.contagem).toEqual({ especialista: 4, estrela: 1, cetico: 1, cetico_estrela: 1 });
     expect(r.rodadas_debate).toBe(1);
     expect(r.debate_fechou).toBe(true);
     expect(r.cetico.refuta).toBe(false);
@@ -241,11 +250,12 @@ describe('avaliarComTime — log em ÁRVORE (nada solto)', () => {
     expect(porTipo('orquestrador')).toHaveLength(1);
     expect(porTipo('especialista')).toHaveLength(4);
     expect(porTipo('cerebro')).toHaveLength(1);
-    expect(porTipo('cetico')).toHaveLength(1);
+    // 2 céticos: o do MÉRITO e o da ESTRELA. Os dois gravam com tipo 'cetico'.
+    expect(porTipo('cetico')).toHaveLength(2);
     expect(porTipo('consenso')).toHaveLength(1);
     expect(porTipo('tool')).toHaveLength(0);
     expect(porTipo('debate')).toHaveLength(0);
-    expect(reg.nos).toHaveLength(8);
+    expect(reg.nos).toHaveLength(9); // + o nó do cético da ESTRELA
 
     for (const n of porTipo('especialista')) expect(n.pai_id).toBe(raiz.id);
     expect(porTipo('cerebro')[0].pai_id).toBe(raiz.id);
@@ -275,7 +285,7 @@ describe('avaliarComTime — log em ÁRVORE (nada solto)', () => {
     expect(idsEspecialistas.has(tools[0].pai_id as string)).toBe(true);
     expect(reg.nos.filter((n) => n.pai_id === null)).toHaveLength(1);
     expect(r.log.nos).toBe(reg.nos.length);
-    expect(r.chamadas_llm).toBe(7); // o especialista com ferramenta falou 2×
+    expect(r.chamadas_llm).toBe(8); // o especialista com ferramenta falou 2×, e há 2 céticos
   });
 });
 
@@ -291,8 +301,8 @@ describe('avaliarComTime — debate com TETO (D15, MAX_RODADAS_DEBATE = 2)', () 
     const reg = fakeRegistrador();
     const r = await rodar({ chamarLlm: llm.fn, registrar: reg.fn });
 
-    expect(r.chamadas_llm).toBe(11);
-    expect(llm.contagem).toEqual({ especialista: 8, estrela: 1, cetico: 2 });
+    expect(r.chamadas_llm).toBe(12); // + o cético da estrela
+    expect(llm.contagem).toEqual({ especialista: 8, estrela: 1, cetico: 2, cetico_estrela: 1 });
     expect(r.rodadas_debate).toBe(2);
     expect(r.debate_fechou).toBe(true);
     expect(r.cetico.refuta).toBe(false);
@@ -318,7 +328,7 @@ describe('avaliarComTime — debate com TETO (D15, MAX_RODADAS_DEBATE = 2)', () 
     expect(especialistas).toHaveLength(8);
     expect(especialistas.filter((n) => n.pai_id === raiz.id)).toHaveLength(4);
     expect(especialistas.filter((n) => n.pai_id === debates[0].id)).toHaveLength(4);
-    expect(reg.nos.filter((n) => n.tipo === 'cetico')).toHaveLength(2);
+    expect(reg.nos.filter((n) => n.tipo === 'cetico')).toHaveLength(3); // 2 do mérito (réplica) + 1 da estrela
     expect(reg.nos.filter((n) => n.pai_id === null)).toHaveLength(1);
   });
 
@@ -327,8 +337,8 @@ describe('avaliarComTime — debate com TETO (D15, MAX_RODADAS_DEBATE = 2)', () 
     const r = await rodar({ chamarLlm: llm.fn });
 
     expect(r.rodadas_debate).toBe(MAX_RODADAS_DEBATE);
-    expect(llm.contagem).toEqual({ especialista: 8, estrela: 1, cetico: 2 });
-    expect(r.chamadas_llm).toBe(11);
+    expect(llm.contagem).toEqual({ especialista: 8, estrela: 1, cetico: 2, cetico_estrela: 1 });
+    expect(r.chamadas_llm).toBe(12); // + o cético da estrela
     expect(r.cetico.refuta).toBe(true);
     expect(r.merito.veredito).toBe('aprovar');
     expect(r.debate_fechou).toBe(false);
@@ -367,7 +377,7 @@ describe('avaliarComTime — cético refuta um AJUSTE: não há o que debater', 
     expect(r.merito.veredito).toBe('ajuste');
     expect(r.cetico.refuta).toBe(true);
     expect(r.rodadas_debate).toBe(1);
-    expect(r.chamadas_llm).toBe(6);
+    expect(r.chamadas_llm).toBe(7); // + o cético da estrela
     expect(r.debate_fechou).toBe(true);
     expect(r.consenso.saida).toBe('ajuste');
     expect(r.textos.ao_autor).not.toBeNull();
@@ -475,7 +485,7 @@ describe('avaliarComTime — resiliência (nunca lança)', () => {
     expect(r.erros.some((e) => /log/i.test(e))).toBe(true);
     // O time continua avaliando mesmo sem log.
     expect(r.consenso.saida).toBe('aprovar');
-    expect(r.chamadas_llm).toBe(6);
+    expect(r.chamadas_llm).toBe(7); // + o cético da estrela
   });
 
   it('registrador devolve null para a raiz → mesmo comportamento: nenhum filho registrado, raiz null', async () => {

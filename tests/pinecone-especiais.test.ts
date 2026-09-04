@@ -277,6 +277,7 @@ const pinecone = {
   namespacePinecone: vi.fn(() => 'prod'),
 };
 const lerResumosEspelho = vi.fn();
+const lerLinhaEspelho = vi.fn();
 const classificarEspecial = vi.fn();
 const gerarEmbeddingsLote = vi.fn();
 
@@ -305,7 +306,10 @@ vi.mock('@/lib/pinecone', () => ({
   garantirIndice: (...a: unknown[]) => pinecone.garantirIndice(...a),
   namespacePinecone: () => pinecone.namespacePinecone(),
 }));
-vi.mock('@/lib/sheet-espelho', () => ({ lerResumosEspelho: () => lerResumosEspelho() }));
+vi.mock('@/lib/sheet-espelho', () => ({
+  lerResumosEspelho: () => lerResumosEspelho(),
+  lerLinhaEspelho: (id: string) => lerLinhaEspelho(id),
+}));
 vi.mock('@/lib/especiais-view', () => ({
   apenasEspeciais: (l: { especial: boolean }[]) => l.filter((p) => p.especial),
 }));
@@ -372,6 +376,7 @@ describe('recuperação de vizinhos — Pinecone primeiro, SQLite como fallback'
     db.getDocumentacaoConteudo.mockResolvedValue({
       conteudo: JSON.stringify({ o_que_faz: 'classifica notas' }),
     });
+    lerLinhaEspelho.mockResolvedValue(null);
     db.getAvaliacoesEspeciais.mockResolvedValue([]);
     db.getEmbeddingEspecial.mockResolvedValue(null);
     db.getEmbeddingsEspeciais.mockResolvedValue([
@@ -427,8 +432,90 @@ describe('recuperação de vizinhos — Pinecone primeiro, SQLite como fallback'
     await classificarEspecialProjeto('P0', { dry: true });
     expect(pinecone.upsertVetores).toHaveBeenCalledTimes(1);
     const [vetores] = pinecone.upsertVetores.mock.calls[0];
-    expect(vetores[0].id).toBe('P0');
+    // Minúsculo: o id é canonicalizado na ENTRADA de `classificarEspecialProjeto`, então
+    // SQLite, embedding, Pinecone e `especial_avaliacao` endereçam sempre a mesma chave.
+    expect(vetores[0].id).toBe('p0');
     expect(vetores[0].metadata.tem_nota_humana).toBe(false);
+  });
+
+  // ⚠️ Regressão dos 30 aprovados invisíveis (run 1 da calibragem, 03/09/2026): a planilha
+  // guarda o id do legado em MAIÚSCULA e o sync reverso cria a linha em `projetos` sempre em
+  // minúscula, e o `=` do SQLite é sensível a caixa. `LEGADO-049` devolvia "projeto sem
+  // contexto para classificar" enquanto `legado-049` passava — sem erro, sem aviso. O mock
+  // abaixo é sensível à caixa DE PROPÓSITO: é a falha de produção, não uma aproximação dela.
+  it('id MAIÚSCULO da planilha endereça o SQLite pela chave canônica (minúscula)', async () => {
+    pinecone.consultarVizinhos.mockResolvedValue([]);
+    db.getProjetoContextoData.mockImplementation(async (id: string) =>
+      id === 'legado-049'
+        ? {
+            nome: 'SofIA do FP&A',
+            area: 'FP&A',
+            contexto_especial: null,
+            descricao_breve: 'faz coisa',
+            memorial_calculo: null,
+            submitted_at: null,
+          }
+        : null,
+    );
+    db.getDocumentacaoConteudo.mockImplementation(async (id: string) =>
+      id === 'legado-049' ? { conteudo: JSON.stringify({ o_que_faz: 'classifica notas' }) } : null,
+    );
+
+    // Não está entre os especiais do espelho — é um APROVADO normal, como os 30 do run 1.
+    // Sem o resumo para salvar a chamada, quem decide é a leitura do SQLite.
+    const r = await classificarEspecialProjeto('LEGADO-049', { dry: true });
+
+    expect(r.ok).toBe(true);
+    expect(r.motivo).toBeUndefined();
+    expect(db.getProjetoContextoData).toHaveBeenCalledWith('legado-049');
+    // E a chave canônica vale para a IDA e a VOLTA: o que se grava tem de endereçar o mesmo
+    // projeto que se leu, senão nasce uma segunda identidade em `especial_avaliacao`.
+    expect(r.projeto_id).toBe('legado-049');
+  });
+
+  /**
+   * Memorial degenerado dos legados importados à mão.
+   *
+   * ⚠️ Medido em prod (03/09/2026): nesses 30 projetos o "Memorial de Saving" é a CONTA que a
+   * triagem escreveu (mediana 57 caracteres, contra 1.903 dos memoriais do app) e o texto do
+   * AUTOR ficou em "Memorial anterior". Lendo só a conta, **30 de 30 saíram 0★, sendo 15 com nota
+   * humana 1**, contra uma taxa base de 50% de zeros nessa faixa. Não era veredito sobre os
+   * projetos, era ausência de dossiê.
+   */
+  it('memorial que é só uma CONTA é complementado com o texto do autor', async () => {
+    pinecone.consultarVizinhos.mockResolvedValue([]);
+    db.getProjetoContextoData.mockResolvedValue({
+      nome: 'SofIA do FP&A', area: 'FP&A', contexto_especial: null,
+      descricao_breve: 'consolida DREs', submitted_at: null,
+      memorial_calculo: '8 análises/mês × ~19min = 2,5h/mês × R$82,10/h = R$205,25.',
+    });
+    lerLinhaEspelho.mockResolvedValue({
+      'Memorial anterior': 'Essa automação reduz tempo de consultas frequentes de valores históricos feitas de forma recorrente pela diretoria. Quantidade de análises mensais: 8.',
+    });
+
+    await classificarEspecialProjeto('P0', { dry: true });
+
+    const [alvo] = classificarEspecial.mock.calls[0] as [{ memorial: string | null }];
+    expect(alvo.memorial).toContain('R$205,25');
+    expect(alvo.memorial).toContain('recorrente pela diretoria');
+  });
+
+  // ⚠️ Em projeto do app, "Memorial anterior" é a versão ANTERIOR do memorial: juntar as duas
+  // colocaria números velhos ao lado dos novos no mesmo texto.
+  it('memorial CHEIO não é complementado', async () => {
+    pinecone.consultarVizinhos.mockResolvedValue([]);
+    const cheio = 'Memorial de Cálculo. Contexto: ' + 'x'.repeat(400);
+    db.getProjetoContextoData.mockResolvedValue({
+      nome: 'Alvo', area: 'Fiscal', contexto_especial: null, descricao_breve: 'faz coisa',
+      submitted_at: null, memorial_calculo: cheio,
+    });
+    lerLinhaEspelho.mockResolvedValue({ 'Memorial anterior': 'versão velha com números antigos' });
+
+    await classificarEspecialProjeto('P0', { dry: true });
+
+    const [alvo] = classificarEspecial.mock.calls[0] as [{ memorial: string | null }];
+    expect(alvo.memorial).toBe(cheio);
+    expect(alvo.memorial).not.toContain('números antigos');
   });
 
   it('upsert no índice falhando NÃO derruba a classificação (best-effort)', async () => {
@@ -449,6 +536,7 @@ describe('backfill do índice (T5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     lerResumosEspelho.mockResolvedValue({ linhas: [resumo('P1', 3), resumo('P2', null)] });
+    lerLinhaEspelho.mockResolvedValue(null);
     db.getAvaliacoesEspeciais.mockResolvedValue([]);
     pinecone.descreverIndice.mockResolvedValue({
       nome: 'godocs-especiais',
@@ -511,6 +599,7 @@ describe('re-auditoria (T6) — relatório, nunca escrita', () => {
     lerResumosEspelho.mockResolvedValue({
       linhas: [resumo('A1', 4), resumo('A2', 1), resumo('A3', null)],
     });
+    lerLinhaEspelho.mockResolvedValue(null);
     db.getAvaliacoesEspeciais.mockResolvedValue([]);
     db.getEmbeddingEspecial.mockImplementation(async (id: string) => linhaEmbedding(id, [1, 0]));
     pinecone.descreverIndice.mockResolvedValue({
@@ -570,5 +659,44 @@ describe('re-auditoria (T6) — relatório, nunca escrita', () => {
     db.getEmbeddingEspecial.mockResolvedValue(null);
     const r = await reauditarEspeciais();
     expect(r.resumo.sem_base).toBe(2);
+  });
+});
+
+/**
+ * Trava de custo dos embeddings.
+ *
+ * ⚠️ As chamadas de LLM vão pelo ai-proxy e são baratas de testar. EMBEDDING é outra coisa: vai
+ * direto na OpenAI, com chave própria, e se paga por chamada. Numa rodada de calibragem, que
+ * repassa a base inteira cinco vezes, qualquer mudança no texto do dossiê muda o hash e
+ * re-embeddaria o lote inteiro sem ninguém pedir (medido: o complemento de memorial sozinho
+ * mudou o texto de 41 projetos).
+ */
+describe('EMBEDDINGS_SOMENTE_LEITURA', () => {
+  const antes = process.env.EMBEDDINGS_SOMENTE_LEITURA;
+  afterEach(() => {
+    if (antes === undefined) delete process.env.EMBEDDINGS_SOMENTE_LEITURA;
+    else process.env.EMBEDDINGS_SOMENTE_LEITURA = antes;
+  });
+
+  it('ligada, NÃO gera embedding nenhum — e a classificação continua', async () => {
+    process.env.EMBEDDINGS_SOMENTE_LEITURA = '1';
+    pinecone.consultarVizinhos.mockResolvedValue([]);
+    db.getEmbeddingEspecial.mockResolvedValue(null); // alvo sem vetor: o caso que geraria
+
+    const r = await classificarEspecialProjeto('P0', { dry: true });
+
+    expect(gerarEmbeddingsLote).not.toHaveBeenCalled();
+    expect(db.upsertEmbeddingEspecial).not.toHaveBeenCalled();
+    expect(r.ok).toBe(true); // sem vetor o projeto fica sem vizinho, não sem nota
+  });
+
+  it('desligada, o comportamento de sempre volta', async () => {
+    delete process.env.EMBEDDINGS_SOMENTE_LEITURA;
+    pinecone.consultarVizinhos.mockResolvedValue([]);
+    db.getEmbeddingEspecial.mockResolvedValue(null);
+
+    await classificarEspecialProjeto('P0', { dry: true });
+
+    expect(gerarEmbeddingsLote).toHaveBeenCalled();
   });
 });

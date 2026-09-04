@@ -1,0 +1,69 @@
+==============================================================================
+run 1 · agente, RAG vazio          n=646  idêntica  47%  ±1  76%  acima 200  abaixo 59
+  distribuição: 0★:306 1★:150 2★:119 3★:39 4★:11 5★:16 6★:4 7★:1
+run 2 · agente + RAG restaurado    n=230  idêntica  58%  ±1  78%  acima 51  abaixo 23
+  distribuição: 0★:130 1★:45 2★:27 3★:12 4★:3 5★:11 7★:1 8★:1
+
+==============================================================================
+ADERÊNCIA POR FAIXA DE CONFIANÇA (dentro de ±1 da nota da planilha)
+run 1 · agente, RAG vazio: sem confiança gravada nesta run
+run 2 · agente + RAG restaurado: sem confiança gravada nesta run
+
+==============================================================================
+ONDE A DIVERGÊNCIA MORA (por nota da planilha, última run)
+  humana   n   idêntica   agente ACIMA   agente ABAIXO   nota média do agente
+      0  134    69%        41             0              0.63
+      1   13    23%         2             8              0.62
+      2   13    23%         5             5              2.08
+      3    7     0%         3             4              3.14
+      4    4    50%         0             2              2.25
+      5    3    33%         0             2              2.67
+      8    1     0%         0             1              5.00
+     10    1     0%         0             1              5.00
+
+==============================================================================
+CONTESTAÇÕES DE PREÇO: 39 projetos já avaliados divergem por 2★ ou mais
+  o agente pagaria MAIS em 28 e MENOS em 11
+  (a nota humana não muda por isto; é lista para revisão de gente)
+
+  humano 0 → agente 7  (subiria)  Lab Gobeaute · Sistema de P&D, Fórmulas e Cada
+     Centraliza os dados de P&D e sustenta os módulos Indexação de Documentos, Estabilidade e RegulAI. Recomendo 7, e não 8, porque o alcance ainda está restrito ao 
+  humano 10 → agente 5  (baixaria)  PIAPP
+     ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. { "projeto
+  humano 5 → agente 0  (baixaria)  Prisma
+     O Prisma cria criativos, publica campanhas e ajusta sua produção pelo desempenho. Diferente da CTR Machine, o memorial só descreve essa capacidade, sem comprova
+  humano 0 → agente 5  (subiria)  Sucesso.AI
+     O Sucesso.AI detecta insucessos, consulta o cliente sobre reenvio ou reembolso e acompanha a tratativa automaticamente. Recebe 5 porque atua diretamente com o c
+  humano 0 → agente 5  (subiria)  Cadastro de Análise de Crédito RCA
+     ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. { "projeto
+  humano 0 → agente 5  (subiria)  Resposta Pública - Gocase e Kokeshi
+     A automação cria e publica respostas no Reclame Aqui sem revisão humana, entregando diretamente ao cliente e expondo a empresa a impacto reputacional se errar. 
+  humano 3 → agente 8  (subiria)  Argos - CDP inteligente
+     O Argos unifica dados de seis marcas e sustenta modelos e três aplicações de IA já usadas pelo CRM. Fica acima do GoBrands por apoiar mais frentes em produção, 
+  humano 4 → agente 0  (baixaria)  Prazo Otimizado
+     O modelo recalibra prazos por transportadora e região para melhorar a conversão. A lógica se aproxima do GoPrice, mas os resultados vêm de um piloto antigo e nã
+  humano 8 → agente 5  (baixaria)  [VERSTA] Robo orçamento - {Marca}
+     { "projeto": "[VERSTA] Robo orçamento, {Marca}", "estrelas": 5, "faixa": "5★, Assume", "muda o jogo": { "resultado": "não", "justificativa": "O projeto automati
+  humano 3 → agente 0  (baixaria)  Chamados Aprovação via Chat V4
+     A automação envia chamados ao aprovador no Google Chat, registra a resposta e atualiza o ticket. Assim como a Automação de Criação de Chamados via API, o memori
+  humano 0 → agente 3  (subiria)  Lab Gobeaute · Módulo Estabilidade (Uso recorr
+     O módulo conduz os estudos, registra evidências, gera o laudo e leva o veredito até a Homologação, com uso recorrente em produção. Fica em 3 porque torna o proc
+  humano 0 → agente 3  (subiria)  Stock Request
+     Consulta o WMS, valida a disponibilidade e aprova solicitações automaticamente, evitando erros que chegam à operação. Supera os painéis de estoque avaliados, ma
+  humano 0 → agente 3  (subiria)  RFQ - Request for Quotation
+     Estrutura, valida e encaminha solicitações de cotação, evitando que dados obrigatórios cheguem incompletos ao time de importações. Fica ao lado do GoQuote, mas 
+  humano 4 → agente 1  (baixaria)  Gopilot – playson de Google Ads
+     ⚠ Conferir na triagem: «[VERSTA] Robo orçamento - {Marca}» (similaridade 0.76) é quase idêntico e vale 8★ — a nota 1★ diverge muito; iguale a faixa ou justifiqu
+  humano 0 → agente 3  (subiria)  FullControl360°
+     Audita faturas antes e depois da cobrança, automatiza contestações e mantém os pagamentos rastreáveis. Como o Relatório Transportador, protege a operação contra
+  humano 0 → agente 3  (subiria)  GO MOVE
+     O GO MOVE conduz o fluxo DMAIC, valida cada seção com IA e mantém projetos e apresentações registrados em uso mensal. Vai além do Fórum de melhoria contínua por
+  humano 2 → agente 5  (subiria)  Carga diária de chargeback nos antifraudes (Ko
+     Extrai chargebacks, cruza pedidos, gera arquivos e confirma os lotes na Konduto e ClearSale diariamente, sem operação humana. Vai além da Automação de Chargebac
+  humano 2 → agente 5  (subiria)  Integração com Operador Logístico - Life of Co
+     ⚠ escape sem citação da doc para "Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria." — voltou para 5★. { "projeto
+  humano 0 → agente 3  (subiria)  Portal de Pedidos Travados (Houdini)
+     O Houdini permite ao cliente escolher a solução para pedidos travados e registra a tratativa, reduzindo o atendimento manual. Fica ao lado do Portal de devoluçõ
+  humano 0 → agente 3  (subiria)  Brand Keepers Framework
+     Valida automaticamente conteúdos de nove marcas antes do envio e já reduziu peças fora de brand de 34% para menos de 20%. Merece 3 porque barra desvios no fluxo
+  … e mais 19. Lista inteira no artefato, filtro "Só divergências de 2★+".

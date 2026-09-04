@@ -446,6 +446,28 @@ const SCHEMA_SQL = `
   -- ⚠️ Um nível pode ter MAIS DE UMA âncora (o topo da base é PIAPP e companhia), por isso a
   -- chave é o projeto e não a nota.
   -- ⚠️ NUNCA use ponto-e-vírgula nos comentários deste arquivo (ver o aviso do FAQ acima).
+  -- Sugestões de AGLUTINAÇÃO (item 5.3): "este projeto é, na verdade, uma feature daquele".
+  -- ⚠️ Tabela INTERNA e a sugestão NUNCA é o vínculo: as colunas "ID Pai"/"ID Feature" da
+  -- planilha só são escritas quando um humano ACEITA no painel. Palpite de agente gravado na
+  -- planilha é indistinguível de fato declarado para quem lê depois (o Gomoon inclusive).
+  -- ⚠️ Fora de SAFE_UPDATE_FIELDS, sem sync reverso -- apagar a tabela só perde histórico.
+  -- O par (filho, pai) é a chave: um mesmo filho pode ter sido sugerido para pais diferentes
+  -- em varreduras distintas, e rejeitar um não pode apagar a decisão sobre o outro.
+  CREATE TABLE IF NOT EXISTS projeto_aglutinacao (
+    filho_id      TEXT NOT NULL,
+    pai_id        TEXT NOT NULL,
+    similaridade  REAL,
+    confianca     REAL,
+    justificativa TEXT,
+    origem        TEXT,
+    estado        TEXT NOT NULL DEFAULT 'sugerido',
+    decidido_por  TEXT,
+    decidido_em   TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (filho_id, pai_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_projeto_aglutinacao_estado ON projeto_aglutinacao(estado);
+
   CREATE TABLE IF NOT EXISTS especial_referencia (
     projeto_id   TEXT PRIMARY KEY,
     nota         INTEGER NOT NULL,
@@ -754,6 +776,8 @@ const MIGRATIONS = [
   // documentação faz auto-detecção do uso na doc enviada e o analisador cruza
   // declaração × detecção. Vai para a coluna "Usa AI Proxy" do Sheets.
   'ALTER TABLE projetos ADD COLUMN usa_ai_proxy TEXT',
+  // Link do app no GoDeploy (Etapa 2, OPCIONAL) → coluna `URL Godeploy` da planilha.
+  'ALTER TABLE projetos ADD COLUMN url_godeploy TEXT',
   // Split do saving em carga real × ganho por escala (só quando alguém fazia à mão).
   // horas_carga_real = trabalho humano de fato; horas_escala = volume incremental que
   // só a automação cobre. Somam o total (saving_horas), que continua sendo o que vira R$.
@@ -819,6 +843,13 @@ const MIGRATIONS = [
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_move_kpi TEXT",
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_sente_falta TEXT",
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_saving_coerente TEXT",
+  // Estágio da pré-aprovação (feature de outro projeto). 1 = líder do AUTOR (fluxo de
+  // sempre); 2 = líder do DONO DO PROJETO PAI, aberto SÓ depois de o estágio 1 ser
+  // aprovado (ou já na submissão se o estágio 1 for isento). DEFAULT 1 -> toda linha e
+  // leitura existente segue sendo estágio 1, sem mudança de comportamento. A decisão de
+  // um estágio resolve só as linhas DAQUELE estágio (a coluna Sheets do estágio 1 nunca
+  // é sobrescrita por uma decisão do estágio 2).
+  "ALTER TABLE projeto_aprovacoes ADD COLUMN estagio INTEGER NOT NULL DEFAULT 1",
   // FAQ: a categoria virou UM documento (markdown leve) em vez de uma lista de tópicos
   // (SPEC_FAQ D13). Bancos que já tinham as categorias recebem a coluna aqui, e o seed
   // faz o BACKFILL do texto só quando o corpo está vazio — corpo escrito pelo admin
@@ -963,9 +994,21 @@ const MIGRATIONS = [
   // aquela com `[link]` do resumo da doc e usa o `[0]` para dar upsert no MESMO arquivo
   // do Drive — a evidência guardada lá seria apagada pela chamada seguinte do cliente.
   'ALTER TABLE projetos ADD COLUMN ganho_anexos_links TEXT',
+  // Eixo TIPO da categorização (item 5.4) — slug de `TIPOS_PROJETO`
+  // (@/lib/categoria-projeto). O eixo NÍVEL continua na coluna `complexidade`.
+  'ALTER TABLE projetos ADD COLUMN categoria_projeto TEXT',
   'ALTER TABLE projetos ADD COLUMN impacto_bruto REAL',
   'ALTER TABLE projetos ADD COLUMN impacto_liquido REAL',
   'ALTER TABLE projetos ADD COLUMN impacto_liquido_mensal REAL',
+  // Projeto como FEATURE de outro projeto (vínculo pai↔filho). O FILHO guarda o id do
+  // PAI em projeto_pai_id (marcado na Etapa 1, só na submissão NOVA); o PAI acumula os
+  // ids dos filhos em projeto_filhos_ids (JSON array de strings). Colunas do Sheets:
+  // projeto_pai_id -> "ID Pai" (linha do filho); projeto_filhos_ids -> "ID Feature"
+  // (linha do pai, lista acumulada). O nome do filho ganha o prefixo "[feature de
+  // <NOME do pai>]". INTERNO ao vínculo -- fora de SAFE_UPDATE_FIELDS (o valor mora no
+  // SQLite e nas 2 colunas dedicadas do Sheets, escritas por nome).
+  'ALTER TABLE projetos ADD COLUMN projeto_pai_id TEXT',
+  'ALTER TABLE projetos ADD COLUMN projeto_filhos_ids TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

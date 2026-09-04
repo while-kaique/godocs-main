@@ -42,6 +42,9 @@ vi.mock('@/integrations/db/client.server', async () => ({
   getAvaliacaoFeedback: vi.fn(async () => null),
   upsertAvaliacaoFeedback: vi.fn(async () => undefined),
   deleteAvaliacaoFeedback: vi.fn(async () => undefined),
+  // Pré-aprovação do estágio 2 (feature de outro projeto) — por padrão sem fila.
+  getAprovacoesDoProjeto: vi.fn(async () => []),
+  getAprovacoesDeProjetos: vi.fn(async () => []),
   ...(await espelhoFakeP).api,
   // O `?refresh=1` dispara o sync reverso de verdade; aqui só o espelho interessa, então o
   // lado de `projetos` é stub (quem cobre aquele lado é `tests/sync-reverse.test.ts`).

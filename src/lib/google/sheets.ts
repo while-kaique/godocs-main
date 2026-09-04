@@ -2,7 +2,7 @@
 
 import { getAccessToken } from './auth';
 import { assertNaoEhDefaultDeProd } from '../env';
-import { chaveColuna } from '../coluna-chave';
+import { chaveColuna, NOME_LEGADO } from '../coluna-chave';
 
 const DEFAULT_SPREADSHEET_ID = '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
 const DEFAULT_SHEET_NAME = 'GoDocs';
@@ -50,7 +50,10 @@ export const SHEET_COLUMNS = [
   'Participante',                   // I  (papel "Participante" — value interno planejador)
   'Contribuidor',                   // J  (papel "Contribuidor" — value interno contribuidor)
   'Descrição',                      // L
-  'URL',                            // M
+  'URL',
+  // Link do app no GoDeploy (Etapa 2, OPCIONAL). A coluna existia na planilha desde sempre
+  // e NUNCA era preenchida — não havia pergunta no formulário que a alimentasse.
+  'URL Godeploy',                            // M
   'Ferramenta',                     // N
   'Escopo',                         // O
   'Tipos de Ganho',                 // P  (v2: as 4 categorias de ganho)
@@ -69,13 +72,23 @@ export const SHEET_COLUMNS = [
   'Impacto Bruto',                  // W  (v2: S + CE + R, sem pesos)
   'Freq. Custo Evitado',            // X
   'Memorial de Saving',             // Y
-  'Custo Externo Mensal',           // Z
+  // ⚠️ `Custo Externo Mensal` SAIU (03/09/2026). A D3 da v2 fundiu as duas linhas de custo
+  // da v1 — a plataforma onde a solução roda e a API/SaaS por uso — em `Custo para Rodar`,
+  // porque economicamente sempre foram a mesma coisa e ninguém as distinguia. A coluna
+  // estava zerada nas 581 linhas da STAGING-V2 e tem UMA linha com valor em prod, onde ela
+  // continua existindo (não a apagamos lá) — o alias não a reintroduz.           // Z
   'Receita Incremental',            // AA
   'Freq. Receita',                  // AB
   'Racional Receita',               // AC
   'Status',                         // AD
   'Impacto Líquido',                // AE (v2: 1,0·S + 0,5·CE + 0,1·R − C)
   'Complexidade',                   // AF (preenchida pelo analisador)
+  // Eixo TIPO da categorização (item 5.4): o que o projeto É — Agente · Sistema · App ·
+  // Dashboard · Automação. Escrita pelo ANALISADOR (nunca pelo append, que a inicializa em
+  // "—"), rótulo legível vindo de `tipoParaSheet`. ⚠️ NÃO confundir com "Tipos de Ganho"
+  // (as 4 categorias de ganho) nem com "Complexidade" — que é o eixo NÍVEL do mesmo item
+  // 5.4, reaproveitada in-place em vez de virar coluna nova.
+  'Tipo de Projeto',
   'Diff Horas / Antes',             // AG (manual — não escrever)
   'Diff Saving / Antes',            // AH (manual — não escrever)
   'Memorial anterior',              // AI (escrita pelo sistema só na edição)
@@ -123,6 +136,18 @@ export const SHEET_COLUMNS = [
   // comentário. A coluna acima fica só com o ESTADO (Pré-aprovado/Pré-pendente/
   // Pré-reprovado) — decisão do Luis, 03/08/2026.
   'Justificativa Aprovação do Líder',
+  // ─── Projeto como FEATURE de outro projeto (vínculo pai↔filho) ───────────────
+  // "ID Pai": na linha do FILHO, o id do projeto PAI (uma feature aponta 1 pai).
+  // "ID Feature": na linha do PAI, a LISTA acumulada dos ids das features (mesmo
+  // padrão das colunas de participantes — cross-row via updateRowByProjectId).
+  // ⚠️ Duas origens escrevem aqui, e elas não se confundem: a DECLARAÇÃO do autor na
+  // Etapa 1 (o vínculo que ele afirma) e o ACEITE humano no painel de aglutinação (a
+  // sugestão do agente, que até ser aceita mora só numa tabela INTERNA — palpite gravado
+  // na planilha é indistinguível de fato declarado para quem lê depois).
+  // ⚠️ As 2 colunas precisam existir no cabeçalho de GoDocs e STAGING (mapeamento por
+  // NOME — se faltar, a célula é ignorada com aviso e o resto do sync segue).
+  'ID Pai',
+  'ID Feature',
   // ─── GoDocs v2 — as 3 perguntas que a v1 nunca fez (BE, BF, BG) ─────────────
   // As demais colunas da v2 são RENOMEAÇÕES in-place das da v1 (a régua D1 trocou os
   // conceitos de nome: o `Custo Evitado` da v1 — a empresa pagava e parou — é o SAVING
@@ -193,8 +218,19 @@ function indexarPorChave<T>(nomes: string[], valor: (nome: string, i: number) =>
  * Resolve a letra da coluna: match EXATO primeiro (comportamento de sempre),
  * tolerante (acento/caixa/espaço) como rede. `undefined` = coluna não existe.
  */
+/**
+ * Nome → letra da coluna. Três tentativas, nesta ordem: nome EXATO, nome normalizado
+ * (acento/caixa — a rede que faz `Aprovação do Lider` casar) e, por último, o NOME LEGADO.
+ *
+ * ⚠️ O legado é a ÚLTIMA tentativa de propósito: numa aba já migrada, o nome novo existe e
+ * o alias nunca é consultado — então migrar a aba não muda comportamento nenhum.
+ */
 export function resolverColunaLetra(map: HeaderMap, nome: string): string | undefined {
-  return map.letterByName[nome] ?? map.letterByKey[chaveColuna(nome)];
+  const direto = map.letterByName[nome] ?? map.letterByKey[chaveColuna(nome)];
+  if (direto) return direto;
+  const legado = NOME_LEGADO[nome];
+  if (!legado) return undefined;
+  return map.letterByName[legado] ?? map.letterByKey[chaveColuna(legado)];
 }
 
 export async function fetchHeaderMap(token: string, spreadsheetId: string, sheetName: string): Promise<HeaderMap> {

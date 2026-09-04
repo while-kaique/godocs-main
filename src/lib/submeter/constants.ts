@@ -395,6 +395,12 @@ export function validarEtapa1(
   // Campos do projeto (escopo/status/ferramenta) só travam na submissão NOVA. Em
   // edição, um legado pode não tê-los preenchidos — não bloqueia (D2/RF-103).
   if (!modoEdicao) {
+    // Vínculo de FEATURE: se marcou "feature", precisa escolher o PAI. ⚠️ NÃO se pergunta
+    // se o pai está em produção: ele é escolhido dentro da nossa base, e todo projeto da
+    // base já passou pelo gate de produção na própria submissão. O gate que vale aqui é o
+    // do `prodStatus` DESTA feature, abaixo.
+    if (form.vinculo === "feature" && !form.paiId.trim())
+      errs.paiId = "Escolha o projeto do qual este é uma feature";
     if (!form.escopo)
       errs.escopo = "Selecione se a solução é interna ou externa";
     if (!form.prodStatus)
@@ -588,6 +594,13 @@ export interface FormData {
   // '' = não respondido; 'sim'/'nao' = resposta determinística na etapa 2. O agente
   // de documentação faz auto-detecção do uso na doc enviada e cruza com esta resposta.
   usaAiProxy: "sim" | "nao" | "";
+  // ─── App no GoDeploy (Etapa 2) ───
+  // A coluna `URL Godeploy` existia na planilha desde sempre e NUNCA foi preenchida —
+  // não havia pergunta que a alimentasse. ⚠️ Tudo OPCIONAL por decisão do Luis: responder
+  // "sim" e não colar o link é aceito, e o "sim" sozinho já é informação (tem app, o link
+  // vem depois). Por isso o link não entra em `validarEtapa2`.
+  temAppGodeploy: "sim" | "nao" | "";
+  urlGodeploy: string;
   // ─── Contrafactual ("se desligar isso hoje, quem reclama?") ───
   // QUEM sente falta é escolhido na Team Guide (mesma fonte do autocomplete da Etapa 1),
   // dinamicamente por PESSOA ou por TIME/ÁREA — quando o impacto é de um time inteiro,
@@ -597,6 +610,18 @@ export interface FormData {
   // "o que piora" (`contrafactualReclamacao`) foi REMOVIDO em 03/08/2026.
   contrafactualAfetadosTipo: AfetadoTipo;
   contrafactualAfetados: string[];
+  // ─── Projeto como FEATURE de outro projeto (Etapa 1) ───
+  // "novo" = projeto normal; "feature" = feature de um projeto existente (escolhe o PAI).
+  // Vale nos 3 fluxos (padrão/especial/liderança). Só a submissão NOVA cria o vínculo
+  // (na edição o vínculo é read-only). `paiId`/`paiNome` vêm do autocomplete do pai.
+  // ⚠️ Os campos do ESPECIAL que vinham junto neste bloco na branch de origem NÃO
+  // voltaram: a v2 os removeu do formulário de propósito (D5 — o especial deixou de ser
+  // declarado pelo usuário e passou a ser DERIVADO de estrela > 0).
+  vinculo: "novo" | "feature" | "";
+  paiId: string;
+  paiNome: string;
+  // Gate de porta (só frontend, como `prodStatus`): o pai precisa estar em produção.
+  // Não vai ao backend, a nenhum prompt nem ao Sheets.
 }
 
 // Quem sentiria falta se a automação parasse: pessoas específicas OU um time/área

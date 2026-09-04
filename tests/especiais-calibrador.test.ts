@@ -251,6 +251,8 @@ describe("curva de referência é parâmetro", () => {
 describe("ponte com o T3 e texto determinístico", () => {
   const av = (lente: string, nota: number): AvaliacaoLente => ({
     lente,
+    piso: null,
+    ancora: null,
     nota,
     evidencia: "nomeada",
     confianca: "media",

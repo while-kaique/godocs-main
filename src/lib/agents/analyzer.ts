@@ -16,6 +16,15 @@ import type {
   SavingColetado,
 } from './types';
 import { detectarAiProxy } from './extractor';
+import {
+  DEFINICAO_AGENTICO,
+  DEFINICAO_TIPO,
+  ROTULO_TIPO,
+  TIPOS_PROJETO,
+  rebaixarAgenticoSemSinal,
+  resolverTipoProjeto,
+  type NivelProjeto,
+} from '@/lib/categoria-projeto';
 import { ehLideranca } from '@/lib/areas/teamguide.server';
 // Mesmas derivações que `submeterParaValidacao` aplica antes de gravar no Sheets — o
 // snapshot da documentação fica defasado no financeiro (ver comentário em buildUserMessage).
@@ -241,11 +250,31 @@ EXEMPLOS:
 - "Agente que recebe o chamado, decide e RESPONDE o cliente sozinho" → **autonomia**.
 - "RPA determinístico que, ao detectar a condição X, APROVA o pedido sozinho no ERP (sem IA)" → **autonomia** (ação consequente automática que é a DECISÃO final, mesmo sem IA).
 
+### 4º NÍVEL — "agentico" (acima de autonomia)
+
+${DEFINICAO_AGENTICO}
+
+⚠️ **A fronteira autonomia × agêntico é QUEM ESCREVE O ROTEIRO**, não quantos passos existem nem quão moderno o projeto parece. Autônomo executa sozinho um caminho que o CONSTRUTOR definiu; agêntico escolhe o caminho em runtime. Na dúvida, classifique **"autonomia"** — como em toda esta árvore, o degrau mais alto exige evidência, não impressão.
+- "Fluxo n8n de 12 nós que sempre roda na mesma ordem e no fim aprova o pedido" → **autonomia** (roteiro fixo).
+- "Agente que recebe o chamado, decide sozinho quais sistemas consultar, itera e fecha o caso" → **agentico**.
+
 Reporte DOIS campos booleanos, além da complexidade:
 - **"usa_ia"** (Pergunta A) — a automação, quando EXECUTA, usa IA em algum passo (gera/classifica/extrai/transcreve/decide com IA — não as ferramentas usadas para construí-la)? true = usa IA no runtime; false = determinística, mesmo se construída com Claude. Se false, a complexidade NÃO pode ser "inteligencia" (será "automacao" ou, se tomar a ação consequente, "autonomia"). Se true, é pelo menos "inteligencia" (a não ser que tome a ação → "autonomia").
 - **"acao_autonoma"** (Pergunta B / passo 1 da árvore) — o projeto toma a AÇÃO consequente na última ponta sozinho, sem um humano confirmar (fecha o caso e age sobre o objeto do processo)? true = fecha o caso e age; false = entrega insumo para um humano decidir/agir. Só classifique "autonomia" quando acao_autonoma=true.
 
 Escreva também "complexidade_justificativa" (2-3 frases) citando evidência concreta da documentação. Para **"autonomia"**, a justificativa DEVE nomear a AÇÃO consequente específica que o sistema toma sozinho (ex.: "remove o cupom no e-commerce automaticamente ao detectar a queda de margem"); se não houver uma ação concreta nomeável, NÃO é autonomia. Para **"automacao"**, explique por que NÃO é inteligência (sem IA no runtime) nem autonomia (para na informação).
+
+## TIPO DE PROJETO (o que ele É — eixo INDEPENDENTE da complexidade)
+
+A complexidade acima diz **COMO** o trabalho acontece. Este campo diz **O QUE FOI ENTREGUE**. São eixos independentes: um Dashboard é quase sempre "automacao", e isso não é contradição.
+
+Classifique em EXATAMENTE um de ${TIPOS_PROJETO.length}, e use esta ORDEM DE PRECEDÊNCIA — o primeiro que se aplicar vence (um projeto que tem agente E painel é "agente"):
+
+${TIPOS_PROJETO.map((t) => `${TIPOS_PROJETO.indexOf(t) + 1}. **"${t}"** (${ROTULO_TIPO[t]}) — ${DEFINICAO_TIPO[t]}`).join('\n')}
+
+⚠️ **NÃO classifique pela FERRAMENTA nem pelo tamanho.** Feito com Claude Code não é "agente"; feito em n8n não é obrigatoriamente "automacao" (n8n que serve um formulário para gente preencher é "app"). O que decide é o ARTEFATO que a pessoa usa no fim.
+⚠️ **"agente" exige IA em runtime.** Menu de respostas fixas no WhatsApp é "automacao", mesmo que o autor o chame de bot.
+Escreva também "tipo_projeto_justificativa" (1-2 frases) nomeando o artefato concreto que sustenta a escolha.
 
 ## CUSTOS DO PROJETO (cross-check declaração × documentação)
 
@@ -308,8 +337,10 @@ IMPORTANTE:
   "resumo": "<2-4 frases claras resumindo o resultado para o usuário>",
   "usa_ia": true | false,
   "acao_autonoma": true | false,
-  "complexidade": "automacao" | "inteligencia" | "autonomia",
+  "complexidade": "automacao" | "inteligencia" | "autonomia" | "agentico",
   "complexidade_justificativa": "<2-3 frases explicando por que este nível foi escolhido>",
+  "tipo_projeto": "agente" | "sistema" | "app" | "dashboard" | "automacao",
+  "tipo_projeto_justificativa": "<1-2 frases nomeando o artefato que sustenta a escolha>",
   "classificacao_avaliacao": "claro_sim" | "claro_nao" | "zona_cinzenta",
   "classificacao_justificativa": "<OBRIGATÓRIO em todos os casos: 2-4 frases dizendo qual critério (recorrência/contrafactual/rastreabilidade) passou ou falhou e por quê>",
   "motivo_reprovacao": "<só quando classificacao_avaliacao='claro_nao': texto legível PELO AUTOR dizendo o que faltou e o que fazer; nos outros casos, null>",
@@ -473,7 +504,7 @@ export function normalizarComplexidade(input: {
   acao_autonoma?: boolean | null;
   tem_ia_como_funcionalidade?: boolean | null;
 }): { complexidade: Complexidade; usa_ia: boolean | undefined; ajuste: string | null } {
-  const VALIDAS: Complexidade[] = ['automacao', 'inteligencia', 'autonomia'];
+  const VALIDAS: Complexidade[] = ['automacao', 'inteligencia', 'autonomia', 'agentico'];
   let complexidade: Complexidade = VALIDAS.includes(input.complexidade as Complexidade)
     ? (input.complexidade as Complexidade)
     : 'automacao'; // fallback conservador
@@ -486,6 +517,18 @@ export function normalizarComplexidade(input: {
 
   let ajuste: string | null = null;
 
+  // ── 4º degrau: agentico exige os DOIS eixos ligados (ação + IA em runtime) ──
+  // Guard em `@/lib/categoria-projeto` (fonte única do eixo NÍVEL). Só REBAIXA, como
+  // todos os outros — nada promove ninguém a agêntico por sinal automático.
+  const agentico = rebaixarAgenticoSemSinal(complexidade as NivelProjeto, {
+    acao_autonoma,
+    ia_efetiva: iaEfetiva ?? null,
+  });
+  if (agentico.ajuste) {
+    complexidade = agentico.nivel as Complexidade;
+    ajuste = agentico.ajuste;
+  }
+
   // ── Eixo AÇÃO (precedência sobre IA — D1) ──
   // Freio anti-falso-autonomia: sem ação consequente, autonomia é impossível. Só
   // rebaixa com sinal EXPLÍCITO false; null/undefined → confia no LLM. NÃO promove
@@ -495,8 +538,9 @@ export function normalizarComplexidade(input: {
     ajuste = `autonomia rebaixada para '${complexidade}' (acao_autonoma=false)`;
   }
 
-  // ── Eixo IA (só mexe em automacao ↔ inteligencia; NUNCA toca autonomia — D1) ──
-  if (complexidade !== 'autonomia') {
+  // ── Eixo IA (só mexe em automacao ↔ inteligencia; NUNCA toca autonomia — D1 —
+  // nem agentico, que já passou pelo guard próprio acima) ──
+  if (complexidade !== 'autonomia' && complexidade !== 'agentico') {
     if (iaEfetiva === false && complexidade !== 'automacao') {
       complexidade = 'automacao';
       ajuste = `rebaixada para 'automacao' (sem IA como funcionalidade)`;
@@ -838,6 +882,28 @@ export async function analisarProjeto(projetoId: string): Promise<ResultadoAnali
   if (norm.ajuste) log(`Complexidade normalizada: ${norm.ajuste} (LLM havia sugerido '${sugestaoLLM}')`);
   resultado.complexidade = norm.complexidade;
   resultado.usa_ia = norm.usa_ia;
+
+  // ── Eixo TIPO (item 5.4): o que o projeto É ──
+  // LLM primeiro; palpite determinístico sobre o texto livre como rede quando ele cala ou
+  // devolve lixo; guard de coerência por cima (agente sem IA em runtime → automação). A IA
+  // EFETIVA aqui é a mesma do eixo de complexidade (resposta do usuário vence o LLM), para
+  // os dois eixos nunca discordarem sobre o mesmo fato.
+  const tipoResolvido = resolverTipoProjeto({
+    sugestaoLLM: resultado.tipo_projeto,
+    texto: [
+      projeto.nome,
+      projeto.descricao_breve,
+      conteudo.titulo,
+      (conteudo.documentacao as Record<string, unknown> | undefined)?.o_que_faz,
+    ]
+      .filter(Boolean)
+      .join(' \n '),
+    ia_efetiva: norm.usa_ia ?? null,
+  });
+  if (tipoResolvido.ajuste) log(`Tipo de projeto normalizado: ${tipoResolvido.ajuste}`);
+  if (tipoResolvido.origem === 'deterministico')
+    log(`Tipo de projeto veio do palpite determinístico (pista: "${tipoResolvido.evidencia}")`);
+  resultado.tipo_projeto = tipoResolvido.tipo;
 
   // Normaliza a classificação de elegibilidade ("isto é projeto?") aplicando as
   // invariantes da régua: nunca reprova sem motivo, especial nunca reprova automático,

@@ -26,14 +26,16 @@
  */
 import { llmChat } from "@/lib/llm";
 import {
-  NIVEIS,
-  CRITERIOS,
-  DERRUBA,
+  NIVEL_ZERO,
+  CRITERIOS_ESTRELA,
+  ESCAPE_MUDA_O_JOGO,
+  PISO_ZERO,
   NOTA_MAX,
-  CURVA_BASE,
-  TOTAL_AUDITADO,
+  TETO_AGENTE,
+  REGRAS_DO_PORQUE,
+  type ChavePisoZero,
   type Confianca,
-} from "@/lib/especiais-regua";
+} from "@/lib/estrelas-regua";
 import { LIMIARES_GENEROSIDADE } from "@/lib/especiais-concordancia";
 import { montarBlocoFewShot, type Vizinho } from "@/lib/especial-corpus";
 import { definicaoFuncao, rotuloFuncao } from "@/lib/especiais-funcao";
@@ -47,6 +49,42 @@ import { extrairJson, type AlvoClassificacao } from "@/lib/agents/especial-class
  * três julgariam um especial como se fosse um projeto financeiro.
  */
 export const CRITERIOS_GLOBAIS = ["Qualidade de execução", "Especiais"] as const;
+
+/**
+ * Critérios da régua que o painel **de propósito** não cobre com uma lente própria — quem os
+ * julga é a BASE (o classificador de 1 agente, que lê o dossiê inteiro e pontua por todos eles).
+ *
+ * ⚠️ Lista DECLARADA, não exceção no teste. Sem ela, o guard de cobertura ou passaria a aceitar
+ * qualquer órfão (e um critério novo esquecido entraria calado, que é o que ele existe para pegar)
+ * ou obrigaria a manter lente que não decide nada. Tirar uma lente é uma decisão; ela fica escrita
+ * aqui, com o número que a sustenta.
+ *
+ * ⚠️ Não promova um destes a `CRITERIOS_GLOBAIS` para "resolver" a cobertura: global entra no
+ * prompt das QUATRO lentes, então custa o mesmo que a lente dedicada e ainda espalha o eixo por
+ * quem não sabe julgá-lo — foi o defeito que o `PISO_POR_LENTE` corrigiu.
+ */
+export const CRITERIOS_SO_DA_BASE = ["Risco evitado"] as const;
+
+/**
+ * Definição de cada EIXO que as lentes julgam.
+ *
+ * ⚠️ Mora aqui, e não na régua, porque eixo **não é escala**: a régua (`estrelas-regua.ts`) diz o
+ * que uma ESTRELA vale e continua sendo fonte única disso; esta lista diz o que cada lente
+ * PERGUNTA. Antes vinha de `especiais-regua.ts`, junto da escala velha (`Ouro`, `Diamante`), que
+ * o dono do produto substituiu em 03/09/2026 — arrastar a escala morta junto do eixo vivo era o
+ * único motivo de o painel ainda depender daquele arquivo.
+ */
+export const EIXOS = [
+  { titulo: "Função na cadeia", texto: "Quanto da cadeia informação → ação → consequência o projeto assume." },
+  { titulo: "Recorrência real", texto: "Roda de novo sozinho (cron, gatilho, uso contínuo), não é peça única." },
+  { titulo: "Rastreabilidade", texto: "Existe relatório, painel, base ou log NOMEADO onde conferir o ponteiro movido." },
+  { titulo: "Contrafactual", texto: "Se desligar, alguém nomeado sente e o processo piora de forma perceptível." },
+  { titulo: "Complexidade técnica", texto: "automação < inteligência (IA no fluxo) < autonomia (decide e age sozinho)." },
+  { titulo: "Alcance e reuso", texto: "1 pessoa < 1 time < área < várias áreas ou marcas < grupo." },
+  { titulo: "Qualidade de execução", texto: "Em produção, documentado, memorial honesto. Admitir limite conta A FAVOR." },
+  { titulo: "Risco evitado", texto: "Fiscal, jurídico, financeiro ou de segurança." },
+  { titulo: "Especiais", texto: "Sem R$, a estrela é o ÚNICO pagamento: valor estratégico e uso real mandam." },
+] as const;
 
 export type Lente = {
   chave: string;
@@ -71,6 +109,8 @@ export type Lente = {
    * nenhuma delas afrouxa a `DERRUBA` (que continua entrando no prompt inteira).
    */
   ancoras: { nota: number; definicao: string }[];
+  /** Ressalva do eixo, quando ele tem um caso que a âncora sozinha não cobre. */
+  observacao?: string;
 };
 
 /** A lente estrutural: teto das outras (ver o cabeçalho e `consolidarLentes`). */
@@ -78,11 +118,50 @@ export const LENTE_GATE = "recorrencia_rastro";
 
 export const LENTES: Lente[] = [
   {
+    // A espinha da régua nova. Sem ela o painel media os APOIOS (recorrência, alcance,
+    // autonomia, risco) e nunca a pergunta central: quanto da cadeia o projeto assume.
+    chave: "funcao_cadeia",
+    rotulo: "Função na cadeia",
+    pergunta:
+      "Quanto da cadeia informação → ação → consequência este projeto assume? Ele entrega o insumo, executa a ação, impede o erro, escolhe, ou responde pela entrega final?",
+    criterios: ["Função na cadeia"],
+    /**
+     * ⚠️ O VERBO vem da régua (fonte única do nome de cada nível); a definição é LOCAL, e tem de
+     * ser. A definição global de cada nível é CONJUNTIVA, ela descreve o projeto inteiro: o 3★
+     * global exige "a consequência evitada recai sobre OUTRA área e tem impacto na operação",
+     * que é alcance, não função. Foi exatamente isso que o T7 mediu — dar a definição global a um
+     * eixo isolado faz toda lente responder 1 ou 2 corretamente, e o painel não passou de 2★ em
+     * 48 especiais. Aqui fica só a parte que é FUNÇÃO; o resto pertence às outras lentes.
+     */
+    ancoras: [
+      { nota: NIVEL_ZERO.nota, definicao: `${NIVEL_ZERO.verbo}. Não assume parte nenhuma da cadeia: existe para testar uma ideia ou resolver uma tarefa isolada.` },
+      { nota: 1, definicao: `${CRITERIOS_ESTRELA[0].verbo}. Entrega o insumo, não a ação: produz dado, visibilidade, alerta ou registro, e quem age é gente.` },
+      { nota: 2, definicao: `${CRITERIOS_ESTRELA[1].verbo}. Assume a ação em si e roda sem ninguém iniciar. Não escolhe o que fazer, faz.` },
+      { nota: 3, definicao: `${CRITERIOS_ESTRELA[2].verbo}. Impede o erro de passar: valida, bloqueia ou exige registro antes de o processo seguir.` },
+      { nota: 4, definicao: `${CRITERIOS_ESTRELA[3].verbo}. Escolhe, não só executa, e a escolha não sai de uma tabela fixa de "se isto, então aquilo".` },
+      { nota: 5, definicao: `${CRITERIOS_ESTRELA[4].verbo}. Responde pela entrega final, sem ninguém entre a falha dele e o prejuízo.` },
+    ],
+  },
+  {
     chave: LENTE_GATE,
     rotulo: "Recorrência, rastro e contrafactual",
     pergunta:
       "Isto roda de novo sozinho, existe um lugar NOMEADO onde conferir o ponteiro, e alguém nomeado sente falta se desligar?",
     criterios: ["Recorrência real", "Rastreabilidade", "Contrafactual"],
+    /**
+     * ⚠️ Medido em 03/09/2026, nos dois casos que o handoff apontava: no PIAPP esta lente
+     * ESCREVEU "usado continuamente por mais de dez times e abastece a geração automática do
+     * Prisma" e mesmo assim respondeu 1, com prova "vaga". Como ela é o teto das outras, o
+     * projeto fechou em 2★ com alcance 5 provado por nome. O Prisma, idem.
+     *
+     * A âncora 3 desta lente já dizia "gente de FORA do autor depende da saída na rotina dela" —
+     * o que faltava era dizer que, numa PLATAFORMA, o dependente NOMEADO É o lugar de conferir.
+     * A régua já declara isso para o escape ("o caso da plataforma"); aqui o eixo não sabia.
+     * ⚠️ Não vale para "poderá ser usado por" nem para dependente sem nome: aí não há atividade
+     * em curso, e a prova continua vaga.
+     */
+    observacao:
+      'PLATAFORMA: quando OUTRO projeto ou time NOMEADO roda em cima deste (consome API, MCP, integração), esse dependente é a prova, e a prova é "nomeada". Não exija um relatório ou painel além dele: para uma plataforma, quem usa É onde se confere. Vale só com nome próprio; "poderá ser usado por" e dependente sem nome continuam prova vaga.',
     ancoras: [
       { nota: 0, definicao: "Rodou uma vez, ou é teste/POC. Nada volta a rodar." },
       { nota: 1, definicao: "Roda de vez em quando, disparado à mão, sem lugar nomeado onde conferir. Se desligar, só o autor sente." },
@@ -90,7 +169,6 @@ export const LENTES: Lente[] = [
       { nota: 3, definicao: "Roda sozinho, o ponteiro tem nome próprio, e gente de FORA do autor depende da saída na rotina dela." },
       { nota: 4, definicao: "A rotina é obrigação recorrente de um processo com prazo (fiscal, financeiro, atendimento) e o rastro é conferível por quem não participou." },
       { nota: 5, definicao: "Outras áreas dependem, e o rastro é sistema/base própria consultada por terceiros — auditável sem pedir nada ao autor." },
-      { nota: 7, definicao: "Parar é incidente operacional do grupo: há dono formal, monitoramento e gente avisada quando falha." },
     ],
   },
   {
@@ -106,7 +184,6 @@ export const LENTES: Lente[] = [
       { nota: 3, definicao: "Inteligência DENTRO do fluxo — IA, modelo ou heurística classifica, extrai ou redige, e esse resultado entra no processo." },
       { nota: 4, definicao: "Decide e age sozinho em parte do fluxo; o humano só revisa exceção." },
       { nota: 5, definicao: "Autonomia de ponta a ponta, com tratamento do próprio erro — é serviço/plataforma que outros chamam." },
-      { nota: 7, definicao: "Orquestra vários serviços ou agentes, se corrige, e outros projetos são construídos em cima dele." },
     ],
   },
   {
@@ -122,26 +199,54 @@ export const LENTES: Lente[] = [
       { nota: 3, definicao: "Pessoas de fora do time do autor usam de fato, e dá para nomear quem." },
       { nota: 4, definicao: "Duas ou mais áreas usam, ou o mesmo projeto foi reusado em outra marca, unidade ou empresa do grupo." },
       { nota: 5, definicao: "A área inteira depende, ou virou serviço em que outros times se acoplam." },
-      { nota: 7, definicao: "Escala de grupo: usuários reais fora do time, em várias marcas ou empresas." },
-    ],
-  },
-  {
-    chave: "risco_evitado",
-    rotulo: "Risco evitado",
-    pergunta:
-      "Que risco fiscal, jurídico, financeiro ou de segurança deixou de existir, e o quanto ele era material?",
-    criterios: ["Risco evitado"],
-    ancoras: [
-      { nota: 0, definicao: "Não há risco a evitar. É resposta CORRETA e comum — a maioria dos projetos não evita risco nenhum." },
-      { nota: 1, definicao: "Erro operacional pequeno, percebido e refeito sem custo." },
-      { nota: 2, definicao: "Retrabalho recorrente ou erro que custa dinheiro pequeno, nomeado no material." },
-      { nota: 3, definicao: "Risco material nomeado — multa, juros, quebra de prazo contratual, perda de dado — com valor ou ocorrência citada." },
-      { nota: 4, definicao: "Risco fiscal, jurídico ou de segurança com exposição relevante E prova de que era real: autuação, incidente passado, apontamento de auditoria." },
-      { nota: 5, definicao: "Exposição estrutural do grupo (compliance, LGPD, fraude) endereçada de forma contínua e auditável." },
-      { nota: 7, definicao: "Risco que ameaçava a operação inteira; o controle virou padrão do grupo." },
     ],
   },
 ];
+
+/**
+ * ⚠️ **A lente «Risco evitado» foi REMOVIDA em 04/09/2026, e remover foi a medida certa.**
+ *
+ * Medido no run 7 (177 projetos com as 5 lentes): ela foi a maior de todas em **12** casos contra
+ * 98 da complexidade, deu **0 em 104 de 177** e, simulando o painel sem ela, **mudaria 1 nota na
+ * base inteira (1%)**. Ou seja: custava um quinto do tempo de cada projeto e não decidia nada —
+ * só somava dispersão, que hoje rebaixa a confiança e trava o ajuste para baixo.
+ *
+ * Ela também não era dona de nenhum item do piso (ver `PISO_POR_LENTE` abaixo), então sair não
+ * deixou desqualificador órfão.
+ *
+ * ⚠️ Isso NÃO quer dizer que risco evitado deixou de contar: ele continua na régua, e a base (o
+ * classificador de 1 agente, que lê o dossiê inteiro) segue pontuando por ele. O que saiu foi o
+ * eixo dedicado no painel. **Antes de recriar uma lente, meça quantas vezes ela venceria** — é
+ * barato, sai do próprio JSON da rodada, e foi essa medição que reprovou esta.
+ */
+
+/**
+ * Quais itens do piso CADA lente pode declarar.
+ *
+ * ⚠️ Medido no primeiro teste do painel repointado (03/09/2026): com a lista inteira em todas as
+ * lentes, **`apenas_mensuravel` disparou em 4 das 5** num fluxo de relatório diário comum. É o
+ * mesmo defeito que a régua já registra em outra forma (o texto antigo "o ganho é mensurável"
+ * disparava em 484 de 484 não-especiais): todo projeto normal TEM número, e a lente de "risco
+ * evitado" não tem como saber se o projeto **se resume** a ele. Ela vê um eixo; o piso é fato do
+ * projeto inteiro.
+ *
+ * A régua não muda: os 7 itens continuam valendo e continuam zerando. O que muda é QUEM pode
+ * afirmá-los, e o critério é o mesmo do painel inteiro: você não julga o eixo dos outros.
+ * Item sem lente dona não seria declarável por ninguém, então cada um tem exatamente uma.
+ */
+export const PISO_POR_LENTE: Readonly<Record<string, readonly ChavePisoZero[]>> = {
+  // O que o projeto ENTREGA além do número, e se o que ele faz é tarefa isolada.
+  funcao_cadeia: ["apenas_mensuravel", "simples_local"],
+  // Existência e continuidade: parado, POC, ou o mesmo escopo de novo.
+  recorrencia_rastro: ["fora_de_uso", "experimentacao", "ressubmissao"],
+  // Quem usa, e se isso é relevante para além de um punhado de gente.
+  alcance_reuso: ["so_o_autor", "marginal"],
+};
+
+/** Os itens do piso que ESTA lente pode declarar (vazio = nenhum, e o campo vem sempre null). */
+export function pisoDaLente(chave: string): readonly ChavePisoZero[] {
+  return PISO_POR_LENTE[chave] ?? [];
+}
 
 /** O que uma lente NÃO julga — os eixos das OUTRAS lentes, derivados, nunca redigitados. */
 export function outrosEixos(chave: string): string[] {
@@ -162,10 +267,29 @@ export type Evidencia = "nomeada" | "vaga" | "ausente";
 
 export type AvaliacaoLente = {
   lente: string;
-  /** A nota mais alta da régua que ESTE eixo sustenta (0..NOTA_MAX). */
+  /** A nota mais alta da régua que ESTE eixo sustenta (0..TETO_AGENTE). */
   nota: number;
+  /**
+   * Qual item do piso zerou o projeto, ou `null` se nenhum.
+   *
+   * ⚠️ **Campo OBRIGATÓRIO de propósito, e é a lição do run 1.** Lá o piso existia só como prosa
+   * no prompt e o agente simplesmente não o usava: das 173 notas em que ele subiu acima de um
+   * zero humano, **nenhuma** citou qualquer um dos desqualificadores, e 180 dos 194 zeros foram
+   * justificados por "não comprova uso recorrente", que é outra regra, do bloco de disciplina.
+   * O escape funciona justamente porque exige campo e é conferido em código; o piso não exigia
+   * nada. Pedir a chave força o agente a percorrer a lista antes de posicionar a nota.
+   */
+  piso: ChavePisoZero | null;
   evidencia: Evidencia;
   confianca: Confianca;
+  /**
+   * A ÂNCORA que a lente diz ter aplicado.
+   *
+   * ⚠️ É o critério virando CAIXA: a lente escolhe a frase da régua que descreve o projeto e a
+   * nota tem de ser a daquela frase. Sem isto, ela responde um número e ninguém confere contra
+   * qual critério — que é como "bateu o critério de 3 mas dei 5" passa sem ninguém ver.
+   */
+  ancora: number | null;
   /** Por que este eixo para nesta nota — 1 a 3 frases. */
   justificativa: string;
   /** O trecho do material que sustenta a nota. Vazio = alegação sem prova (ver o guard). */
@@ -175,7 +299,7 @@ export type AvaliacaoLente = {
 // ─── Prompt (montado da régua — fonte única) ───────────────────────────────────
 
 function textoDosCriterios(titulos: readonly string[]): string {
-  return CRITERIOS.filter((c) => titulos.includes(c.titulo))
+  return EIXOS.filter((c) => titulos.includes(c.titulo))
     .map((c) => `- ${c.titulo}: ${c.texto}`)
     .join("\n");
 }
@@ -199,15 +323,37 @@ function descreverAncoras(lente: Lente): string {
  * não consegue alegar sozinho e que travavam TODA lente em 1–2.
  */
 function descreverEscalaGlobalCurta(): string {
-  return NIVEIS.map((n) => `${n.nota} ${n.titulo}`).join(" · ");
+  const base = [NIVEL_ZERO, ...CRITERIOS_ESTRELA].map((n) => `${n.nota} ${n.verbo}`).join(" · ");
+  return `${base} · ${TETO_AGENTE + 1}-${NOTA_MAX} ${ESCAPE_MUDA_O_JOGO.verbo}`;
 }
 
-function descreverCurva(): string {
-  return Object.entries(CURVA_BASE)
-    .filter(([k]) => k !== "vazio")
-    .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([nota, qtd]) => `${nota}★: ${qtd} (${((qtd / TOTAL_AUDITADO) * 100).toFixed(1)}%)`)
-    .join(" · ");
+/**
+ * ⚠️ A CURVA SAIU DO PROMPT DA LENTE, de propósito. Ela dizia "≥3★ é top 4% da base" e essa base
+ * é a base INTEIRA (especiais mais normais), enquanto a lente julga um eixo isolado de UM
+ * projeto. Está na lista do que já foi medido e não deve ser retentado
+ * (`docs/plans/painel-agentes-especiais.md`): âncora de raridade dentro da lente empurra todo
+ * mundo para baixo, e o painel não passava de 2★ em 48 especiais. Quem lê curva é o revisor, e a
+ * dele é a dos ESPECIAIS auditados, não a da base.
+ */
+
+/**
+ * O bloco do piso NA LENTE — só os itens do eixo dela (ver `PISO_POR_LENTE`). Lente sem itens
+ * recebe a instrução explícita de não opinar: silêncio no prompt vira palpite na resposta.
+ */
+function textoDoPiso(lente: Lente): string {
+  const meus = PISO_ZERO.filter((d) => pisoDaLente(lente.chave).includes(d.chave));
+  if (meus.length === 0) {
+    return 'O QUE ZERA: nada disso é do seu eixo. Responda "piso": null SEMPRE — outra lente do painel cuida dos desqualificadores, e opinar aqui zera o projeto por um motivo que você não tem como verificar.';
+  }
+  return [
+    "O QUE ZERA o projeto inteiro, por melhor que o memorial esteja. Estes são os do SEU eixo:",
+    ...meus.map((d) => `- [${d.chave}] ${d.texto}`),
+    'Se nenhum for verdade, responda "piso": null. É a resposta mais comum, e é correta.',
+    '⚠️ Zerar é a afirmação mais forte que você pode fazer, e ela derruba o projeto INTEIRO, por',
+    'cima do que as outras quatro lentes acharam. Só declare o piso se puder COPIAR em',
+    '"sustentacao" o trecho do material que mostra isso. Sem o trecho, o piso é ignorado e sobra',
+    'apenas a sua nota — que já é a forma correta de dizer "neste eixo o projeto não sustenta".',
+  ].join("\n");
 }
 
 export function buildSystemPromptLente(lente: Lente): string {
@@ -228,21 +374,18 @@ ${outrosEixos(lente.chave)
   .join("\n")}
 
 O QUE VOCÊ DEVOLVE:
-A nota MAIS ALTA da régua 0–${NOTA_MAX} que o SEU eixo sustenta — um TETO vindo do seu eixo, não um voto médio. Se o seu eixo sustenta 2, diga 2 mesmo que o projeto pareça impressionante por outro motivo: o outro motivo não é seu.
+A nota MAIS ALTA de 0 a ${TETO_AGENTE} que o SEU eixo sustenta: um TETO vindo do seu eixo, não um voto médio. Se o seu eixo sustenta 2, diga 2 mesmo que o projeto pareça impressionante por outro motivo, porque o outro motivo não é seu.
 
-A RÉGUA DO SEU EIXO — a escala é a MESMA 0–${NOTA_MAX} da base, mas aqui está o que cada nota significa NO SEU EIXO. É contra ESTAS frases que você responde, e não contra a descrição de um projeto inteiro:
+⚠️ ${TETO_AGENTE} é o SEU máximo. A faixa ${TETO_AGENTE + 1} a ${NOTA_MAX} ("${ESCAPE_MUDA_O_JOGO.verbo}") não é decidida por eixo isolado nem por você: ela exige duas citações da documentação e vai para o comitê humano, num passo separado. Nunca devolva nota acima de ${TETO_AGENTE}.
+
+A RÉGUA DO SEU EIXO: a escala é a MESMA da base, mas aqui está o que cada nota significa NO SEU EIXO. É contra ESTAS frases que você responde, e não contra a descrição de um projeto inteiro:
 ${descreverAncoras(lente)}
-Nota não listada fica entre a de baixo e a de cima. De 8 a 10 é o topo absoluto da base (3 projetos em 644): só se o SEU eixo, sozinho, já for o melhor exemplo que existe.
+Nota não listada fica entre a de baixo e a de cima.${lente.observacao ? `\n\n⚠️ ${lente.observacao}` : ""}
 
 A ESCALA GLOBAL (só para LER a nota dos projetos vizinhos — não responda por ela):
 ${descreverEscalaGlobalCurta()}
 
-O QUE DERRUBA para 0–1, por melhor que o memorial esteja:
-${DERRUBA.map((d) => `- ${d}`).join("\n")}
-
-A CURVA REAL DA BASE (644 projetos) — sua régua contra inflação:
-${descreverCurva()}
-≥3★ é top 4% da base; ≥5★ é top 1%. Na dúvida entre duas faixas, fique na MENOR.
+${textoDoPiso(lente)}
 
 DISCIPLINA:
 - Notas INTEIRAS.
@@ -252,14 +395,21 @@ DISCIPLINA:
 - Se o seu eixo simplesmente NÃO se aplica a este projeto (ex.: não há risco nenhum a evitar), devolva nota 0 com evidencia "ausente" e diga isso na justificativa. Isso é resposta CORRETA, não falha — outra lente sustenta o projeto.
 - Os projetos vizinhos vêm com a nota GLOBAL deles (todos os eixos juntos). Use como âncora de MAGNITUDE — "um projeto assim vale 4 na base inteira" — nunca como a resposta do seu eixo.
 
+COMO ESCREVER A JUSTIFICATIVA:
+${REGRAS_DO_PORQUE}
+
 FORMATO — responda APENAS com JSON válido, sem texto fora do JSON:
 {
-  "nota": <inteiro 0 a ${NOTA_MAX}>,
+  "nota": <inteiro 0 a ${TETO_AGENTE}>,
+  "ancora": <a NOTA da frase da régua do seu eixo que descreve este projeto — tem de ser a mesma de "nota">,
+  "piso": <a chave do item que ZERA, entre aspas, ou null se nenhum se aplica>,
   "evidencia": "nomeada" | "vaga" | "ausente",
   "confianca": "alta" | "media" | "baixa",
   "justificativa": "<1 a 3 frases: por que o seu eixo para nesta nota>",
   "sustentacao": "<o trecho do material que sustenta a nota, copiado. Vazio se não houver trecho nenhum.>"
 }
+⚠️ "ancora" é a frase da régua acima que você aplicou. Escolha a frase PRIMEIRO e responda a nota dela: se o projeto bate a descrição do 2, a nota é 2, mesmo que ele impressione por outro motivo. Critério é caixa, não é escala solta.
+⚠️ "piso" é OBRIGATÓRIO e vem ANTES de pensar na nota: percorra os itens que zeram, decida se algum é verdade, e só então posicione o eixo. Preencher com null é uma resposta legítima e comum; o que não vale é não olhar.
 "evidencia": use "nomeada" SÓ quando houver nome próprio de relatório, painel, base, sistema, time ou pessoa em que se possa ir conferir — e copie esse trecho em "sustentacao". Sem trecho, é "vaga" ou "ausente".`;
 }
 
@@ -320,7 +470,9 @@ export function normalizarAvaliacaoLente(bruto: unknown, lente: string): Avaliac
   const o = bruto as Record<string, unknown>;
   const notaCrua = Number(o.nota);
   if (!Number.isFinite(notaCrua)) return null;
-  const nota = Math.max(0, Math.min(NOTA_MAX, Math.round(notaCrua)));
+  // ⚠️ Clampa no TETO DO AGENTE, não em NOTA_MAX: a faixa 6-10 não é decidida por eixo isolado.
+  // Uma lente que devolve 7 está opinando sobre o escape, que exige duas citações e o comitê.
+  const nota = Math.max(0, Math.min(TETO_AGENTE, Math.round(notaCrua)));
 
   const sustentacao = typeof o.sustentacao === "string" ? o.sustentacao.trim() : "";
   let evidencia: Evidencia = EVIDENCIAS.includes(o.evidencia as Evidencia)
@@ -334,9 +486,42 @@ export function normalizarAvaliacaoLente(bruto: unknown, lente: string): Avaliac
 
   const justCrua = typeof o.justificativa === "string" ? o.justificativa.trim() : "";
 
+  // ⚠️ A CAIXA VENCE O NÚMERO. Se a lente diz ter aplicado a âncora 2 e responde 4, vale 2: ela
+  // nomeou o critério que descreve o projeto, e a nota daquele critério é a daquela caixa. Sem
+  // esta trava, "bateu o critério de 2 mas dei 4" atravessa todas as etapas sem ninguém ver.
+  const ancoraCrua = Number(o.ancora);
+  const ancora =
+    Number.isFinite(ancoraCrua) && lentePorChave(lente)?.ancoras.some((a) => a.nota === ancoraCrua)
+      ? ancoraCrua
+      : null;
+  const notaDaCaixa = ancora != null ? ancora : nota;
+
+  // Piso declarado: só vale chave que EXISTE na régua. Chave inventada é ruído, e aceitá-la
+  // deixaria o agente zerar por um motivo que ninguém consegue auditar depois.
+  // Só vale chave que EXISTE na régua **e** pertence ao eixo DESTA lente. Chave inventada é
+  // ruído; chave de outro eixo é a lente zerando o projeto por um fato que ela não tem como
+  // verificar, que foi o que se mediu quando todas viam a lista inteira.
+  const pisoCru = typeof o.piso === "string" ? o.piso.trim() : "";
+  const permitidos = pisoDaLente(lente);
+  const pisoDoEixo = (permitidos.find((c) => c === pisoCru) ?? null) as ChavePisoZero | null;
+  // ⚠️ **ZERAR EXIGE CITAÇÃO**, pela mesma razão que o escape exige duas: é a afirmação mais
+  // forte que uma lente pode fazer, e ela zera o projeto INTEIRO, por cima das outras quatro.
+  //
+  // Medido na run 4: o piso derrubou a 0 três projetos de nota alta — «Ferramenta de testes de
+  // novos produtos» (planilha 7) por `ressubmissao`, «Benchmark de Estampas» (planilha 4) por
+  // `so_o_autor` e o **GoPrice** (planilha 4) por `experimentacao`. O GoPrice é o exemplo de 4★
+  // da PRÓPRIA régua. Nenhum dos três precisou apontar um trecho do dossiê para zerar.
+  //
+  // Com a citação exigida, a lente ainda pode zerar, mas tem de mostrar ONDE leu isso — e quem
+  // revisa consegue conferir. Sem trecho, a alegação vira só a nota baixa daquele eixo.
+  const piso = pisoDoEixo && sustentacao.length >= MIN_SUSTENTACAO ? pisoDoEixo : null;
+
   return {
     lente,
-    nota,
+    // O piso é DESQUALIFICADOR: uma vez nomeado, a nota do eixo não sobrevive a ele.
+    nota: piso ? 0 : notaDaCaixa,
+    ancora,
+    piso,
     evidencia,
     confianca,
     justificativa: justCrua || "Sem justificativa — a lente não explicou a nota.",
@@ -421,6 +606,31 @@ export function consolidarLentes(avaliacoes: AvaliacaoLente[]): Consolidado {
   const porChave = new Map(avaliacoes.map((a) => [a.lente, a]));
   const faltando = LENTES.filter((l) => !porChave.has(l.chave)).map((l) => l.chave);
 
+  // ⚠️ O PISO É DO PROJETO, NÃO DO EIXO. "Ninguém além do autor usa" ou "está parado" não são
+  // verdades sobre alcance ou sobre autonomia: são verdades sobre o projeto, e a régua diz que
+  // basta UM ser verdade. Então uma lente que nomeia um item do piso zera o conjunto, não só a
+  // si mesma. Sem isto, uma lente diria "0, está parado" e as outras quatro fariam média em cima
+  // dela.
+  //
+  // ⚠️ Qual lente e qual item ficam NA EXPLICAÇÃO, e isso é a metade que importa: se o piso
+  // passar a disparar demais, é aqui que se vê, com nome e chave, em vez de só aparecer como uma
+  // base achatada em 0 (o risco declarado da D12). Nenhum item do piso disparou nas 173 notas do
+  // run 1, então o número esperado é maior que zero e menor do que "quase tudo".
+  const comPiso = avaliacoes.filter((a) => a.piso != null);
+  if (comPiso.length > 0) {
+    const chaves = [...new Set(comPiso.map((a) => `${a.lente}:${a.piso}`))].join(", ");
+    return {
+      nota_preliminar: 0,
+      gate: porChave.get(LENTE_GATE)?.nota ?? null,
+      gate_evidencia: porChave.get(LENTE_GATE)?.evidencia ?? null,
+      teto: 0,
+      valor_max: avaliacoes.length ? Math.max(...avaliacoes.map((a) => a.nota)) : 0,
+      valor_nomeado_max: 0,
+      faltando,
+      explicacao: `zerado pelo piso (${chaves})`,
+    };
+  }
+
   const gateAv = porChave.get(LENTE_GATE) ?? null;
   const valor = avaliacoes.filter((a) => a.lente !== LENTE_GATE);
   const valor_max = valor.length ? Math.max(...valor.map((a) => a.nota)) : 0;
@@ -451,7 +661,7 @@ export function consolidarLentes(avaliacoes: AvaliacaoLente[]): Consolidado {
       : gateAv.evidencia === "vaga" && valor_nomeado_max >= NOTA_VALOR_EMPRESTA
         ? MARGEM_VALOR_NOMEADO
         : 0;
-  const teto = Math.min(NOTA_MAX, gateAv.nota + margem);
+  const teto = Math.min(TETO_AGENTE, gateAv.nota + margem);
   const bruta = Math.max(gateAv.nota, valor_max);
   const nota_preliminar = Math.min(teto, bruta);
 

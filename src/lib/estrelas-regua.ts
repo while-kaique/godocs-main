@@ -191,16 +191,22 @@ export const FAIXA_ESCAPE = { min: TETO_AGENTE + 1, max: NOTA_MAX } as const;
  * indica a faixa, e **o comitê humano define o número por critério comparativo** contra os
  * projetos que já estão nela. Não reintroduzir os cinco níveis sem decisão do dono do produto.
  */
+/**
+ * ⚠️ **Revisão de 03/09/2026 (Luis):** saiu o traço *"Substitui humanos de maneira clara e
+ * inequívoca"*. Ele era o mais duro de provar — quase nenhum projeto da base substitui gente de
+ * forma inequívoca, e o traço acabava lido como requisito, empurrando candidatos legítimos para
+ * fora da faixa. O que ficou descreve o EFEITO (revoluciona o trabalho, move KPI e resultado,
+ * abre frente nova), não a contrapartida em pessoas.
+ */
 export const ESCAPE_MUDA_O_JOGO = {
   verbo: 'Muda o Jogo',
   criterio:
     'Revoluciona como a área — ou a empresa — trabalha. O agente INDICA a faixa; quem define o número é o comitê humano, comparando com os projetos que já estão em 6★–10★.',
   /** Os traços que descrevem a faixa. São a leitura do dono do produto, não um checklist somado. */
   tracos: [
+    'Revoluciona como a área — ou a empresa — trabalha.',
     'Sistema agêntico com impacto direto nos KPIs e no resultado financeiro.',
-    'Abre uma nova frente de receita ou de saving, não uma melhoria da frente que já existia.',
-    'Substitui humanos de maneira clara e inequívoca.',
-    'Muda o jeito de trabalhar da área inteira, não a velocidade de uma rotina.',
+    'Abre novas frentes de receita ou de saving.',
   ],
 } as const;
 
@@ -336,21 +342,83 @@ export function descreverEscape(): string {
     'Como a faixa se parece:',
     tracos,
     '',
-    `Você indica a FAIXA e cita a evidência de cada gatilho. NÃO escolha o número entre ${FAIXA_ESCAPE.min} e ${FAIXA_ESCAPE.max}: isso é do comitê humano.`,
+    '',
+    'O CASO DA PLATAFORMA — leia com atenção, é onde mais se erra:',
+    'Quando OUTRO projeto ou processo, NOMEADO, roda em cima deste (consome API, MCP, integração)',
+    'e nasceu depois dele, os DOIS gatilhos estão satisfeitos por esse mesmo fato:',
+    '  · gatilho 1 — o projeto dependente É a atividade que não existiria sem ele;',
+    '  · gatilho 2 — o dependente não tem "jeito antigo" para onde voltar, porque nunca existiu sem ele.',
+    'A citação é a frase do dossiê que NOMEIA o dependente. NÃO exija uma confissão literal do tipo',
+    '"o processo antigo foi abandonado": memorial nenhum escreve isso, e cobrá-la reprova plataforma',
+    'legítima. Um dependente nomeado basta; dois ou mais tornam o caso evidente.',
+    '⚠️ Isso NÃO vale para "poderá ser usado por", "abre portas para" ou dependente sem nome — aí',
+    'não há atividade em curso, e a nota fica em 5★.',
+    '',
+    `O VEREDITO é a FAIXA ${FAIXA_ESCAPE.min}-${FAIXA_ESCAPE.max}, e ela é um NÍVEL inteiro, não um trecho de escala.`,
+    `⚠️ NÃO escolha um número dentro da faixa. Não recomende ${FAIXA_ESCAPE.min}, nem ${FAIXA_ESCAPE.max}, nem nada no meio.`,
+    `Responda exatamente ${NOTA_ESCAPE} no campo da nota: aqui esse ${NOTA_ESCAPE} NÃO quer dizer "${NOTA_ESCAPE} estrelas", é a marca de que o`,
+    'projeto caiu neste nível. Quem crava o número final é o comitê humano, comparando com quem já está lá.',
+    'No porquê, explique por que o projeto MUDA O JOGO. Não escreva por que seria um número e não outro.',
+    'Cite a evidência de cada gatilho.',
   ].join('\n');
 }
+
+/**
+ * Como o PORQUÊ é escrito — **FONTE ÚNICA**, interpolada pelos prompts que produzem texto lido
+ * por gente (classificador, cérebro da estrela, lentes do painel).
+ *
+ * ⚠️ Estava DIGITADA DUAS VEZES, palavra por palavra, em `agents/especial-classificador.ts` e
+ * em `avaliacao/cerebro-estrela.ts`. Duas cópias divergem na primeira vez que alguém melhora uma
+ * frase — e este texto é a única coisa que a pessoa da triagem realmente lê. Não redigite: altere
+ * a constante.
+ *
+ * ⚠️ **Regras de 03/09/2026 (Luis):** linguagem natural, fácil, que um leigo entenda de primeira,
+ * e **sem travessão nem hífen como pontuação**. "Quem entende o que é complexo explica fácil" —
+ * mas sem ser prolixo: explicar fácil é escrever CURTO, não escrever mais.
+ */
+export const REGRAS_DO_PORQUE = `COMO ESCREVER O PORQUÊ (quem lê não conhece a régua por dentro e não vai perguntar):
+- Escreva 2 a 3 frases curtas, nesta ordem: o que o projeto FAZ · por que é essa nota e não a de cima · o que faria subir, em termos concretos deste projeto.
+- LINGUAGEM NATURAL, de conversa. Quem entende de verdade explica fácil: escreva como explicaria a alguém de outra área, que nunca viu este sistema. Se uma frase precisa ser relida para ser entendida, reescreva.
+- CURTO. Explicar fácil é escrever menos, não mais. Nada de rodeio, preâmbulo ou repetir com outras palavras o que já foi dito.
+- ⚠️ NÃO use travessão (—) nem hífen (-) como pontuação no meio da frase. Separe com vírgula, ponto ou dois pontos. Hífen só dentro de palavra composta.
+- PROIBIDO usar o vocabulário interno da régua. Nunca escreva: "gatilho", "escape", "piso", "critério aplicado", "desqualificador", "faixa", "promoção", "dependente nomeado", "modo anterior deixou de existir", "irreversibilidade", "não existiria sem ele". Essas são as palavras do CÓDIGO, não do leitor.
+- Diga a mesma coisa em português comum. Em vez de "falta prova de que o modo anterior deixou de existir", escreva "para subir, faltaria mostrar que ninguém mais faz esse trabalho do jeito antigo". Em vez de "sem dependente nomeado", escreva "nenhum outro projeto é citado como dependente deste".
+- Nada de "conforme a régua", "de acordo com o critério", "alinhado ao nível". Fale do PROJETO, não do instrumento.
+- Citar um projeto de comparação é bom e ajuda ("faz o mesmo que o Godash, que é 1"). Citar o número do critério não é.`;
 
 // ─── Escape: validação da saída ──────────────────────────────────────────────
 
 export type IndicacaoEscape = {
   /**
-   * A nota que o agente devolveu. Qualquer valor na faixa serve como "indico o escape" — o número
-   * em si é descartado pelo comitê, que decide por comparação.
+   * MARCA de que o agente indicou a faixa — não é posição dentro dela (ver `NOTA_ESCAPE`).
+   * Qualquer valor DENTRO da faixa vale como "indico o escape", e é colapsado em `NOTA_ESCAPE`
+   * antes de virar nota, porque a faixa é um nível único.
    */
   sugestao: number;
   /** Cada gatilho com a frase da doc que o sustenta. Sem citação, o escape não vale. */
   evidencias: Partial<Record<ChaveGatilhoEscape, string>>;
 };
+
+/**
+ * A marca da faixa de escape — **um valor só para todo o nível**.
+ *
+ * ⚠️ Isto NÃO é "6 estrelas". A faixa é um SÉTIMO NÍVEL, ao lado de 0..5 e não acima deles por
+ * gradação: o projeto que cai aqui não se classificou em nenhuma das seis caixas. Guardar 6, 7 ou
+ * 8 daria a impressão de posição dentro de uma escala que não tem degrau nenhum definido — a
+ * régua descreve os cinco verbos de 0 a 5 e, de propósito, NÃO descreve o que separa um 7 de um 8.
+ *
+ * ⚠️ **Pedir a sugestão ao agente foi tentado e revertido (04/09/2026).** O prompt mandava
+ * recomendar um número e justificar "por que esse e não o vizinho"; como não existe critério que
+ * separe os vizinhos, o modelo preenchia com prosa plausível e sem lastro, e o número aparecia ao
+ * lado do rótulo da faixa competindo com ele. Não voltar a pedir: quem crava 6, 7, 8, 9 ou 10 é o
+ * comitê humano, comparando com quem já está na faixa.
+ */
+export const NOTA_ESCAPE = FAIXA_ESCAPE.min;
+
+/** Colapsa qualquer valor da faixa na marca única, para que o nível seja UM balde e não cinco. */
+export function normalizarEscape(nota: number): number {
+  return ehEscape(nota) ? NOTA_ESCAPE : nota;
+}
 
 /**
  * O escape só vale com os DOIS gatilhos evidenciados por citação da doc e a indicação dentro da
@@ -362,6 +430,20 @@ export function escapeValido(ind: IndicacaoEscape): boolean {
     const ev = ind.evidencias[g.chave];
     return typeof ev === 'string' && ev.trim().length > 0;
   });
+}
+
+/**
+ * Como a nota do agente APARECE para quem decide.
+ *
+ * ⚠️ Dentro de 0 a ${TETO_AGENTE} o agente dá uma nota. Na faixa de escape ele **declara a
+ * FAIXA** e o número que ele devolve é SUGESTÃO, não veredito: quem crava 6, 7, 8, 9 ou 10 é o
+ * comitê humano, comparando com quem já está lá. Mostrar "6★" na tela apaga essa diferença e
+ * convida a triagem a aplicar o número com um clique, que é exatamente o que não pode acontecer.
+ */
+export function rotuloNotaAgente(nota: number): { rotulo: string; sugestao: number | null } {
+  return ehEscape(nota)
+    ? { rotulo: `${FAIXA_ESCAPE.min}-${FAIXA_ESCAPE.max}`, sugestao: null }
+    : { rotulo: String(nota), sugestao: null };
 }
 
 // ─── Confiança (declarada, não sentida) ──────────────────────────────────────
