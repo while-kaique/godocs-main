@@ -118,11 +118,26 @@ RUNS.forEach((run, i) => {
   anteriorPorRun.set(run.id, antes);
 });
 
+/**
+ * O universo de projetos: a UNIÃO de todas as rodadas.
+ *
+ * ⚠️ Uma rodada parcial (a amostra de 196) mostrava só os projetos dela, e o resto da base
+ * simplesmente SUMIA da tela. Some também dos filtros: "contestações de preço" numa run de
+ * amostra respondia sobre 196, e parecia responder sobre a base. Agora todo projeto aparece em
+ * toda rodada — quem ela não avaliou aparece dizendo isso.
+ */
+const UNIVERSO = new Map();
+for (const r of RUNS) {
+  for (const l of r.linhas) {
+    if (!UNIVERSO.has(l.id)) UNIVERSO.set(l.id, { id: l.id, nome: l.nome, area: l.area, humana: l.humana, especial: l.especial });
+  }
+}
+
 const linhasHtml = RUNS.map((run) => {
   const ordenadas = [...run.linhas].sort(
     (a, b) => b.agente - a.agente || a.nome.localeCompare(b.nome, 'pt-BR'),
   );
-  return ordenadas
+  const feitos = ordenadas
     .map((l) => {
       const insuf = l.dossie === 'insuficiente';
       // Divergência só conta onde ela SIGNIFICA algo: com dossiê insuficiente o agente não
@@ -138,6 +153,22 @@ const linhasHtml = RUNS.map((run) => {
 <td class="pq">${esc(l.leitura)}${blocoAuditoria(l)}</td></tr>`;
     })
     .join('\n');
+
+  // Os que ESTA rodada não avaliou entram como linha própria, e não somem.
+  const avaliados = new Set(run.linhas.map((l) => l.id));
+  const ausentes = [...UNIVERSO.values()]
+    .filter((p) => !avaliados.has(p.id))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    .map(
+      (p) => `<tr data-run="${run.id}" data-n="-1" data-b="${esc(semAcento(p.nome + ' ' + (p.area || '')))}" class="ausente" hidden>
+<td class="n"><span class="pill pnr">—</span></td>
+<td class="h">${p.humana != null ? p.humana : '<span class="vazio">—</span>'}</td>
+<td class="nome">${esc(p.nome)}<span class="area">${esc(p.area || '—')}</span></td>
+<td class="pq"><span class="naorodou">Não avaliado nesta rodada.</span></td></tr>`,
+    )
+    .join('\n');
+
+  return `${feitos}\n${ausentes}`;
 }).join('\n');
 
 // Estatística de cada run vai como DADO para o cliente: o seletor recalcula KPIs, barras e
@@ -156,8 +187,16 @@ const STATS = RUNS.map((r) => ({
   iguais: r.iguais,
   perto: r.perto,
   falhas: r.falhas.length,
+  // Quantos da base esta rodada NÃO avaliou. Sem este número, uma run de amostra parece uma
+  // run da base inteira que achou menos coisa.
+  ausentes: 0,
   dist: r.dist,
 }));
+{
+  const universo = new Set();
+  RUNS.forEach((r) => r.linhas.forEach((l) => universo.add(l.id)));
+  STATS.forEach((s, i) => (s.ausentes = universo.size - RUNS[i].linhas.length));
+}
 
 const abas = RUNS.map(
   (r, i) =>
@@ -235,6 +274,9 @@ td.pq{font-size:13px;color:var(--ink2);line-height:1.5}
 .aba[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
 :root[data-theme="dark"] .aba[aria-pressed="true"],:root:not([data-theme="light"]) .aba[aria-pressed="true"]{color:#0E141A}
 .meta{font-size:12px;color:var(--ink3);margin:-6px 0 16px}
+.pnr{background:transparent;border:1px dashed var(--line);color:var(--ink3)!important}
+tr.ausente td{opacity:.6}
+.naorodou{font-style:italic;color:var(--ink3)}
 .aud{display:block;margin-top:7px;padding:7px 9px;border-left:3px solid var(--div);background:var(--div-bg);border-radius:0 6px 6px 0;font-size:12px;line-height:1.45;color:var(--ink)}
 .aud b{color:var(--div)}
 .delta{display:block;margin-top:3px;font:500 10.5px/1 "IBM Plex Mono",monospace;color:var(--div)}
@@ -340,7 +382,8 @@ var STATS=__STATS__;
       notas.filter(function(n){return n<=5;}).map(function(n){
         return '<button class="chip" data-f="'+n+'" aria-pressed="false"><i class="dot p'+n+'"></i>'+n+'★ <b>'+s.dist[n]+'</b></button>';
       }).join('')+
-      (esc6?'<button class="chip esc" data-f="6+" aria-pressed="false"><i class="dot p6"></i>6-10★ <b>'+esc6+'</b></button>':'');
+      (esc6?'<button class="chip esc" data-f="6+" aria-pressed="false"><i class="dot p6"></i>6-10★ <b>'+esc6+'</b></button>':'')+
+      (s.ausentes?'<button class="chip" data-f="-1" aria-pressed="false">não avaliado <b>'+s.ausentes+'</b></button>':'');
     ligarFiltros();
   }
 
@@ -376,7 +419,8 @@ var STATS=__STATS__;
       tr.hidden=!ok; if(ok)n++;
     });
     pintar();
-    conta.textContent=n+' de '+stat(runAtual).total;
+    var st=stat(runAtual);
+    conta.textContent=n+' de '+(st.total+st.ausentes)+(st.ausentes?' ('+st.ausentes+' não avaliados nesta rodada)':'');
     nada.hidden=n>0;
   }
   function escolher(v){ filtro=(v===filtro||v==='')?null:v; aplicar(); }
