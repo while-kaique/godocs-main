@@ -433,6 +433,17 @@ async function garantirEmbeddings(
   embeddings: MapaEmbedding,
   opts: { capGeracao?: number } = {},
 ): Promise<{ mapa: MapaEmbedding; gerados: number }> {
+  // ⚠️ TRAVA DE CUSTO. As chamadas de LLM vão pelo ai-proxy e são baratas de testar; EMBEDDING é
+  // outra coisa: vai direto na OpenAI, com chave própria, e se paga por chamada. Com
+  // `EMBEDDINGS_SOMENTE_LEITURA` ligada, nada é gerado — os vetores que existem seguem sendo
+  // LIDOS normalmente e quem não tem vetor simplesmente fica sem vizinho.
+  //
+  // Existe para rodada de calibragem, que repassa a base inteira várias vezes: ali qualquer
+  // mudança no texto do dossiê (um complemento de memorial, por exemplo) muda o hash e
+  // re-embeddaria o lote todo sem ninguém pedir. Env lida em RUNTIME, nunca em escopo de módulo.
+  if (String(process.env.EMBEDDINGS_SOMENTE_LEITURA ?? "") === "1") {
+    return { mapa: embeddings, gerados: 0 };
+  }
   const cap = opts.capGeracao ?? 40; // teto por corrida (custo + tempo do cron)
   // Modelo-alvo: vetor gerado por OUTRO modelo é "velho" mesmo com o texto igual (troca de
   // `-small`→`-large` muda a dimensão, e cosseno entre dims diferentes é 0 → o vizinho some).

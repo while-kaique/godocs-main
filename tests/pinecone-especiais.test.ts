@@ -661,3 +661,42 @@ describe('re-auditoria (T6) — relatório, nunca escrita', () => {
     expect(r.resumo.sem_base).toBe(2);
   });
 });
+
+/**
+ * Trava de custo dos embeddings.
+ *
+ * ⚠️ As chamadas de LLM vão pelo ai-proxy e são baratas de testar. EMBEDDING é outra coisa: vai
+ * direto na OpenAI, com chave própria, e se paga por chamada. Numa rodada de calibragem, que
+ * repassa a base inteira cinco vezes, qualquer mudança no texto do dossiê muda o hash e
+ * re-embeddaria o lote inteiro sem ninguém pedir (medido: o complemento de memorial sozinho
+ * mudou o texto de 41 projetos).
+ */
+describe('EMBEDDINGS_SOMENTE_LEITURA', () => {
+  const antes = process.env.EMBEDDINGS_SOMENTE_LEITURA;
+  afterEach(() => {
+    if (antes === undefined) delete process.env.EMBEDDINGS_SOMENTE_LEITURA;
+    else process.env.EMBEDDINGS_SOMENTE_LEITURA = antes;
+  });
+
+  it('ligada, NÃO gera embedding nenhum — e a classificação continua', async () => {
+    process.env.EMBEDDINGS_SOMENTE_LEITURA = '1';
+    pinecone.consultarVizinhos.mockResolvedValue([]);
+    db.getEmbeddingEspecial.mockResolvedValue(null); // alvo sem vetor: o caso que geraria
+
+    const r = await classificarEspecialProjeto('P0', { dry: true });
+
+    expect(gerarEmbeddingsLote).not.toHaveBeenCalled();
+    expect(db.upsertEmbeddingEspecial).not.toHaveBeenCalled();
+    expect(r.ok).toBe(true); // sem vetor o projeto fica sem vizinho, não sem nota
+  });
+
+  it('desligada, o comportamento de sempre volta', async () => {
+    delete process.env.EMBEDDINGS_SOMENTE_LEITURA;
+    pinecone.consultarVizinhos.mockResolvedValue([]);
+    db.getEmbeddingEspecial.mockResolvedValue(null);
+
+    await classificarEspecialProjeto('P0', { dry: true });
+
+    expect(gerarEmbeddingsLote).toHaveBeenCalled();
+  });
+});
