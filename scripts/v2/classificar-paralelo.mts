@@ -18,6 +18,23 @@
 
 import { rodarPoolAdaptativo } from './_concorrencia.mts';
 
+/**
+ * Agrupa os motivos de recuo por CAUSA, com a contagem.
+ *
+ * ⚠️ Era `[...new Set(motivos)]`, e a deduplicação escondia a única informação que importa: na
+ * run 8 foram **47 recuos** e o relatório mostrava **3 linhas**, o que me fez concluir (errado)
+ * que 44 recuos não tinham motivo. Saber que a causa foi 429 do gateway, e não 502 de borda,
+ * é a diferença entre pedir mais concorrência e caçar bug no nosso lado.
+ */
+function contarMotivos(motivos: string[]): string[] {
+  const cont = new Map<string, number>();
+  for (const m of motivos) {
+    const chave = (m.match(/HTTP \d+(?:: [^\n{<]{0,60})?/) ?? [m.slice(0, 60)])[0].trim();
+    cont.set(chave, (cont.get(chave) ?? 0) + 1);
+  }
+  return [...cont.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n}x ${k}`);
+}
+
 const BASE = process.argv.includes('--staging')
   ? 'https://godocs-staging.devgogroup.com'
   : 'https://godocs.devgogroup.com';
@@ -253,7 +270,7 @@ const rel = await rodarPoolAdaptativo({
   },
 });
 console.log(`\n\nconcorrência: terminou em ${rel.alvoFinal} (pico ${rel.alvoMax}, piso ${rel.alvoMin}) · ${rel.recuos} recuos · ${rel.reentradas} re-tentativas · ${rel.esperas} esperas de fila`);
-if (rel.motivos.length) console.log(`motivos dos recuos: ${[...new Set(rel.motivos)].slice(0, 5).join(' | ')}`);
+if (rel.motivos.length) console.log(`motivos dos recuos: ${contarMotivos(rel.motivos).slice(0, 5).join(' | ')}`);
 
 // ⚠️ REPESCAGEM. O pool já re-tenta a saturação, mas uma rajada longa pode esgotar as
 // tentativas de um item. Uma passada final, conservadora, para 502 nunca virar buraco no
@@ -308,7 +325,7 @@ if (destino) {
     projetos: projetos.length,
     falhas: falhas.length,
     duracao_s: Math.round((Date.now() - t0) / 1000),
-    concorrencia: { final: rel.alvoFinal, pico: rel.alvoMax, piso: rel.alvoMin, recuos: rel.recuos, esperas: rel.esperas, motivos: [...new Set(rel.motivos)].slice(0, 8) },
+    concorrencia: { final: rel.alvoFinal, pico: rel.alvoMax, piso: rel.alvoMin, recuos: rel.recuos, esperas: rel.esperas, motivos: contarMotivos(rel.motivos).slice(0, 8) },
   };
   await writeFile(destino, JSON.stringify({ meta, linhas, falhas, dist }, null, 1));
   console.log(`\nrelatório: ${destino}`);

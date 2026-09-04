@@ -145,9 +145,16 @@ const linhasHtml = RUNS.map((run) => {
       const div = !insuf && l.humana != null && Math.abs(l.humana - l.agente) >= 2;
       const classes = [div ? 'div' : '', insuf ? 'insuf' : '', l.ajustaria ? 'aud-sim' : ''].filter(Boolean).join(' ');
       const anterior = anteriorPorRun.get(run.id)?.get(l.id);
-      const mudou = anterior != null && anterior !== l.agente;
+      // ⚠️ O delta compara NÍVEIS, não números, e por isso passa pelo `rotuloNota`.
+      //
+      // A faixa 6-10 é UM nível: dentro dela não existe 7 nem 8, existe "muda o jogo". Enquanto o
+      // delta comparava o número cru, um projeto que saiu de 8 para 7 aparecia como "8→7" logo
+      // abaixo do rótulo "6-10", e isso se lê como o agente SUGERINDO uma estrela dentro da faixa.
+      // Além de confundir quem decide, é falso: não houve mudança de nível nenhuma. O que continua
+      // aparecendo é o que importa de verdade, a travessia da fronteira ("5→6-10", "6-10→4").
+      const mudou = anterior != null && rotuloNota(anterior) !== rotuloNota(l.agente);
       return `<tr data-run="${run.id}" data-n="${l.agente}" data-b="${esc(semAcento(l.nome + ' ' + l.area + ' ' + l.leitura))}"${classes ? ` class="${classes}"` : ''} hidden>
-<td class="n"><span class="pill p${l.agente}">${rotuloNota(l.agente)}</span>${mudou ? `<span class="delta" title="na run anterior era ${anterior}">${anterior}→${l.agente}</span>` : ''}</td>
+<td class="n"><span class="pill p${l.agente}">${rotuloNota(l.agente)}</span>${mudou ? `<span class="delta" title="na run anterior era ${rotuloNota(anterior)}">${rotuloNota(anterior)}→${rotuloNota(l.agente)}</span>` : ''}</td>
 <td class="h">${l.humana != null ? l.humana : '<span class="vazio">—</span>'}${insuf ? '<span class="tag" title="O memorial deste projeto é só a conta do saving: não há dossiê que sustente veredito, então ele fica fora da concordância.">sem dossiê</span>' : ''}</td>
 <td class="nome">${esc(l.nome)}<span class="area">${esc(l.area || '—')}</span></td>
 <td class="pq">${esc(l.leitura)}${blocoAuditoria(l)}</td></tr>`;
@@ -371,12 +378,22 @@ var STATS=__STATS__;
     partes.push('concordância medida sobre '+s.comparaveis+' projetos, fora os de dossiê insuficiente');
     document.getElementById('meta').textContent=partes.join(' · ');
 
+    // ⚠️ A faixa 6-10 é UM nível, então é UMA barra.
+    //
+    // Agrupando pelo número cru, ela virava cinco barras rotuladas '6-10' lado a lado, com
+    // contagens diferentes: a página passava a afirmar que existe uma escala interna na faixa,
+    // que é exatamente o que a régua não define e o que confunde quem decide. O filtro dessa
+    // barra é '6+', o mesmo do chip, para clicar na barra e clicar no chip darem a MESMA lista.
     var notas=Object.keys(s.dist).map(Number).sort(function(a,b){return a-b;});
-    var max=1; notas.forEach(function(n){ if(s.dist[n]>max) max=s.dist[n]; });
-    document.getElementById('barras').innerHTML=notas.map(function(n){
-      return '<button class="barra" data-f="'+n+'" aria-pressed="false"><span class="bn">'+rot(n)+'</span><span class="bt"><span class="bf p'+n+'" style="width:'+(s.dist[n]/max*100)+'%"></span></span><span class="bq">'+s.dist[n]+'</span></button>';
-    }).join('');
     var esc6=0; notas.forEach(function(n){ if(n>=6) esc6+=s.dist[n]; });
+    var baldes=notas.filter(function(n){return n<=5;}).map(function(n){
+      return { f:String(n), rotulo:String(n), cor:n, q:s.dist[n] };
+    });
+    if(esc6) baldes.push({ f:'6+', rotulo:'6-10', cor:6, q:esc6 });
+    var max=1; baldes.forEach(function(b){ if(b.q>max) max=b.q; });
+    document.getElementById('barras').innerHTML=baldes.map(function(b){
+      return '<button class="barra" data-f="'+b.f+'" aria-pressed="false"><span class="bn">'+b.rotulo+'</span><span class="bt"><span class="bf p'+b.cor+'" style="width:'+(b.q/max*100)+'%"></span></span><span class="bq">'+b.q+'</span></button>';
+    }).join('');
     document.getElementById('chips').innerHTML=
       '<button class="chip" data-f="" aria-pressed="true">Todas <b>'+s.total+'</b></button>'+
       notas.filter(function(n){return n<=5;}).map(function(n){
