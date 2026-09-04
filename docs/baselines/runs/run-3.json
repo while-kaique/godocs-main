@@ -1,0 +1,2043 @@
+{
+ "meta": {
+  "run": "run 3 · agente + RAG + auditoria (amostra 196)",
+  "juiz": "AGENTE",
+  "rota": "/api/admin/especiais/classificar",
+  "gravou": false,
+  "rodado_em": "2026-09-04T05:16:52.680Z",
+  "projetos": 196,
+  "falhas": 0,
+  "duracao_s": 1806,
+  "concorrencia": {
+   "final": 6,
+   "pico": 13,
+   "piso": 4,
+   "recuos": 6
+  }
+ },
+ "linhas": [
+  {
+   "id": "legado-031",
+   "nome": "Máquina de Criação de CTRs",
+   "area": "PRODUTO",
+   "humana": 2,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "A ferramenta gera criativos padronizados, mas ainda depende de pessoas para inserir dados, revisar e exportar cada arte. Como a Central de Estampas e o Gocase Creative Studio, resolve uma tarefa local e seu valor está concentrado na economia de horas. Para subir, precisaria operar os testes de CTR de ponta a ponta, sem início ou revisão manual."
+  },
+  {
+   "id": "legado-034",
+   "nome": "Creators Hub",
+   "area": "GROWTH",
+   "humana": 2,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Padroniza os envios dos creators, direciona os vídeos ao teste de anúncios e preenche os controles automaticamente, evitando erros que antes exigiam correção manual. Fica acima dos hubs informativos porque interfere na operação, mas não decide quais conteúdos ou investimentos devem avançar. Para subir, precisaria selecionar vídeos ou distribuir verba usando inteligência própria e critérios auditáveis."
+  },
+  {
+   "id": "legado-038",
+   "nome": "Base Custos - Gobeaute",
+   "area": "FINANÇAS",
+   "humana": 1,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "Atualiza e confere automaticamente custos dos três ERPs, alimentando análises financeiras e operacionais. Fica em 1, como Automação Cupons Beaute, porque entrega a base para pessoas analisarem, sem corrigir divergências ou tomar decisões. Subiria se aplicasse correções ou concluísse uma rotina financeira sem intervenção."
+  },
+  {
+   "id": "legado-042",
+   "nome": "Gestão de Lojas",
+   "area": "LOJAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O site organiza fornecedores, manutenções, peças e notificações das lojas. Como Gestão de Tarefas Inteligente, apresenta economia estimada, mas não comprova uso recorrente ou decisões tomadas, por isso ainda não chega a 1 estrela. Para subir, precisa mostrar acessos frequentes e lojas agindo com base nos registros ou alertas."
+  },
+  {
+   "id": "legado-033",
+   "nome": "Robo subir vídeos em teste",
+   "area": "GROWTH",
+   "humana": 5,
+   "especial": true,
+   "agente": 5,
+   "confianca": "alta",
+   "leitura": "O robô publica milhares de vídeos em testes no Facebook Ads, cria adsets e escolhe páginas sem intervenção humana. Fica em 5 porque atua diretamente na mídia, mas automatiza uma rotina que já existia. Para subir, precisa comprovar processos novos, em uso, construídos sobre essa automação."
+  },
+  {
+   "id": "legado-035",
+   "nome": "Damidash",
+   "area": "GROWTH",
+   "humana": 2,
+   "especial": true,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "O Damidash reúne indicadores de todas as marcas em tempo real para orientar gestores, como o Dashboard Lives Gogroup. Não sobe porque apenas informa e o cálculo de horas não comprova uso recorrente nem execução automática. Para chegar a 2★, precisaria agir sobre os dados sem intervenção humana ou sustentar outro projeto nomeado."
+  },
+  {
+   "id": "legado-037",
+   "nome": "Margem Diaria - Gobeaute (vendas yampi)",
+   "area": "FINANÇAS",
+   "humana": 3,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Automatiza a captura, o tratamento e o envio diário dos relatórios usados pelo comercial. Mantém 3 estrelas por coerência com a avaliação já registrada deste mesmo projeto, mas não chega a 4 porque não decide os ajustes comerciais. Para subir, teria de escolher e aplicar ações com critérios auditáveis."
+  },
+  {
+   "id": "legado-039",
+   "nome": "Controle de Checklist Fechamento Contábil",
+   "area": "FINANÇAS",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O sistema organiza tarefas, documentos, cobranças e validações do fechamento contábil. Fica abaixo do Cockpit Contábil porque o memorial só comprova a economia declarada e não mostra uso recorrente por outras pessoas. Para subir, precisa registrar fechamentos realizados, usuários ativos e ações executadas automaticamente."
+  },
+  {
+   "id": "legado-047",
+   "nome": "[ILUSTRA] Gerador de Estampas Best Sellers",
+   "area": "MARKETING",
+   "humana": 3,
+   "especial": true,
+   "agente": 4,
+   "confianca": "media",
+   "leitura": "Analisa vendas e cria diariamente novas estampas, com produção e resultado comercial acompanhados. Fica junto do Benchmark de Estampas, também avaliado em 4, mas não sobe porque não há prova de publicação direta no site. Para subir, precisaria colocar as artes no mercado sem revisão humana e responder pela meta final."
+  },
+  {
+   "id": "legado-056",
+   "nome": "Reporte diário B2B",
+   "area": "B2B GOCASE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Gera diariamente um relatório comercial com análises e recomendações no Google Chat. Como no Chat Waitlist, o memorial comprova o envio, mas não mostra que alguém lê e usa o conteúdo em decisões recorrentes. Para subir, precisa identificar os leitores e as ações tomadas a partir do reporte."
+  },
+  {
+   "id": "legado-032",
+   "nome": "[VERSTA] Robo orçamento - {Marca}",
+   "area": "GROWTH",
+   "humana": 8,
+   "especial": true,
+   "agente": 5,
+   "confianca": "media",
+   "leitura": "Controla todo o orçamento de anúncios e altera gastos no mercado sem intervenção humana, como o Robô subir vídeos. Fica em 5, não em 8, porque substitui uma gestão antes manual e nenhum projeto novo é citado rodando sobre ele. Para subir, precisa mostrar operações ativas que nasceram integradas ao robô."
+  },
+  {
+   "id": "legado-050",
+   "nome": "Consulta automática de NFD nas bases dos CDs",
+   "area": "CSC",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Como o NFD Unificadas, cruza bases e retorna chaves de NFD após acionamento manual. Atende uma tarefa determinística de uma pessoa, e o valor apresentado se resume às horas economizadas; para chegar a 1 estrela, precisaria comprovar uso recorrente por outras pessoas e impacto relevante além do saving."
+  },
+  {
+   "id": "legado-055",
+   "nome": "RPA Download XML — MeuDanfe",
+   "area": "CSC",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Automação no Download e Encaminhamento de XML's» (similaridade 0.91) é quase idêntico e vale 5★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Automatiza a consulta e o download de XMLs para uma única analista, em tarefa local equivalente à Automação de NFs via Python. Apesar do volume recorrente, o valor apresentado se resume ao saving de tempo e não há evidência de uso por outras pessoas, integração ou consequência operacional direta."
+  },
+  {
+   "id": "legado-058",
+   "nome": "B2B DW",
+   "area": "B2B GOBEAUTE",
+   "humana": 1,
+   "especial": false,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Automatiza pipelines recorrentes de dados e sustenta o fluxo DashB2B, indo além de uma base informativa como o Dashboard Analytics Gerencial Gobeaute. Fica em 3 porque não escolhe autonomamente ações que comprometem recursos. Para subir, precisaria tomar decisões auditáveis sobre carteira, campanhas ou estoque com consequência operacional direta."
+  },
+  {
+   "id": "legado-066",
+   "nome": "Emissor de etiquetas",
+   "area": "AZ",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Expedição B2B» (similaridade 0.85) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Gera etiquetas sob comando manual para uma única assistente, em um fluxo simples e local, semelhante ao Filemaker - Gerador de Documentos. Não sobe porque todo uso ainda exige seleção, bipagem e impressão pela pessoa; para avançar, precisaria operar de forma recorrente para mais usuários ou automatizar a emissão sem intervenção.",
+   "valor_declarado": 109.195,
+   "valor_sugerido": 218.39,
+   "ajustaria": true,
+   "auditoria": "Confirmação do valor mensal: 16,67h antes − 1h depois = 15,67h economizadas; 15,6667 × 13,94 = R$ 218,39. Nada foi retirado além da 1h residual, e não foram adicionados custo evitado, escala, receita ou custos externos."
+  },
+  {
+   "id": "legado-079",
+   "nome": "Automação - Coleta de Chamados do Jurídico",
+   "area": "CSC",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Chamados Aprovação via Chat V4» (similaridade 0.88) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Coleta e estrutura seis tipos de chamados jurídicos em uma planilha central. Fica em 0, como a Coleta de Chamados de Admissão, porque o memorial estima a rotina, mas não comprova uso recorrente. Para subir, precisa mostrar execuções reais e uso contínuo da base pela equipe."
+  },
+  {
+   "id": "legado-077",
+   "nome": "Coleta de Imagens Shopify",
+   "area": "CSC",
+   "humana": 1,
+   "especial": false,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "legado-072",
+   "nome": "att_preco_prazo_conversao",
+   "area": "DADOS",
+   "humana": 0,
+   "especial": false,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "legado-099",
+   "nome": "Classificação BADS do BOT",
+   "area": "CX",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Gohelp - Influenciadores Gobeauty» (similaridade 0.83) é quase idêntico e vale 5★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Classifica BADs a cada três horas e preenche uma planilha, substituindo a leitura manual de um estagiário. Fica em 0★, como Análise de BADs de Atendimento por IA, porque comprova apenas uma tarefa local e o saving, sem mostrar decisões ou ações decorrentes. Subiria se demonstrasse uso recorrente dessas classificações para corrigir o bot ou alterar a operação."
+  },
+  {
+   "id": "625248d60d3858b8d808da3089d83544",
+   "nome": "Benchmark de Estampas",
+   "area": "MARKETING",
+   "humana": 4,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Gera semanalmente novas estampas com base no desempenho do mercado, em linha com o Gerador de Estampas Best Sellers já avaliado em 3★. Não sobe porque apenas prepara artes para o portfólio, sem decidir ou publicar o que será vendido. Subiria se selecionasse e lançasse produtos automaticamente, com resultado acompanhado."
+  },
+  {
+   "id": "legado-064",
+   "nome": "[BRUNA] Automação NFs Gobeaute",
+   "area": "Sourcing & Procurement Gobeaute",
+   "humana": 2,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "A automação monitora e-mails, extrai dados de XMLs e registra as notas em planilha sem acionamento humano, assumindo uma rotina recorrente ponta a ponta. É comparável à Automação de Inputs de Saída, já avaliada com 2 estrelas, pois executa um fluxo definido, mas não demonstra validar, bloquear ou impedir erros com impacto em outra área."
+  },
+  {
+   "id": "legado-111",
+   "nome": "[DUDA] CPMV",
+   "area": "GROWTH",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Automatiza a coleta e o cálculo de métricas de Reels e TikTok para atualizar registros usados no CPM. Assim como o Baixador de Reels, resolve uma tarefa operacional local, e todo o valor descrito está nas 23 horas mensais economizadas. Para chegar a 1 estrela, precisaria demonstrar uso recorrente dessas métricas em decisões relevantes além do saving."
+  },
+  {
+   "id": "legado-100",
+   "nome": "Disparos de comunicação de Reenvio na Rituária",
+   "area": "CX",
+   "humana": 1,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Insucessos - Gocase» (similaridade 0.82) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. Identifica reenvios e organiza dados de rastreio para apoiar comunicações proativas, com redução observada nos contatos. Não sobe porque o memorial só comprova o registro em planilha, não o disparo automático de ponta a ponta. Para avançar, precisa demonstrar envios recorrentes ao cliente sem intervenção humana."
+  },
+  {
+   "id": "4b652006784d6d96da9027a89a46da23",
+   "nome": "Skill Cronômetro de tempo",
+   "area": "GENTE E GESTÃO | CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "O painel reúne pauta, agenda e cronômetro para orientar apresentações em eventos internos. Como a Galeria de Lançamentos, resolve uma tarefa simples e local, com uso comprovado apenas em ocasiões pontuais. Para subir, precisaria mostrar adoção recorrente em vários ciclos e decisões tomadas a partir dele."
+  },
+  {
+   "id": "legado-120",
+   "nome": "Alerta Vendas Produtos Por Dia - Gocase",
+   "area": "PRODUTO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O projeto automatiza a extração, comparação e envio semanal de vendas por produto. Assim como a Automação de Relatório de Malas, o memorial comprova principalmente horas economizadas, mas não demonstra que o time usa o relatório para tomar decisões. Para chegar a 1 estrela, precisa evidenciar decisões recorrentes de produto ou design tomadas com essas informações."
+  },
+  {
+   "id": "legado-087",
+   "nome": "Fluxo de Auditoria Interna de Jornada (Ponto x Folha)",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "legado-097",
+   "nome": "Insucessos - Gobeaute",
+   "area": "CX",
+   "humana": 4,
+   "especial": false,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Automatiza a identificação de insucessos e o contato com clientes para confirmar ou corrigir endereços, assumindo uma rotina antes feita por três pessoas. Fica ao lado de Insucessos - Gocase: evita falhas na operação, mas não escolhe a solução com inteligência própria. Para subir, teria de decidir e aplicar autonomamente o tratamento adequado para cada caso.",
+   "valor_declarado": 15250,
+   "valor_sugerido": 15250,
+   "ajustaria": false,
+   "auditoria": "Confirmação do valor declarado: R$ 16.800/mês de contrato externo evitado − R$ 1.550/mês de custo incremental do Insider = R$ 15.250/mês de economia líquida. Não foram somadas horas internas nem receita, portanto não há dupla contagem identificável."
+  },
+  {
+   "id": "db6eba61c6b1dbaa6cffe93d08ab1cee",
+   "nome": "Solicitação de Rescisão",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "Gera e envia documentos de rescisão para cerca de 35 casos mensais, com histórico e controle de acesso. Como o Portal de Admissão, sustenta uma rotina usada por gestores e DP, mas cada solicitação ainda precisa ser iniciada na interface. Subiria se um evento no sistema de RH disparasse e concluísse o fluxo sem acionamento humano."
+  },
+  {
+   "id": "dd39b29ea3dc3fc51332d9a650c12fc7",
+   "nome": "Live Machine",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Centraliza a operação e, após o envio do arquivo, transmite o conteúdo ao Instagram e reúne os resultados. Fica acima do Dashboard Lives Gogroup porque executa a transmissão, mas não comprova controles que impeçam falhas operacionais. Para subir, precisaria bloquear erros antes da publicação e demonstrar uso recorrente com impacto em outra área."
+  },
+  {
+   "id": "legado-131",
+   "nome": "Torre de Controle Gobeaute",
+   "area": "TRANSPORTES",
+   "humana": 0,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "A automação executa diariamente a coleta, tratamento e consolidação dos dados de SLA, como a Análise Inteligente de Prazos. Fica em 2 porque entrega indicadores para o time priorizar as tratativas, mas não valida nem bloqueia falhas operacionais. Para subir, precisaria impedir erros ou atrasos antes que afetassem outra área."
+  },
+  {
+   "id": "legado-152",
+   "nome": "Gostream",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 2,
+   "confianca": "alta",
+   "leitura": "O Gostream executa automaticamente uma rotina recorrente de atualização da planilha de R&S a cada movimentação no InHire, eliminando a iniciação e o preenchimento manual. Fica em 2★, alinhado ao HireFlow, porque registra dados sem validar ou bloquear falhas com impacto em outra área. Para subir, precisaria impedir inconsistências antes que afetem admissões ou sustentar um processo posterior nomeado."
+  },
+  {
+   "id": "legado-156",
+   "nome": "CX Hub — Plataforma Central de Operações de Backoffice CX",
+   "area": "CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Automatiza reenvios e tickets logísticos após o acionamento das agentes, com uso mensal comprovado em milhares de ocorrências. Fica abaixo do Portal de devoluções porque não há evidência de validação ou bloqueio de erros com impacto em outra área. Subiria se impedisse solicitações incorretas antes de chegarem ao ERP ou ao transportador."
+  },
+  {
+   "id": "legado-183",
+   "nome": "Triagem Automática de Comunicação de Fornecedores Estratégicos",
+   "area": "SOURCING E PROCUREMENT GOBEAUTE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Classifica e arquiva automaticamente mensagens da caixa de entrada de uma única pessoa. Fica em 0 porque é uma rotina local e todo o benefício apresentado se resume às 11 horas economizadas, com alcance menor que a Automação da gestão de banco de horas. Para subir, precisaria sustentar a rotina de mais usuários ou produzir uma consequência operacional relevante além da economia de tempo."
+  },
+  {
+   "id": "legado-139",
+   "nome": "RPA Portal Comprovantes",
+   "area": "FINANÇAS",
+   "humana": 2,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Automatiza uma rotina recorrente de busca, organização e disponibilização de comprovantes bancários, eliminando a execução manual. Está alinhado a projetos como Automação de Extratos Bancários e Fluxo Automatizado de NFSE, pois executa o processo, mas não valida nem bloqueia erros com impacto operacional."
+  },
+  {
+   "id": "ef0add4b31d3990c62632be255c4e855",
+   "nome": "Gocreators - DashBoard",
+   "area": "GROWTH",
+   "humana": 2,
+   "especial": true,
+   "agente": 2,
+   "confianca": "media",
+   "leitura": "Centraliza métricas e a gestão de pautas, mas as decisões de conteúdo e mídia continuam com os gestores. Fica em 2 estrelas, alinhado ao Gocreators Dashboard já avaliado e ao Haileydash; não sobe porque não há validação ou bloqueio que impeça erros operacionais. Para avançar, precisaria aplicar controles obrigatórios com impacto comprovado em outra área."
+  },
+  {
+   "id": "legado-173",
+   "nome": "JBP TBC 2026 · Joint Business Plan (Big 4 Terceirista)",
+   "area": "SOURCING E PROCUREMENT GOBEAUTE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Produz uma apresentação executiva pontual para uma negociação com a TBC, sem IA no uso final. Assim como o dossiê da Yenzah, não comprova uso recorrente nem valor além das 16 horas economizadas; para subir, precisaria sustentar revisões recorrentes e gerar informação usada em decisões futuras."
+  },
+  {
+   "id": "legado-140",
+   "nome": "Automação de presença do alinhamento semanal",
+   "area": "Gente e Gestão",
+   "humana": 0,
+   "especial": false,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "legado-166",
+   "nome": "SPG · IAGO Copiloto Q&A Operacional",
+   "area": "SOURCING E PROCUREMENT GOBEAUTE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O widget responde consultas operacionais simples para três pessoas, mas apenas substitui buscas manuais e não executa ações nem muda decisões. Tem alcance menor que o Agente Analista de Dados, também avaliado com 0 mesmo registrando cerca de 100 perguntas mensais. Para chegar a 1, precisaria comprovar uso recorrente mais amplo e relevância para decisões do time."
+  },
+  {
+   "id": "legado-198",
+   "nome": "Gestão de Tarefas Inteligente",
+   "area": "TRANSPORTES",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Relatório Transportador» (similaridade 0.81) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Centraliza tarefas, status, comentários e checklists de 14 pessoas. Como Gestão visual de projetos e Pipeline de Projetos, traz apenas saving estimado e não comprova uso recorrente ou decisões geradas pela plataforma. Para subir, precisa demonstrar uso contínuo pelo time e ações tomadas a partir dela."
+  },
+  {
+   "id": "legado-178",
+   "nome": "Prazo Otimizado",
+   "area": "TRANSPORTES",
+   "humana": 4,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O projeto testou um modelo estatístico para encurtar prazos prometidos por transportadora e região. Fica em 0 porque a evidência vem de um piloto antigo, a escala nacional ainda é projetada e não há uso atual comprovado, ao contrário do GoPrice. Para subir, precisa mostrar recalibrações ativas hoje e efeitos medidos em conversão e SLA."
+  },
+  {
+   "id": "legado-218",
+   "nome": "Dashboard Operacional B2B",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O dashboard substitui filtros manuais e mostra pedidos, alertas e status para duas pessoas. Como a Torre de Controle B2B, fica restrito a uma consulta operacional local e não executa ações sobre os pedidos. Para subir, precisaria comprovar uso recorrente em decisões relevantes ou atuar diretamente nas exceções identificadas."
+  },
+  {
+   "id": "legado-227",
+   "nome": "[Ytalo] Itens reembolsados - Por motivo Gocase",
+   "area": "CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Consolida itens reembolsados por motivo, registra o histórico e envia o resultado ao chat, como o projeto de ruptura de estoque já avaliado em 0★. Não há comprovação de uso recorrente nem de decisões tomadas com a saída. Para subir, precisa demonstrar execução regular em produção e usuários agindo sobre os resultados."
+  },
+  {
+   "id": "4e5fd243efe0a5963460a05e1491a1ae",
+   "nome": "Análise de convergência  - premissas de AVD",
+   "area": "Gente e Gestão",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Consolida dados e gera análises para apoiar as calibrações da AVD. Assim como o Dashboard de resultados AVD 2025, comprova economia de horas, mas não demonstra gestores usando a análise nem decisões tomadas com ela. Para chegar a 1 estrela, precisa registrar o uso pelos responsáveis em cada ciclo de avaliação."
+  },
+  {
+   "id": "011154efe218d675c32636d58adfd0db",
+   "nome": "Razão Contábil Consolidado",
+   "area": "FINANÇAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Processa automaticamente os arquivos mensais, aplica regras contábeis e consolida o resultado, em papel semelhante ao RV/RB Coorte. Fica em 2 porque ainda há revisão humana e não bloqueia classificações incorretas antes de afetarem outra área. Para subir, precisa validar ou impedir esses erros com impacto operacional comprovado."
+  },
+  {
+   "id": "legado-207",
+   "nome": "GO HC",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O app consolida dados operacionais e calcula o headcount necessário por etapa. Assim como o Headcount Gogroup, não há comprovação de uso recorrente por outras pessoas nem de decisões tomadas com suas informações. Para subir, precisa demonstrar consultas frequentes pelas lideranças e como elas ajustam equipes a partir do app."
+  },
+  {
+   "id": "0e1fd5d4dca9a13a35e0014adefc3f25",
+   "nome": "Abastecimento Lojas",
+   "area": "LOJAS",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "A solução organiza requisições, entregas e confirmações de abastecimento em três lojas, substituindo conversas dispersas por um fluxo rastreável. Apesar do uso recorrente, o alcance está restrito a três pessoas e as ações continuam manuais, ficando próxima de Trocas e Devoluções - Lojas Físicas. Para subir, precisaria comprovar adoção mais ampla ou executar automaticamente etapas do abastecimento."
+  },
+  {
+   "id": "d1579cfa97be186fc9a13a6f036d7474",
+   "nome": "GoGroup Mobility",
+   "area": "Gente e Gestão",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "Centraliza corridas, orçamento e registros para gestores revisarem e aprovarem, de forma semelhante à Plataforma de Orçamento de Pessoal 2026. Fica em 1 porque Facilities ainda importa os relatórios e as decisões continuam humanas. Para subir, precisaria executar automaticamente uma etapa recorrente do fluxo, sem depender de início manual."
+  },
+  {
+   "id": "71f8c78816d6a3dd9088f1d2a39ffc5a",
+   "nome": "Portal de Reembolsos (Gobeaute)",
+   "area": "CX",
+   "humana": 3,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Portal de devoluções de CX» (similaridade 0.87) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. O portal informa o andamento do reembolso e entrega o comprovante diretamente ao cliente, com uso comprovado por 1.783 contatos mensais evitados. Não chega a 2 porque não executa o reembolso e depende da solicitação do cliente ou do encaminhamento pelo atendimento. Subiria se processasse o pedido até a conclusão sem intervenção humana."
+  },
+  {
+   "id": "5ebe736d7bd4b27ba7138ebba2de9daf",
+   "nome": "Gerador de Vistas",
+   "area": "PRODUTO",
+   "humana": 2,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "Automatiza a criação de vistas coloridas para waitlists e lançamentos. Como o GoRender, é uma melhoria local cujo valor documentado se limita às 54,4 horas poupadas, sem comprovação de usuários recorrentes. Para subir, precisa mostrar uso contínuo pela equipe e geração completa sem acionamento ou retrabalho manual."
+  },
+  {
+   "id": "0b92927b09b1ae84dd0c481bf6fa5214",
+   "nome": "RPA - Ajuste de inventário",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Agente de apuração de Impostos» (similaridade 0.80) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. O RPA lançou ajustes fiscais no WebGex a partir de uma planilha e registrou o status de cada linha. Fica em 0 porque foi uma execução pontual, sem uso recorrente, ao contrário da Automação de Despesas Fiscais, que opera mensalmente. Para subir, precisaria executar novos lotes de forma recorrente."
+  },
+  {
+   "id": "7a5fadc829ff57f7024ab08528b04898",
+   "nome": "[ECOMM] Alerta de pedidos travados",
+   "area": "GROWTH",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Alerta de Pedidos Travados por Responsável» (similaridade 0.88) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Monitora pedidos travados e envia ao Chat informações para a equipe agir. Fica em 0, como os alertas equivalentes já avaliados, porque o memorial não comprova uso recorrente nem decisões tomadas a partir das mensagens. Para subir, precisa demonstrar quem usa os alertas e quais pedidos são destravados por essa rotina."
+  },
+  {
+   "id": "0a362cd4b1b8f5f5ebb60abb6d25df5d",
+   "nome": "Gocase B2B Service Desk (RMA E CADASTROS)",
+   "area": "B2B GOCASE",
+   "humana": 1,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Automatiza cadastros e processa casos simples de RMA em tempo real, deixando para a equipe apenas validações e exceções. Está acima de Gestão de Faturamento B2B, que somente organiza informações, mas ainda não bloqueia erros com consequência operacional para outra área."
+  },
+  {
+   "id": "75490b6b4fb70711102de90b0d24bd9c",
+   "nome": "V.I.S.I.O.N. — Visão Integrada de Supervisão Inteligente,  Operacional e de Negócios",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 2,
+   "especial": false,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "299719a729c65ca062af80b1ad6f85e5",
+   "nome": "Relatório de Cupons - Impacto de campanhas",
+   "area": "LOJAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "media",
+   "leitura": "Consulta os cupons no Metabase e envia ao chat um resumo diário e mensal das campanhas. Como o Resumo Executivo de Lojas, entrega informação para outras pessoas interpretarem, mas não toma nenhuma ação sobre as campanhas. Para subir, precisaria ajustar ou acionar campanhas automaticamente com base nos resultados.",
+   "valor_declarado": 174.465,
+   "valor_sugerido": 348.93,
+   "ajustaria": true,
+   "auditoria": "Confirmação do valor declarado: 700 minutos mensais ÷ 60 = 11,67 horas; 11,67 × R$ 29,90 = R$ 348,93 por mês. Nada foi retirado, pois não há receita bruta, custo evitado ou custo externo duplicado no ganho."
+  },
+  {
+   "id": "b35f788c70ef99bfb465fb4d20d36a9d",
+   "nome": "Resumo NFS | Trello → Chat",
+   "area": "LOJAS",
+   "humana": 1,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "Envia diariamente o resumo das notas fiscais e destaca prazos para a equipe agir, como o Resumo Executivo já avaliado. Fica em 1 porque apenas informa e direciona aos cartões, sem tratar atrasos ou atualizar a operação. Para subir, precisaria executar essas ações de ponta a ponta.",
+   "valor_declarado": 209.1,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "O valor unitário e a multiplicação estão coerentes, portanto não são absurdos por si. Porém, não há dados para separar das 30h a parcela efetivamente eliminada pelo resumo automático; sugerir um número exigiria essa decomposição."
+  },
+  {
+   "id": "33c884049f5fa0c017c684ec9f353a10",
+   "nome": "Resumo Executivo - Diretoria, Head/Gerente e Gerentes de Loja",
+   "area": "LOJAS",
+   "humana": 1,
+   "especial": false,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "1b75bcf9e08ccb24f7247781beb4ca44",
+   "nome": "Ordens Travadas/Em Espera | Metabase -> Chat",
+   "area": "LOJAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Alerta de Pedidos Travados por Responsável» (similaridade 0.89) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Consolida ordens retidas e envia alertas ao Chat para a liderança decidir o destravamento. Como Overview Produção e Entradas de Estoque, apenas informa, e o memorial não comprova uso recorrente além da declaração. Para chegar a 1 estrela, precisa mostrar envios e ações regulares da liderança a partir deles."
+  },
+  {
+   "id": "50f7370646f7b8dafc071ec9615dcb31",
+   "nome": "Gestão de Contencioso | Gogroup",
+   "area": "JURIDICO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Centraliza processos judiciais, riscos e relatórios para apoiar o Jurídico e a liderança. Fica em 0, abaixo de Regularizações, porque só apresenta resultados esperados e estimativas, sem comprovar uso recorrente. Para subir, precisa mostrar usuários ativos e decisões tomadas com seus alertas ou relatórios."
+  },
+  {
+   "id": "b1b47044a5244921df55a0ec0bd0857c",
+   "nome": "Entradas de Estoque | Metabase -> Chat",
+   "area": "LOJAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Monitora entradas de estoque e envia avisos para uma assistente, que ainda confere e decide o que fazer. Assim como os projetos Metabase → Chat já avaliados, é uma solução local de informação, sem atuação sobre o estoque. Para subir, precisaria assumir uma ação operacional relevante ou sustentar decisões recorrentes de uma equipe maior.",
+   "valor_declarado": 104.55,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "R$ 209,10 está matematicamente correto para 15h mensais, sem custo externo ou dupla contagem. Não há base para reduzir com certeza: usando 22 dias seriam 11h e R$ 153,34, mas 30 dias podem ser válidos se a operação diária for coberta por escala. É necessário esclarecer dias e pessoas."
+  },
+  {
+   "id": "fd13dd230d3f470bbae29393ab3c1f84",
+   "nome": "Inlfuhub",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "A plataforma centraliza campanhas, contratos, calendário e métricas para cinco analistas acompanharem e ajustarem a operação. Fica em 1 estrela, ao lado do GocaLives, porque organiza e atualiza informações, mas as análises, marcações e revisões ainda são feitas por pessoas. Para subir, precisaria executar sozinho ações recorrentes, como remarcar datas ou enviar orientações aos influenciadores."
+  },
+  {
+   "id": "5a0eba5329975cea1a5a084cea4244b4",
+   "nome": "Dashboard BOT · Gogroup",
+   "area": "CX",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Centraliza indicadores de CX e gera análises para apoiar decisões humanas. Assim como os dashboards de Afiliados e Performance Produtos, não há evidência de acessos ou decisões recorrentes que comprove uso real. Para chegar a 1 estrela, precisa demonstrar consumo frequente por analistas e gestores, com registros de acesso ou rotinas nomeadas."
+  },
+  {
+   "id": "3ec81350fc444814eb61630353ae233b",
+   "nome": "Automação End-to-End de Inadimplência",
+   "area": "FINANÇAS",
+   "humana": 3,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Executa automaticamente uma rotina recorrente completa, desde a coleta dos títulos até a atualização da Neofin, das planilhas e dos relatórios, ficando acima de projetos apenas informativos como o Bot de detecção de Extravios. Não chega a 3 porque a conferência descrita não bloqueia erros nem protege formalmente outra área; para subir, precisaria impedir divergências antes da cobrança e registrar esse controle de forma auditável."
+  },
+  {
+   "id": "6910309d52726b6737d61a27d2cc6df1",
+   "nome": "GDI - Gestão de Industrialização",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 3,
+   "especial": true,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "O GDI automatiza a consulta de endereços e grande parte do lançamento da produção e das etiquetas, com uso operacional e resultado realizado. Fica acima dos projetos apenas informativos, mas não chega a 3★ porque não há validação ou bloqueio sistêmico de erros. Para subir, precisa impedir ordens, materiais ou apontamentos inválidos antes que afetem a produção."
+  },
+  {
+   "id": "7e4004e94b6102fb6a6a1bc6fd0627f0",
+   "nome": "Agente Demonstracoes Contabeis",
+   "area": "FINANÇAS",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O agente gera demonstrações contábeis em Excel e PDF, mas ainda opera com dados sintéticos para validar o processo. Fica abaixo da Automação de Extratos Bancários porque não há uso produtivo comprovado; poderá chegar a 2 quando consultar o ledger real e executar entregas recorrentes."
+  },
+  {
+   "id": "f42a5563a94b384937b0ad39bfb8ff4d",
+   "nome": "Gocreators",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "A plataforma pretende treinar e incentivar creators, acompanhar métricas e impulsionar a geração de conteúdo. Fica abaixo do Gocreators - DashBoard porque o memorial só registra resultados esperados, sem comprovar uso recorrente ou impacto real. Para subir, precisa demonstrar creators ativos, conteúdos publicados e uma rotina sustentada pela plataforma."
+  },
+  {
+   "id": "71abeeb121c643d60133e2ac48b902ef",
+   "nome": "Tiny Cadastro autônomo ficha técnica produto",
+   "area": "AZ",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Preenche fichas e imagens no Tiny quando Victor aciona o script. Como o Catalogador de produtos, é uma automação local para uma pessoa, e o valor descrito se limita às horas economizadas. Para subir, precisaria rodar automaticamente em uma rotina comprovada e sustentar um processo mais amplo."
+  },
+  {
+   "id": "05c4b3690bb33ff8f9bc0c039790d971",
+   "nome": "BB Indústria QC",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 3,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "O BB Indústria QC padroniza inspeções, calcula amostragens, registra não conformidades e aciona outras áreas com rastreabilidade. Fica em 3, alinhado ao seu papel de controle operacional e acima dos projetos que apenas registram testes; não chega a 4 porque a decisão sobre lotes e fornecedores continua humana. Para subir, precisaria decidir autonomamente liberações ou ações sobre fornecedores."
+  },
+  {
+   "id": "c3de05afe937e1818b8a41261d37ba53",
+   "nome": "Shipping hub",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 3,
+   "confianca": "media",
+   "leitura": "O hub centraliza métricas de frete e já levou à correção de cadastros, prazos e regras que afetavam a operação. Fica em 3 estrelas, mantendo a avaliação do Shipping hub citado como referência, mas não chega a 4 porque apenas mostra os problemas e a decisão continua humana. Subiria se ajustasse regras e parâmetros automaticamente."
+  },
+  {
+   "id": "9ea94045b29b20f79e861adeab561a9d",
+   "nome": "Boletos Itaú via Proxy Bancária",
+   "area": "FINANÇAS",
+   "humana": 2,
+   "especial": false,
+   "agente": 5,
+   "confianca": "baixa",
+   "leitura": "⚠ escape sem citação da doc para \"Existe atividade em curso hoje que NÃO existiria sem ele. Não \"seria mais lenta\": não existiria.\" — voltou para 5★. A proxy sustenta um processo ativo do bot do RCA, que depende dela para consultar o Itaú e entregar boletos. Fica em 6, acima das automações isoladas de 5 estrelas, mas abaixo de 7 porque apenas um processo dependente foi identificado."
+  },
+  {
+   "id": "d1f00a69b3a113d2c9121450533f978b",
+   "nome": "Godash",
+   "area": "GROWTH",
+   "humana": 2,
+   "especial": true,
+   "agente": 2,
+   "confianca": "media",
+   "leitura": "Centraliza indicadores usados por gestores e oferece consultas via MCP, em papel semelhante ao Damidash e ao Gocreators Dashboard. Fica em 2 porque apoia decisões humanas, mas não valida nem bloqueia erros operacionais. Subiria se passasse a impedir falhas com impacto comprovado em outras áreas."
+  },
+  {
+   "id": "27974e66b3f3cd233e153ca34156736b",
+   "nome": "Automação de envio Reinf",
+   "area": "RPA",
+   "humana": 2,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Automatiza a preparação, assinatura e transmissão mensal da EFD-REINF à Receita Federal, em linha com o Fluxo Automatizado de NFSE. Fica em 2 porque executa um fluxo definido, mas não comprova validações que impeçam o envio de dados fiscais incorretos. Para subir, precisa demonstrar essas barreiras e apresentar históricos de transmissões aceitas."
+  },
+  {
+   "id": "cdfa8daf29b3dfff65d0499ebf22efb3",
+   "nome": "Cultural hub",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Organiza entrevistas culturais, registra dados e encerra a sessão quando ao menos dois guardiões solicitam. Fica em 2, como o Creators Hub, porque executa o fluxo, mas a decisão continua humana. Para subir, precisa comprovar uso recorrente e impedir erros que afetem outra área."
+  },
+  {
+   "id": "797a887e1fcba72cf7da73c9dfffa81a",
+   "nome": "hub de mensagens dos grupos do time de influenciadores",
+   "area": "GROWTH",
+   "humana": 2,
+   "especial": true,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Centraliza automaticamente mensagens do WhatsApp, calcula indicadores e entrega um resumo diário por IA para orientar a gestão. Fica no mesmo patamar de Haileydash e Gocreators Dashboard, pois gera informação recorrente, mas não impede falhas nem resolve pendências. Subiria se escalasse ou bloqueasse automaticamente atendimentos fora do SLA."
+  },
+  {
+   "id": "c1538380f0aedeac9353419bce98e8f8",
+   "nome": "PIAPP",
+   "area": "GROWTH",
+   "humana": 10,
+   "especial": true,
+   "agente": 7,
+   "confianca": "baixa",
+   "leitura": "O Piapp fornece geração multimídia por API e MCP para mais de dez times. Fica em 7, acima do Prisma e do Gocontent Machine, pois o Prisma já opera sobre ele; não chega a 8 porque só essa operação está nomeada. Para subir, precisa comprovar um segundo projeto em produção consumindo a plataforma.\n\nEvidência do escape:\n• Existe atividade em curso hoje que NÃO existiria sem ele. Não \"seria mais lenta\": não existiria.\n  \"Temos ganho mensal com ele de +3 milhões e com o prisma para geração automática que utiliza o piapp já vai nos 400k.\"\n• Removê-lo não devolve o estado anterior — o jeito antigo deixou de existir como opção.\n  \"Temos ganho mensal com ele de +3 milhões e com o prisma para geração automática que utiliza o piapp já vai nos 400k.\""
+  },
+  {
+   "id": "fc990e190c5bba2cef976af6f4b5f3a7",
+   "nome": "Ferramenta de testes de novos produtos ctr com agente autonomo (CTR machine)",
+   "area": "GROWTH",
+   "humana": 7,
+   "especial": true,
+   "agente": 5,
+   "confianca": "baixa",
+   "leitura": "Encontra produtos promissores, cria embalagem e imagens e publica o teste no Facebook de forma automatizada. Fica em 5, acima do Agente precificador, porque chega ao mercado sem aprovação humana, mas não há outro projeto nomeado operando sobre ela. Para subir, precisa comprovar processos novos em produção que dependam dessa ferramenta."
+  },
+  {
+   "id": "2afc53e51f6935703b474988d0840a4a",
+   "nome": "Ferramenta de comentar nos posts",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "2c33e5088fd9ec5c46d6c4bfd43fa1b8",
+   "nome": "Agente precificador",
+   "area": "GROWTH",
+   "humana": 4,
+   "especial": true,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "O agente aprende com estoque e vendas para recomendar preços, que são aplicados na loja após aprovação do operador, assim como o GoPrice. Fica em 4 porque ainda há revisão humana antes da alteração. Para subir, precisaria operar preços de forma autônoma, com metas e limites auditáveis."
+  },
+  {
+   "id": "f482fa39fbab042409249c96ee0b5bc4",
+   "nome": "Gopilot – playson de Google Ads",
+   "area": "GROWTH",
+   "humana": 4,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «[VERSTA] Robo orçamento - {Marca}» (similaridade 0.76) é quase idêntico e vale 8★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. O agente monitora campanhas e recomenda ajustes, mas a equipe ainda decide e executa as mudanças. Fica em 0, como Auditoria de Contas Meta Ads, porque não há prova concreta de uso recorrente. Para subir, precisa mostrar recomendações usadas pela equipe ou aplicar os ajustes automaticamente."
+  },
+  {
+   "id": "f3bbd579ba1b284d0e8f5fb20ee3a1f0",
+   "nome": "Automação Onboarding",
+   "area": "Gente e Gestão",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "A automação dispara mensagens, e-mails, solicitações de acesso e controles de kits após o cadastro. Diferentemente de Onboarding & Integração, não há logs ou casos concluídos que comprovem operação recorrente. Para subir, precisa demonstrar onboardings executados automaticamente em produção."
+  },
+  {
+   "id": "8a69b80a0321c31c2c577ae4254fcec7",
+   "nome": "Evnio de e-mails com Informe de Rendimentos anual",
+   "area": "Gente e Gestão",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "A automação localiza e envia anualmente mais de 900 informes, com registro de status e reprocessamento. Como nas automações de contratos e férias, o uso é pontual, ainda exige preparação e conferência humana, e o valor documentado se limita às 42 horas economizadas. Para subir, teria de operar sem acionamento manual e sustentar outros processos relevantes."
+  },
+  {
+   "id": "084f0d94ec2ad51b4d3b0e73cda57948",
+   "nome": "Acompanhamento de Mudanças de Preço",
+   "area": "GROWTH",
+   "humana": 2,
+   "especial": true,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Sistema de alertas» (similaridade 0.81) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. Monitora mudanças de preço, registra o histórico e informa automaticamente as áreas envolvidas. Fica em 1 porque entrega informação para que as pessoas atuem, sem executar a correção ou impedir um preço incorreto; subiria se corrigisse ou bloqueasse divergências automaticamente."
+  },
+  {
+   "id": "5651c09639c1f61bee22b5767ebd8ef6",
+   "nome": "Prisma",
+   "area": "GROWTH",
+   "humana": 5,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O Prisma cria, publica e otimiza criativos com vários agentes. Embora seja parecido com a CTR Machine, o memorial não cita campanha ativa, volume produzido ou resultado real, por isso ainda não alcança a nota dela. Para subir, precisa comprovar criativos publicados de forma recorrente e campanhas medidas."
+  },
+  {
+   "id": "1337c147f90a0a73c54f40526422453a",
+   "nome": "Go Select IA",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O Go Select IA entrevista candidatos por áudio, calcula aderência e recomenda quais perfis o RH deve priorizar. Fica em 0 porque o texto diz o que a ferramenta fará, mas não comprova uso real. Para subir, precisa mostrar seleções realizadas, candidatos avaliados e uso recorrente pelo RH."
+  },
+  {
+   "id": "f4888bd4bfae265b91c1b45e8d3324f1",
+   "nome": "Sistema de alertas",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 3,
+   "confianca": "alta",
+   "leitura": "Monitora métricas críticas a cada 10 minutos, liga para responsáveis, aciona a contingência e envia WhatsApp ao detectar anomalias. Fica em 3, ao lado de Integrações multi-plataforma de CRM, porque protege a operação, mas a correção ainda depende de uma pessoa. Para subir, teria de escolher a resposta adequada e executá-la automaticamente."
+  },
+  {
+   "id": "4f83eb613abc6d704bc4f1ef3bb0877c",
+   "nome": "Portal de Jornada do Cliente B2B",
+   "area": "CSC",
+   "humana": 2,
+   "especial": false,
+   "agente": 3,
+   "confianca": "alta",
+   "leitura": "O portal organiza a devolução entre sete áreas, roteia cada chamado, monitora SLA e mantém um histórico auditável, com nove casos destravados na primeira semana. Fica ao lado do Portal de devoluções de CX em 3 estrelas porque controla o fluxo e evita falhas, mas as decisões do processo continuam humanas e baseadas em regras determinísticas. Para subir, precisaria decidir casos ambíguos com inteligência agregada e comprometer recursos da empresa com impacto direto."
+  },
+  {
+   "id": "caddf5a75fa33da411b7e84e39cc0475",
+   "nome": "Fluxo de carrinho abandonado e checkout",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 2,
+   "confianca": "media",
+   "leitura": "Sem leitura — o modelo não justificou a nota."
+  },
+  {
+   "id": "931fc7c51c5f001bbedde2403c139393",
+   "nome": "Avaliador de OKR",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Avalia KRs com IA e entrega notas, justificativas e sugestões para um analista distribuir às áreas. Como o Gerenciador de OKRs, atende uma única pessoa e teve uso pontual, sem comprovar uma rotina recorrente nas equipes. Para subir, precisa mostrar uso contínuo por outras pessoas e correções reais feitas a partir dos relatórios."
+  },
+  {
+   "id": "04a1e4edee977d07335e203d6a67f890",
+   "nome": "Integrações multi-plataforma de CRM",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "A integração sincroniza Insider e Omnisend, reduz falhas e impede envios duplicados que poderiam gerar spam ao cliente, com aumento medido de cerca de 3% no share de receita do CRM. Fica em 3 estrelas, alinhada ao Fluxo de carrinho abandonado e checkout, pois protege a operação, mas não escolhe autonomamente públicos, canais ou campanhas. Para subir, precisaria assumir essas escolhas com inteligência e impacto direto."
+  },
+  {
+   "id": "e0bc3303bdb4ab42cab081c977bc6ea9",
+   "nome": "FÉRIAS · PJs (TECNOLOGIA)",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Centraliza solicitações e aprovações de férias dos PJs de Tecnologia. Assim como a Agenda de Viagens Corporativas, fica em 0 porque não há registros de acessos, solicitações ou aprovações reais. Para subir, precisa comprovar uso recorrente por colaboradores e lideranças."
+  },
+  {
+   "id": "042ceb241415c998dc98038ef31c4907",
+   "nome": "Automação de Nfs via Python",
+   "area": "Supply Gogroup",
+   "humana": 0,
+   "especial": false,
+   "agente": 2,
+   "confianca": "media",
+   "leitura": "Baixa diariamente as NF-e, gera os DANFEs e arquiva tudo no Drive sem intervenção, como a Automação de Inputs de Saída. Fica em 2 porque apenas executa uma rotina definida, sem comprovar validação ou bloqueio de falhas. Para subir, precisaria detectar notas ausentes e impedir impacto no processo de compras."
+  },
+  {
+   "id": "e8d21e1041eab22d16bdafc271db909e",
+   "nome": "CX - Ticket Creator",
+   "area": "RPA",
+   "humana": 5,
+   "especial": true,
+   "agente": 5,
+   "confianca": "baixa",
+   "leitura": "Abre tickets diretamente nas transportadoras, em produção e com 94% das ocorrências concluídas sem intervenção humana, assumindo uma entrega final que afeta o cliente. Fica em 5, como o próprio CX Ticket Creator usado como referência, porque substituiu um fluxo n8n e aberturas manuais, mas não sustenta novos processos nomeados. Para subir, precisaria se tornar a base de outras operações que tenham nascido e funcionem sobre ele."
+  },
+  {
+   "id": "4c0b4e19ac8316415208f764d25ebe7e",
+   "nome": "Fast Track",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Centraliza OKRs, calcula resultados e prepara materiais do ciclo, como o Gerenciador de OKRs já avaliado em 0. A economia é pontual e não há registro de uso recorrente pelas áreas. Para subir, precisa mostrar acessos mensais e decisões tomadas com a plataforma."
+  },
+  {
+   "id": "0708a976f1dd189f1e8a106e93b5c2f7",
+   "nome": "Automação de Dados CTR Gocase",
+   "area": "PRODUTO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Robo subir vídeos em teste» (similaridade 0.88) é quase idêntico e vale 5★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Coleta resultados de CTR, atualiza uma planilha e arquiva imagens diariamente. Como o GoDaily, substitui uma tarefa local de uma pessoa, e o benefício apresentado se limita às 16 horas mensais economizadas. Para subir, precisa comprovar uso recorrente por outras pessoas e decisões de produto tomadas com esses dados."
+  },
+  {
+   "id": "244735580d1bdff3d0a9ebef2eccd35e",
+   "nome": "Automação validação catraca refeitorio",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O app cruza a nota do refeitório com a catraca e prepara divergências, glosa e e-mail. Fica abaixo das automações fiscais de 2 estrelas porque atende uma conferência mensal pequena, exige arquivos e revisão, e não há prova de envio automático. Para subir, precisa demonstrar uso recorrente e contestação executada sem intervenção."
+  },
+  {
+   "id": "70ac508ffef75517e5ca90db0f2b9ddf",
+   "nome": "Gohelp",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Gohelp - Influenciadores Gobeauty» (similaridade 0.86) é quase idêntico e vale 5★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. O GoHelp responde de forma autônoma às dúvidas de candidatos após a entrevista com RH. Fica em 1 estrela, como o Universo Gocoins, porque orienta, mas não realiza etapas do processo seletivo nem decide sobre candidatos. Para subir, precisaria executar uma solicitação completa ou uma etapa operacional."
+  },
+  {
+   "id": "85443676002563cbdfb4ae8b85a605ba",
+   "nome": "Pesquisa pulso - Gogroup",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "alta",
+   "leitura": "Automatiza a coleta, a consolidação e a visualização dos pulsos trimestrais, incluindo análises qualitativas e históricas. Assim como o NPS - Gestores e Candidatos, produz informações para líderes e Gente e Gestão decidirem, mas não executa ações a partir dos resultados. Para chegar a 2 estrelas, precisaria iniciar e conduzir automaticamente etapas recorrentes após identificar desvios."
+  },
+  {
+   "id": "110f199139399ccd797af95aee10f165",
+   "nome": "Sucesso.AI",
+   "area": "CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "O Sucesso.AI detecta insucessos e contata o cliente automaticamente para obter sua escolha. Fica em 2, acima dos Disparos de Reenvio, porque executa o contato, mas não comprova que conclui o reenvio ou o reembolso. Para subir, precisaria validar o tratamento e impedir que casos sem solução avancem."
+  },
+  {
+   "id": "43149070d81a1b405ea08f66eebec1da",
+   "nome": "GoUniform",
+   "area": "GENTE E GESTÃO | CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Centraliza estoque, cadastro de funcionários e solicitações de uniformes. Fica em 0, como Facilities Gestão Operacional, porque o memorial não comprova uso recorrente e descreve impacto de apenas uma hora por semestre. Para subir, precisa mostrar usuários ativos e solicitações realmente processadas pelo aplicativo."
+  },
+  {
+   "id": "3f625de8dfbba719e411e4420e71f89c",
+   "nome": "Agente Estoque Custo",
+   "area": "FINANÇAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Automatiza rotinas recorrentes de custeio, lançamentos e conciliações sem depender de acionamento manual. Fica abaixo do Estoque ao vivo Gobeaute porque não há evidência de bloqueio de divergências nem de outro processo nomeado que dependa da API. Para chegar a 3, deve impedir automaticamente o fechamento ou a movimentação quando detectar inconsistências com impacto operacional."
+  },
+  {
+   "id": "d672763598c2468ab96606347d3b6e97",
+   "nome": "SST PRO - SEGURANÇA DO TRABALHO",
+   "area": "GENTE E GESTÃO | CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O app registra e apresenta riscos, ocorrências, indicadores e checklists de SST. Fica em 0, como o SegTrab, porque o memorial cita apenas um especialista e não comprova outros usuários recorrentes nem ações tomadas a partir dos registros. Para chegar a 1, precisa demonstrar uso contínuo por outras pessoas e decisões concretas apoiadas pelo app."
+  },
+  {
+   "id": "8bce20c2919b3e6d94bfd4933116a6d8",
+   "nome": "Tesla Bot",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "O Tesla Bot trata dados e produz indicadores de manutenção para apoiar decisões, de forma semelhante ao Agente Analista de Dados. Não recebe 2 porque não executa ações sobre as ordens de serviço nem há comprovação clara de uma rotina autônoma recorrente. Para subir, precisaria agir automaticamente sobre as ocorrências, como abrir, priorizar ou encaminhar manutenções."
+  },
+  {
+   "id": "88a169cce620725c413d7457b3cb9ce1",
+   "nome": "GoStream - Checklist Proposta",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Publica no Google Chat um checklist quando o candidato avança para Proposta, mas a conferência continua manual. Assim como Gostream e Chat Waitlist, atende uma rotina pequena e o memorial não comprova uso recorrente nem redução real de erros. Para subir, precisa demonstrar operação contínua e queda verificável nas propostas com validações pendentes."
+  },
+  {
+   "id": "67c6b4fa84cc48ad3ef75dce1cb164eb",
+   "nome": "SEO Gocase",
+   "area": "GROWTH",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "A skill gera textos de produto para SEO, mas atende uma única pessoa, em apenas cinco produtos por mês, e ainda depende de acionamento e revisão humana. Como o Catalogador de produtos e o GoDaily, é uma automação simples e local, sem impacto relevante além da pequena economia declarada. Para subir, precisaria ter uso recorrente por mais pessoas ou automatizar uma etapa relevante da publicação do catálogo."
+  },
+  {
+   "id": "62b60c15e40ce23d063a7e58f2db7ff1",
+   "nome": "Classificação Automática de NPS e Review por IA",
+   "area": "CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Classifica diariamente os comentários de detratores e grava os motivos no Supabase sem acionamento humano, ficando ao lado de Confere.AI e Análise de BADs. Fica em 2, e não 3, porque apenas alimenta a base e o painel, sem impedir falhas operacionais; subiria se a classificação bloqueasse ou corrigisse erros automaticamente."
+  },
+  {
+   "id": "39d180dc4e4ee29640cffec5fe9a118a",
+   "nome": "Cadastro de Análise de Crédito RCA",
+   "area": "B2B GOBEAUTE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Preenche e envia formulários de análise de crédito, mas depende de execução manual via run.bat e atende uma rotina local de apenas um analista, como o Fomrs_RCA_RDstation. Fica em 0 porque não há prova de uso recorrente nem impacto além das 11 horas economizadas; subiria com execução autônoma e adoção operacional comprovada."
+  },
+  {
+   "id": "0bd70ba17882781235e433235d4f16d9",
+   "nome": "Automação Semanal de Cronograma de Mala do Monday",
+   "area": "PRODUTO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Assim como a Automação de Relatório de Malas, o projeto gera um relatório recorrente, mas o memorial comprova apenas a substituição de 4 horas mensais de uma única analista. Os efeitos sobre decisões e prazos são apenas esperados; para chegar a 1 estrela, faltam evidências de que o squad consulta o relatório regularmente e age a partir dele."
+  },
+  {
+   "id": "46cf07d0ee60fd21e981405fd17265f3",
+   "nome": "GoPilot",
+   "area": "RPA",
+   "humana": 1,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Sem leitura — o modelo não justificou a nota."
+  },
+  {
+   "id": "fd165938a9c4583fb007e167a36e6615",
+   "nome": "Hailey",
+   "area": "RPA",
+   "humana": 2,
+   "especial": true,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "cbe83a0740da0e3aa906a2c9fbf38a93",
+   "nome": "GERADOR DE GNRE",
+   "area": "FINANÇAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Lê XMLs, monta as guias e as envia ao portal, deixando ao analista a retirada para pagamento. Como a Automação GIA ST, atende uma rotina fiscal local de uma pessoa e depende de operação humana, por isso não sobe. Para avançar, precisaria rodar de forma autônoma e sustentar uma rotina operacional mais ampla."
+  },
+  {
+   "id": "698637672d3bb93670f35d672f509482",
+   "nome": "Tropa Gogroup",
+   "area": "RPA",
+   "humana": 2,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «GoDocs» (similaridade 0.77) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Consolida KPIs e agenda cobranças pelo Google Chat, mas o memorial apresenta resultados esperados e não comprova uso recorrente. Fica abaixo do Checklist de Início de Turno; para subir a 2★, precisa mostrar logs de execuções e áreas respondendo semanalmente ao Bot Tropa."
+  },
+  {
+   "id": "51a339718e462d9d74709f92e621ab21",
+   "nome": "Dashboard Lives Gogroup",
+   "area": "GROWTH",
+   "humana": 1,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Consolida dados de lives para apoiar controle e otimizações. Fica abaixo dos dashboards de 1★ e 2★ porque o memorial não comprova atualização contínua, usuários recorrentes nem decisões tomadas com seus dados. Pode subir ao demonstrar uma rotina ativa, com responsáveis e exemplos de ações geradas."
+  },
+  {
+   "id": "7cc5e99cdc78654b7baa2717ac9eb6ca",
+   "nome": "Catálogos - House of beauty",
+   "area": "DESENVOLVIMENTO PRODUTO GOBEAUTE",
+   "humana": 1,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Digitaliza e centraliza catálogos para compartilhamento por link ou QR Code. Como no Catalogador de produtos, não há comprovação de uso recorrente pelas equipes ou em ações comerciais; pode chegar a 1 estrela quando consultas, usuários e eventos atendidos estiverem registrados."
+  },
+  {
+   "id": "ac15e77f72462417e2fb67ab582805e4",
+   "nome": "Hub RCA / Vendedores - Gobeaute",
+   "area": "B2B GOBEAUTE",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "O Hub dá aos vendedores acesso direto a pedidos, documentos, boletos, estoque e comissões, como os painéis de controle já avaliados. Fica em 1 estrela porque entrega informações sob consulta, mas o vendedor ainda inicia o acesso e decide o que fazer. Para subir, precisaria executar ações recorrentes sozinho, como tratar pedidos atrasados ou cobrar inadimplentes."
+  },
+  {
+   "id": "2e7661ed9d40c55958cb7cff0402c893",
+   "nome": "Mix Produtos Gobeaute",
+   "area": "GROWTH",
+   "humana": 1,
+   "especial": true,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "Consolida vendas, metas, margem e estoque das oito marcas e sustenta o relatório executivo semanal. Fica em 2, como o Haileydash, porque automatiza a informação, mas as decisões e correções continuam com o time. Para subir, precisaria detectar e impedir falhas operacionais antes que afetem outras áreas."
+  },
+  {
+   "id": "ffccf702c5ba9a95f29710067636a777",
+   "nome": "Painel de Recebedoria de Doc Fiscais",
+   "area": "FINANÇAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O painel consolida notas fiscais e apresenta indicadores sobre documentos recebidos fora da competência. Fica em 0, como o Controle Fiscal de Lançamentos, porque atende uma assistente e não comprova uso recorrente nem ações geradas pelas análises. Para subir, precisa demonstrar uma rotina ativa em que outras pessoas consultem o painel e tratem as pendências."
+  },
+  {
+   "id": "892919afc3baf2542791fe2d87817809",
+   "nome": "CMV Gobeaute",
+   "area": "GROWTH",
+   "humana": 1,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Margem Diaria - Gobeaute (vendas yampi)» (similaridade 0.76) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. O painel consolida o CMV das oito marcas e aponta os SKUs que afetam a margem. Fica abaixo do Mix Produtos Gobeaute porque o memorial não comprova uso recorrente por outras pessoas. Para subir, precisa mostrar quem consulta o painel, com que frequência e quais decisões reais toma a partir dele."
+  },
+  {
+   "id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+   "nome": "Sab.IÁ — Analista de IA para geração de FAQs",
+   "area": "CX",
+   "humana": 1,
+   "especial": false,
+   "agente": 2,
+   "confianca": "alta",
+   "leitura": "Analisa diariamente atendimentos escalados e redige sugestões de FAQs para validação humana. Fica em 2, como Ger.AI CX e a classificação de NPS, porque executa a análise recorrente, mas não publica nem impede erros sem revisão. Para subir, precisaria validar e publicar com controles auditáveis, sem decisão humana."
+  },
+  {
+   "id": "094f30c93878a4211fe047de14def297",
+   "nome": "Sistema de Assinatura Digital de Romaneios - TikTok",
+   "area": "ÁREA NÃO IDENTIFICADA",
+   "humana": 1,
+   "especial": true,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "c955748c57508700a7e2457fbaa369dd",
+   "nome": "Analista de Boost de Estampas",
+   "area": "MARKETING",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "Sem leitura — o modelo não justificou a nota."
+  },
+  {
+   "id": "b9289e97e84b136bdc87639c75ed8d4b",
+   "nome": "Disparo de resultados automáticos (Chat Gocase)",
+   "area": "CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "A solução automatiza a consulta e o envio de indicadores, mas o memorial comprova apenas a execução do fluxo, não o uso recorrente dos alertas pelos agentes. Está no mesmo patamar do Chat Waitlist/CTR Gocase e do Alerta de reembolsos: para chegar a 1 estrela, precisa demonstrar que os destinatários recebem, consultam e usam as mensagens para ajustar a operação durante o dia."
+  },
+  {
+   "id": "5760091fa8ea81b8f3cd8bd9234968b8",
+   "nome": "Hitmaker",
+   "area": "GROWTH",
+   "humana": 1,
+   "especial": true,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "9f00af06cbbea1aafdb400062a7c2d72",
+   "nome": "Automação das Solicitações de Pagamento",
+   "area": "FINANÇAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Sem leitura — o modelo não justificou a nota."
+  },
+  {
+   "id": "b803bebb9429700bbe85f676c417f627",
+   "nome": "Cupons Yampi",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "a521856e6ac299aad4bc3d9251f5d417",
+   "nome": "Trocas e Devoluções - Lojas Físicas",
+   "area": "LOJAS - ADM",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "alta",
+   "leitura": "Centraliza os protocolos, aplica políticas, registra decisões e automatiza comunicações e alertas. Assim como Gestão de Faturamento B2B, organiza o fluxo, mas o atendente ainda abre cada caso e o supervisor analisa e decide. Para subir, precisaria executar sozinho uma etapa operacional completa, sem depender de alguém para iniciá-la."
+  },
+  {
+   "id": "88ba535dbdf3d55b708832576b536e9f",
+   "nome": "Matriz de habilidades",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 1,
+   "especial": true,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "787221b15119ff10a71bf9f4a992a785",
+   "nome": "SPG · Compras — Evolução de Custo Unitário por SKU × CD",
+   "area": "SOURCING E PROCUREMENT GOBEAUTE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O módulo calcula e exibe a evolução do custo por SKU e CD para apoiar análises e renegociações. Fica em 0, como os painéis vizinhos do SPG, porque estar em produção não comprova consultas recorrentes nem decisões tomadas com ele. Para subir, precisa mostrar acessos frequentes e renegociações efetivamente iniciadas a partir dos alertas de custo."
+  },
+  {
+   "id": "9d36a35cad0b8a318e50c618c97e52c9",
+   "nome": "Experiencia PCD Gocase",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "A aplicação coleta a percepção de sete colaboradores PCD e consolida médias e comentários para Gente & Gestão. Como nos projetos Avaliação performance PCDS e Pesquisa performance PCDS, o memorial mostra apenas uma economia pontual e não comprova uso recorrente nem ações tomadas. Para subir, precisa registrar ciclos realizados e decisões de inclusão geradas pelos resultados."
+  },
+  {
+   "id": "32bfb9878a3b2f7ba7b6b6fb9bd17951",
+   "nome": "GoRender",
+   "area": "PRODUTO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Gera em lote imagens de produtos, mas atende uma tarefa local de uma assistente e seu valor se concentra nas 60 horas mensais economizadas, ficando ao lado de GoShoot Batch e Automação de Mockups de Cases. Para subir, precisaria sustentar uma rotina de outras pessoas ou alimentar um processo nomeado além da geração das imagens."
+  },
+  {
+   "id": "0948b36da6660fa70fe4e4337c46e652",
+   "nome": "SAIBBI — Sistema de Análise de Impressão BB Indústria",
+   "area": "ÁREA NÃO IDENTIFICADA",
+   "humana": 2,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "O SAIBBI mede defeitos de impressão, padroniza a aprovação e gera laudo rastreável antes de liberar ou barrar o lote. Fica ao lado do BB Indústria QC em 3, pois impede falhas com limites fixos, mas não faz uma escolha inteligente sob incerteza. Para subir, precisaria interpretar as imagens e decidir autonomamente com um modelo validado e auditável."
+  },
+  {
+   "id": "ecda75be6aa981954da880d5a64331b0",
+   "nome": "Centralizador de opt-out GoBeaute",
+   "area": "GROWTH",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Automação End-to-End de Inadimplência» (similaridade 0.86) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Sem leitura — o modelo não justificou a nota."
+  },
+  {
+   "id": "9a71f410d3289dddd51e4a33acc2989d",
+   "nome": "Hub de Importação",
+   "area": "SUPPLY CHAIN",
+   "humana": 1,
+   "especial": true,
+   "agente": 4,
+   "confianca": "alta",
+   "leitura": "O projeto não só consolida dados, mas recomenda priorizações de embarque que influenciam risco de ruptura e alocação de estoque, aproximando-se do GoPrice e do Smart Replan. Fica em 4 porque a decisão final ainda depende do comprador e não há execução autônoma com responsabilidade direta pelo resultado. Para chegar a 5, precisaria aplicar as priorizações de forma autônoma, com meta operacional auditável e sem intervenção humana entre a decisão e o embarque."
+  },
+  {
+   "id": "5d3b781ba9a5f39992e4b54e6da63f8c",
+   "nome": "Fluxo BPMN",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Cria, edita e exporta fluxogramas BPMN em um ambiente central, de forma semelhante aos projetos de gestão visual já avaliados. Não há comprovação de uso recorrente por outras pessoas nem de decisões tomadas a partir dos diagramas. Para subir, precisa demonstrar uma rotina ativa do time em que os fluxos orientem ações concretas."
+  },
+  {
+   "id": "4f452f2a1ef198a4d672c78485581da8",
+   "nome": "Ressarcimento CX",
+   "area": "CX",
+   "humana": 3,
+   "especial": true,
+   "agente": 2,
+   "confianca": "alta",
+   "leitura": "Centraliza, cruza e classifica automaticamente os casos cobráveis, em atuação semelhante ao RV/RB Coorte. Fica em 2 porque ainda entrega a base para as áreas cobrarem, sem impedir erros ou controlar a cobrança. Para subir, precisaria validar e bloquear casos incorretos antes do envio às transportadoras."
+  },
+  {
+   "id": "9cede95b8da4fbbaf68e75e84491ea29",
+   "nome": "Pesquisa Satisfação Prima Vida",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Coleta percepções sobre o convênio odontológico e consolida respostas em um painel para apoiar a negociação. Fica em 0, como Pesquisa satisfação Temporários, porque não comprova ciclos realizados nem decisões tomadas com os dados; para subir, precisa demonstrar uso recorrente e melhorias negociadas a partir da pesquisa."
+  },
+  {
+   "id": "84145328d7589246ece6f3782a729b28",
+   "nome": "Abastecimento de tinta",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 1,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Centraliza os registros e bloqueia o abastecimento com tinta vencida, aproximando-se do BB Indústria QC. Porém, o memorial descreve objetivos e resultados esperados, sem comprovar uso recorrente; subiria com registros reais de bloqueios e adoção pelos setores DTF, UV e Térmicos."
+  },
+  {
+   "id": "c417fe024caf2b48b5701b82070b34b9",
+   "nome": "Agente de Waitlists",
+   "area": "DESENVOLVIMENTO PRODUTO GOBEAUTE",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "O agente monitora as waitlists, escolhe a próxima cor e executa a troca no Spree após comando e autenticação da Assistente. Fica abaixo de Launch Intelligence porque ainda não roda sozinho. Para subir, precisa da chave de escrita e do cron diário, eliminando o início manual e a autenticação humana."
+  },
+  {
+   "id": "585bf5b9dbb412ca995a88d8a22b3def",
+   "nome": "Automação - Bases de Recebimento",
+   "area": "OPERACOES GOBEAUTE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "A automação extrai e consolida bases de recebimento que antes eram tratadas por um supervisor. Assim como o Painel de Recebimento, o valor documentado se limita à economia de uma tarefa local, sem comprovação de uso recorrente ou mudança nas decisões. Para subir, precisa comprovar operação contínua e um processo nomeado que use essas bases."
+  },
+  {
+   "id": "39553b210705e924902ed6eb95cb320a",
+   "nome": "Universo Gocoins",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Gohelp - Influenciadores Gobeauty» (similaridade 0.89) é quase idêntico e vale 5★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. A central responde dúvidas recorrentes, mostra o catálogo e orienta o colaborador até o fluxo correto, com cerca de cinco atendimentos diários. Fica acima do GoAssist Benefícios pelo uso recorrente informado, mas não sobe porque ainda não altera saldo, redefine senha nem conclui solicitações. Para subir, precisaria executar essas tarefas no sistema."
+  },
+  {
+   "id": "ba4e5bef40d8a25f0447e12fec736f92",
+   "nome": "Order Bump Gobeaute",
+   "area": "GROWTH",
+   "humana": 1,
+   "especial": true,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Margem Diaria - Gobeaute (vendas yampi)» (similaridade 0.77) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. O robô verifica diariamente o estoque dos order bumps e avisa o time quando recomenda desativá-los, como uma rotina informativa próxima ao Mix Produtos Gobeaute. Não recebe 2 estrelas porque uma pessoa ainda precisa aprovar cada desativação. Para subir, precisa comprovar uso recorrente e executar a correção completa sem intervenção."
+  },
+  {
+   "id": "1502780dbd2269031d9b73afd1bc0ae5",
+   "nome": "Pzerify - Criação de malas P0",
+   "area": "PRODUTO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "A aplicação edita cerca de dez malas por mês após upload da equipe, com ajustes finais ainda manuais. Fica em 0 porque resolve uma tarefa local para duas pessoas e seu valor demonstrado se resume às horas economizadas, como a Central de Estampas. Para subir, precisaria comprovar uso recorrente mais amplo ou assumir automaticamente um fluxo operacional completo."
+  },
+  {
+   "id": "66e286edd711576d3b13e51f97f918d5",
+   "nome": "NPS - Gestores e Candidatos",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "Coleta respostas e calcula automaticamente o NPS para a leitura mensal de Recrutamento e Seleção. Como o Fórum de melhoria contínua, entrega informação para análise humana, mas não inicia nem executa melhorias no processo. Subiria se tratasse detratores e acionasse ajustes automaticamente."
+  },
+  {
+   "id": "85d3a9d728fdb909f0b2b290d37b7d88",
+   "nome": "GoProduct",
+   "area": "PRODUTO",
+   "humana": 2,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O GoProduct centraliza cadastros e pretende fornecer dados confiáveis por API. Fica em 0, como Inventario-ti, porque o texto fala em resultado esperado e automações genéricas, sem comprovar uso recorrente hoje. Para subir, precisa mostrar uma rotina em produção e nomear uma automação que já consome sua API."
+  },
+  {
+   "id": "bb24d1b523b325d2d97a37f4c7bd1c0f",
+   "nome": "Gocontent Machine",
+   "area": "TECNOLOGIA",
+   "humana": 4,
+   "especial": true,
+   "agente": 5,
+   "confianca": "alta",
+   "leitura": "Gera e publica conteúdo diretamente nas lojas Shopify das sete marcas, assumindo uma entrega que chega ao cliente sem operação manual. Fica em 5 porque substitui um processo manual existente e nenhum produto ativo é citado como construído sobre essa infraestrutura. Para subir, precisa comprovar uma integração nomeada que dependa dela para funcionar."
+  },
+  {
+   "id": "2c23b6650cf58226cf7414867764fcae",
+   "nome": "Teste de Descascamento (térmicos)",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 2,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «BB Indústria QC» (similaridade 0.76) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Digitaliza os testes de descascamento e oferece rastreabilidade por máquina, turno e auditor. O memorial descreve benefícios, mas não comprova uso recorrente, registros realizados ou bloqueios efetivos, ficando próximo de Análise Descascamento e abaixo do BB Indústria QC. Para subir, precisa apresentar histórico de uso nos turnos e casos em que uma não conformidade gerou ação operacional."
+  },
+  {
+   "id": "8f315702b9f3ea3f20e9d1fc104a1d1f",
+   "nome": "Checklist de Inicio de turno",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 2,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Registra as condições das máquinas, exige justificativa e alerta a liderança sobre falhas, tornando as ocorrências auditáveis. Fica em 3 estrelas, como BB Indústria QC, porque não decide nem executa a resposta operacional. Para subir, teria de escolher e acionar a tratativa com inteligência própria."
+  },
+  {
+   "id": "78cab6ebfceed6820926743bcc658e62",
+   "nome": "Carga diária de chargeback nos antifraudes (Konduto + ClearSale)",
+   "area": "DADOS",
+   "humana": 2,
+   "especial": false,
+   "agente": 5,
+   "confianca": "alta",
+   "leitura": "Extrai, formata e envia diariamente os chargebacks à Konduto e à ClearSale, inclusive confirmando os lotes sem intervenção humana. Fica acima da Automação de Chargebacks porque conclui a entrega ao fornecedor, mas não sobe porque essa carga já existia manualmente. Para subir, outros processos novos precisariam operar sobre esta solução."
+  },
+  {
+   "id": "72e558da4c6796c150586ab3cd9c4285",
+   "nome": "Bot de Faturamento V2",
+   "area": "TRANSPORTES",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O bot foi criado para faturar pedidos em lote no Olist, mas o documento apresenta operação e resultados esperados sem comprovar execuções reais. Fica junto de Automação Bases de Recebimento, e não das automações de 2 estrelas que já demonstram rotina e volume. Para subir, precisa mostrar dias executados, notas emitidas e erros registrados."
+  },
+  {
+   "id": "1eac04cf4319ff23855348f85f0529e4",
+   "nome": "ecom-metrics-hub",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 8,
+   "confianca": "baixa",
+   "leitura": "O dashROI unifica dados de sete marcas e sustenta três projetos em operação. Fica em 8, acima do GoBrands de 7 pela amplitude de 19 rotinas e três projetos consumidores, mas não chega a 9 porque o alcance comprovado ainda está concentrado em Growth. Para subir, precisa sustentar também operações críticas de outras áreas.\n\nEvidência do escape:\n• Existe atividade em curso hoje que NÃO existiria sem ele. Não \"seria mais lenta\": não existiria.\n  \"VERSTA – Robô Orçamento,\nDashboard de Planejamento e GoPilot leem a estrutura do dashROI. O ganho\nfinanceiro desses projetos é medido neles; contá-lo aqui seria dupla contagem.\nSem esta base, nenhum deles existe.\"\n• Removê-lo não devolve o estado anterior — o jeito antigo deixou de existir como opção.\n  \"VERSTA – Robô Orçamento,\nDashboard de Planejamento e GoPilot leem a estrutura do dashROI. O ganho\nfinanceiro desses projetos é medido neles; contá-lo aqui seria dupla contagem.\nSem esta base, nenhum deles existe.\""
+  },
+  {
+   "id": "8982a86daf53cb6068c64990608b11a9",
+   "nome": "Gocase Creative Studio",
+   "area": "MARKETING",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "O Creative Studio gera imagens e banners com poucos cliques para uma única analista. Fica em 0, como a Central de Estampas, porque resolve uma produção local e seu valor está concentrado nas 23 horas economizadas. Para subir, precisaria ter uso recorrente por outras pessoas ou alimentar um processo nomeado além dessa tarefa."
+  },
+  {
+   "id": "ae06cf9cbd5f27797016e031658989f7",
+   "nome": "Portal de Ocorrências B2B",
+   "area": "B2B GOBEAUTE",
+   "humana": 2,
+   "especial": true,
+   "agente": 2,
+   "confianca": "media",
+   "leitura": "Centraliza ocorrências B2B, encaminha etapas e integra clientes e áreas internas. Fica junto ao Portal de Jornada do Cliente B2B, pois automatiza o fluxo, mas não há prova de bloqueio de erros com impacto operacional. Para subir, precisa demonstrar validações obrigatórias que impeçam devoluções ou aprovações incorretas."
+  },
+  {
+   "id": "c508f9083c801d5b6fbc982339599c27",
+   "nome": "Dashboard Analytics Gerencial Gocase",
+   "area": "SUPPLY CHAIN",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "Consolida e atualiza automaticamente indicadores de vendas, previsão e estoque para orientar o time. Fica em 1, como o Dashboard Analytics Gerencial Gobeaute, porque entrega informação, mas as decisões e ações continuam humanas. Para subir, precisaria agir sobre estoques ou previsões sem depender da leitura do painel."
+  },
+  {
+   "id": "64d18a843521f08c3be0d6a4b6aea1a9",
+   "nome": "Portal de Admissão GoGroup",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "O portal centraliza documentos e pendências de cerca de 40 admissões mensais, substituindo o controle pelo WhatsApp. Está ao lado de Declaração de Integridade e abaixo da Central de Atendimento das Gocoins, pois o RH ainda revisa e decide sobre cada documento. Para chegar a 2 estrelas, precisaria validar arquivos, cobrar pendências e encaminhar admissões automaticamente."
+  },
+  {
+   "id": "1d37cb8155199ce91a3687dc7832c532",
+   "nome": "Análise Inteligente de Prazos",
+   "area": "TRANSPORTES",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Automação End-to-End de Inadimplência» (similaridade 0.91) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Automatiza a coleta e a consolidação de dados de prazos, entregando análises para decisões humanas. Assim como a Torre de Controle Gobeaute, o memorial descreve execução recorrente, mas não comprova usuários, consultas ou decisões tomadas com a plataforma. Para subir, precisa apresentar registros de acesso e ações logísticas realizadas a partir das análises."
+  },
+  {
+   "id": "12d5f2bcbd0cefad63af4a76d7f2dae9",
+   "nome": "Central de Estampas",
+   "area": "PRODUTO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "A Central de Estampas aplica estampas em lote, mas ainda é operada e corrigida por duas pessoas. Como o Pzerify, resolve uma tarefa local e seu valor documentado se limita a acelerar a produção existente, por isso não chega a 1. Para subir, precisaria sustentar uma rotina mais ampla e recorrente, com consequência operacional além dessa economia de tempo."
+  },
+  {
+   "id": "4fd5a48560371e00ba47ff9ca7ad0c68",
+   "nome": "Vision Board - Licenciados",
+   "area": "MARKETING",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O painel centraliza dados de 12 licenciados e sugere ações, mas continua dependendo do time para interpretar as informações e decidir a curadoria. Como o Painel de Licenciamentos e o Analista de Boost de Estampas, não há comprovação de uso recorrente nem de decisões efetivamente alteradas; para chegar a 1 estrela, precisa demonstrar consultas frequentes por outros usuários e decisões tomadas com base nele."
+  },
+  {
+   "id": "5afa214f38acc42a1a5a377bc15650d1",
+   "nome": "Processador de XML NFe",
+   "area": "FINANÇAS",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Corrige, separa e organiza XMLs para posterior importação manual no Web GEX. Como o Relatorio de XML e a Automação notas emitidas SEFAZ ES, atende uma tarefa local de uma pessoa e o valor demonstrado se limita às 7,12 horas economizadas. Para subir, precisaria comprovar uso recorrente por outros usuários ou assumir também a importação sem acionamento humano."
+  },
+  {
+   "id": "51f2908501d0ec728ff96e5edd7544ba",
+   "nome": "Central de Atendimento das Gocoins",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Gohelp - Influenciadores Gobeauty» (similaridade 0.88) é quase idêntico e vale 5★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. A central organiza dúvidas e chamados de Gocoins, faz triagem e mostra indicadores ao G&G, como o Universo Gocoins. Fica em 1 estrela porque a Assistente ainda revisa casos e dá a resposta final; subiria se concluísse solicitações recorrentes sem essa intervenção."
+  },
+  {
+   "id": "9512d433f168a6eb0804e5b543cdb5fe",
+   "nome": "Painel S&OE - Gobeaute",
+   "area": "SUPPLY GOGROUP",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Estoque ao vivo Gobeaute» (similaridade 0.92) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. Como o Dashboard Analytics Gerencial Gobeaute, consolida indicadores diários para orientar compras e escoamento, mas as decisões e ações continuam humanas. Não chega a 2 porque a atualização ainda é iniciada manualmente e o painel não executa compras, bloqueios ou transferências. Subiria se passasse a realizar essas ações automaticamente."
+  },
+  {
+   "id": "3ed3db78fa3465c4d6fe88f2ee44e113",
+   "nome": "Fórum de melhoria continua",
+   "area": "CX",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "alta",
+   "leitura": "Automatiza a consolidação e a classificação dos dados usados no fórum mensal, com uso medido em produção. Como o Semanal Gomagics, prepara informações para a reunião, mas as pessoas ainda interpretam os dados e decidem as ações. Para subir, precisaria executar automaticamente uma ação operacional após identificar os problemas."
+  },
+  {
+   "id": "598d24a7b65d4f2a964ddf91344645a3",
+   "nome": "Automação notas emitidas SEFAZ ES",
+   "area": "FINANÇAS",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "O script, iniciado manualmente, baixa e consolida notas em um XLSX para a conferência mensal de um analista. Como o Processador de XML NFe, é uma tarefa local cujo valor documentado se limita à economia de horas. Para subir, precisaria ter uso recorrente por mais pessoas ou alimentar um processo citado no memorial."
+  },
+  {
+   "id": "240727795b77ff2229280029c68e8b61",
+   "nome": "Automação assinatura digital férias",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Automatiza o envio e o acompanhamento de 35 a 40 recibos mensais, mas uma analista ainda inicia os scripts. Assim como Envio de Assinatura Digital Automatizada, é uma tarefa local cujo valor está nas quatro horas já contabilizadas. Para subir, precisaria rodar sozinha e sustentar uma rotina mais ampla do DP."
+  },
+  {
+   "id": "312330b0d164b011e1dfe8c897eb5b69",
+   "nome": "GocaLives",
+   "area": "GROWTH",
+   "humana": null,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "O GocaLives gera artes, trata participantes, registra vencedores e consolida o faturamento em uma rotina usada em 10 lives mensais. Fica em 2★, próximo ao Hub Criativo v2, porque executa etapas recorrentes, mas não impede erros com consequência operacional para outra área. Para subir, precisaria validar ou bloquear automaticamente falhas em cupons, sorteios ou publicações."
+  },
+  {
+   "id": "85bde7847eca496f6ecda453171406b8",
+   "nome": "Vencimentos UNILOG",
+   "area": "JURIDICO",
+   "humana": null,
+   "especial": false,
+   "agente": 2,
+   "confianca": "media",
+   "leitura": "A automação extrai os dados, analisa vencimentos e envia semanalmente as solicitações de mudança de classe, sem trabalho residual do Supervisor. Supera o Controle de Vencimentos, que apenas informa, mas não bloqueia erros nem comprova a correção final. Para subir, precisaria impedir classes incorretas e registrar a regularização concluída."
+  },
+  {
+   "id": "964d897c105d416b16a02ebb57792aee",
+   "nome": "Plataforma de Orçamento de Pessoal 2026 (GoGroup)",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Agente de apuração de Impostos» (similaridade 0.88) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. Centraliza o orçamento de pessoal, automatiza cálculos e mostra desvios com histórico de alterações. Fica em 1, próxima ao Painel de Validação de Folha, porque apoia a análise e ainda exige conferência mensal e dados externos. Para subir, precisaria executar o ciclo mensal completo sem alimentação ou início manual."
+  },
+  {
+   "id": "7dfe2daef081604d61457288b615aa89",
+   "nome": "Skill - Supabase Dados CX",
+   "area": "CX",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "A skill entrega indicadores oficiais de CX em linguagem natural para cinco usuários recorrentes, de forma parecida com o CX Self-Service. Fica em 1★ porque apenas informa e ainda depende de alguém fazer a pergunta, validar o resultado e agir. Para subir, precisaria rodar sem solicitação e executar uma ação operacional completa."
+  },
+  {
+   "id": "a79b9029e7ea2f7dbec12793baf53712",
+   "nome": "Monitoramento de Background Check - Compliance",
+   "area": "JURIDICO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Cruza bases e mostra pendências de Background Check para a equipe de Compliance. Fica em 0, como Farol de Ciência e Controle de Vencimentos, porque o resultado é esperado, o uso recorrente não foi comprovado e a rotina atende uma única especialista. Para subir, precisa demonstrar acessos frequentes e ações de conformidade tomadas a partir do painel."
+  },
+  {
+   "id": "bc1e03767138c5480b5a5adfbbd5ef5f",
+   "nome": "Baixador de Reels",
+   "area": "GROWTH",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "A ferramenta baixa Reels em lote após o usuário iniciar o agente e enviar os links. Fica junto das automações locais avaliadas com 0, pois o valor se resume às horas poupadas em uma tarefa simples. Para subir, precisaria operar sem acionamento humano e comprovar uso recorrente por registros de execução."
+  },
+  {
+   "id": "7a94c4d4fffe1eee52b51bb6cd5a88ad",
+   "nome": "Integração com Operador Logístico - Life of Colour",
+   "area": "TECNOLOGIA",
+   "humana": 2,
+   "especial": true,
+   "agente": 6,
+   "confianca": "media",
+   "leitura": "Conecta Shopify e eStore em produção e conduz pedidos, estoque e rastreio até a entrega. Fica em 6, acima do CX Ticket Creator pelo papel indispensável na operação inteira, mas abaixo de GoBrands, que sustenta várias pipelines e modelos. Para subir, precisaria sustentar outras marcas, operadores ou processos independentes.\n\nEvidência do escape:\n• Existe atividade em curso hoje que NÃO existiria sem ele. Não \"seria mais lenta\": não existiria.\n  \"Este middleware foi desenhado e construído do zero por uma única pessoa e é hoje o único elo entre a loja e o armazém: todo pedido da LOC passa por este código.\"\n• Removê-lo não devolve o estado anterior — o jeito antigo deixou de existir como opção.\n  \"Não havia operação manual para economizar (na escala de pedidos da LOC, repasse humano nunca foi opção) e o efeito não é um delta de receita, é a continuidade de 100% do faturamento da unidade.\""
+  },
+  {
+   "id": "9fd7215a71459337322b52d45510d0c5",
+   "nome": "Automação da Comissões de Itens Licenciados",
+   "area": "FINANÇAS",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O robô extrai as comissões mensalmente, valida os dados e publica a planilha no Drive sem intervenção. Assim como a Automação de Relatório de Malas, fica em 0 porque só estão comprovadas as horas poupadas e a geração do arquivo, não seu uso ou efeito posterior. Para subir, é preciso mostrar quem usa a planilha de forma recorrente e qual ação ela sustenta."
+  },
+  {
+   "id": "d3ef50ed277bc1877fa2f3461f0007ca",
+   "nome": "Simulador de Custos - GoBeauty",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": null,
+   "especial": false,
+   "agente": 2,
+   "confianca": "media",
+   "leitura": "A automação coleta os relatórios, consolida os custos e gera análises mensais para Operações e Finanças. Como a Análise Inteligente de Prazos, executa a preparação recorrente, mas a conferência da fatura e as ações seguem humanas. Para subir, teria de bloquear cobranças divergentes antes do pagamento."
+  },
+  {
+   "id": "afee09014dfd72a2ac8cc6e1cf820d1c",
+   "nome": "Gestão de Faturamento B2b - Gocase",
+   "area": "FINANÇAS",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Automação End-to-End de Inadimplência» (similaridade 0.89) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. Centraliza solicitações fiscais, organiza prioridades e dá visibilidade de status e prazos para várias áreas. Fica em 1, como Abastecimento Lojas, porque as assistentes ainda analisam os cards, executam o faturamento e atualizam o fluxo. Subiria se recebesse e executasse essas solicitações automaticamente, sem depender dessa operação manual."
+  },
+  {
+   "id": "4d669d9a11b96cb96393a735c30677dd",
+   "nome": "Automação dos Câmbios Internacionais",
+   "area": "FINANÇAS",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Automação End-to-End de Inadimplência» (similaridade 0.89) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. A automação reúne chamados, anexos e cálculos e prepara planilha, e-mails e despesas para conferência. Fica abaixo de Análise Inteligente de Prazos porque depende de um botão e não efetiva nenhuma ação nos sistemas. Para chegar a 2 estrelas, precisaria iniciar cada ciclo sozinha e concluir a preparação sem comando manual."
+  },
+  {
+   "id": "f9f0000b601d81a3e508cb9beae503ca",
+   "nome": "Freight Cost Intelligence (CFI)",
+   "area": "TRANSPORTES",
+   "humana": 1,
+   "especial": false,
+   "agente": 2,
+   "confianca": "alta",
+   "leitura": "O projeto automatiza de ponta a ponta a coleta, tratamento, cruzamento e atualização dos dados de frete, sem necessidade de acionamento humano. Assim como a Análise Inteligente de Prazos, ele executa uma rotina recorrente e entrega informação para análise, mas não bloqueia erros nem toma decisões sobre transportadoras, rotas ou marcas. Para chegar a 3★, precisaria validar ou impedir automaticamente inconsistências com impacto operacional."
+  },
+  {
+   "id": "d9574be54d6bee5f91fbe401e05d188a",
+   "nome": "Cérebro de trocas Gocase",
+   "area": "CX",
+   "humana": 2,
+   "especial": false,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "O portal interpreta o relato, valida a elegibilidade e bloqueia solicitações indevidas antes da abertura do protocolo. Fica em 3, acima do Confere.AI, porque impede o erro antes que ele entre na operação, mas a decisão final ainda segue validações determinísticas. Para subir, precisaria decidir casos ambíguos com inteligência própria e consequência operacional auditada."
+  },
+  {
+   "id": "0c708b3d696c121e7644393209235860",
+   "nome": "Conexão MCP-GTI",
+   "area": "TRANSPORTES",
+   "humana": null,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Relatório Transportador» (similaridade 0.81) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. Consulta e atualiza dados do GTI por linguagem natural, mas depende do usuário para iniciar a interação, decidir prioridades e confirmar escritas, ficando próximo do CX Self-Service e do CFI. Para subir, precisaria monitorar e executar ações recorrentes sozinho, ou sustentar um processo nomeado que tenha sido criado sobre essa integração."
+  },
+  {
+   "id": "a4d59efee3ccdcc5e81a414576d58650",
+   "nome": "Trilha de Carreira Operacional",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O app formaliza critérios e calcula a elegibilidade para promoções operacionais. Fica em 0, como Pipeline de sucessão de lideranças, porque só há economia pontual e nenhuma promoção concluída ou rotina recorrente comprovada. Para subir, precisa demonstrar ciclos reais de avaliação e decisões registradas pelo fluxo."
+  },
+  {
+   "id": "4790ee41286dffa0b9ff13117596295f",
+   "nome": "Quiz de Vendas Apice",
+   "area": "TECNOLOGIA",
+   "humana": null,
+   "especial": false,
+   "agente": 5,
+   "confianca": "alta",
+   "leitura": "O quiz recomenda produtos diretamente à cliente, monta a rotina e a leva ao carrinho, com uso e conversão medidos. Fica em 5 porque responde pela experiência final de compra, mas substitui um quiz que já existia. Para subir, precisaria sustentar outros processos em operação que tenham sido criados sobre sua integração."
+  },
+  {
+   "id": "420621fb38bd761ddaed5ccd4cc61fcb",
+   "nome": "Painel de eficiência operacional de CX",
+   "area": "CX",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Portal de devoluções de CX» (similaridade 0.92) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Consolida automaticamente os indicadores de eficiência de CX e mantém o histórico pronto para consultas semanais e mensais, em uso comprovado pelo Supervisor. Fica em 1★, ao lado dos painéis gerenciais já avaliados, porque ainda entrega informação: o Supervisor filtra, captura e distribui o relatório. Para subir, teria de gerar e enviar o relatório completo sem intervenção humana."
+  },
+  {
+   "id": "768f4f6f8e858e06b9590991604f0428",
+   "nome": "Esteira de Hits - Google",
+   "area": "GROWTH",
+   "humana": 1,
+   "especial": false,
+   "agente": 5,
+   "confianca": "alta",
+   "leitura": "A esteira seleciona criativos e os coloca em veiculação no Google Ads sem operação humana recorrente. Faz o mesmo tipo de entrega final do Robo subir vídeos em teste, também avaliado em 5, mas automatiza uma única rotina que antes era manual. Para subir, precisaria sustentar outros processos ativos construídos sobre sua integração."
+  },
+  {
+   "id": "c0c69dcd5df93f5378160e1b49bf2f8d",
+   "nome": "Sistema de memória de M&A",
+   "area": "CSC",
+   "humana": 3,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «GoDocs» (similaridade 0.75) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. É uma infraestrutura de memória estratégica desenhada para acumular aprendizados de negociações de M&A. Assim como o Master Memory, ainda começa vazio e não há uso recorrente comprovado em deals reais, portanto permanece como experimentação. Para chegar a 1 estrela, precisa demonstrar consultas e registros recorrentes que efetivamente orientem negociações em andamento."
+  },
+  {
+   "id": "ab2290a4b13e89edb3a95ab12fa76b11",
+   "nome": "Envio de e-mails para aprovação de ajustes dos líderes",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Organiza pendências e envia e-mails para que os líderes aprovem ajustes de ponto. Fica em 0, como Automação assinatura digital férias, porque foi uma ação pontual, iniciada manualmente e usada por um Assistente. Para subir, precisa operar de forma automática e recorrente em cada fechamento."
+  },
+  {
+   "id": "02c3d43be8c6010839b18b311825747c",
+   "nome": "BID Financeiro",
+   "area": "FINANÇAS",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Sem leitura — o modelo não justificou a nota."
+  },
+  {
+   "id": "88b8e4e3a64454dfe4fcfa50fc3d92ee",
+   "nome": "GoPrice",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 4,
+   "especial": true,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "O GoPrice recomenda preços com base em elasticidade, estoque e aprendizado contínuo, fazendo o mesmo tipo de escolha do Agente precificador. Fica em 4 porque ainda sugere mudanças e deixa a aplicação com o time. Para subir, precisaria publicar os preços sozinho e responder por uma meta auditável."
+  },
+  {
+   "id": "b2b498d0117b47548f7e8a140d87d79f",
+   "nome": "Agente de Geração e Teste A/B de GIFs de CRM | Spectrum",
+   "area": "GROWTH",
+   "humana": null,
+   "especial": false,
+   "agente": 2,
+   "confianca": "alta",
+   "leitura": "O Spectrum gera conceitos diariamente, organiza pautas e prepara campanhas na Insider, reduzindo o trabalho manual de cinco pessoas. Fica acima dos geradores locais porque roda sozinho, mas não chega a 3★ porque toda peça ainda passa por revisão e aprovação humana. Para subir, precisaria validar e bloquear campanhas inadequadas antes que afetem a operação."
+  },
+  {
+   "id": "29c4f7971afa4ae46aaca20725070bb6",
+   "nome": "Painel Stock Flow - Gocase",
+   "area": "SUPPLY GOGROUP",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Estoque ao vivo Gobeaute» (similaridade 0.83) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. O painel consolida projeções de estoque e aponta riscos de ruptura e excesso. Como no Dashboard Analytics Gerencial Gocase, o memorial comprova a automação, mas não demonstra consultas recorrentes nem ações tomadas pelas áreas; para chegar a 1 estrela, precisa registrar usuários frequentes e decisões realizadas com seus alertas."
+  },
+  {
+   "id": "77f1e31e19c9bc2558928c127d21b317",
+   "nome": "Headcount Gogroup",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O projeto automatiza a consolidação de ponto e publica dashboards de headcount e absenteísmo, mas continua sendo uma ferramenta informativa: as decisões e ações permanecem com as lideranças. Além disso, não há evidência de uso recorrente dos painéis nem de decisões efetivamente alteradas; a economia declarada é estimada sobre uma rotina manual que, segundo o memorial, não existia. Assim, fica em 0★, alinhado ao Painel de Indicadores Gogroup e abaixo do Dashboard Analytics Gerencial Gobeaute, que já demonstrava atualização diária para orientar lideranças."
+  },
+  {
+   "id": "e3a60b2e6cc89938ba4bfe31c51c8804",
+   "nome": "Cases IA | Lógica",
+   "area": "RPA",
+   "humana": 3,
+   "especial": true,
+   "agente": 4,
+   "confianca": "alta",
+   "leitura": "Aplica e corrige provas, usa IA para decidir a triagem e grava o resultado na InHire, com 420 decisões reais. Fica em 4 estrelas, como Cases IA, pois cobre só a prova e a triagem, enquanto o GoHunter também ordena e integra selecionados. Para subir, teria de assumir mais etapas do funil até a entrega final."
+  },
+  {
+   "id": "legado-106",
+   "nome": "[Meli] - Auth Layer",
+   "area": "AZ",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Replica o escopo já avaliado em [Tiny] Auth Layer e registra somente 40 horas pontuais de implementação. Fica abaixo dele porque não comprova uso recorrente nem nomeia workflows ativos que consumam os tokens. Para subir, precisa demonstrar chamadas reais e recorrentes de processos identificados."
+  },
+  {
+   "id": "8adc7e24da8543aa6aae7222b95607c7",
+   "nome": "GoHunter",
+   "area": "RPA",
+   "humana": 5,
+   "especial": true,
+   "agente": 3,
+   "confianca": "media",
+   "leitura": "O GoHunter avalia e pontua perfis com nove agentes, padroniza critérios e envia candidatos selecionados à InHire, com mais de 24 mil perfis aprovados. Fica em 3★, como Cases IA e Funil R&S, porque torna a triagem auditável, mas a busca e a escolha final ainda passam pelas recrutadoras. Para subir, precisa decidir automaticamente quem avança ou recebe abordagem e comprovar esse uso em vagas reais."
+  },
+  {
+   "id": "95cbd504a32e6f29cf5549ad1a16ae53",
+   "nome": "CTR Machine Gocase - Admaker",
+   "area": "PRODUTO",
+   "humana": 4,
+   "especial": true,
+   "agente": 5,
+   "confianca": "baixa",
+   "leitura": "⚠ escape sem citação da doc para \"Existe atividade em curso hoje que NÃO existiria sem ele. Não \"seria mais lenta\": não existiria.\" — voltou para 5★. O projeto assume o ciclo completo de criação, publicação e medição de testes de CTR e já sustenta processos nomeados como Gerador de Briefing e Color Drop. Recomendo 7★ porque está no mesmo patamar da CTR Machine já avaliada com essa nota. Não recomendo 8★ porque o memorial ainda não comprova dependência irreversível em processos além dessa cadeia de produto."
+  },
+  {
+   "id": "1844c74da817b98d8084ffefaf982f83",
+   "nome": "Controle de Pedidos de Compra Gobeaute",
+   "area": "Sourcing & Procurement Gobeaute",
+   "humana": 2,
+   "especial": false,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "f4dd86d51bf371ada22f32a1b4c63e99",
+   "nome": "Gobeaute · Acompanhamentos",
+   "area": "Sourcing & Procurement Gobeaute",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Cruza notas fiscais com pedidos do Protheus e exibe divergências para compras e financeiro tratarem. Como no Dashboard de Acompanhamento Fiscal, há apenas resultado esperado e estimativas, sem comprovação de uso recorrente. Para subir, precisa demonstrar acessos e decisões tomadas pelo time com base no painel."
+  },
+  {
+   "id": "f8c9e95980b86a7ab3f7ab2a6ecde82f",
+   "nome": "Gobeaute Prompt Studio",
+   "area": "DESENVOLVIMENTO PRODUTO GOBEAUTE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Gera prompts e imagens em um fluxo guiado, mas cada execução ainda é iniciada e revisada por uma pessoa. Fica em 0, como Gocase Creative Studio e GoShoot Batch, por automatizar uma tarefa local sem assumir decisões ou entregas. Para subir, precisaria operar de forma autônoma e sustentar uma rotina recorrente de outros processos.",
+   "valor_declarado": 36.595,
+   "valor_sugerido": 73.19,
+   "ajustaria": true,
+   "auditoria": "Confirmação do valor declarado: 5,25 horas mensais economizadas × R$ 13,94 por hora = R$ 73,185, arredondado para R$ 73,19 por mês. Como custo evitado, escala e custo externo são zero, não há parcelas a retirar nem indício de dupla contagem."
+  },
+  {
+   "id": "8d200fc05d9267f7c820d97e5f732f67",
+   "nome": "Agente de Projetos",
+   "area": "PRODUTO",
+   "humana": null,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "O agente varre os boards sem acionamento humano, cobra responsáveis e sincroniza atualizações recorrentes. Fica em 2, próximo à Análise Inteligente de Prazos, pois executa a rotina, mas não bloqueia projetos nem impede que dados incompletos avancem. Subiria se passasse a barrar etapas com pendências e protegesse diretamente a operação de outra área."
+  },
+  {
+   "id": "be298b19e8921082d3f7445b7422445f",
+   "nome": "Controle de bonificações",
+   "area": "OPERACOES GOBEAUTE",
+   "humana": 0,
+   "especial": false,
+   "agente": null,
+   "confianca": null,
+   "leitura": "LLM não devolveu recomendação utilizável"
+  },
+  {
+   "id": "a5c53437050d4a5405d36ce86b594b1c",
+   "nome": "Smart Replan",
+   "area": "SUPPLY GOGROUP",
+   "humana": 4,
+   "especial": true,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "O Smart Replan analisa demanda, cobertura e estoque para recomendar ajustes de forecast, produção e trânsito, em linha com GoPrice e Agente precificador. Fica em 4 porque o time ainda confirma os ajustes antes da execução. Para subir, precisaria aplicar as mudanças diretamente nos pedidos e planos, com metas auditáveis e sem aprovação humana."
+  }
+ ],
+ "falhas": [],
+ "dist": [
+  [
+   0,
+   88
+  ],
+  [
+   1,
+   30
+  ],
+  [
+   2,
+   31
+  ],
+  [
+   3,
+   14
+  ],
+  [
+   4,
+   6
+  ],
+  [
+   5,
+   10
+  ],
+  [
+   6,
+   1
+  ],
+  [
+   7,
+   1
+  ],
+  [
+   8,
+   1
+  ]
+ ]
+}
