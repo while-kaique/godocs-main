@@ -58,6 +58,29 @@ for (const r of runs) {
   }
 }
 
+// ── Os BOLSÕES de divergência, por nota humana ───────────────────────────────
+// ⚠️ A média esconde a forma do erro. No run 1 o viés agregado parecia moderado, e por baixo
+// dele havia 173 projetos que o humano pôs em 0 e o agente subiu, contra 59 em que ele foi mais
+// duro que o humano. São defeitos OPOSTOS e não se corrigem com o mesmo ajuste, então a tabela
+// abaixo é a que diz o que calibrar.
+console.log('\n' + '='.repeat(78));
+console.log('ONDE O ERRO MORA (por nota humana, última run)');
+{
+  const r = runs[runs.length - 1];
+  const c = r.linhas.filter(comparavel);
+  const notas = [...new Set(c.map((l) => l.humana))].sort((a, b) => a - b);
+  console.log('  humana   n   idêntica   agente ACIMA   agente ABAIXO   nota média do agente');
+  for (const h of notas) {
+    const g = c.filter((l) => l.humana === h);
+    const ident = g.filter((l) => l.agente === h).length;
+    const acima = g.filter((l) => l.agente > h).length;
+    const abaixo = g.filter((l) => l.agente < h).length;
+    const media = (g.reduce((a, l) => a + l.agente, 0) / g.length).toFixed(2);
+    console.log(
+      `  ${String(h).padStart(5)}  ${String(g.length).padStart(3)}   ${pct(ident, g.length)}      ${String(acima).padStart(4)}          ${String(abaixo).padStart(4)}              ${media}`,
+    );
+  }
+}
 // ── O que MUDOU entre a última e a penúltima ─────────────────────────────────
 if (runs.length >= 2) {
   const a = runs[runs.length - 2];
