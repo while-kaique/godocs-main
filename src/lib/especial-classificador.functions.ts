@@ -487,22 +487,24 @@ export type ResultadoClassificacao = {
 };
 
 /**
- * Classifica UM especial. `dry` não grava — devolve a recomendação e os vizinhos usados
- * (é o que a rota manual/o cron em modo seco mostram).
+ * Resolve o ALVO e os VIZINHOS de um projeto — o preparo comum ao classificador de 1 agente e ao
+ * painel de lentes.
  *
- * ⚠️ **Projeto que JÁ tem nota humana (coluna "Estrelas") NÃO é reclassificado** — a nota de
- * gente é a verdade e a âncora; gerar uma recomendação competindo com ela (ex.: o agente sugerir
- * 3 para o PIAPP, que é 10) é só ruído no cartão. Ele segue no corpus como EXEMPLAR, ensinando o
- * agente. `forcar` reabre isso (uso manual explícito), nunca o caminho automático.
+ * ⚠️ Existe para os dois caminhos não divergirem em silêncio. Se cada um montasse o próprio
+ * dossiê e a própria vizinhança, a comparação entre eles deixaria de medir o JULGAMENTO e passaria
+ * a medir a diferença de preparo, que é a forma mais fácil de uma troca de arquitetura se
+ * disfarçar de mudança de nota.
  */
-export async function classificarEspecialProjeto(
-  projetoIdBruto: string,
-  opts: { dry?: boolean; forcar?: boolean } = {},
-): Promise<ResultadoClassificacao> {
-  // Chave canônica: o id chega da planilha (`LEGADO-049`) ou do app (hex minúsculo) e daqui
-  // para baixo ele endereça o SQLite, o embedding, o Pinecone e a linha de `especial_avaliacao`.
-  // Normalizar UMA vez, na entrada, é o que impede leitura e escrita de divergirem de caixa.
-  const projetoId = chaveProjeto(projetoIdBruto);
+type AlvoPreparado = {
+  alvo: AlvoClassificacao;
+  vizinhos: Vizinho[];
+  origem: OrigemVizinhos;
+};
+
+async function prepararAlvo(
+  projetoId: string,
+  opts: { forcar?: boolean } = {},
+): Promise<AlvoPreparado | { ok: boolean; motivo: string }> {
   const { linhas } = await lerResumosEspelho();
   const especiais = apenasEspeciais(
     linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null),
@@ -510,19 +512,17 @@ export async function classificarEspecialProjeto(
   const resumoPorId = new Map(especiais.map((p) => [chaveProjeto(p.id), p]));
 
   const resumoAlvo = resumoPorId.get(projetoId);
+  // Nota humana é VERDADE e âncora: recomendar por cima dela é ruído no cartão e, pior, alimenta
+  // o corpus com opinião do próprio agente (o anti-feedback-loop).
   if (!opts.forcar && resumoAlvo?.estrelas != null) {
     return {
       ok: true,
-      projeto_id: projetoId,
       motivo: `já tem nota humana (${resumoAlvo.estrelas}★) — vira âncora, não é reclassificado`,
-      gravado: false,
     };
   }
 
   const montado = await montarEntradaSemantica(projetoId, resumoAlvo);
-  if (!montado) {
-    return { ok: false, projeto_id: projetoId, motivo: "projeto sem contexto para classificar" };
-  }
+  if (!montado) return { ok: false, motivo: "projeto sem contexto para classificar" };
 
   // Embedding do ALVO — 1 linha, não a tabela inteira. Ler todos os vetores por classificação é
   // exatamente o que encosta no teto de 32 MiB de RPC do Godeploy; com o Pinecone no ar, a tabela
@@ -561,9 +561,32 @@ export async function classificarEspecialProjeto(
           ),
       })
     : { vizinhos: [] as Vizinho[], origem: "sqlite" as OrigemVizinhos };
-  const vizinhos = recuperado.vizinhos;
 
-  const recomendacao = await classificarEspecial(montado.alvo, vizinhos);
+  return { alvo: montado.alvo, vizinhos: recuperado.vizinhos, origem: recuperado.origem };
+}
+
+/**
+ * Classifica UM especial. `dry` não grava — devolve a recomendação e os vizinhos usados
+ * (é o que a rota manual/o cron em modo seco mostram).
+ *
+ * ⚠️ **Projeto que JÁ tem nota humana (coluna "Estrelas") NÃO é reclassificado** — a nota de
+ * gente é a verdade e a âncora; gerar uma recomendação competindo com ela (ex.: o agente sugerir
+ * 3 para o PIAPP, que é 10) é só ruído no cartão. Ele segue no corpus como EXEMPLAR, ensinando o
+ * agente. `forcar` reabre isso (uso manual explícito), nunca o caminho automático.
+ */
+export async function classificarEspecialProjeto(
+  projetoIdBruto: string,
+  opts: { dry?: boolean; forcar?: boolean } = {},
+): Promise<ResultadoClassificacao> {
+  // Chave canônica: o id chega da planilha (`LEGADO-049`) ou do app (hex minúsculo) e daqui
+  // para baixo ele endereça o SQLite, o embedding, o Pinecone e a linha de `especial_avaliacao`.
+  // Normalizar UMA vez, na entrada, é o que impede leitura e escrita de divergirem de caixa.
+  const projetoId = chaveProjeto(projetoIdBruto);
+  const pronto = await prepararAlvo(projetoId, { forcar: opts.forcar });
+  if ("motivo" in pronto) return { ok: pronto.ok, projeto_id: projetoId, motivo: pronto.motivo, gravado: false };
+  const { alvo, vizinhos, origem } = pronto;
+
+  const recomendacao = await classificarEspecial(alvo, vizinhos);
   if (!recomendacao) {
     return { ok: false, projeto_id: projetoId, motivo: "LLM não devolveu recomendação utilizável" };
   }
@@ -587,7 +610,7 @@ export async function classificarEspecialProjeto(
     projeto_id: projetoId,
     recomendacao,
     gravado,
-    origem_vizinhos: recuperado.origem,
+    origem_vizinhos: origem,
     vizinhos: vizinhos.map((v) => ({
       nome: v.nome,
       estrela: v.estrela_efetiva,
@@ -1490,6 +1513,52 @@ export type OpcoesPainelLote = {
   tetoChamadas?: number;
   redigirLeitura?: boolean;
 };
+
+/**
+ * Julga UM projeto com o painel de lentes, resolvendo alvo e vizinhos pelo MESMO preparo do
+ * classificador de 1 agente (`prepararAlvo`).
+ *
+ * ⚠️ Existe pelo motivo já documentado no `/classificar`: **a rota de LOTE processa em SÉRIE**, e
+ * uma rodada de painel na base inteira em série não termina. Com uma entrada por projeto, a
+ * concorrência mora no cliente, onde dá para limitá-la e recuar quando o gateway reclama.
+ *
+ * ⚠️ **`dry` é o DEFAULT**, como em todo o caminho do painel: gravar exige `{dry:false}`
+ * explícito, e mesmo gravando escreve só em `especial_avaliacao`, NUNCA na coluna "Estrelas".
+ */
+export async function julgarProjetoComPainel(
+  projetoIdBruto: string,
+  opts: { dry?: boolean; forcar?: boolean; lentes?: string[] } = {},
+): Promise<{
+  ok: boolean;
+  projeto_id: string;
+  motivo?: string;
+  julgamento?: JulgamentoPainel;
+  gravado?: boolean;
+}> {
+  const projetoId = chaveProjeto(projetoIdBruto);
+  const dry = opts.dry ?? true;
+  const pronto = await prepararAlvo(projetoId, { forcar: opts.forcar });
+  if ("motivo" in pronto) return { ok: pronto.ok, projeto_id: projetoId, motivo: pronto.motivo };
+
+  const julgamento = await julgarUmEspecialComPainel(pronto.alvo, pronto.vizinhos, {
+    lentes: opts.lentes,
+  });
+
+  let gravado = false;
+  if (!dry) {
+    await upsertAvaliacaoEspecial({
+      projeto_id: projetoId,
+      estrelas_recomendada: julgamento.nota,
+      confianca: julgamento.confianca,
+      leitura: julgamento.linha.motivos.join(" "),
+      contestada: julgamento.contestada,
+      origem: ORIGEM_PAINEL,
+      modelo: modeloChatConfigurado(),
+    });
+    gravado = true;
+  }
+  return { ok: true, projeto_id: projetoId, julgamento, gravado };
+}
 
 /**
  * O painel em LOTE (T6). Três fases, nesta ordem:

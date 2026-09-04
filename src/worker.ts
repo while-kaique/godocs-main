@@ -72,6 +72,7 @@ import {
 } from "@/lib/aglutinacao.functions";
 import {
   classificarEspecialProjeto,
+  julgarProjetoComPainel,
   classificarEspeciaisPendentes,
   classificarEspecialEmBackground,
   prepararIndicePinecone,
@@ -1170,6 +1171,26 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // ⚠️ Paginado E limitado por CUSTO: ~8 chamadas de LLM por projeto, ~30–50 s de relógio cada,
     // então a corrida para no `tetoChamadas` e devolve `proximo_offset` de onde continuar.
     // `soComNotaHumana:true` julga exatamente o test set do T7.
+    // Painel de lentes em UM projeto. ⚠️ Espelha o `/classificar`: a rota de LOTE roda em série,
+    // e a rodada de calibragem na base inteira só termina com a concorrência no cliente.
+    if (pathname === "/api/admin/especiais/painel-projeto" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as {
+        projetoId?: string;
+        dry?: boolean;
+        forcar?: boolean;
+        lentes?: string[];
+      };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
+      return json(
+        await julgarProjetoComPainel(body.projetoId, {
+          dry: body.dry,
+          forcar: body.forcar,
+          lentes: body.lentes,
+        }),
+      );
+    }
+
     if (pathname === "/api/admin/especiais/painel" && method === "POST") {
       await requireAdmin(request);
       const body = (await readBody(request)) as {
