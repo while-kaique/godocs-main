@@ -87,6 +87,24 @@ const semAcento = (s) =>
  * ⚠️ De 6 a 10 o agente DECLARA a faixa e o número é sugestão dele; quem crava a estrela é o
  * comitê humano. Mostrar "7" na tabela apaga essa diferença.
  */
+/** R$ curto, para caber na célula sem virar a coluna. */
+function reais(n) {
+  if (n == null || !Number.isFinite(n)) return '—';
+  return 'R$ ' + n.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+}
+
+/**
+ * A auditoria do VALOR aparece DENTRO da célula do porquê, não numa coluna nova.
+ *
+ * ⚠️ Coluna nova espremeria a tabela, e a auditoria só existe para os projetos NORMAIS: uma
+ * coluna vazia em metade das linhas é pior que nenhuma. Aqui ela aparece só quando há proposta
+ * de ajuste, com o de-para e a conta, que é o que se lê para decidir.
+ */
+function blocoAuditoria(l) {
+  if (!l.ajustaria || l.valor_sugerido == null) return '';
+  return `<span class="aud"><b>Valor a revisar:</b> ${reais(l.valor_declarado)} → ${esc(reais(l.valor_sugerido))}. ${esc(l.auditoria || '')}</span>`;
+}
+
 function rotuloNota(n) {
   return n >= 6 ? '6-10' : String(n);
 }
@@ -110,14 +128,14 @@ const linhasHtml = RUNS.map((run) => {
       // Divergência só conta onde ela SIGNIFICA algo: com dossiê insuficiente o agente não
       // discordou do humano, ele não teve o que ler.
       const div = !insuf && l.humana != null && Math.abs(l.humana - l.agente) >= 2;
-      const classes = [div ? 'div' : '', insuf ? 'insuf' : ''].filter(Boolean).join(' ');
+      const classes = [div ? 'div' : '', insuf ? 'insuf' : '', l.ajustaria ? 'aud-sim' : ''].filter(Boolean).join(' ');
       const anterior = anteriorPorRun.get(run.id)?.get(l.id);
       const mudou = anterior != null && anterior !== l.agente;
       return `<tr data-run="${run.id}" data-n="${l.agente}" data-b="${esc(semAcento(l.nome + ' ' + l.area + ' ' + l.leitura))}"${classes ? ` class="${classes}"` : ''} hidden>
 <td class="n"><span class="pill p${l.agente}">${rotuloNota(l.agente)}</span>${mudou ? `<span class="delta" title="na run anterior era ${anterior}">${anterior}→${l.agente}</span>` : ''}</td>
 <td class="h">${l.humana != null ? l.humana : '<span class="vazio">—</span>'}${insuf ? '<span class="tag" title="O memorial deste projeto é só a conta do saving: não há dossiê que sustente veredito, então ele fica fora da concordância.">sem dossiê</span>' : ''}</td>
 <td class="nome">${esc(l.nome)}<span class="area">${esc(l.area || '—')}</span></td>
-<td class="pq">${esc(l.leitura)}</td></tr>`;
+<td class="pq">${esc(l.leitura)}${blocoAuditoria(l)}</td></tr>`;
     })
     .join('\n');
 }).join('\n');
@@ -217,6 +235,8 @@ td.pq{font-size:13px;color:var(--ink2);line-height:1.5}
 .aba[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
 :root[data-theme="dark"] .aba[aria-pressed="true"],:root:not([data-theme="light"]) .aba[aria-pressed="true"]{color:#0E141A}
 .meta{font-size:12px;color:var(--ink3);margin:-6px 0 16px}
+.aud{display:block;margin-top:7px;padding:7px 9px;border-left:3px solid var(--div);background:var(--div-bg);border-radius:0 6px 6px 0;font-size:12px;line-height:1.45;color:var(--ink)}
+.aud b{color:var(--div)}
 .delta{display:block;margin-top:3px;font:500 10.5px/1 "IBM Plex Mono",monospace;color:var(--div)}
 .tag{display:block;margin-top:3px;font:500 10px/1.3 inherit;color:var(--ink3);cursor:help}
 tr.insuf td.h{color:var(--ink3)}
@@ -263,6 +283,7 @@ tr.insuf td.h{color:var(--ink3)}
 <div class="ferramentas">
   <input type="search" id="q" placeholder="Buscar projeto, área ou motivo…" aria-label="Buscar">
   <button class="tog" id="soDiv" aria-pressed="false" title="Projetos que já receberam estrela da triagem e que o agente avalia 2★ ou mais longe. A nota humana não muda por isto: é lista para revisão de gente.">Contestações de preço (2★+)</button>
+  <button class="tog" id="soAud" aria-pressed="false" title="Projetos em que o auditor financeiro propõe um número diferente do declarado, com a conta. Nada disso é gravado: é lista para revisão de gente.">Valor a revisar</button>
   <span class="conta" id="conta"></span>
 </div>
 
@@ -280,7 +301,7 @@ ${linhasHtml}
 var STATS=__STATS__;
 (function(){
   var corpo=document.getElementById('corpo'), q=document.getElementById('q'),
-      soDiv=document.getElementById('soDiv'), conta=document.getElementById('conta'),
+      soDiv=document.getElementById('soDiv'), soAud=document.getElementById('soAud'), conta=document.getElementById('conta'),
       nada=document.getElementById('nada'), linhas=[].slice.call(corpo.rows),
       abas=[].slice.call(document.querySelectorAll('.aba')),
       filtro=null, runAtual=STATS[STATS.length-1].id;
@@ -346,11 +367,12 @@ var STATS=__STATS__;
   function aplicar(){
     // cada palavra vale um "contém", e TODAS precisam aparecer — ordem não importa
     var termos=sa(q.value).split(/\s+/).filter(Boolean),
-        sd=soDiv.getAttribute('aria-pressed')==='true', n=0;
+        sd=soDiv.getAttribute('aria-pressed')==='true',
+        sv=soAud.getAttribute('aria-pressed')==='true', n=0;
     linhas.forEach(function(tr){
       var b=tr.dataset.b, achou=true;
       for(var i=0;i<termos.length;i++){ if(b.indexOf(termos[i])<0){achou=false;break;} }
-      var ok=casa(tr)&&achou&&(!sd||tr.classList.contains('div'));
+      var ok=casa(tr)&&achou&&(!sd||tr.classList.contains('div'))&&(!sv||tr.classList.contains('aud-sim'));
       tr.hidden=!ok; if(ok)n++;
     });
     pintar();
@@ -364,6 +386,9 @@ var STATS=__STATS__;
   })});
   soDiv.addEventListener('click',function(){
     soDiv.setAttribute('aria-pressed',soDiv.getAttribute('aria-pressed')==='true'?'false':'true'); aplicar();
+  });
+  soAud.addEventListener('click',function(){
+    soAud.setAttribute('aria-pressed',soAud.getAttribute('aria-pressed')==='true'?'false':'true'); aplicar();
   });
   q.addEventListener('input',aplicar);
   pintarRun();
