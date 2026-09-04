@@ -51,29 +51,8 @@ export type SinalDoPainel = {
  * 2. **A faixa de escape é do run 1.** Se a base entrou em 6-10 com as duas citações conferidas,
  *    as lentes não a tiram de lá: elas julgam eixo isolado e nenhuma sozinha responde à pergunta
  *    do escape. E se a base NÃO entrou, elas também não colocam.
- * 3. **Descer exige DUAS coisas: nenhum eixo sustentando a altura, ou as lentes concordando.**
- *    Se algum eixo alcança a nota da base E as lentes discordam entre si, quem manda é a base, e
- *    a discordância sai como confiança mais baixa (`confiancaPorConsenso`), não como nota menor.
- *
- *    ⚠️ Esta é a lição do run 7, e ela é estrutural, não de calibragem. A base julga o PROJETO;
- *    a lente julga UM eixo. Projeto bom quase nunca é bom em todos os eixos — o PIAPP é 1 em
- *    função e 5 em alcance —, e a consolidação usa a lente de gate como TETO. Resultado: bastava
- *    o gate estar baixo para a nota cair, mesmo com outro eixo sustentando o topo. Medido: dos 9
- *    projetos com base 5 no run 7, **os 9** desceram para 4, e o nível 5 esvaziou (2 projetos
- *    contra 5 na faixa de escape, que as lentes não alcançam). O caso que fechou o diagnóstico é
- *    o «[VERSTA] Robô orçamento»: função 5, alcance 4, gate 2 — o texto dizia "controla 100% do
- *    orçamento, roda 24/7, sem aprovação manual", que é a definição literal do 5, e a nota saiu 4.
- *
- *    ⚠️ **As duas pernas são necessárias, e cada uma sozinha erra para um lado.** Medido no run 7:
- *    só a dispersão segurava o «Gohelp» em 5 com as lentes em 2, 1, 4, 2, onde NENHUMA alcança a
- *    base (a dispersão vinha de 4 contra 1, não de um eixo forte); só o "alguma alcança" levantava
- *    seis projetos do fundo (GO HC, Base Custos, Sucesso.AI…), onde as lentes CONCORDAM que é
- *    baixo e o teto do gate está exercendo exatamente a função que tem. Juntas: 12 projetos se
- *    movem em 188, o erro médio contra a planilha cai de 1,14 para 1,12 e o acerto exato sobe de
- *    36% para 39%.
- *
- *    Subir continua livre: lente que sustenta MAIS do que a base viu é informação nova, e um eixo
- *    só basta para trazê-la (a régua é disjuntiva — a nota vem de UM eixo).
+ * 3. **As lentes SÓ SOBEM.** Para baixo existe apenas o piso, que exige citação do dossiê. Ver o
+ *    bloco no corpo da função, com as duas alternativas medidas e descartadas.
  *
  * 4. **Fora disso, no máximo um degrau** na direção que as lentes apontam.
  */
@@ -87,22 +66,29 @@ export function ajustarNotaComPainel(base: number, sinal: SinalDoPainel): Ajuste
   const querido = sinal.nota_lentes;
   if (querido === base) return { nota: base, base, delta: 0, motivo: 'as lentes concordam com a base' };
 
-  const notas = sinal.notas_das_lentes;
-  const maior = notas.length ? Math.max(...notas) : 0;
-  const menor = notas.length ? Math.min(...notas) : 0;
-  // As DUAS pernas têm de valer, e cada uma diz uma coisa diferente:
-  //  · `alcanca` — algum eixo sustenta aquela altura por conta própria (a régua é disjuntiva);
-  //  · `discordam` — a consolidação baixa não é veredito do grupo, é o teto do gate agindo sozinho.
-  // Quando as lentes CONCORDAM que é baixo, o gate está certo e a nota desce normalmente.
-  const alcanca = notas.length >= 2 && maior >= base;
-  const discordam = notas.length >= 2 && maior - menor >= DISPERSAO_AMBIGUA;
-  if (querido < base && alcanca && discordam) {
-    return {
-      nota: base,
-      base,
-      delta: 0,
-      motivo: `um eixo sustenta a nota (${maior}) e as lentes discordam entre si (de ${menor} a ${maior}), então a leitura do dossiê inteiro prevalece`,
-    };
+  // ⚠️ **AS LENTES SÓ SOBEM. Descer é do PISO, e só dele.**
+  //
+  // A base lê o dossiê inteiro e diz em que CAIXA da régua o projeto está. A lente lê UM eixo, e a
+  // régua é disjuntiva: a nota vem de UM eixo. Então uma lente baixa não desmente a caixa, ela só
+  // informa que aquele eixo é fraco — e tirar o projeto da caixa por isso é pôr o claro no lugar
+  // errado, que é o defeito que esta regra existe para matar.
+  //
+  // Medido: o «[VERSTA] Robô orçamento» (planilha 8) teve base 5 nas runs 7 E 8, e nas duas o time
+  // o entregou como 4. Não foi ruído: o texto dizia "controla 100% do orçamento, roda 24/7, sem
+  // aprovação manual", que é a definição literal do 5, debaixo de um 4. Na run 7 os 9 projetos com
+  // base 5 desceram, os 9.
+  //
+  // ⚠️ Duas tentativas de conserto MAIS FRACAS foram medidas e descartadas, não retentar sem dado
+  // novo: (a) "só desce se as lentes discordam" segurava o «Gohelp» em 5 com as lentes em 2,1,4,2,
+  // onde nenhuma chega perto; (b) "só desce se nenhuma alcança a base" não salva o VERSTA na run 8
+  // (lá o eixo que o sustentava caiu de 5 para 2) e ainda piora a aderência — erro 0,894 contra
+  // 0,868, exato 51% contra 52%. Esta regra dá erro 0,868 e exato 53%, com 5★ indo de 8 para 19.
+  //
+  // ⚠️ O preço, declarado: quando a base é otimista e TODAS as lentes discordam, nada a corrige a
+  // não ser o piso. Aceito de propósito — a base é o juiz que viu o projeto inteiro, e um falso 4
+  // que vira 5 custa uma olhada da triagem, enquanto o inverso apaga um projeto bom da fila.
+  if (querido < base) {
+    return { nota: base, base, delta: 0, motivo: 'as lentes não derrubam a nota do dossiê inteiro; para baixo, só o piso' };
   }
 
   const direcao = querido > base ? 1 : -1;

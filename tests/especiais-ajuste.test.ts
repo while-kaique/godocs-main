@@ -20,9 +20,8 @@ describe('ajuste fino da nota do run 1', () => {
     }
   });
 
-  it('move na direção das lentes, e concordância não mexe em nada', () => {
+  it('sobe na direção das lentes; concordância não mexe em nada', () => {
     expect(ajustarNotaComPainel(2, semPiso(5)).nota).toBe(3);
-    expect(ajustarNotaComPainel(4, semPiso(0)).nota).toBe(3);
     expect(ajustarNotaComPainel(3, semPiso(3)).nota).toBe(3);
   });
 
@@ -55,50 +54,37 @@ describe('ajuste fino da nota do run 1', () => {
    * O padrão era sistemático, não anedota: dos 9 projetos com base 5 no run 7, os 9 desceram, e o
    * nível 5 esvaziou (2 projetos, contra 5 na faixa de escape que as lentes não alcançam).
    */
-  it('NÃO desce quando um eixo sustenta a base E as lentes discordam entre si', () => {
-    const versta = { nota_lentes: 3, piso: null, notas_das_lentes: [5, 4, 2, 2] };
-    const r = ajustarNotaComPainel(5, versta);
-    expect(r.nota).toBe(5);
-    expect(r.delta).toBe(0);
-    expect(r.motivo).toContain('discordam');
-  });
-
   /**
-   * ⚠️ As duas pernas são necessárias, e cada uma sozinha erra para um lado — medido no run 7.
-   * Este é o «Gohelp»: lentes 2, 1, 4, 2 contra base 5. A dispersão é 3, mas ela vem de 4 contra
-   * 1, e NENHUM eixo chega perto de 5. A base foi otimista e a descida é legítima.
+   * ⚠️ A propriedade central: a lente lê UM eixo e a régua é disjuntiva, então lente baixa não
+   * desmente a caixa em que a base pôs o projeto — só diz que aquele eixo é fraco.
+   *
+   * O caso é o «[VERSTA] Robô orçamento» (planilha 8): base 5 nas runs 7 E 8, e nas duas o time
+   * entregou 4, com o texto dizendo "controla 100% do orçamento, roda 24/7, sem aprovação manual",
+   * que é a definição literal do 5. Na run 7, dos 9 projetos com base 5, os 9 desceram.
    */
-  it('desce quando as lentes discordam mas NENHUMA alcança a base', () => {
-    const gohelp = { nota_lentes: 2, piso: null, notas_das_lentes: [2, 1, 4, 2] };
-    expect(ajustarNotaComPainel(5, gohelp).nota).toBe(4);
+  it('as lentes NUNCA derrubam a nota da base, por mais baixas que estejam', () => {
+    for (let base = 0; base <= TETO_AGENTE; base++) {
+      for (let lentes = 0; lentes < base; lentes++) {
+        const r = ajustarNotaComPainel(base, semPiso(lentes));
+        expect(r.nota, `base ${base} lentes ${lentes}`).toBe(base);
+        expect(r.delta).toBe(0);
+      }
+    }
   });
 
-  /**
-   * O outro lado: aqui uma lente empata com a base, mas as quatro CONCORDAM que é baixo e quem
-   * puxou a nota para baixo foi o teto do gate, exercendo a função que ele tem. Sem esta perna,
-   * seis projetos do fundo da escala subiam (GO HC, Base Custos, Sucesso.AI…).
-   */
-  it('desce quando alguma alcança a base mas as lentes CONCORDAM entre si', () => {
-    const fundo = { nota_lentes: 0, piso: null, notas_das_lentes: [2, 1, 2, 1] };
-    expect(ajustarNotaComPainel(2, fundo).nota).toBe(1);
+  it('o VERSTA fica em 5 com as lentes do run 7 E com as do run 8', () => {
+    // run 7: função 5, alcance 4, gate 2, complexidade 2 — um eixo sustentava
+    expect(ajustarNotaComPainel(5, { nota_lentes: 3, piso: null, notas_das_lentes: [5, 4, 2, 2] }).nota).toBe(5);
+    // run 8: o eixo que sustentava caiu para 2, e mesmo assim a caixa da base vale
+    expect(ajustarNotaComPainel(5, { nota_lentes: 2, piso: null, notas_das_lentes: [2, 2, 0, 4] }).nota).toBe(5);
   });
 
-  it('desce normalmente quando as lentes concordam que é para baixo', () => {
-    const r = ajustarNotaComPainel(4, { nota_lentes: 2, piso: null, notas_das_lentes: [2, 2, 1, 2] });
-    expect(r.nota).toBe(3);
-  });
-
-  // Subir é assimétrico DE PROPÓSITO: a régua é disjuntiva, a nota vem de UM eixo, então uma lente
-  // sustentando mais do que a base viu é informação nova mesmo com as outras baixas.
-  it('SOBE mesmo com as lentes dispersas', () => {
-    const r = ajustarNotaComPainel(1, { nota_lentes: 5, piso: null, notas_das_lentes: [5, 4, 0, 0] });
-    expect(r.nota).toBe(2);
-  });
-
-  // O piso é fato do projeto inteiro, não média de eixo: dispersão não o segura.
-  it('o piso zera mesmo com as lentes dispersas', () => {
-    const r = ajustarNotaComPainel(5, { nota_lentes: 5, piso: 'fora_de_uso', notas_das_lentes: [5, 0, 5, 0] });
-    expect(r.nota).toBe(0);
+  // Para baixo existe UMA força, e ela exige citação do dossiê para agir.
+  it('o piso continua zerando de qualquer altura', () => {
+    for (let base = 0; base <= TETO_AGENTE; base++) {
+      const r = ajustarNotaComPainel(base, { nota_lentes: base, piso: 'fora_de_uso', notas_das_lentes: [base, base, base, base] });
+      expect(r.nota).toBe(0);
+    }
   });
 
   it('o motivo diz quando o ajuste foi LIMITADO, para o relatório não parecer concordância', () => {
