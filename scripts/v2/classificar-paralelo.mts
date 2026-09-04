@@ -47,6 +47,8 @@ type Saida = {
   // resposta do TIME (`/painel-projeto`)
   julgamento?: { nota?: number; nota_lentes?: number; confianca?: string; avaliacoes?: { lente: string; nota: number; piso?: string | null }[] };
   base?: { nota?: number; leitura?: string };
+  leitura?: string;
+  incoerencias?: string[];
   ajuste?: { delta?: number; motivo?: string };
 };
 
@@ -171,7 +173,9 @@ async function classificar(p: Alvo): Promise<void> {
       // ⚠️ Sem isto a medição de "alta acerta mais que média?" fica impossível depois: a run é
       // dry, então nada vai para `especial_avaliacao` e a confiança se perde com o processo.
       confianca: (JUIZ === 'TIME' ? s.julgamento?.confianca : s.recomendacao?.confianca) ?? null,
-      leitura: (JUIZ === 'TIME' ? s.base?.leitura : s.recomendacao?.leitura) ?? s.motivo ?? '',
+      // ⚠️ No TIME é a leitura COMPOSTA que interessa, não a da base: a composta é a que vai ao
+      // banco e à tela, e é ela que a verificação de coerência corrige.
+      leitura: (JUIZ === 'TIME' ? (s.leitura ?? s.base?.leitura) : s.recomendacao?.leitura) ?? s.motivo ?? '',
       // Só no TIME: dá para auditar o ajuste depois sem reabrir cada projeto.
       ...(JUIZ === 'TIME'
         ? {

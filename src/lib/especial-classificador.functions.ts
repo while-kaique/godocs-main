@@ -1569,6 +1569,8 @@ export async function julgarProjetoComPainel(
   julgamento?: JulgamentoPainel;
   /** A nota do run 1, que é o ponto de partida — fica visível para o ajuste ser auditável. */
   base?: { nota: number; leitura: string };
+  /** O porquê final, já composto e verificado — é o que vai ao banco e à tela. */
+  leitura?: string;
   ajuste?: AjustePainel;
   /** O que a verificação de coerência achou. Vazio = texto e nota dizem a mesma coisa. */
   incoerencias?: string[];
@@ -1693,6 +1695,10 @@ export async function julgarProjetoComPainel(
     projeto_id: projetoId,
     // ⚠️ A pendência sai no resultado em vez de morrer: "o texto afirma que outros dependem
     // deste projeto e a nota não escapou" é justamente o caso PIAPP, e são 60 na run 5.
+    // ⚠️ A leitura COMPOSTA sai na resposta. Sem isso o relatório da rodada só via a leitura da
+    // BASE e media a versão que a correção existe para substituir — foi assim que eu concluí
+    // que o conserto de coerência falhara, quando na verdade eu olhava outro campo.
+    leitura,
     incoerencias: incoerencias.map((i) =>
       i.tipo === "numero_divergente" ? `texto cravava ${i.noTexto}` : `afirma dependentes ("${i.pista}") e não escapou`,
     ),
