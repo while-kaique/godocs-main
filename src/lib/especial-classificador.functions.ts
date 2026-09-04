@@ -543,7 +543,9 @@ async function prepararAlvo(
   //
   // Continua valendo o anti-feedback-loop: `rotuloExemplar` prefere a nota HUMANA à recomendada,
   // então o que ensina o agente é a decisão de gente, não a opinião dele mesmo.
-  const exemplares = mapaExemplares(todos, avaliacoesParaExemplar(await getAvaliacoesEspeciais()));
+  const avaliacoesRows = await getAvaliacoesEspeciais();
+  const avaliacoes = avaliacoesParaExemplar(avaliacoesRows);
+  const exemplares = mapaExemplares(todos, avaliacoes);
 
   const resumoAlvo = resumoPorId.get(projetoId);
   // Nota humana é VERDADE e âncora: recomendar por cima dela é ruído no cartão e, pior, alimenta
@@ -571,14 +573,6 @@ async function prepararAlvo(
     )
   ).mapa;
   const alvoEmb = mapa.get(projetoId);
-
-  const avaliacoesRows = await getAvaliacoesEspeciais();
-  const avaliacoes = new Map(
-    avaliacoesRows.map((a) => [
-      a.projeto_id,
-      { estrelas_recomendada: a.estrelas_recomendada, leitura: a.leitura },
-    ]),
-  );
 
   // O alvo também vira memória para os próximos — best-effort, nunca derruba a classificação.
   await indexarPinecone([projetoId], mapa, resumoPorId, avaliacoes);

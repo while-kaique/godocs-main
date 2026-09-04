@@ -32,7 +32,26 @@ const CONC_MIN = Number(process.env.CONC_MIN ?? 4);
 const TIMEOUT_MS = 180_000;
 
 type Rec = { estrelas_recomendada?: number; confianca?: string; leitura?: string; contestada?: boolean };
-type Saida = { ok?: boolean; recomendacao?: Rec; motivo?: string };
+type Saida = {
+  ok?: boolean;
+  recomendacao?: Rec;
+  motivo?: string;
+  // resposta do TIME (`/painel-projeto`)
+  julgamento?: { nota?: number; nota_lentes?: number; confianca?: string; avaliacoes?: { lente: string; nota: number; piso?: string | null }[] };
+  base?: { nota?: number; leitura?: string };
+  ajuste?: { delta?: number; motivo?: string };
+};
+
+/**
+ * Qual juiz roda: o classificador de 1 agente (`AGENTE`, o do run 1) ou o TIME de lentes
+ * (`TIME`), que usa aquele como base e ajusta em um degrau.
+ *
+ * ⚠️ Uma rota por juiz, mas UM script: o que muda entre eles é a forma da resposta, não o
+ * paralelismo, o relatório nem a repescagem. Dois scripts divergiriam no primeiro ajuste, e a
+ * comparação entre as duas rodadas passaria a medir a diferença entre os scripts.
+ */
+const JUIZ = (process.env.JUIZ ?? 'AGENTE').toUpperCase() === 'TIME' ? 'TIME' : 'AGENTE';
+const ROTA = JUIZ === 'TIME' ? '/api/admin/especiais/painel-projeto' : '/api/admin/especiais/classificar';
 
 async function post<T>(rota: string, corpo: unknown): Promise<T> {
   const r = await fetch(`${BASE}${rota}`, {
@@ -48,7 +67,7 @@ async function post<T>(rota: string, corpo: unknown): Promise<T> {
   return JSON.parse(t) as T;
 }
 
-type Alvo = { id: string; nome: string; estrelas: number | null; area?: string };
+type Alvo = { id: string; nome: string; estrelas: number | null; area?: string; especial?: boolean };
 let projetos: Alvo[];
 if (process.env.APROVADOS === '1') {
   // Todos os APROVADOS da planilha (especiais e normais). O classificador aceita os dois:
@@ -63,6 +82,7 @@ if (process.env.APROVADOS === '1') {
   const [h, ...ls] = values;
   const c = (n: string) => h.indexOf(n);
   const iId = c('ID Projeto'), iNome = c('Projeto'), iSt = c('Status'), iEst = c('Estrelas'), iAr = c('Área');
+  const iEsp = c('Especial?');
   projetos = ls
     .filter((l) => (l[iSt] ?? '').trim().toLowerCase() === 'aprovado' && (l[iId] ?? '').trim())
     .map((l) => ({
@@ -70,6 +90,9 @@ if (process.env.APROVADOS === '1') {
       nome: (l[iNome] ?? '').trim(),
       estrelas: (l[iEst] ?? '').trim() ? Number((l[iEst] ?? '').replace(',', '.')) : null,
       area: (l[iAr] ?? '').trim(),
+      // ⚠️ Vai para o relatório porque "com nota humana" sem essa quebra ENGANA: dá a entender
+      // que a triagem estrelou centenas de especiais, quando são 59 especiais e 459 normais.
+      especial: /^s/i.test((l[iEsp] ?? '').trim()),
     }));
 } else {
   const lista = (await (
@@ -85,24 +108,45 @@ if (process.env.SOMENTE_IDS) {
   console.log(`recorte SOMENTE_IDS: ${projetos.length} de ${alvo.size} ids pedidos`);
 }
 
+console.log(`juiz ${JUIZ} (${ROTA})`);
 console.log(`${projetos.length} projetos · concorrência adaptativa ${CONC_INICIAL}→${CONC_MAX} (piso ${CONC_MIN}) · ${VALENDO ? 'VALENDO' : 'ENSAIO'}\n`);
 
 const notas = new Map<number, number>();
-const linhas: Array<{ id: string; nome: string; area: string; humana: number | null; agente: number | null; leitura: string }> = [];
+const linhas: Array<{
+  id: string; nome: string; area: string; humana: number | null; especial?: boolean; agente: number | null; leitura: string;
+  base?: number | null; delta?: number; ajuste?: string; lentes?: { l: string; n: number; piso: string | null }[];
+}> = [];
 const falhas: Array<{ id: string; erro: string }> = [];
 let feitos = 0;
 const t0 = Date.now();
 
 async function classificar(p: Alvo): Promise<void> {
   try {
-    const s = await post<Saida>('/api/admin/especiais/classificar', {
+    const s = await post<Saida>(ROTA, {
       projetoId: p.id,
       dry: !VALENDO,
       forcar: true,
     });
-    const nota = s.recomendacao?.estrelas_recomendada ?? null;
+    const nota = (JUIZ === 'TIME' ? s.julgamento?.nota : s.recomendacao?.estrelas_recomendada) ?? null;
     if (nota != null) notas.set(nota, (notas.get(nota) ?? 0) + 1);
-    linhas.push({ id: p.id, nome: p.nome, area: p.area ?? '', humana: p.estrelas, agente: nota, leitura: s.recomendacao?.leitura ?? s.motivo ?? '' });
+    linhas.push({
+      id: p.id,
+      nome: p.nome,
+      area: p.area ?? '',
+      humana: p.estrelas,
+      especial: p.especial ?? false,
+      agente: nota,
+      leitura: (JUIZ === 'TIME' ? s.base?.leitura : s.recomendacao?.leitura) ?? s.motivo ?? '',
+      // Só no TIME: dá para auditar o ajuste depois sem reabrir cada projeto.
+      ...(JUIZ === 'TIME'
+        ? {
+            base: s.base?.nota ?? null,
+            delta: s.ajuste?.delta ?? 0,
+            ajuste: s.ajuste?.motivo ?? '',
+            lentes: (s.julgamento?.avaliacoes ?? []).map((a) => ({ l: a.lente, n: a.nota, piso: a.piso ?? null })),
+          }
+        : {}),
+    });
   } catch (e) {
     // ⚠️ Falha NÃO é nota 0: sem esta lista, uma rajada de 502 viraria "a base é toda baixa".
     // O pool re-tenta a saturação sozinho; o que chega aqui já esgotou as tentativas.
@@ -171,6 +215,19 @@ if (falhas.length) {
 const destino = process.env.SAIDA_JSON;
 if (destino) {
   const { writeFile } = await import('node:fs/promises');
-  await writeFile(destino, JSON.stringify({ linhas, falhas, dist }, null, 1));
+  // ⚠️ O relatório carrega COMO foi rodado, não só o resultado. Sem isso, comparar duas runs
+  // vira adivinhação sobre o que mudou entre elas: juiz, se gravou, quando, quantas falhas.
+  const meta = {
+    run: process.env.RUN_ROTULO ?? null,
+    juiz: JUIZ,
+    rota: ROTA,
+    gravou: VALENDO,
+    rodado_em: new Date().toISOString(),
+    projetos: projetos.length,
+    falhas: falhas.length,
+    duracao_s: Math.round((Date.now() - t0) / 1000),
+    concorrencia: { final: rel.alvoFinal, pico: rel.alvoMax, piso: rel.alvoMin, recuos: rel.recuos },
+  };
+  await writeFile(destino, JSON.stringify({ meta, linhas, falhas, dist }, null, 1));
   console.log(`\nrelatório: ${destino}`);
 }

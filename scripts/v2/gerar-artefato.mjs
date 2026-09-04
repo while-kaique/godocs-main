@@ -1,20 +1,72 @@
 // Gera o artefato "Estrelas da Base": uma linha por projeto aprovado, com a nota do agente,
 // a nota humana quando existe, e o PORQUÊ. Sem prosa em volta — a página é a tabela.
+//
+// Uso: node gerar-artefato.mjs saida.html run1.json run2.json ...
+//
+// ⚠️ As runs CONVIVEM na mesma página, com um seletor no topo, e a anterior nunca é apagada.
+// Calibrar é comparar: uma página que só mostra a rodada mais recente esconde justamente a
+// pergunta que interessa, que é o que mudou de uma para a outra e se o motivo escrito sustenta.
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const ENTRADA = process.argv[2];
-const SAIDA = process.argv[3];
-const d = JSON.parse(readFileSync(ENTRADA, 'utf8'));
-const linhas = d.linhas.filter((l) => l.agente != null);
-const falhas = d.falhas ?? [];
+const SAIDA = process.argv[2];
+const ARQUIVOS = process.argv.slice(3);
+if (!SAIDA || ARQUIVOS.length === 0) {
+  console.error('uso: node gerar-artefato.mjs saida.html run1.json [run2.json ...]');
+  process.exit(2);
+}
 
-const dist = {};
-for (const l of linhas) dist[l.agente] = (dist[l.agente] ?? 0) + 1;
+/** Um run carregado, já com as contas que a página mostra. */
+function carregar(arquivo, indice) {
+  const d = JSON.parse(readFileSync(arquivo, 'utf8'));
+  const meta = d.meta ?? {};
+  const linhas = d.linhas.filter((l) => l.agente != null);
+  const falhas = d.falhas ?? [];
+  const dist = {};
+  for (const l of linhas) dist[l.agente] = (dist[l.agente] ?? 0) + 1;
+
+  // ⚠️ "com nota humana" sozinho ENGANA: dá a entender que a triagem estrelou centenas de
+  // ESPECIAIS. A base tem 59 especiais e centenas de normais com estrela, então a quebra é
+  // parte do número, não um detalhe.
+  const comHumana = linhas.filter((l) => l.humana != null);
+  const espComHumana = comHumana.filter((l) => l.especial).length;
+
+  // Projetos cujo dossiê não sustenta veredito (memorial que é só a conta) ficam FORA da
+  // concordância: contá-los como acerto ou erro seria medir a documentação, não o agente.
+  const comparaveis = comHumana.filter((l) => l.dossie !== 'insuficiente');
+  const iguais = comparaveis.filter((l) => l.humana === l.agente).length;
+  const perto = comparaveis.filter((l) => Math.abs(l.humana - l.agente) <= 1).length;
+
+  return {
+    id: 'r' + indice,
+    rotulo: meta.run ?? `run ${indice + 1}`,
+    juiz: meta.juiz ?? null,
+    rodadoEm: meta.rodado_em ?? null,
+    gravou: meta.gravou ?? null,
+    linhas,
+    falhas,
+    dist,
+    total: linhas.length,
+    comHumana: comHumana.length,
+    espComHumana,
+    normComHumana: comHumana.length - espComHumana,
+    comparaveis: comparaveis.length,
+    iguais,
+    perto,
+  };
+}
+
+const RUNS = ARQUIVOS.map(carregar);
+// A página abre na ÚLTIMA run: é a que se quer olhar. As anteriores ficam a um clique.
+const ATUAL = RUNS[RUNS.length - 1];
+
+const linhas = ATUAL.linhas;
+const falhas = ATUAL.falhas;
+const dist = ATUAL.dist;
 const maxDist = Math.max(...Object.values(dist), 1);
-const total = linhas.length;
+const total = ATUAL.total;
 const comHumana = linhas.filter((l) => l.humana != null);
-const iguais = comHumana.filter((l) => l.humana === l.agente).length;
-const perto = comHumana.filter((l) => Math.abs(l.humana - l.agente) <= 1).length;
+const iguais = ATUAL.iguais;
+const perto = ATUAL.perto;
 
 const esc = (s) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

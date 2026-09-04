@@ -144,6 +144,34 @@ export function hashTexto(texto: string): string {
  * Renderiza os vizinhos como exemplos para o prompt. Cada linha: nota + nome + área + a leitura
  * que a justifica. A leitura é o que ensina o "por que não sobe" — mais valiosa que a nota nua.
  */
+/**
+ * Teto do texto de CADA vizinho no bloco de exemplos.
+ *
+ * ⚠️ O vizinho está ali para ancorar MAGNITUDE ("um projeto assim vale 4"), não para ser lido
+ * inteiro. Com 6 vizinhos e a leitura completa de cada um, o prompt ganhava alguns milhares de
+ * caracteres em TODA chamada, e cada chamada passou a segurar por mais tempo um dos ~8 slots de
+ * Codex do gateway. Medido nesta sessão: com o RAG devolvendo 0 vizinhos a base inteira rodava em
+ * ~9 min; com 6 vizinhos por projeto e leitura cheia, a vazão caiu ao ponto de a concorrência
+ * recuar até o piso. Cortar aqui devolve a velocidade sem tirar a âncora.
+ */
+export const RESUMO_VIZINHO_MAX = 180;
+
+/**
+ * ⚠️ A leitura gravada de um vizinho pode trazer o bloco "Evidência do escape", com as duas
+ * citações literais da doc DELE. Isso é auditoria do vizinho, não exemplo para o alvo: só ocupa
+ * espaço e ainda convida o modelo a imitar a formatação.
+ */
+function resumoDoVizinho(leitura: string | null): string {
+  const limpo = String(leitura ?? '')
+    .split('Evidência do escape:')[0]
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!limpo) return '';
+  return limpo.length <= RESUMO_VIZINHO_MAX
+    ? limpo
+    : limpo.slice(0, RESUMO_VIZINHO_MAX).replace(/\s+\S*$/, '') + '…';
+}
+
 export function montarBlocoFewShot(vizinhos: Vizinho[]): string {
   if (vizinhos.length === 0) {
     return 'Nenhum projeto especial parecido já avaliado — posicione só pela régua e pela curva.';
@@ -152,8 +180,8 @@ export function montarBlocoFewShot(vizinhos: Vizinho[]): string {
     const nota = `${v.estrela_efetiva} ${v.estrela_efetiva === 1 ? 'estrela' : 'estrelas'}`;
     const proc = v.fonte_rotulo === 'humana' ? 'nota da triagem' : 'recomendação anterior';
     const area = v.area ? ` · ${v.area}` : '';
-    const leitura = v.leitura ? ` — ${v.leitura}` : '';
-    return `• «${v.nome ?? v.projeto_id}»${area} → ${nota} (${proc})${leitura}`;
+    const resumo = resumoDoVizinho(v.leitura);
+    return `• «${v.nome ?? v.projeto_id}»${area} → ${nota} (${proc})${resumo ? ` — ${resumo}` : ''}`;
   });
   return linhas.join('\n');
 }
