@@ -19,6 +19,7 @@
 import { describe, it, expect } from "vitest";
 import {
   CRITERIOS_GLOBAIS,
+  CRITERIOS_SO_DA_BASE,
   LENTES,
   LENTE_GATE,
   MARGEM_ACIMA_DO_GATE,
@@ -97,10 +98,22 @@ describe("as lentes são declaradas e distintas", () => {
     for (const t of CRITERIOS_GLOBAIS) expect(titulos).toContain(t);
   });
 
-  it("lentes + globais COBREM a régua inteira — critério novo esquecido aqui falha", () => {
-    const cobertos = new Set<string>([...LENTES.flatMap((l) => l.criterios), ...CRITERIOS_GLOBAIS]);
+  it("lentes + globais + a lista da base COBREM a régua inteira — critério novo esquecido aqui falha", () => {
+    const cobertos = new Set<string>([
+      ...LENTES.flatMap((l) => l.criterios),
+      ...CRITERIOS_GLOBAIS,
+      ...CRITERIOS_SO_DA_BASE,
+    ]);
     const orfaos = EIXOS.map((c) => c.titulo).filter((t) => !cobertos.has(t));
     expect(orfaos).toEqual([]);
+  });
+
+  // ⚠️ A saída fica ESTREITA de propósito: o que sai do painel tem de estar DECLARADO, e o teste
+  // trava o tamanho para "criar lista de exceção" não virar a saída fácil da próxima remoção.
+  it("a lista do que só a base julga é curta e não repete o que já tem lente", () => {
+    expect(CRITERIOS_SO_DA_BASE.length).toBeLessThanOrEqual(2);
+    const comLente = new Set(LENTES.flatMap((l) => l.criterios));
+    for (const t of CRITERIOS_SO_DA_BASE) expect(comLente.has(t)).toBe(false);
   });
 
   it("`outrosEixos` devolve os rótulos das OUTRAS lentes, nunca o da própria", () => {

@@ -39,6 +39,8 @@ export type SinalDoPainel = {
   nota_lentes: number;
   /** Item do piso nomeado por alguma lente dona dele, ou null. */
   piso: string | null;
+  /** A nota de CADA lente. É o que diz se elas concordam entre si — ver a regra 3 abaixo. */
+  notas_das_lentes: readonly number[];
 };
 
 /**
@@ -49,7 +51,22 @@ export type SinalDoPainel = {
  * 2. **A faixa de escape é do run 1.** Se a base entrou em 6-10 com as duas citações conferidas,
  *    as lentes não a tiram de lá: elas julgam eixo isolado e nenhuma sozinha responde à pergunta
  *    do escape. E se a base NÃO entrou, elas também não colocam.
- * 3. **Fora disso, no máximo um degrau** na direção que as lentes apontam.
+ * 3. **Descer exige que as lentes concordem entre si.** Dispersas, quem manda é a base, e a
+ *    discordância sai como confiança mais baixa (`confiancaPorConsenso`), não como nota menor.
+ *
+ *    ⚠️ Esta é a lição do run 7, e ela é estrutural, não de calibragem. A base julga o PROJETO;
+ *    a lente julga UM eixo. Projeto bom quase nunca é bom em todos os eixos — o PIAPP é 1 em
+ *    função e 5 em alcance —, e a consolidação usa a lente de gate como TETO. Resultado: bastava
+ *    o gate estar baixo para a nota cair, mesmo com outro eixo sustentando o topo. Medido: dos 9
+ *    projetos com base 5 no run 7, **os 9** desceram para 4, e o nível 5 esvaziou (2 projetos
+ *    contra 5 na faixa de escape, que as lentes não alcançam). O caso que fechou o diagnóstico é
+ *    o «[VERSTA] Robô orçamento»: função 5, alcance 4, gate 2 — o texto dizia "controla 100% do
+ *    orçamento, roda 24/7, sem aprovação manual", que é a definição literal do 5, e a nota saiu 4.
+ *
+ *    Subir continua livre: lente que sustenta MAIS do que a base viu é informação nova, e um eixo
+ *    só basta para trazê-la (a régua é disjuntiva — a nota vem de UM eixo).
+ *
+ * 4. **Fora disso, no máximo um degrau** na direção que as lentes apontam.
  */
 export function ajustarNotaComPainel(base: number, sinal: SinalDoPainel): AjustePainel {
   if (sinal.piso) {
@@ -60,6 +77,18 @@ export function ajustarNotaComPainel(base: number, sinal: SinalDoPainel): Ajuste
   }
   const querido = sinal.nota_lentes;
   if (querido === base) return { nota: base, base, delta: 0, motivo: 'as lentes concordam com a base' };
+
+  const dispersao = sinal.notas_das_lentes.length >= 2
+    ? Math.max(...sinal.notas_das_lentes) - Math.min(...sinal.notas_das_lentes)
+    : 0;
+  if (querido < base && dispersao >= DISPERSAO_AMBIGUA) {
+    return {
+      nota: base,
+      base,
+      delta: 0,
+      motivo: `as lentes discordaram entre si (de ${Math.min(...sinal.notas_das_lentes)} a ${Math.max(...sinal.notas_das_lentes)}), então a nota do dossiê inteiro prevalece`,
+    };
+  }
 
   const direcao = querido > base ? 1 : -1;
   const delta = direcao * Math.min(AJUSTE_MAX_PAINEL, Math.abs(querido - base));

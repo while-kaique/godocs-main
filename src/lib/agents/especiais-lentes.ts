@@ -51,6 +51,21 @@ import { extrairJson, type AlvoClassificacao } from "@/lib/agents/especial-class
 export const CRITERIOS_GLOBAIS = ["Qualidade de execução", "Especiais"] as const;
 
 /**
+ * Critérios da régua que o painel **de propósito** não cobre com uma lente própria — quem os
+ * julga é a BASE (o classificador de 1 agente, que lê o dossiê inteiro e pontua por todos eles).
+ *
+ * ⚠️ Lista DECLARADA, não exceção no teste. Sem ela, o guard de cobertura ou passaria a aceitar
+ * qualquer órfão (e um critério novo esquecido entraria calado, que é o que ele existe para pegar)
+ * ou obrigaria a manter lente que não decide nada. Tirar uma lente é uma decisão; ela fica escrita
+ * aqui, com o número que a sustenta.
+ *
+ * ⚠️ Não promova um destes a `CRITERIOS_GLOBAIS` para "resolver" a cobertura: global entra no
+ * prompt das QUATRO lentes, então custa o mesmo que a lente dedicada e ainda espalha o eixo por
+ * quem não sabe julgá-lo — foi o defeito que o `PISO_POR_LENTE` corrigiu.
+ */
+export const CRITERIOS_SO_DA_BASE = ["Risco evitado"] as const;
+
+/**
  * Definição de cada EIXO que as lentes julgam.
  *
  * ⚠️ Mora aqui, e não na régua, porque eixo **não é escala**: a régua (`estrelas-regua.ts`) diz o
@@ -186,22 +201,24 @@ export const LENTES: Lente[] = [
       { nota: 5, definicao: "A área inteira depende, ou virou serviço em que outros times se acoplam." },
     ],
   },
-  {
-    chave: "risco_evitado",
-    rotulo: "Risco evitado",
-    pergunta:
-      "Que risco fiscal, jurídico, financeiro ou de segurança deixou de existir, e o quanto ele era material?",
-    criterios: ["Risco evitado"],
-    ancoras: [
-      { nota: 0, definicao: "Não há risco a evitar. É resposta CORRETA e comum — a maioria dos projetos não evita risco nenhum." },
-      { nota: 1, definicao: "Erro operacional pequeno, percebido e refeito sem custo." },
-      { nota: 2, definicao: "Retrabalho recorrente ou erro que custa dinheiro pequeno, nomeado no material." },
-      { nota: 3, definicao: "Risco material nomeado — multa, juros, quebra de prazo contratual, perda de dado — com valor ou ocorrência citada." },
-      { nota: 4, definicao: "Risco fiscal, jurídico ou de segurança com exposição relevante E prova de que era real: autuação, incidente passado, apontamento de auditoria." },
-      { nota: 5, definicao: "Exposição estrutural do grupo (compliance, LGPD, fraude) endereçada de forma contínua e auditável." },
-    ],
-  },
 ];
+
+/**
+ * ⚠️ **A lente «Risco evitado» foi REMOVIDA em 04/09/2026, e remover foi a medida certa.**
+ *
+ * Medido no run 7 (177 projetos com as 5 lentes): ela foi a maior de todas em **12** casos contra
+ * 98 da complexidade, deu **0 em 104 de 177** e, simulando o painel sem ela, **mudaria 1 nota na
+ * base inteira (1%)**. Ou seja: custava um quinto do tempo de cada projeto e não decidia nada —
+ * só somava dispersão, que hoje rebaixa a confiança e trava o ajuste para baixo.
+ *
+ * Ela também não era dona de nenhum item do piso (ver `PISO_POR_LENTE` abaixo), então sair não
+ * deixou desqualificador órfão.
+ *
+ * ⚠️ Isso NÃO quer dizer que risco evitado deixou de contar: ele continua na régua, e a base (o
+ * classificador de 1 agente, que lê o dossiê inteiro) segue pontuando por ele. O que saiu foi o
+ * eixo dedicado no painel. **Antes de recriar uma lente, meça quantas vezes ela venceria** — é
+ * barato, sai do próprio JSON da rodada, e foi essa medição que reprovou esta.
+ */
 
 /**
  * Quais itens do piso CADA lente pode declarar.

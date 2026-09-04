@@ -8,7 +8,8 @@ import { TETO_AGENTE } from '@/lib/estrelas-regua';
  * propriedade que resolve isso: o time AJUSTA a nota do run 1, não a substitui.
  */
 describe('ajuste fino da nota do run 1', () => {
-  const semPiso = (nota: number) => ({ nota_lentes: nota, piso: null });
+  /** Lentes CONCORDES entre si (dispersão 0) — é o cenário dos casos antigos. */
+  const semPiso = (nota: number) => ({ nota_lentes: nota, piso: null, notas_das_lentes: [nota, nota, nota, nota] });
 
   it('nunca move mais que um degrau, por mais longe que as lentes estejam', () => {
     for (let base = 0; base <= TETO_AGENTE; base++) {
@@ -39,9 +40,45 @@ describe('ajuste fino da nota do run 1', () => {
 
   // Única exceção ao degrau: o piso não é "um pouco menos", é "não pontua".
   it('piso nomeado zera de qualquer altura, e diz qual foi', () => {
-    const r = ajustarNotaComPainel(5, { nota_lentes: 5, piso: 'fora_de_uso' });
+    const r = ajustarNotaComPainel(5, { nota_lentes: 5, piso: 'fora_de_uso', notas_das_lentes: [5, 5, 5, 5] });
     expect(r.nota).toBe(0);
     expect(r.motivo).toContain('fora_de_uso');
+  });
+
+
+  /**
+   * ⚠️ O caso «[VERSTA] Robô orçamento», run 7 (04/09/2026). A base leu o dossiê inteiro e disse 5;
+   * as lentes saíram função 5, alcance 4, gate 2, complexidade 2. A consolidação usa o gate como
+   * TETO, então o gate sozinho puxou a nota para baixo e o texto final ficou dizendo "controla
+   * 100% do orçamento, roda 24/7, sem aprovação manual" debaixo de um 4.
+   *
+   * O padrão era sistemático, não anedota: dos 9 projetos com base 5 no run 7, os 9 desceram, e o
+   * nível 5 esvaziou (2 projetos, contra 5 na faixa de escape que as lentes não alcançam).
+   */
+  it('NÃO desce quando as lentes discordam entre si: a base julga o projeto, a lente só um eixo', () => {
+    const versta = { nota_lentes: 3, piso: null, notas_das_lentes: [5, 4, 2, 2] };
+    const r = ajustarNotaComPainel(5, versta);
+    expect(r.nota).toBe(5);
+    expect(r.delta).toBe(0);
+    expect(r.motivo).toContain('discordaram');
+  });
+
+  it('desce normalmente quando as lentes concordam que é para baixo', () => {
+    const r = ajustarNotaComPainel(4, { nota_lentes: 2, piso: null, notas_das_lentes: [2, 2, 1, 2] });
+    expect(r.nota).toBe(3);
+  });
+
+  // Subir é assimétrico DE PROPÓSITO: a régua é disjuntiva, a nota vem de UM eixo, então uma lente
+  // sustentando mais do que a base viu é informação nova mesmo com as outras baixas.
+  it('SOBE mesmo com as lentes dispersas', () => {
+    const r = ajustarNotaComPainel(1, { nota_lentes: 5, piso: null, notas_das_lentes: [5, 4, 0, 0] });
+    expect(r.nota).toBe(2);
+  });
+
+  // O piso é fato do projeto inteiro, não média de eixo: dispersão não o segura.
+  it('o piso zera mesmo com as lentes dispersas', () => {
+    const r = ajustarNotaComPainel(5, { nota_lentes: 5, piso: 'fora_de_uso', notas_das_lentes: [5, 0, 5, 0] });
+    expect(r.nota).toBe(0);
   });
 
   it('o motivo diz quando o ajuste foi LIMITADO, para o relatório não parecer concordância', () => {

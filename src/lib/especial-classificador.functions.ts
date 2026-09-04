@@ -28,7 +28,7 @@ import {
 } from "@/integrations/db/client.server";
 import { lerResumosEspelho, lerLinhaEspelho } from "@/lib/sheet-espelho";
 import { chaveProjeto } from "@/lib/projeto-chave";
-import { TETO_AGENTE, ehEscape } from "@/lib/estrelas-regua";
+import { TETO_AGENTE, ehEscape, normalizarEscape} from "@/lib/estrelas-regua";
 import { ajustarNotaComPainel, confiancaPorConsenso, type AjustePainel } from "@/lib/especiais-ajuste";
 import { verificarCoerencia, removerNumerosDivergentes } from "@/lib/coerencia-leitura";
 import { apenasEspeciais } from "@/lib/especiais-view";
@@ -1616,8 +1616,10 @@ export async function julgarProjetoComPainel(
   const ajustada = ajustarNotaComPainel(base.estrelas_recomendada, {
     nota_lentes: julgamento.nota_lentes,
     piso: pisoNomeado,
+    notas_das_lentes: julgamento.avaliacoes.map((a) => a.nota),
   });
-  const notaFinal = ajustada.nota;
+  // ⚠️ A faixa de escape é UM nível, não cinco posições: qualquer valor dela vira a marca única.
+  const notaFinal = normalizarEscape(ajustada.nota);
   // O PORQUÊ é o ganho real de ter cinco olhares: a base explica o projeto, e as lentes dizem em
   // que eixo ele para. Sem isto o time custaria cinco chamadas para devolver o mesmo texto.
   const porEixo = julgamento.avaliacoes
@@ -1644,12 +1646,22 @@ export async function julgarProjetoComPainel(
     .filter((t) => t && t.length > 20)
     .slice(0, 2)
     .join(" ");
+  // ⚠️ Quando a base não justificou, quem fala são as LENTES — nunca o texto de reserva.
+  //
+  // Medido no run 7: 7 projetos (4%) chegaram à tela com "Sem leitura, o modelo não justificou a
+  // nota". Um deles é o «ecom-metrics-hub», que entrou na faixa de escape com uma citação boa e
+  // apareceu sem uma linha de texto. É a pior falha possível aqui: a triagem lê o porquê, e um
+  // veredito sem porquê não é auditável, é palpite. O material para o texto já existia no mesmo
+  // turno (as justificativas por eixo), só não estava sendo usado neste ramo.
+  const baseTemLeitura = (base.leitura ?? "").trim().length > 30 && !/^Sem leitura/i.test(base.leitura ?? "");
   const leituraCrua =
     ajustada.delta !== 0
       ? [`Nota ${notaFinal}: ${ajustada.motivo}.`, justificativaDasLentes, `Por eixo: ${porEixo}.`]
           .filter(Boolean)
           .join(" ")
-      : [base.leitura, `Por eixo: ${porEixo}.`].join(" ");
+      : [baseTemLeitura ? base.leitura : justificativaDasLentes, `Por eixo: ${porEixo}.`]
+          .filter(Boolean)
+          .join(" ");
 
   // Rede final, em CÓDIGO: nenhuma frase que crave um número diferente do veredito sobrevive.
   // As quatro etapas de verificação do time (lentes, consolidação, revisor, consenso) não olham

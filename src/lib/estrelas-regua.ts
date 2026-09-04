@@ -354,11 +354,12 @@ export function descreverEscape(): string {
     '⚠️ Isso NÃO vale para "poderá ser usado por", "abre portas para" ou dependente sem nome — aí',
     'não há atividade em curso, e a nota fica em 5★.',
     '',
-    `O VEREDITO que fica registrado é a FAIXA ${FAIXA_ESCAPE.min}-${FAIXA_ESCAPE.max}, não um número.`,
-    `Ainda assim, RECOMENDE um número de ${FAIXA_ESCAPE.min} a ${FAIXA_ESCAPE.max} e diga em UMA frase simples por que esse e não o vizinho`,
-    'de cima ou de baixo, comparando com os projetos que já estão na faixa. Quem crava o número final é o',
-    'comitê humano; sua recomendação é o ponto de partida da conversa dele, e uma recomendação sem porquê não serve de nada.',
-    'Cite também a evidência de cada gatilho.',
+    `O VEREDITO é a FAIXA ${FAIXA_ESCAPE.min}-${FAIXA_ESCAPE.max}, e ela é um NÍVEL inteiro, não um trecho de escala.`,
+    `⚠️ NÃO escolha um número dentro da faixa. Não recomende ${FAIXA_ESCAPE.min}, nem ${FAIXA_ESCAPE.max}, nem nada no meio.`,
+    `Responda exatamente ${NOTA_ESCAPE} no campo da nota: aqui esse ${NOTA_ESCAPE} NÃO quer dizer "${NOTA_ESCAPE} estrelas", é a marca de que o`,
+    'projeto caiu neste nível. Quem crava o número final é o comitê humano, comparando com quem já está lá.',
+    'No porquê, explique por que o projeto MUDA O JOGO. Não escreva por que seria um número e não outro.',
+    'Cite a evidência de cada gatilho.',
   ].join('\n');
 }
 
@@ -389,15 +390,35 @@ export const REGRAS_DO_PORQUE = `COMO ESCREVER O PORQUÊ (quem lê não conhece 
 
 export type IndicacaoEscape = {
   /**
-   * O número que o agente RECOMENDA dentro da faixa. O veredito registrado continua sendo a
-   * FAIXA (é o comitê humano que crava 6, 7, 8, 9 ou 10), mas a recomendação não é descartada:
-   * ela é o ponto de partida da conversa do comitê, e por isso o prompt cobra o porquê dela.
-   * Para o guard `escapeValido`, qualquer valor DENTRO da faixa vale como "indico o escape".
+   * MARCA de que o agente indicou a faixa — não é posição dentro dela (ver `NOTA_ESCAPE`).
+   * Qualquer valor DENTRO da faixa vale como "indico o escape", e é colapsado em `NOTA_ESCAPE`
+   * antes de virar nota, porque a faixa é um nível único.
    */
   sugestao: number;
   /** Cada gatilho com a frase da doc que o sustenta. Sem citação, o escape não vale. */
   evidencias: Partial<Record<ChaveGatilhoEscape, string>>;
 };
+
+/**
+ * A marca da faixa de escape — **um valor só para todo o nível**.
+ *
+ * ⚠️ Isto NÃO é "6 estrelas". A faixa é um SÉTIMO NÍVEL, ao lado de 0..5 e não acima deles por
+ * gradação: o projeto que cai aqui não se classificou em nenhuma das seis caixas. Guardar 6, 7 ou
+ * 8 daria a impressão de posição dentro de uma escala que não tem degrau nenhum definido — a
+ * régua descreve os cinco verbos de 0 a 5 e, de propósito, NÃO descreve o que separa um 7 de um 8.
+ *
+ * ⚠️ **Pedir a sugestão ao agente foi tentado e revertido (04/09/2026).** O prompt mandava
+ * recomendar um número e justificar "por que esse e não o vizinho"; como não existe critério que
+ * separe os vizinhos, o modelo preenchia com prosa plausível e sem lastro, e o número aparecia ao
+ * lado do rótulo da faixa competindo com ele. Não voltar a pedir: quem crava 6, 7, 8, 9 ou 10 é o
+ * comitê humano, comparando com quem já está na faixa.
+ */
+export const NOTA_ESCAPE = FAIXA_ESCAPE.min;
+
+/** Colapsa qualquer valor da faixa na marca única, para que o nível seja UM balde e não cinco. */
+export function normalizarEscape(nota: number): number {
+  return ehEscape(nota) ? NOTA_ESCAPE : nota;
+}
 
 /**
  * O escape só vale com os DOIS gatilhos evidenciados por citação da doc e a indicação dentro da
@@ -421,7 +442,7 @@ export function escapeValido(ind: IndicacaoEscape): boolean {
  */
 export function rotuloNotaAgente(nota: number): { rotulo: string; sugestao: number | null } {
   return ehEscape(nota)
-    ? { rotulo: `${FAIXA_ESCAPE.min}-${FAIXA_ESCAPE.max}`, sugestao: nota }
+    ? { rotulo: `${FAIXA_ESCAPE.min}-${FAIXA_ESCAPE.max}`, sugestao: null }
     : { rotulo: String(nota), sugestao: null };
 }
 
