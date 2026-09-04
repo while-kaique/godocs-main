@@ -235,6 +235,7 @@ describe("prompt do revisor", () => {
     const av: AvaliacaoLente[] = [
       {
         lente: "recorrencia_rastro",
+        piso: null,
         nota: 2,
         evidencia: "nomeada",
         confianca: "alta",
@@ -243,6 +244,7 @@ describe("prompt do revisor", () => {
       },
       {
         lente: "alcance_reuso",
+        piso: null,
         nota: 4,
         evidencia: "nomeada",
         confianca: "alta",

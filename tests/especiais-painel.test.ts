@@ -38,6 +38,7 @@ function av(
 ): AvaliacaoLente {
   return {
     lente,
+    piso: null,
     nota,
     evidencia,
     confianca: "media",

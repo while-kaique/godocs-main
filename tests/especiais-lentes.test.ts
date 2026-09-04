@@ -36,13 +36,22 @@ import {
   type AvaliacaoLente,
   type Evidencia,
 } from "@/lib/agents/especiais-lentes";
-import { CRITERIOS, NIVEIS, NOTA_MAX, definicaoDe } from "@/lib/especiais-regua";
+import { EIXOS } from "@/lib/agents/especiais-lentes";
+import {
+  NIVEL_ZERO,
+  CRITERIOS_ESTRELA,
+  ESCAPE_MUDA_O_JOGO,
+  PISO_ZERO,
+  NOTA_MAX,
+  TETO_AGENTE,
+} from "@/lib/estrelas-regua";
 import type { AlvoClassificacao } from "@/lib/agents/especial-classificador";
 import type { Vizinho } from "@/lib/especial-corpus";
 
 function av(lente: string, nota: number, evidencia: Evidencia = "nomeada"): AvaliacaoLente {
   return {
     lente,
+    piso: null,
     nota,
     evidencia,
     confianca: "media",
@@ -80,7 +89,7 @@ describe("as lentes são declaradas e distintas", () => {
   });
 
   it("todo critério referenciado EXISTE na régua (nada é redigitado aqui)", () => {
-    const titulos = CRITERIOS.map((c) => c.titulo);
+    const titulos = EIXOS.map((c) => c.titulo);
     for (const l of LENTES) {
       for (const t of l.criterios) expect(titulos).toContain(t);
     }
@@ -89,7 +98,7 @@ describe("as lentes são declaradas e distintas", () => {
 
   it("lentes + globais COBREM a régua inteira — critério novo esquecido aqui falha", () => {
     const cobertos = new Set<string>([...LENTES.flatMap((l) => l.criterios), ...CRITERIOS_GLOBAIS]);
-    const orfaos = CRITERIOS.map((c) => c.titulo).filter((t) => !cobertos.has(t));
+    const orfaos = EIXOS.map((c) => c.titulo).filter((t) => !cobertos.has(t));
     expect(orfaos).toEqual([]);
   });
 
@@ -129,20 +138,36 @@ describe("prompt de cada lente", () => {
     const gate = lentePorChave(GATE)!;
     const p = buildSystemPromptLente(gate);
     // o texto do seu próprio critério está lá…
-    const meu = CRITERIOS.find((c) => c.titulo === gate.criterios[0])!;
+    const meu = EIXOS.find((c) => c.titulo === gate.criterios[0])!;
     expect(p).toContain(meu.texto);
     // …e o texto de um critério de OUTRA lente, não.
-    const alheio = CRITERIOS.find((c) => c.titulo === "Alcance e reuso")!;
+    const alheio = EIXOS.find((c) => c.titulo === "Alcance e reuso")!;
     expect(p).not.toContain(alheio.texto);
     // o bloco de "não julgo" nomeia as outras lentes
     for (const r of outrosEixos(gate.chave)) expect(p).toContain(r);
   });
 
-  it("traz a régua, a curva e o teto da escala (importados, não redigitados)", () => {
+  // ⚠️ Repoint de 03/09/2026 para a régua nova (`estrelas-regua.ts`). Duas mudanças de contrato:
+  //  1. o teto da LENTE é `TETO_AGENTE`, não `NOTA_MAX` — a faixa 6-10 não sai de eixo isolado,
+  //     exige duas citações e o comitê humano;
+  //  2. a CURVA saiu do prompt da lente, e a saída não deve voltar por engano: ela dizia "≥3★ é
+  //     top 4% da base" sobre a base INTEIRA, e está na lista do que já foi medido e reprovado
+  //     (nenhuma lente passava de 2★ em 48 especiais).
+  it("o teto da lente é o do AGENTE, e a curva da base NÃO entra no prompt", () => {
     const p = buildSystemPromptLente(LENTES[1]);
-    expect(p).toContain(`0–${NOTA_MAX}`);
-    expect(p).toContain("top 4%");
-    expect(p).toContain("0★:"); // a curva real
+    expect(p).toContain(`0 a ${TETO_AGENTE}`);
+    expect(p).toContain(`${TETO_AGENTE + 1} a ${NOTA_MAX}`); // diz que o escape existe, e que não é dela
+    expect(p).not.toContain("top 4%");
+    expect(p).not.toContain("0★:");
+  });
+
+  // O piso deixa de ser prosa: a lente tem de NOMEAR o desqualificador que aplicou. É o defeito
+  // medido no run 1 (nenhuma das 173 notas que subiram citou um item do piso sequer).
+  it("o piso entra com as chaves da régua e é campo obrigatório da resposta", () => {
+    const p = buildSystemPromptLente(LENTES[0]);
+    for (const item of PISO_ZERO) expect(p).toContain(item.chave);
+    expect(p).toContain('"piso"');
+    expect(p).toMatch(/piso.{0,40}OBRIGATÓRIO/s);
   });
 
   it("traz as âncoras DO EIXO da lente, e não as de outra lente", () => {
@@ -162,16 +187,21 @@ describe("prompt de cada lente", () => {
     // 28/08/2026 em docs/plans/painel-agentes-especiais.md.
     for (const l of LENTES) {
       const p = buildSystemPromptLente(l);
-      for (let nota = 3; nota <= NOTA_MAX; nota++) {
-        const global = definicaoDe(nota)!;
-        expect(p).not.toContain(global);
+      // ⚠️ Vale inclusive para a lente de FUNÇÃO, cujo eixo É a espinha da régua: ela usa o
+      // VERBO de cada nível (fonte única) com definição LOCAL, contendo só a parte de função.
+      // O texto global do 3★ cobra "recai sobre OUTRA área", que é alcance — e é essa mistura
+      // que fazia toda lente parar em 1 ou 2.
+      for (const n of CRITERIOS_ESTRELA) {
+        if (n.nota < 3) continue;
+        expect(p).not.toContain(n.criterio);
       }
     }
   });
 
   it("traz a escala global só em TÍTULOS, para ler a nota dos vizinhos", () => {
     const p = buildSystemPromptLente(LENTES[0]);
-    for (const n of NIVEIS) expect(p).toContain(`${n.nota} ${n.titulo}`);
+    for (const n of [NIVEL_ZERO, ...CRITERIOS_ESTRELA]) expect(p).toContain(`${n.nota} ${n.verbo}`);
+    expect(p).toContain(ESCAPE_MUDA_O_JOGO.verbo);
   });
 
   it("dois prompts de lentes diferentes NÃO são o mesmo texto", () => {
@@ -211,7 +241,8 @@ describe("mensagem de usuário", () => {
 
 describe("normalização e guards da saída", () => {
   it("nota fora da escala é clampada e arredondada", () => {
-    expect(normalizarAvaliacaoLente({ nota: 99 }, GATE)!.nota).toBe(NOTA_MAX);
+    // Clampa no teto do AGENTE: uma lente que devolve 7 está opinando sobre o escape.
+    expect(normalizarAvaliacaoLente({ nota: 99 }, GATE)!.nota).toBe(TETO_AGENTE);
     expect(normalizarAvaliacaoLente({ nota: -4 }, GATE)!.nota).toBe(0);
     expect(normalizarAvaliacaoLente({ nota: 2.6 }, GATE)!.nota).toBe(3);
   });
@@ -315,15 +346,37 @@ describe("consolidação — sem média, gate como teto", () => {
     expect(c.nota_preliminar).toBe(5);
   });
 
-  it("projeto de topo não é comprimido: gate 7 + alcance 8 sustenta 8", () => {
-    const c = consolidarLentes([av(GATE, 7, "nomeada"), av(VALOR[1], 8)]);
-    expect(c.nota_preliminar).toBe(8);
+  // O ponto original continua valendo: eixo forte não é comprimido pela média dos fracos. O que
+  // mudou com a régua nova é a altura em que isso acontece — o topo do painel é 5, e 6 a 10 é
+  // outra decisão, com duas citações e comitê humano.
+  it("projeto de topo não é comprimido: gate 4 + alcance 5 sustenta 5", () => {
+    const c = consolidarLentes([av(GATE, 4, "nomeada"), av(VALOR[1], 5)]);
+    expect(c.nota_preliminar).toBe(5);
   });
 
-  it("nunca passa do teto da escala", () => {
-    const c = consolidarLentes([av(GATE, NOTA_MAX, "nomeada"), av(VALOR[0], NOTA_MAX)]);
-    expect(c.teto).toBe(NOTA_MAX);
-    expect(c.nota_preliminar).toBe(NOTA_MAX);
+  it("nunca passa do TETO DO AGENTE, mesmo com todas as lentes no máximo", () => {
+    const c = consolidarLentes([av(GATE, TETO_AGENTE, "nomeada"), av(VALOR[0], TETO_AGENTE)]);
+    expect(c.teto).toBe(TETO_AGENTE);
+    expect(c.nota_preliminar).toBe(TETO_AGENTE);
+  });
+
+  /**
+   * O piso é do PROJETO, não do eixo: "ninguém além do autor usa" não é uma verdade sobre
+   * alcance, é uma verdade sobre o projeto. Sem esta regra, uma lente diria "0, está parado" e as
+   * outras quatro fariam média por cima dela.
+   */
+  it("uma lente que NOMEIA um item do piso zera o conjunto, e a explicação diz qual", () => {
+    const comPiso: AvaliacaoLente = { ...av(VALOR[1], 4, "nomeada"), piso: "so_o_autor" };
+    const c = consolidarLentes([av(GATE, 3, "nomeada"), comPiso]);
+    expect(c.nota_preliminar).toBe(0);
+    expect(c.explicacao).toContain("so_o_autor");
+    expect(c.explicacao).toContain(VALOR[1]);
+  });
+
+  it("sem piso nomeado, nada muda", () => {
+    const c = consolidarLentes([av(GATE, 3, "nomeada"), av(VALOR[1], 4)]);
+    expect(c.nota_preliminar).toBeGreaterThan(0);
+    expect(c.explicacao).not.toContain("piso");
   });
 
   it("gate sozinho vale a própria nota (sem lente de valor não zera o projeto)", () => {
