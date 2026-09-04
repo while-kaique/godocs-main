@@ -26,10 +26,14 @@ const COOKIE = process.env.E2E_COOKIE ?? '';
 // Concorrência ADAPTATIVA (ver `_concorrencia.mts`): `CONC` é o PONTO DE PARTIDA, não o teto.
 // A rodada sobe sozinha enquanto o gateway aguenta e recua pela metade ao primeiro 502 — que é
 // o que permite ir mais rápido SEM atropelar produção, com quem divide os slots de Codex.
+// O ai-proxy aceita concorrência 32 com fila de 150 (informado pelo dono da plataforma), então
+// o ponto de partida sobe. O pool continua recuando se o gateway devolver 502/503/429.
 const CONC_INICIAL = Number(process.env.CONC ?? 24);
 const CONC_MAX = Number(process.env.CONC_MAX ?? 72);
 const CONC_MIN = Number(process.env.CONC_MIN ?? 4);
-const TIMEOUT_MS = 180_000;
+// ⚠️ 180s era baixo demais: o proxy tem FILA de 150, então esperar é normal e não é falha.
+// Com o limite curto, a espera virava "timeout", o pool lia saturação e cortava a concorrência.
+const TIMEOUT_MS = Number(process.env.TIMEOUT_MS ?? 600_000);
 
 type Rec = { estrelas_recomendada?: number; confianca?: string; leitura?: string; contestada?: boolean };
 type Auditoria = {
@@ -231,7 +235,8 @@ const rel = await rodarPoolAdaptativo({
     process.stdout.write(`   ${f}/${t} · ${Math.round((Date.now() - t0) / 1000)}s · conc ${alvo}    \r`);
   },
 });
-console.log(`\n\nconcorrência: terminou em ${rel.alvoFinal} (pico ${rel.alvoMax}, piso ${rel.alvoMin}) · ${rel.recuos} recuos · ${rel.reentradas} re-tentativas`);
+console.log(`\n\nconcorrência: terminou em ${rel.alvoFinal} (pico ${rel.alvoMax}, piso ${rel.alvoMin}) · ${rel.recuos} recuos · ${rel.reentradas} re-tentativas · ${rel.esperas} esperas de fila`);
+if (rel.motivos.length) console.log(`motivos dos recuos: ${[...new Set(rel.motivos)].slice(0, 5).join(' | ')}`);
 
 // ⚠️ REPESCAGEM. O pool já re-tenta a saturação, mas uma rajada longa pode esgotar as
 // tentativas de um item. Uma passada final, conservadora, para 502 nunca virar buraco no
@@ -286,7 +291,7 @@ if (destino) {
     projetos: projetos.length,
     falhas: falhas.length,
     duracao_s: Math.round((Date.now() - t0) / 1000),
-    concorrencia: { final: rel.alvoFinal, pico: rel.alvoMax, piso: rel.alvoMin, recuos: rel.recuos },
+    concorrencia: { final: rel.alvoFinal, pico: rel.alvoMax, piso: rel.alvoMin, recuos: rel.recuos, esperas: rel.esperas, motivos: [...new Set(rel.motivos)].slice(0, 8) },
   };
   await writeFile(destino, JSON.stringify({ meta, linhas, falhas, dist }, null, 1));
   console.log(`\nrelatório: ${destino}`);

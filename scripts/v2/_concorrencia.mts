@@ -36,12 +36,32 @@ export type RelatorioPool = {
   alvoMin: number;
   recuos: number;
   reentradas: number;
+  /** Re-tentativas por ESPERA (fila), que não mexem na concorrência. */
+  esperas: number;
+  /** Por que cada recuo aconteceu — sem isto, "recuei 23 vezes" é dedução, não medida. */
+  motivos: string[];
 };
 
 /** 502/503/504/429 e timeout: o gateway não respondeu. 4xx de verdade não entra aqui. */
 export function ehSaturacao(e: unknown): boolean {
   const m = e instanceof Error ? e.message : String(e);
-  return /HTTP (429|500|502|503|504)|timed out|timeout|aborted|ECONNRESET|fetch failed|socket hang up/i.test(m);
+  return /HTTP (429|500|502|503|504)|ECONNRESET|fetch failed|socket hang up/i.test(m);
+}
+
+/**
+ * ⚠️ TIMEOUT NÃO É SATURAÇÃO, e confundir os dois me fez rodar a noite inteira estrangulado.
+ *
+ * O ai-proxy aceita **concorrência 32 com fila de 150**. Numa fila, mandar mais requisições não
+ * devolve 502: devolve ESPERA. Essa espera estourava o meu limite de 180s, o pool lia "o gateway
+ * está saturado" e cortava a concorrência pela metade. Repetidamente — a run 5 teve 23 recuos e
+ * terminou em 6; a run 6 passou 109 medições em 4. Com 32 disponíveis.
+ *
+ * Timeout agora só re-tenta o item, sem mexer na concorrência. Quem manda recuar é o gateway
+ * dizendo não (502/503/429), não o relógio dizendo que a fila está andando devagar.
+ */
+export function ehEspera(e: unknown): boolean {
+  const m = e instanceof Error ? e.message : String(e);
+  return /timed out|timeout|aborted|AbortError/i.test(m);
 }
 
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -61,9 +81,10 @@ export async function rodarPoolAdaptativo<T>(o: OpcoesPool<T>): Promise<Relatori
   let feitos = 0;
   let limpasSeguidas = 0;
   let ultimoRecuoMs = 0;
-  const rel: RelatorioPool = { alvoFinal: alvo, alvoMax: alvo, alvoMin: alvo, recuos: 0, reentradas: 0 };
+  const rel: RelatorioPool = { alvoFinal: alvo, alvoMax: alvo, alvoMin: alvo, recuos: 0, reentradas: 0, esperas: 0, motivos: [] };
 
-  function recuar() {
+  function recuar(motivo?: string) {
+    if (motivo && rel.motivos.length < 20) rel.motivos.push(motivo.slice(0, 90));
     const novo = Math.max(minimo, Math.floor(alvo / 2));
     if (novo < alvo) {
       alvo = novo;
@@ -99,8 +120,12 @@ export async function rodarPoolAdaptativo<T>(o: OpcoesPool<T>): Promise<Relatori
         feitos++;
         talvezSubir();
       } catch (e) {
-        if (ehSaturacao(e) && t.tentativa + 1 < tentativas) {
-          recuar();
+        // Espera na fila re-tenta SEM recuar: encolher a concorrência por causa de fila só faz
+        // a fila andar mais devagar.
+        const foiEspera = ehEspera(e);
+        if ((ehSaturacao(e) || foiEspera) && t.tentativa + 1 < tentativas) {
+          if (!foiEspera) recuar(e instanceof Error ? e.message : String(e));
+          else rel.esperas++;
           rel.reentradas++;
           // Backoff com jitter: sem o jitter, os que caíram juntos voltam juntos e
           // ressaturam o gateway no mesmo instante.
@@ -110,7 +135,7 @@ export async function rodarPoolAdaptativo<T>(o: OpcoesPool<T>): Promise<Relatori
           fila.push({ item: t.item, tentativa: t.tentativa + 1 });
           continue;
         }
-        if (ehSaturacao(e)) recuar();
+        if (ehSaturacao(e)) recuar(e instanceof Error ? e.message : String(e));
         feitos++; // o chamador já registrou a falha dele
       }
       // ⚠️ O caminho de re-tentativa acima decrementa e faz `continue` — se este `ativos--`
