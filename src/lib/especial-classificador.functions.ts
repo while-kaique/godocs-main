@@ -310,12 +310,21 @@ function montarCorpus(
  * score). Nome/área/leitura/notas continuam vindo da fonte da verdade: o espelho da planilha e a
  * tabela `especial_avaliacao`, não da metadata do índice (decisão 6).
  */
+/** Só o recorte de `especial_avaliacao` que o mapa de exemplares usa. */
+function avaliacoesParaExemplar(
+  rows: { projeto_id: string; estrelas_recomendada: number; leitura: string | null }[],
+): Map<string, { estrelas_recomendada: number; leitura: string | null }> {
+  return new Map(
+    rows.map((a) => [a.projeto_id, { estrelas_recomendada: a.estrelas_recomendada, leitura: a.leitura }]),
+  );
+}
+
 function mapaExemplares(
-  especiais: ProjetoDashboardResumo[],
+  projetos: ProjetoDashboardResumo[],
   avaliacoes: Map<string, { estrelas_recomendada: number; leitura: string | null }>,
 ): Map<string, ExemplarSemVetor> {
   const mapa = new Map<string, ExemplarSemVetor>();
-  for (const p of especiais) {
+  for (const p of projetos) {
     const av = avaliacoes.get(p.id);
     mapa.set(p.id, {
       projeto_id: p.id,
@@ -520,10 +529,21 @@ async function prepararAlvo(
   opts: { forcar?: boolean } = {},
 ): Promise<AlvoPreparado | { ok: boolean; motivo: string }> {
   const { linhas } = await lerResumosEspelho();
-  const especiais = apenasEspeciais(
-    linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null),
-  );
+  const todos = linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null);
+  const especiais = apenasEspeciais(todos);
   const resumoPorId = new Map(especiais.map((p) => [chaveProjeto(p.id), p]));
+
+  // ⚠️ VIZINHOS SAEM DA BASE INTEIRA, não só dos especiais.
+  //
+  // O índice devolve id + score, e quem hidrata o resto é este mapa. Montado só com os 59
+  // especiais, todo vizinho NORMAL era descartado em silêncio — medido em prod: projeto normal
+  // recebia 0 vizinhos enquanto um especial recebia 6. A memória certa para posicionar um
+  // projeto é a base toda, e são 459 normais com nota humana dada pela triagem contra 59
+  // especiais: jogar fora os 459 era jogar fora quase toda a memória que existe.
+  //
+  // Continua valendo o anti-feedback-loop: `rotuloExemplar` prefere a nota HUMANA à recomendada,
+  // então o que ensina o agente é a decisão de gente, não a opinião dele mesmo.
+  const exemplares = mapaExemplares(todos, avaliacoesParaExemplar(await getAvaliacoesEspeciais()));
 
   const resumoAlvo = resumoPorId.get(projetoId);
   // Nota humana é VERDADE e âncora: recomendar por cima dela é ruído no cartão e, pior, alimenta
@@ -566,10 +586,10 @@ async function prepararAlvo(
   const recuperado = alvoEmb
     ? await recuperarVizinhos(alvoEmb.vetor, {
         excluirId: projetoId,
-        exemplarPorId: mapaExemplares(especiais, avaliacoes),
+        exemplarPorId: exemplares,
         corpusFallback: async () =>
           montarCorpus(
-            especiais,
+            todos,
             avaliacoes,
             decodificarEmbeddings(await getEmbeddingsEspeciais()),
           ),
