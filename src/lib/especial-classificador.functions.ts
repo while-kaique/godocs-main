@@ -523,6 +523,8 @@ type AlvoPreparado = {
   alvo: AlvoClassificacao;
   vizinhos: Vizinho[];
   origem: OrigemVizinhos;
+  /** Nomes dos OUTROS projetos da base — é contra eles que se confere um dependente nomeado. */
+  nomesDaBase: string[];
 };
 
 async function prepararAlvo(
@@ -591,7 +593,12 @@ async function prepararAlvo(
       })
     : { vizinhos: [] as Vizinho[], origem: "sqlite" as OrigemVizinhos };
 
-  return { alvo: montado.alvo, vizinhos: recuperado.vizinhos, origem: recuperado.origem };
+  return {
+    alvo: montado.alvo,
+    vizinhos: recuperado.vizinhos,
+    origem: recuperado.origem,
+    nomesDaBase: todos.filter((p) => chaveProjeto(p.id) !== projetoId).map((p) => p.nome ?? "").filter((n): n is string => n.length > 0),
+  };
 }
 
 /**
@@ -1647,7 +1654,7 @@ export async function julgarProjetoComPainel(
   // Rede final, em CÓDIGO: nenhuma frase que crave um número diferente do veredito sobrevive.
   // As quatro etapas de verificação do time (lentes, consolidação, revisor, consenso) não olham
   // para isto — o revisor ataca a ALTURA da nota, o consenso mede divergência entre eixos.
-  const incoerencias = verificarCoerencia(leituraCrua, notaFinal, TETO_AGENTE);
+  const incoerencias = verificarCoerencia(leituraCrua, notaFinal, TETO_AGENTE, pronto.nomesDaBase);
   const semNumeroErrado = incoerencias.some((i) => i.tipo === "numero_divergente")
     ? removerNumerosDivergentes(leituraCrua, notaFinal)
     : leituraCrua;
@@ -1663,7 +1670,7 @@ export async function julgarProjetoComPainel(
   // comitê; o que não pode é a afirmação morrer sem ninguém responder a ela.
   const pendenteDependente = incoerencias.find((i) => i.tipo === "dependente_sem_escape");
   const leitura = pendenteDependente
-    ? `${semNumeroErrado} ⚠ Conferir: o texto afirma que outros projetos dependem deste, o que é a prova da faixa 6-10, e a nota ficou em ${notaFinal}. Ou faltam as duas citações da documentação, ou a dependência não é de verdade.`
+    ? `${semNumeroErrado} ⚠ Conferir: o texto diz que «${pendenteDependente.tipo === "dependente_sem_escape" ? pendenteDependente.nomeado : ""}» depende deste projeto, e a nota ficou em ${notaFinal}. Um dependente nomeado é a prova da faixa 6-10, mas não a garante sozinho: ou faltam as duas citações, ou a dependência não sustenta a faixa.`
     : semNumeroErrado;
 
   const contestada =
@@ -1700,7 +1707,9 @@ export async function julgarProjetoComPainel(
     // que o conserto de coerência falhara, quando na verdade eu olhava outro campo.
     leitura,
     incoerencias: incoerencias.map((i) =>
-      i.tipo === "numero_divergente" ? `texto cravava ${i.noTexto}` : `afirma dependentes ("${i.pista}") e não escapou`,
+      i.tipo === "numero_divergente"
+        ? `texto cravava ${i.noTexto}`
+        : `nomeia «${i.nomeado}» como dependente ("${i.pista}") e não escapou`,
     ),
     julgamento: { ...julgamento, nota: notaFinal, contestada, confianca },
     base: { nota: base.estrelas_recomendada, leitura: base.leitura },

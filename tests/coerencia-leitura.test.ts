@@ -38,17 +38,34 @@ describe('coerência entre o porquê e a nota', () => {
    * O caso PIAPP: o agente escreve a prova do escape e não escapa. Medido na run 5 em 60
    * projetos. Não é erro por si, é uma afirmação que ficou SEM RESPOSTA.
    */
-  it('marca a afirmação de dependentes quando a nota não escapa', () => {
+  /**
+   * ⚠️ A régua exige dependente NOMEADO, e ter dependente não é, por si, critério de escape: um
+   * projeto pode sustentar outro e legitimamente ficar em 3. Marcando só pela frase, a run 7
+   * acusou 75 de 188 projetos (40%) — marca que pega 40% da base não é marca, é ruído.
+   */
+  const BASE = ['Prisma', 'GoPromos', 'Gocontent Machine'];
+
+  it('marca quando a frase vem com um projeto NOMEADO da base', () => {
     for (const pista of PISTAS_DEPENDENTE) {
-      const t = `O projeto ${pista} outros fluxos da área.`;
-      const inc = verificarCoerencia(t, TETO_AGENTE, TETO_AGENTE);
+      const t = `O projeto ${pista} o Prisma, que roda em cima dele.`;
+      const inc = verificarCoerencia(t, TETO_AGENTE, TETO_AGENTE, BASE);
       expect(inc.some((i) => i.tipo === 'dependente_sem_escape'), pista).toBe(true);
     }
   });
 
+  it('NÃO marca quando a frase não nomeia ninguém', () => {
+    const t = 'O projeto sustenta outros fluxos da área e é usado por vários times.';
+    expect(verificarCoerencia(t, TETO_AGENTE, TETO_AGENTE, BASE)).toEqual([]);
+  });
+
+  it('NÃO marca quando nomeia um projeto que não existe na base', () => {
+    const t = 'O projeto sustenta o Sistema Fantasia, que roda em cima dele.';
+    expect(verificarCoerencia(t, TETO_AGENTE, TETO_AGENTE, BASE)).toEqual([]);
+  });
+
   it('acima do teto do agente a afirmação de dependentes NÃO é pendência: ele já escapou', () => {
-    const t = 'O projeto sustenta outros três fluxos nomeados.';
-    const inc = verificarCoerencia(t, TETO_AGENTE + 1, TETO_AGENTE);
+    const t = 'O projeto sustenta o Prisma, que roda em cima dele.';
+    const inc = verificarCoerencia(t, TETO_AGENTE + 1, TETO_AGENTE, BASE);
     expect(inc.some((i) => i.tipo === 'dependente_sem_escape')).toBe(false);
   });
 

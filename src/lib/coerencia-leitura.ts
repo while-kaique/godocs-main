@@ -54,7 +54,7 @@ export const PISTAS_DEPENDENTE = [
 
 export type Incoerencia =
   | { tipo: 'numero_divergente'; nota: number; noTexto: number }
-  | { tipo: 'dependente_sem_escape'; pista: string };
+  | { tipo: 'dependente_sem_escape'; pista: string; nomeado: string };
 
 /** Números que o texto crava, sem repetir. */
 function numerosCravados(leitura: string): number[] {
@@ -78,6 +78,7 @@ export function verificarCoerencia(
   leitura: string,
   nota: number,
   tetoAgente: number,
+  nomesDaBase: readonly string[] = [],
 ): Incoerencia[] {
   const texto = String(leitura ?? '');
   const out: Incoerencia[] = [];
@@ -87,9 +88,42 @@ export function verificarCoerencia(
   if (nota <= tetoAgente) {
     const baixo = texto.toLowerCase();
     const pista = PISTAS_DEPENDENTE.find((p) => baixo.includes(p));
-    if (pista) out.push({ tipo: 'dependente_sem_escape', pista });
+    // ⚠️ **A FRASE NÃO BASTA: o dependente tem de ser NOMEADO.**
+    //
+    // A régua é explícita ("não vale dependente sem nome"), e ter dependente também não é, por
+    // si, critério de escape: um projeto pode sustentar outro e legitimamente ficar em 3. A
+    // primeira versão marcava qualquer texto com "sustenta" ou "usado por" e acusou **75 de 188
+    // projetos (40%)** na run 7. Marca que pega 40% da base não é marca, é ruído: se quase
+    // metade vai ao comitê, o comitê deixa de olhar.
+    //
+    // Agora a pista só vale quando o texto NOMEIA outro projeto que existe na base. Isso é
+    // verificável, e é a mesma prova que o "caso da plataforma" pede.
+    const nomeado = pista ? acharNomeDaBase(texto, nomesDaBase) : null;
+    if (pista && nomeado) out.push({ tipo: 'dependente_sem_escape', pista, nomeado });
   }
   return out;
+}
+
+/**
+ * Procura, no texto, o nome de OUTRO projeto da base.
+ *
+ * ⚠️ Fronteira de palavra e nome distintivo, pelos dois erros que eu mesmo cometi montando o
+ * grafo de dependências: sem fronteira, "RA Monitor" casa dentro de "pa**ra monitor**ar" (13
+ * falsos positivos em 14); sem piso de tamanho, "Controle" casa em 64 projetos porque é palavra
+ * comum, não nome.
+ */
+function acharNomeDaBase(texto: string, nomes: readonly string[]): string | null {
+  const alvo = texto.toLowerCase();
+  for (const bruto of nomes) {
+    const n = String(bruto ?? '')
+      .toLowerCase()
+      .replace(/^\[[^\]]*\]\s*/, '')
+      .trim();
+    if (n.length < 5) continue;
+    const re = new RegExp(`(^|[^a-z0-9])${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`);
+    if (re.test(alvo)) return bruto;
+  }
+  return null;
 }
 
 /**
