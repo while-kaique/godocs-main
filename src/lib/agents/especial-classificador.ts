@@ -315,9 +315,12 @@ export function acharCamposRecomendacao(bruto: unknown): Record<string, unknown>
   };
 
   // A nota, sob qualquer um dos nomes vistos, no topo ou um nível abaixo.
+  // ⚠️ Procura em TODO objeto um nível abaixo, não numa lista de chaves escolhidas a dedo. O
+  // modelo aninha a resposta onde quer, inclusive dentro do próprio `projeto` que ele ecoou. A
+  // segurança não vem de restringir ONDE olhar, vem das duas condições sobre o que serve como
+  // nota: o nome da chave fala de nota, e o valor cabe na escala.
   const ninhos: Record<string, unknown>[] = [o];
-  for (const k of ["recomendacao", "recomendação", "resultado", "avaliacao"]) {
-    const v = o[k];
+  for (const v of Object.values(o)) {
     if (v && typeof v === "object" && !Array.isArray(v)) ninhos.push(v as Record<string, unknown>);
   }
   // ⚠️ **Régua, não lista fechada.** A primeira versão tinha uma lista de apelidos e o modelo
@@ -473,14 +476,20 @@ export async function classificarEspecial(
   alvo: AlvoClassificacao,
   vizinhos: Vizinho[],
 ): Promise<RecomendacaoEspecial | null> {
-  const raw = await llmChat(
-    [
-      { role: 'system', content: buildSystemPromptEspecial() },
-      { role: 'user', content: buildUserMessageEspecial(alvo, vizinhos) },
-    ],
-    { jsonMode: true, temperature: 0.2, maxTokens: 900 },
-  );
-  const json = extrairJson(raw);
+  // ⚠️ UMA segunda chance quando a resposta vem inútil. É o mesmo padrão do `orchestrator.ts`, e
+  // existe porque a falha aqui é ESTOCÁSTICA: o mesmo projeto responde no formato canônico numa
+  // chamada e ecoa a entrada na seguinte (medido: `legado-031` fez as duas coisas em minutos).
+  // Sem a repescagem, o relatório atribui ao PROJETO um defeito que é do sorteio.
+  const mensagens = [
+    { role: 'system' as const, content: buildSystemPromptEspecial() },
+    { role: 'user' as const, content: buildUserMessageEspecial(alvo, vizinhos) },
+  ];
+  let raw = await llmChat(mensagens, { jsonMode: true, temperature: 0.2, maxTokens: 900 });
+  let json = extrairJson(raw);
+  if (acharCamposRecomendacao(json) == null && recuperarDeProsa(raw) == null) {
+    raw = await llmChat(mensagens, { jsonMode: true, temperature: 0.2, maxTokens: 900 });
+    json = extrairJson(raw);
+  }
   // Resposta em prosa não é resposta ausente: recuperar é a diferença entre "o agente avaliou
   // e nós perdemos" e "o projeto não foi avaliado". O `ajuste_guard` deixa a recuperação
   // VISÍVEL — sem isso a rodada não teria como saber com que frequência isso acontece.

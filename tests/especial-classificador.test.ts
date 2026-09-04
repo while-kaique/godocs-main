@@ -556,3 +556,25 @@ describe('a chave da nota é reconhecida por régua', () => {
     expect(normalizarRecomendacao(c)!.estrelas_recomendada).toBe(1);
   });
 });
+
+/**
+ * A nota pode estar aninhada em qualquer lugar, inclusive dentro do eco.
+ *
+ * ⚠️ A segurança não vem de restringir ONDE olhar, vem das duas condições sobre o que serve como
+ * nota: o nome da chave fala de nota, e o valor cabe na escala.
+ */
+describe('a nota é achada em qualquer objeto um nível abaixo', () => {
+  it('acha dentro do próprio projeto ecoado', () => {
+    const c = acharCamposRecomendacao({
+      projeto: { nome: '[Supply] GLPI', area: 'Supply', nota_recomendada: 2, justificativa: 'roda sozinho' },
+    });
+    expect(c).not.toBeNull();
+    const r = normalizarRecomendacao(c)!;
+    expect(r.estrelas_recomendada).toBe(2);
+    expect(r.leitura).toContain('roda sozinho');
+  });
+
+  it('continua recusando eco sem nota nenhuma, por mais fundo que seja', () => {
+    expect(acharCamposRecomendacao({ projeto: { nome: 'X', area: 'Y', ferramenta: 'n8n' } })).toBeNull();
+  });
+});
