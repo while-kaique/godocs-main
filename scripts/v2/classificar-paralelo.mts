@@ -26,10 +26,19 @@ const COOKIE = process.env.E2E_COOKIE ?? '';
 // Concorrência ADAPTATIVA (ver `_concorrencia.mts`): `CONC` é o PONTO DE PARTIDA, não o teto.
 // A rodada sobe sozinha enquanto o gateway aguenta e recua pela metade ao primeiro 502 — que é
 // o que permite ir mais rápido SEM atropelar produção, com quem divide os slots de Codex.
-// O ai-proxy aceita concorrência 32 com fila de 150 (informado pelo dono da plataforma), então
-// o ponto de partida sobe. O pool continua recuando se o gateway devolver 502/503/429.
-const CONC_INICIAL = Number(process.env.CONC ?? 24);
-const CONC_MAX = Number(process.env.CONC_MAX ?? 72);
+// ⚠️ O ai-proxy passou de 32 para 64 de concorrência (04/09/2026), com fila de 150.
+//
+// A conta que importa NÃO é projetos, é CHAMADAS: as 5 lentes rodam em paralelo dentro de cada
+// projeto, então cada unidade que eu agendo vale ~7 chamadas simultâneas. Com 32 o pool
+// estabilizava em 4 a 6 projetos (~28 a 42 chamadas); com 64 o espaço é o dobro. O ponto de
+// partida sobe junto, e o pool continua recuando sozinho se o gateway devolver 502/503/429 —
+// que é o que ele sabe fazer melhor do que eu adivinhar o número.
+const CONC_INICIAL = Number(process.env.CONC ?? 12);
+// ⚠️ O teto fica um pouco ACIMA do que os 64 slots comportam (12 projetos ≈ 84 chamadas), e é
+// de propósito: com fila de 150, manter um excedente pequeno impede slot ocioso entre uma
+// chamada e outra. Muito acima disso não acelera nada — só engorda a fila — porque a vazão é
+// dada pelos slots, não por quantas requisições esperam.
+const CONC_MAX = Number(process.env.CONC_MAX ?? 20);
 const CONC_MIN = Number(process.env.CONC_MIN ?? 4);
 // ⚠️ 180s era baixo demais: o proxy tem FILA de 150, então esperar é normal e não é falha.
 // Com o limite curto, a espera virava "timeout", o pool lia saturação e cortava a concorrência.

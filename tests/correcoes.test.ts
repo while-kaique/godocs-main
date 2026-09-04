@@ -16,6 +16,7 @@ const base: Correcao = {
   para: 8,
   recomendado: 5,
   motivo: 'outros projetos rodam em cima dele, é plataforma e não alcance',
+  leitura_agente: 'Fica em 5 porque atende bem uma área, mas nenhum outro projeto é citado.',
   quando: '2026-09-04',
 };
 
@@ -45,6 +46,9 @@ describe('o que uma correção ensina', () => {
     expect(t).toContain('PIAPP');
     expect(t).toContain('SUBIU');
     expect(t).toContain('o agente recomendou 5');
+    // ⚠️ O PAR é a lição: o argumento do agente e a réplica da triagem, lado a lado.
+    expect(t).toContain('o agente argumentou');
+    expect(t).toContain('a triagem respondeu');
     expect(t).toContain('plataforma');
   });
 
@@ -80,7 +84,7 @@ describe('leitura das correções do log', () => {
     projeto_id: 'p1',
     projeto_nome: 'PIAPP',
     created_at: '2026-09-04 10:00',
-    meta_json: JSON.stringify({ estrelas: 8, estrelas_anterior: 5, motivo: 'é plataforma, outros rodam nele', recomendado_pelo_agente: 5, ...meta }),
+    meta_json: JSON.stringify({ estrelas: 8, estrelas_anterior: 5, motivo: 'é plataforma, outros rodam nele', recomendado_pelo_agente: 5, leitura_do_agente: 'Fica em 5 porque atende uma área.', ...meta }),
     ...over,
   });
 

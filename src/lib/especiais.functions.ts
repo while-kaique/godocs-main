@@ -258,12 +258,16 @@ export async function definirEstrelasEspecial(raw: unknown, adminEmail: string) 
     : null;
   // O que o agente tinha recomendado — sem isto a correção não diz de ONDE a nota veio, e
   // "estava 5 e virou 8" não distingue "o agente errou" de "a triagem mudou de ideia".
-  const recomendado = await (async () => {
+  // ⚠️ Guarda a nota E o texto: o motivo que a pessoa escreve é quase sempre uma RÉPLICA a uma
+  // frase do agente ("você disse que caiu para 0 porque antes ninguém fazia, mas dá para
+  // escalar"). Sem o argumento original, a réplica é metade de uma conversa.
+  const doAgente = await (async () => {
     try {
       const rows = await getAvaliacoesEspeciais();
-      return rows.find((a) => a.projeto_id === projeto_id)?.estrelas_recomendada ?? null;
+      const a = rows.find((x) => x.projeto_id === projeto_id);
+      return { nota: a?.estrelas_recomendada ?? null, leitura: a?.leitura ?? null };
     } catch {
-      return null;
+      return { nota: null, leitura: null };
     }
   })();
 
@@ -290,7 +294,8 @@ export async function definirEstrelasEspecial(raw: unknown, adminEmail: string) 
       estrelas,
       estrelas_anterior: estrelasAnterior,
       motivo: motivo || null,
-      recomendado_pelo_agente: recomendado,
+      recomendado_pelo_agente: doAgente.nota,
+      leitura_do_agente: doAgente.leitura,
     },
   });
 

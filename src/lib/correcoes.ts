@@ -38,6 +38,16 @@ export type Correcao = {
   para: number;
   /** O que o AGENTE tinha recomendado, quando havia recomendação. */
   recomendado: number | null;
+  /**
+   * O PORQUÊ que o agente escreveu — o texto que a pessoa estava lendo quando discordou.
+   *
+   * ⚠️ Sem ele a lição fica pela metade. O motivo humano é quase sempre uma RÉPLICA a uma frase
+   * específica ("você disse que caiu para 0 porque antes ninguém fazia, mas dá para escalar e
+   * ter saving escalado"). Guardar só a réplica é guardar metade de uma conversa: o agente lê
+   * "dá para escalar" sem saber a qual raciocínio dele aquilo responde, e não tem como corrigir
+   * o passo que errou.
+   */
+  leitura_agente: string | null;
   /** A razão escrita por quem corrigiu. É o que transforma gabarito em critério. */
   motivo: string | null;
   quando: string | null;
@@ -64,7 +74,17 @@ export function descreverCorrecao(c: Correcao): string {
   const dir = c.recomendado != null && c.para > c.recomendado ? 'SUBIU' : 'BAIXOU';
   const origem = c.recomendado != null ? `o agente recomendou ${c.recomendado}` : `estava ${c.de}`;
   const unidade = c.tipo === 'estrela' ? '★' : '';
-  return `• «${c.projeto_nome ?? c.projeto_id}»: ${origem}, a triagem ${dir} para ${c.para}${unidade} — motivo: ${c.motivo}`;
+  // O PAR é a lição: o que o agente argumentou, e o que a réplica humana disse sobre AQUILO.
+  const oQueOAgenteDisse = c.leitura_agente
+    ? `\n    o agente argumentou: "${recortar(c.leitura_agente)}"`
+    : '';
+  return `• «${c.projeto_nome ?? c.projeto_id}»: ${origem}, a triagem ${dir} para ${c.para}${unidade}.${oQueOAgenteDisse}\n    a triagem respondeu: "${c.motivo}"`;
+}
+
+/** O argumento do agente entra recortado: o que ensina é a tese dele, não o texto inteiro. */
+function recortar(t: string, teto = 220): string {
+  const limpo = t.replace(/\s+/g, ' ').trim();
+  return limpo.length <= teto ? limpo : `${limpo.slice(0, teto).replace(/\s+\S*$/, '')}…`;
 }
 
 /**
@@ -79,9 +99,10 @@ export function blocoCorrecoes(correcoes: Correcao[], teto = 6): string {
   return [
     'CORREÇÕES QUE A TRIAGEM JÁ FEZ (o que a gente mudou na sua recomendação, e por quê):',
     ...uteis.map(descreverCorrecao),
-    '⚠️ Estas são correções em OUTROS projetos. Use-as para reconhecer o CRITÉRIO que passou',
-    'batido, nunca para copiar a nota: um projeto que não se parece com nenhum deles pode ter a',
-    'mesma propriedade, e um que se parece pode não ter.',
+    '⚠️ Estas são correções em OUTROS projetos. Cada uma é um raciocínio SEU que a triagem',
+    'respondeu. Leia o par: onde o argumento falhou, e o que faltava enxergar. Use isso para',
+    'reconhecer o CRITÉRIO que passou batido, nunca para copiar a nota — um projeto que não se',
+    'parece com nenhum deles pode ter a mesma propriedade, e um que se parece pode não ter.',
   ].join('\n');
 }
 
@@ -127,6 +148,10 @@ export function correcoesDoLog(linhas: LinhaAtividade[]): Correcao[] {
       para,
       recomendado: num(meta.recomendado_pelo_agente),
       motivo: typeof meta.motivo === 'string' && meta.motivo.trim() ? meta.motivo.trim() : null,
+      leitura_agente:
+        typeof meta.leitura_do_agente === 'string' && meta.leitura_do_agente.trim()
+          ? meta.leitura_do_agente.trim()
+          : null,
       quando: l.created_at,
     };
     // O log vem do mais novo para o mais antigo: o primeiro que aparece é o que vale.
