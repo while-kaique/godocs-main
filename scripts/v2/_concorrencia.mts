@@ -43,8 +43,23 @@ export type RelatorioPool = {
 };
 
 /** 502/503/504/429 e timeout: o gateway não respondeu. 4xx de verdade não entra aqui. */
+/**
+ * Erro de CREDENCIAL disfarçado de erro de servidor.
+ *
+ * ⚠️ Medido na run 7: o proxy devolve `HTTP 500 {"error":"OpenAI error 401: Incorrect API key"}`
+ * para uma fração das chamadas. Isso é chave quebrada, não gateway cheio — vai acontecer de
+ * novo em qualquer concorrência, e recuar não ajuda em NADA. Como o meu classificador via só o
+ * "500", cada uma dessas cortava a concorrência pela metade: eu caía de 16 para 4 nos primeiros
+ * minutos e passava a rodada inteira lá embaixo, com 64 slots livres do outro lado.
+ */
+export function ehCredencial(e: unknown): boolean {
+  const m = e instanceof Error ? e.message : String(e);
+  return /401|Incorrect API key|invalid_api_key|Unauthorized/i.test(m);
+}
+
 export function ehSaturacao(e: unknown): boolean {
   const m = e instanceof Error ? e.message : String(e);
+  if (ehCredencial(e)) return false; // credencial não é fila cheia
   return /HTTP (429|500|502|503|504)|ECONNRESET|fetch failed|socket hang up/i.test(m);
 }
 
@@ -73,7 +88,11 @@ export async function rodarPoolAdaptativo<T>(o: OpcoesPool<T>): Promise<Relatori
   let alvo = Math.min(maximo, Math.max(minimo, o.inicial ?? 16));
 
   // Sobe +2 a cada SUBIDA_APOS conclusões limpas, e só depois da carência do último recuo.
-  const SUBIDA_APOS = 12;
+  // ⚠️ Sobe rápido, recua devagar. Chegar de 16 a 32 a +2 a cada 12 conclusões levava 96
+  // conclusões — numa rodada de 648 isso é um sexto dela rodando abaixo do teto à toa. O risco
+  // de subir rápido é baixo porque o recuo continua sendo pela metade, imediato.
+  const SUBIDA_APOS = 5;
+  const PASSO_SUBIDA = 4;
   const CARENCIA_MS = 8_000;
 
   const fila = o.itens.map((item) => ({ item, tentativa: 0 }));
@@ -100,7 +119,7 @@ export async function rodarPoolAdaptativo<T>(o: OpcoesPool<T>): Promise<Relatori
     limpasSeguidas = 0;
     if (Date.now() - ultimoRecuoMs < CARENCIA_MS) return;
     if (alvo >= maximo) return;
-    alvo = Math.min(maximo, alvo + 2);
+    alvo = Math.min(maximo, alvo + PASSO_SUBIDA);
     rel.alvoMax = Math.max(rel.alvoMax, alvo);
   }
 
@@ -122,7 +141,8 @@ export async function rodarPoolAdaptativo<T>(o: OpcoesPool<T>): Promise<Relatori
       } catch (e) {
         // Espera na fila re-tenta SEM recuar: encolher a concorrência por causa de fila só faz
         // a fila andar mais devagar.
-        const foiEspera = ehEspera(e);
+        // Credencial entra junto da espera: re-tenta o item, não mexe na concorrência.
+        const foiEspera = ehEspera(e) || ehCredencial(e);
         if ((ehSaturacao(e) || foiEspera) && t.tentativa + 1 < tentativas) {
           if (!foiEspera) recuar(e instanceof Error ? e.message : String(e));
           else rel.esperas++;
