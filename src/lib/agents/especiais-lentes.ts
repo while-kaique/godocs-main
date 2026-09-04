@@ -324,6 +324,10 @@ function textoDoPiso(lente: Lente): string {
     "O QUE ZERA o projeto inteiro, por melhor que o memorial esteja. Estes são os do SEU eixo:",
     ...meus.map((d) => `- [${d.chave}] ${d.texto}`),
     'Se nenhum for verdade, responda "piso": null. É a resposta mais comum, e é correta.',
+    '⚠️ Zerar é a afirmação mais forte que você pode fazer, e ela derruba o projeto INTEIRO, por',
+    'cima do que as outras quatro lentes acharam. Só declare o piso se puder COPIAR em',
+    '"sustentacao" o trecho do material que mostra isso. Sem o trecho, o piso é ignorado e sobra',
+    'apenas a sua nota — que já é a forma correta de dizer "neste eixo o projeto não sustenta".',
   ].join("\n");
 }
 
@@ -462,7 +466,18 @@ export function normalizarAvaliacaoLente(bruto: unknown, lente: string): Avaliac
   // verificar, que foi o que se mediu quando todas viam a lista inteira.
   const pisoCru = typeof o.piso === "string" ? o.piso.trim() : "";
   const permitidos = pisoDaLente(lente);
-  const piso = (permitidos.find((c) => c === pisoCru) ?? null) as ChavePisoZero | null;
+  const pisoDoEixo = (permitidos.find((c) => c === pisoCru) ?? null) as ChavePisoZero | null;
+  // ⚠️ **ZERAR EXIGE CITAÇÃO**, pela mesma razão que o escape exige duas: é a afirmação mais
+  // forte que uma lente pode fazer, e ela zera o projeto INTEIRO, por cima das outras quatro.
+  //
+  // Medido na run 4: o piso derrubou a 0 três projetos de nota alta — «Ferramenta de testes de
+  // novos produtos» (planilha 7) por `ressubmissao`, «Benchmark de Estampas» (planilha 4) por
+  // `so_o_autor` e o **GoPrice** (planilha 4) por `experimentacao`. O GoPrice é o exemplo de 4★
+  // da PRÓPRIA régua. Nenhum dos três precisou apontar um trecho do dossiê para zerar.
+  //
+  // Com a citação exigida, a lente ainda pode zerar, mas tem de mostrar ONDE leu isso — e quem
+  // revisa consegue conferir. Sem trecho, a alegação vira só a nota baixa daquele eixo.
+  const piso = pisoDoEixo && sustentacao.length >= MIN_SUSTENTACAO ? pisoDoEixo : null;
 
   return {
     lente,

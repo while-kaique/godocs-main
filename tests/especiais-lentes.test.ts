@@ -193,11 +193,19 @@ describe("prompt de cada lente", () => {
 
   it("chave de piso de OUTRO eixo é descartada na normalização", () => {
     // `so_o_autor` é da lente de alcance: a de função não pode zerar o projeto com ela.
-    const av = normalizarAvaliacaoLente({ nota: 3, piso: "so_o_autor" }, "funcao_cadeia")!;
+    // ⚠️ Os dois casos levam sustentação, senão o teste mediria a regra do trecho e não a do eixo.
+    const trecho = "o memorial diz que só o autor usa a ferramenta, ninguém mais foi citado";
+    const av = normalizarAvaliacaoLente(
+      { nota: 3, piso: "so_o_autor", sustentacao: trecho },
+      "funcao_cadeia",
+    )!;
     expect(av.piso).toBeNull();
     expect(av.nota).toBe(3);
     // e a dona dela zera normalmente
-    const dona = normalizarAvaliacaoLente({ nota: 3, piso: "so_o_autor" }, "alcance_reuso")!;
+    const dona = normalizarAvaliacaoLente(
+      { nota: 3, piso: "so_o_autor", sustentacao: trecho },
+      "alcance_reuso",
+    )!;
     expect(dona.piso).toBe("so_o_autor");
     expect(dona.nota).toBe(0);
   });
@@ -469,5 +477,44 @@ describe("ressalva da plataforma na lente estrutural", () => {
     expect(obs).toContain("NOMEADO");
     expect(obs).toContain("poderá ser usado por");
     expect(obs).toContain("vaga");
+  });
+});
+
+/**
+ * Zerar exige citação.
+ *
+ * ⚠️ Medido na run 4: o piso derrubou a 0 três projetos de nota alta, entre eles o **GoPrice**,
+ * que é o exemplo de 4★ da PRÓPRIA régua, alegando `experimentacao`. Nenhum precisou apontar um
+ * trecho do dossiê. Zerar é a afirmação mais forte que uma lente faz, e ela passa por cima das
+ * outras quatro: tem de ser conferível, pela mesma razão que o escape exige duas citações.
+ */
+describe('o piso exige o trecho que o sustenta', () => {
+  it('piso sem sustentação é ignorado, e sobra a nota do eixo', () => {
+    const av = normalizarAvaliacaoLente(
+      { nota: 4, piso: 'experimentacao', evidencia: 'vaga', sustentacao: '' },
+      'recorrencia_rastro',
+    )!;
+    expect(av.piso).toBeNull();
+    expect(av.nota).toBe(4);
+  });
+
+  it('piso COM o trecho copiado zera normalmente', () => {
+    const av = normalizarAvaliacaoLente(
+      {
+        nota: 4,
+        piso: 'experimentacao',
+        evidencia: 'nomeada',
+        sustentacao: 'o memorial diz que o projeto é uma POC para testar a ideia',
+      },
+      'recorrencia_rastro',
+    )!;
+    expect(av.piso).toBe('experimentacao');
+    expect(av.nota).toBe(0);
+  });
+
+  it('o prompt pede a citação junto do piso', () => {
+    const p = buildSystemPromptLente(lentePorChave(LENTE_GATE)!);
+    expect(p).toMatch(/Zerar é a afirmação mais forte/);
+    expect(p).toMatch(/COPIAR em/);
   });
 });
