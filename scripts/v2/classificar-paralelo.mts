@@ -33,12 +33,20 @@ const COOKIE = process.env.E2E_COOKIE ?? '';
 // estabilizava em 4 a 6 projetos (~28 a 42 chamadas); com 64 o espaço é o dobro. O ponto de
 // partida sobe junto, e o pool continua recuando sozinho se o gateway devolver 502/503/429 —
 // que é o que ele sabe fazer melhor do que eu adivinhar o número.
-const CONC_INICIAL = Number(process.env.CONC ?? 12);
-// ⚠️ O teto fica um pouco ACIMA do que os 64 slots comportam (12 projetos ≈ 84 chamadas), e é
-// de propósito: com fila de 150, manter um excedente pequeno impede slot ocioso entre uma
-// chamada e outra. Muito acima disso não acelera nada — só engorda a fila — porque a vazão é
-// dada pelos slots, não por quantas requisições esperam.
-const CONC_MAX = Number(process.env.CONC_MAX ?? 20);
+const CONC_INICIAL = Number(process.env.CONC ?? 16);
+/**
+ * ⚠️ O teto fica ACIMA do que os slots comportam, e o motivo NÃO é vazão.
+ *
+ * A vazão é `slots ÷ tempo médio da chamada`: fila mais funda não faz nada terminar antes, só
+ * evita a recusa. O ganho de sobrecarregar de leve é OUTRO — enquanto houver excedente
+ * esperando, nenhum slot fica ocioso entre uma chamada e outra, e o pool para de oscilar. Nas
+ * runs 5 a 7 ele passava o tempo caindo de 8 para 4 e voltando, porque o excedente virava 502 e
+ * era lido como saturação; com fila grande o excedente espera e a concorrência fica estável.
+ *
+ * Subir muito além disso é desperdício: as chamadas empilham, cada projeto demora mais e o
+ * relógio total não muda.
+ */
+const CONC_MAX = Number(process.env.CONC_MAX ?? 32);
 const CONC_MIN = Number(process.env.CONC_MIN ?? 4);
 // ⚠️ 180s era baixo demais: o proxy tem FILA de 150, então esperar é normal e não é falha.
 // Com o limite curto, a espera virava "timeout", o pool lia saturação e cortava a concorrência.
