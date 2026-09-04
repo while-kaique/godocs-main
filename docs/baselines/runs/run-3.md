@@ -50,3 +50,24 @@ refazendo a conta, em vez de acusar falta.
 - **14 de 196 sem nota** (7%). Caiu de 65% na run 2, mas não é zero.
 - **Confiança quase toda "baixa"** (137 de 182). Nesta rodada ela é a AUTODECLARADA pelo modelo,
   porque o consenso entre lentes só existe no caminho do time. As próximas medem a de verdade.
+
+## A medição da confiança — e ela reprova
+
+Aderência dentro de ±1 da nota da planilha, por faixa de confiança **autodeclarada pelo modelo**:
+
+| confiança | n | dentro de ±1 |
+|---|---:|---:|
+| alta | 23 | 78% |
+| média | 12 | 58% |
+| **baixa** | 107 | **80%** |
+
+**"Baixa" adere MAIS que "alta".** A confiança que sai do próprio modelo não é só pouco
+informativa: nesta amostra ela está levemente INVERTIDA. Qualquer limiar construído em cima dela
+seria pior que sortear — e limiar de confiança é exatamente o que se queria usar para decidir o
+que a triagem olha primeiro.
+
+Isso não é surpresa e já tinha precedente medido neste repo (T1: o modelo se declarou "alta" em
+456 de 484). É a razão de a confiança do time vir do CONSENSO — as 5 lentes divergindo entre si
+e a base discordando das lentes — em vez da autodeclaração. A run 4 é o primeiro teste dessa
+versão, e a pergunta é a mesma: **"alta" adere mais que "baixa"?** Se não aderir, o problema não
+é o método de derivar, é a premissa de que dá para saber a certeza sem gabarito.
