@@ -23,7 +23,7 @@
  */
 import { llmChat } from '@/lib/llm';
 import { carregarDossie } from '@/lib/avaliacao/dossie.functions';
-import { dossieParaTexto } from '@/lib/avaliacao/dossie';
+import { dossieParaTexto, type Dossie } from '@/lib/avaliacao/dossie';
 import { buildPromptMerito, normalizarJulgamentoMerito, type JulgamentoMerito } from '@/lib/avaliacao/cerebro-merito';
 import { extrairJson } from '@/lib/agents/especial-classificador';
 import { chaveProjeto } from '@/lib/projeto-chave';
@@ -40,13 +40,18 @@ export type ResultadoAuditoriaValor = {
   julgamento?: JulgamentoMerito;
 };
 
-/** O ganho que a planilha declara, que é o número sob auditoria. */
-function ganhoDeclarado(dossie: { espelho?: Record<string, string> | null }): number | null {
-  const row = dossie.espelho ?? null;
-  if (!row) return null;
-  const cru = row['Impacto Líquido Mensal'] ?? row['Impacto Líquido'] ?? '';
-  const n = Number(String(cru).replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''));
-  return Number.isFinite(n) ? n : null;
+/**
+ * O ganho que o projeto declara, que é o número sob auditoria.
+ *
+ * ⚠️ Vem do bloco `financeiro` do próprio dossiê, JÁ NORMALIZADO. A primeira versão foi ler a
+ * célula crua do espelho, e voltou `null` nos quatro projetos do primeiro teste: `Dossie` não
+ * expõe a linha da planilha, ele expõe os números já tratados. Com `null` ali, `ajustaria`
+ * ficava sempre falso e a auditoria inteira virava decorativa — dizia o valor sugerido e nunca
+ * marcava ninguém para revisão.
+ */
+function ganhoDeclarado(dossie: Dossie): number | null {
+  const f = dossie.financeiro;
+  return f.ganho_total_mensal ?? f.saving_reais ?? null;
 }
 
 export async function auditarValorProjeto(projetoIdBruto: string): Promise<ResultadoAuditoriaValor> {
@@ -65,7 +70,7 @@ export async function auditarValorProjeto(projetoIdBruto: string): Promise<Resul
     return { ok: false, projeto_id: projetoId, motivo: 'LLM não devolveu auditoria utilizável' };
   }
 
-  const declarado = ganhoDeclarado(dossie as { espelho?: Record<string, string> | null });
+  const declarado = ganhoDeclarado(dossie);
   const sugerido = julgamento.valor?.valor_sugerido ?? null;
   // "Ajustaria" é quando há NÚMERO proposto e ele difere do declarado. Repetir o declarado é
   // resposta válida e esperada: quer dizer "auditei e o número se sustenta".
