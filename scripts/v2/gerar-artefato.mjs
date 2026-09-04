@@ -78,41 +78,73 @@ const esc = (s) =>
 const semAcento = (s) =>
   String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-const ordenadas = [...linhas].sort((a, b) => b.agente - a.agente || a.nome.localeCompare(b.nome, 'pt-BR'));
+// ⚠️ As linhas de TODAS as runs vão para o HTML de uma vez, marcadas com `data-run`. O
+// seletor do topo só troca quais aparecem. É o que permite comparar sem recarregar nada e sem
+// a página precisar de servidor.
+/**
+ * A faixa de escape aparece como FAIXA, não como número.
+ *
+ * ⚠️ De 6 a 10 o agente DECLARA a faixa e o número é sugestão dele; quem crava a estrela é o
+ * comitê humano. Mostrar "7" na tabela apaga essa diferença.
+ */
+function rotuloNota(n) {
+  return n >= 6 ? '6-10' : String(n);
+}
 
-const linhasHtml = ordenadas
-  .map((l) => {
-    const div = l.humana != null && Math.abs(l.humana - l.agente) >= 2;
-    return `<tr data-n="${l.agente}" data-b="${esc(semAcento(l.nome + ' ' + l.area + ' ' + l.leitura))}"${div ? ' class="div"' : ''}>
-<td class="n"><span class="pill p${l.agente}">${l.agente}</span></td>
-<td class="h">${l.humana != null ? l.humana : '<span class="vazio">—</span>'}</td>
+// Para cada run, a nota que o MESMO projeto tinha na run anterior. É o que faz a tabela mostrar
+// "0→2" em vez de obrigar a abrir duas páginas lado a lado: calibrar é comparar.
+const anteriorPorRun = new Map();
+RUNS.forEach((run, i) => {
+  if (i === 0) return;
+  const antes = new Map(RUNS[i - 1].linhas.map((l) => [l.id, l.agente]));
+  anteriorPorRun.set(run.id, antes);
+});
+
+const linhasHtml = RUNS.map((run) => {
+  const ordenadas = [...run.linhas].sort(
+    (a, b) => b.agente - a.agente || a.nome.localeCompare(b.nome, 'pt-BR'),
+  );
+  return ordenadas
+    .map((l) => {
+      const insuf = l.dossie === 'insuficiente';
+      // Divergência só conta onde ela SIGNIFICA algo: com dossiê insuficiente o agente não
+      // discordou do humano, ele não teve o que ler.
+      const div = !insuf && l.humana != null && Math.abs(l.humana - l.agente) >= 2;
+      const classes = [div ? 'div' : '', insuf ? 'insuf' : ''].filter(Boolean).join(' ');
+      const anterior = anteriorPorRun.get(run.id)?.get(l.id);
+      const mudou = anterior != null && anterior !== l.agente;
+      return `<tr data-run="${run.id}" data-n="${l.agente}" data-b="${esc(semAcento(l.nome + ' ' + l.area + ' ' + l.leitura))}"${classes ? ` class="${classes}"` : ''} hidden>
+<td class="n"><span class="pill p${l.agente}">${rotuloNota(l.agente)}</span>${mudou ? `<span class="delta" title="na run anterior era ${anterior}">${anterior}→${l.agente}</span>` : ''}</td>
+<td class="h">${l.humana != null ? l.humana : '<span class="vazio">—</span>'}${insuf ? '<span class="tag" title="O memorial deste projeto é só a conta do saving: não há dossiê que sustente veredito, então ele fica fora da concordância.">sem dossiê</span>' : ''}</td>
 <td class="nome">${esc(l.nome)}<span class="area">${esc(l.area || '—')}</span></td>
 <td class="pq">${esc(l.leitura)}</td></tr>`;
-  })
-  .join('\n');
+    })
+    .join('\n');
+}).join('\n');
 
-const notasPresentes = Object.keys(dist).map(Number).sort((a, b) => a - b);
-const escapeQtd = notasPresentes.filter((n) => n >= 6).reduce((a, n) => a + dist[n], 0);
-// Chips: "Todas" + uma por estrela de 0 a 5 + um agrupado para 6–10 (poucos, e a faixa
-// interessa junta: é a que vai ao comitê). Cada um traz a CONTAGEM ao lado.
-const chips =
-  `<button class="chip on" data-f="" aria-pressed="true">Todas <b>${total}</b></button>` +
-  notasPresentes
-    .filter((n) => n <= 5)
-    .map((n) => `<button class="chip" data-f="${n}" aria-pressed="false"><i class="dot p${n}"></i>${n}★ <b>${dist[n]}</b></button>`)
-    .join('') +
-  (escapeQtd
-    ? `<button class="chip esc" data-f="6+" aria-pressed="false"><i class="dot p6"></i>6–10★ <b>${escapeQtd}</b></button>`
-    : '');
+// Estatística de cada run vai como DADO para o cliente: o seletor recalcula KPIs, barras e
+// chips sem recarregar a página.
+const STATS = RUNS.map((r) => ({
+  id: r.id,
+  rotulo: r.rotulo,
+  juiz: r.juiz,
+  rodadoEm: r.rodadoEm,
+  gravou: r.gravou,
+  total: r.total,
+  comHumana: r.comHumana,
+  espComHumana: r.espComHumana,
+  normComHumana: r.normComHumana,
+  comparaveis: r.comparaveis,
+  iguais: r.iguais,
+  perto: r.perto,
+  falhas: r.falhas.length,
+  dist: r.dist,
+}));
 
-const barras = Object.keys(dist)
-  .map(Number)
-  .sort((a, b) => a - b)
-  .map(
-    (n) =>
-      `<button class="barra" data-f="${n}" aria-pressed="false"><span class="bn">${n}★</span><span class="bt"><span class="bf p${n}" style="width:${(dist[n] / maxDist) * 100}%"></span></span><span class="bq">${dist[n]}</span></button>`,
-  )
-  .join('');
+const abas = RUNS.map(
+  (r, i) =>
+    `<button class="aba${i === RUNS.length - 1 ? ' on' : ''}" data-run="${r.id}" aria-pressed="${i === RUNS.length - 1}">${esc(r.rotulo)}</button>`,
+).join('');
 
 const html = `<title>Estrelas da Base</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
@@ -178,23 +210,38 @@ td.nome{width:250px;font-weight:600;font-size:13.5px}
 .area{display:block;font-weight:400;font-size:11px;color:var(--ink3);margin-top:2px}
 td.pq{font-size:13px;color:var(--ink2);line-height:1.5}
 .nada{padding:26px;text-align:center;color:var(--ink3)}
+.runs{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:0 0 16px}
+.runs .rot{font:600 11px/1 "IBM Plex Mono",monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin-right:4px}
+.aba{padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink2);font:600 12.5px/1 inherit;cursor:pointer;white-space:nowrap}
+.aba:hover{border-color:var(--blue);color:var(--ink)}
+.aba[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+:root[data-theme="dark"] .aba[aria-pressed="true"],:root:not([data-theme="light"]) .aba[aria-pressed="true"]{color:#0E141A}
+.meta{font-size:12px;color:var(--ink3);margin:-6px 0 16px}
+.delta{display:block;margin-top:3px;font:500 10.5px/1 "IBM Plex Mono",monospace;color:var(--div)}
+.tag{display:block;margin-top:3px;font:500 10px/1.3 inherit;color:var(--ink3);cursor:help}
+tr.insuf td.h{color:var(--ink3)}
 @media(max-width:760px){.painel{grid-template-columns:1fr}td.nome{width:auto}}
 </style>
 <div class="wrap">
 <header>
   <h1>Estrelas da Base</h1>
-  <p class="sub">Todos os projetos <b>aprovados</b>, com a estrela que o agente indica e o porquê. A nota humana aparece quando existe — o agente nunca a escreve.</p>
+  <p class="sub">Todos os projetos <b>aprovados</b>, com a estrela que o agente indica e o porquê. A nota humana aparece quando existe, e o agente nunca a escreve. De 6 a 10 ele declara a faixa: o número é do comitê.</p>
   <div class="kpis">
-    <div class="kpi"><b>${total}</b><span>projetos avaliados</span></div>
-    <div class="kpi"><b>${comHumana.length}</b><span>com nota humana</span></div>
-    <div class="kpi"><b>${comHumana.length ? Math.round((iguais / comHumana.length) * 100) : 0}%</b><span>nota idêntica</span></div>
-    <div class="kpi"><b>${comHumana.length ? Math.round((perto / comHumana.length) * 100) : 0}%</b><span>dentro de 1★</span></div>
-    ${falhas.length ? `<div class="kpi"><b>${falhas.length}</b><span>falhas de chamada</span></div>` : ''}
+    <div class="kpi"><b id="k-total">—</b><span>projetos avaliados</span></div>
+    <div class="kpi"><b id="k-humana">—</b><span id="k-humana-sub">com nota humana</span></div>
+    <div class="kpi"><b id="k-ident">—</b><span>nota idêntica</span></div>
+    <div class="kpi"><b id="k-perto">—</b><span>dentro de 1★</span></div>
+    <div class="kpi" id="k-falhas-box" hidden><b id="k-falhas">—</b><span>falhas de chamada</span></div>
   </div>
 </header>
 
+<div class="runs" role="group" aria-label="Escolher a rodada">
+  <span class="rot">Rodada</span>${abas}
+</div>
+<p class="meta" id="meta"></p>
+
 <div class="painel">
-  <div class="barras">${barras}</div>
+  <div class="barras" id="barras"></div>
   <div class="legenda">
     <b>A régua</b>
     <ul>
@@ -209,7 +256,7 @@ td.pq{font-size:13px;color:var(--ink2);line-height:1.5}
   </div>
 </div>
 
-<div class="chips" role="group" aria-label="Filtrar por estrela">${chips}</div>
+<div class="chips" id="chips" role="group" aria-label="Filtrar por estrela"></div>
 
 <div class="ferramentas">
   <input type="search" id="q" placeholder="Buscar projeto, área ou motivo…" aria-label="Buscar">
@@ -228,14 +275,62 @@ ${linhasHtml}
 </div>
 </div>
 <script>
+var STATS=__STATS__;
 (function(){
   var corpo=document.getElementById('corpo'), q=document.getElementById('q'),
       soDiv=document.getElementById('soDiv'), conta=document.getElementById('conta'),
       nada=document.getElementById('nada'), linhas=[].slice.call(corpo.rows),
-      barras=[].slice.call(document.querySelectorAll('.barra')),
-      chips=[].slice.call(document.querySelectorAll('.chip')), filtro=null;
+      abas=[].slice.call(document.querySelectorAll('.aba')),
+      filtro=null, runAtual=STATS[STATS.length-1].id;
+
+  function stat(id){ for(var i=0;i<STATS.length;i++) if(STATS[i].id===id) return STATS[i]; return STATS[0]; }
+  function pct(a,b){ return b? Math.round(a/b*100)+'%' : '—'; }
+  function rot(n){ return n>=6 ? '6-10' : String(n); }
+
+  // ⚠️ Redesenha KPIs, barras e chips a cada troca de rodada. Sem isto, o seletor trocaria as
+  // linhas e deixaria os números da rodada ANTERIOR no topo, que é pior que não ter seletor.
+  function pintarRun(){
+    var s=stat(runAtual);
+    document.getElementById('k-total').textContent=s.total;
+    document.getElementById('k-humana').textContent=s.comHumana;
+    document.getElementById('k-humana-sub').textContent='com nota humana ('+s.espComHumana+' especiais, '+s.normComHumana+' normais)';
+    document.getElementById('k-ident').textContent=pct(s.iguais,s.comparaveis);
+    document.getElementById('k-perto').textContent=pct(s.perto,s.comparaveis);
+    var fb=document.getElementById('k-falhas-box');
+    fb.hidden=!s.falhas; document.getElementById('k-falhas').textContent=s.falhas;
+
+    var partes=[];
+    if(s.juiz) partes.push('juiz '+(s.juiz==='TIME'?'time de 5 lentes':'agente único'));
+    if(s.gravou!=null) partes.push(s.gravou?'gravou no banco':'ensaio, não gravou');
+    if(s.rodadoEm) partes.push('rodado em '+String(s.rodadoEm).replace('T',' ').slice(0,16)+' UTC');
+    partes.push('concordância medida sobre '+s.comparaveis+' projetos, fora os de dossiê insuficiente');
+    document.getElementById('meta').textContent=partes.join(' · ');
+
+    var notas=Object.keys(s.dist).map(Number).sort(function(a,b){return a-b;});
+    var max=1; notas.forEach(function(n){ if(s.dist[n]>max) max=s.dist[n]; });
+    document.getElementById('barras').innerHTML=notas.map(function(n){
+      return '<button class="barra" data-f="'+n+'" aria-pressed="false"><span class="bn">'+rot(n)+'</span><span class="bt"><span class="bf p'+n+'" style="width:'+(s.dist[n]/max*100)+'%"></span></span><span class="bq">'+s.dist[n]+'</span></button>';
+    }).join('');
+    var esc6=0; notas.forEach(function(n){ if(n>=6) esc6+=s.dist[n]; });
+    document.getElementById('chips').innerHTML=
+      '<button class="chip" data-f="" aria-pressed="true">Todas <b>'+s.total+'</b></button>'+
+      notas.filter(function(n){return n<=5;}).map(function(n){
+        return '<button class="chip" data-f="'+n+'" aria-pressed="false"><i class="dot p'+n+'"></i>'+n+'★ <b>'+s.dist[n]+'</b></button>';
+      }).join('')+
+      (esc6?'<button class="chip esc" data-f="6+" aria-pressed="false"><i class="dot p6"></i>6-10★ <b>'+esc6+'</b></button>':'');
+    ligarFiltros();
+  }
+
+  var barras=[], chips=[];
+  function ligarFiltros(){
+    barras=[].slice.call(document.querySelectorAll('.barra'));
+    chips=[].slice.call(document.querySelectorAll('.chip'));
+    chips.forEach(function(c){c.addEventListener('click',function(){escolher(c.dataset.f===''?null:c.dataset.f)})});
+    barras.forEach(function(b){b.addEventListener('click',function(){escolher(b.dataset.f)})});
+  }
   // filtro: null = todas · '3' = exatamente 3 · '6+' = a faixa do escape inteira
   function casa(tr){
+    if(tr.dataset.run!==runAtual) return false;
     if(filtro===null) return true;
     if(filtro==='6+') return Number(tr.dataset.n)>=6;
     return tr.dataset.n===filtro;
@@ -243,6 +338,7 @@ ${linhasHtml}
   function pintar(){
     chips.forEach(function(c){var v=c.dataset.f===''?null:c.dataset.f; c.setAttribute('aria-pressed', String(v===filtro)); });
     barras.forEach(function(b){b.setAttribute('aria-pressed', String(b.dataset.f===filtro)); });
+    abas.forEach(function(a){a.setAttribute('aria-pressed', String(a.dataset.run===runAtual)); });
   }
   function sa(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
   function aplicar(){
@@ -256,19 +352,24 @@ ${linhasHtml}
       tr.hidden=!ok; if(ok)n++;
     });
     pintar();
-    conta.textContent=n+' de '+linhas.length;
+    conta.textContent=n+' de '+stat(runAtual).total;
     nada.hidden=n>0;
   }
   function escolher(v){ filtro=(v===filtro||v==='')?null:v; aplicar(); }
-  chips.forEach(function(c){c.addEventListener('click',function(){escolher(c.dataset.f===''?null:c.dataset.f)})});
-  barras.forEach(function(b){b.addEventListener('click',function(){escolher(b.dataset.f)})});
+  abas.forEach(function(a){a.addEventListener('click',function(){
+    if(a.dataset.run===runAtual) return;
+    runAtual=a.dataset.run; filtro=null; pintarRun(); aplicar();
+  })});
   soDiv.addEventListener('click',function(){
     soDiv.setAttribute('aria-pressed',soDiv.getAttribute('aria-pressed')==='true'?'false':'true'); aplicar();
   });
   q.addEventListener('input',aplicar);
+  pintarRun();
   aplicar();
 })();
 </script>`;
 
-writeFileSync(SAIDA, html);
-console.log(`${SAIDA} · ${total} projetos · ${Math.round(html.length / 1024)} KB`);
+writeFileSync(SAIDA, html.replace('__STATS__', JSON.stringify(STATS)));
+console.log(
+  `${SAIDA} · ${RUNS.length} run(s) · ${RUNS.map((r) => `${r.rotulo}: ${r.total}`).join(' · ')} · ${Math.round(html.length / 1024)} KB`,
+);
