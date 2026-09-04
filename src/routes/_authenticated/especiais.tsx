@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { HistoricoButton } from '@/components/historico/historico-button';
 import { StatusBadge } from '@/components/status-badge';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
+import { rotuloNotaAgente } from '@/lib/estrelas-regua';
 import { apiFetch } from '@/lib/api-client';
 import { fmtDataBR } from '@/lib/format-date';
 import {
@@ -1051,6 +1052,7 @@ function RecomendacaoAuditoria({
 }) {
   const delta = deltaRecomendacao(atual, avaliacao);
   const rotulo = rotuloDelta(delta);
+  const notaAgente = rotuloNotaAgente(avaliacao.estrelas_recomendada);
   return (
     <div className="mt-2 rounded-md border px-2 py-1.5" style={{ borderColor: 'rgba(0,89,169,0.18)', background: 'rgba(0,89,169,0.04)' }}>
       <div className="flex flex-wrap items-center gap-1.5">
@@ -1058,9 +1060,16 @@ function RecomendacaoAuditoria({
           Auditoria recomenda
         </span>
         <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold tabular-nums">
-          {avaliacao.estrelas_recomendada}
+          {notaAgente.rotulo}
           <Star className="h-3 w-3" style={{ color: OURO_BORDA }} fill={OURO} aria-hidden />
         </span>
+        {/* Na faixa alta o número é SUGESTÃO, e a tela tem de dizer isso: quem crava 6, 7, 8, 9
+            ou 10 é o comitê, comparando com quem já está lá. */}
+        {notaAgente.sugestao != null && (
+          <span className="text-[10.5px] text-muted-foreground">
+            · sugere {notaAgente.sugestao}
+          </span>
+        )}
         {rotulo && (
           <span className="rounded px-1 py-0.5 text-[10.5px] font-semibold tabular-nums"
             style={{ background: delta! > 0 ? 'rgba(23,113,79,0.12)' : 'rgba(179,38,30,0.10)', color: delta! > 0 ? '#17714f' : '#b3261e' }}>
@@ -1086,7 +1095,10 @@ function RecomendacaoAuditoria({
           com evidência forte.
         </p>
       )}
-      {delta != null && (
+      {/* ⚠️ Sem botão de aplicar na faixa alta: aplicar com um clique é justamente entregar ao
+          agente a decisão que é do comitê. Lá ele declara a faixa e sugere; o número sai da
+          comparação humana com os projetos que já estão nela. */}
+      {delta != null && notaAgente.sugestao == null && (
         <button
           type="button"
           onClick={onAplicar}

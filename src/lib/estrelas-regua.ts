@@ -411,6 +411,20 @@ export function escapeValido(ind: IndicacaoEscape): boolean {
   });
 }
 
+/**
+ * Como a nota do agente APARECE para quem decide.
+ *
+ * ⚠️ Dentro de 0 a ${TETO_AGENTE} o agente dá uma nota. Na faixa de escape ele **declara a
+ * FAIXA** e o número que ele devolve é SUGESTÃO, não veredito: quem crava 6, 7, 8, 9 ou 10 é o
+ * comitê humano, comparando com quem já está lá. Mostrar "6★" na tela apaga essa diferença e
+ * convida a triagem a aplicar o número com um clique, que é exatamente o que não pode acontecer.
+ */
+export function rotuloNotaAgente(nota: number): { rotulo: string; sugestao: number | null } {
+  return ehEscape(nota)
+    ? { rotulo: `${FAIXA_ESCAPE.min}-${FAIXA_ESCAPE.max}`, sugestao: nota }
+    : { rotulo: String(nota), sugestao: null };
+}
+
 // ─── Confiança (declarada, não sentida) ──────────────────────────────────────
 
 export type Confianca = 'alta' | 'media' | 'baixa';

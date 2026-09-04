@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  rotuloNotaAgente,
   TETO_AGENTE,
   NOTA_MAX,
   FAIXA_ESCAPE,
@@ -298,5 +299,25 @@ describe('achatamento (D12)', () => {
   it('desempata pelo nível menor (o pior caso é o achatamento para baixo)', () => {
     const r = detectarAchatamento([1, 1, 4, 4]);
     expect(r.destino).toBe(1);
+  });
+});
+
+/**
+ * Como a nota do agente aparece para quem decide.
+ *
+ * ⚠️ Decisão do Luis (03/09/2026): na faixa alta o agente DECLARA "6-10" e SUGERE onde encaixar,
+ * com o porquê. A estrela específica é humana, comparando com quem já está na faixa. Mostrar "6★"
+ * na tela apaga a diferença e convida a triagem a aplicar o número com um clique.
+ */
+describe('rótulo da nota do agente', () => {
+  it('de 0 a 5 mostra o número; de 6 a 10 mostra a FAIXA e o número vira sugestão', () => {
+    for (let n = 0; n <= TETO_AGENTE; n++) {
+      expect(rotuloNotaAgente(n)).toEqual({ rotulo: String(n), sugestao: null });
+    }
+    for (let n = TETO_AGENTE + 1; n <= NOTA_MAX; n++) {
+      const r = rotuloNotaAgente(n);
+      expect(r.rotulo).toBe(`${TETO_AGENTE + 1}-${NOTA_MAX}`);
+      expect(r.sugestao).toBe(n); // a sugestão não se perde, só deixa de ser o veredito
+    }
   });
 });
