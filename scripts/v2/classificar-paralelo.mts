@@ -113,7 +113,8 @@ console.log(`${projetos.length} projetos · concorrência adaptativa ${CONC_INIC
 
 const notas = new Map<number, number>();
 const linhas: Array<{
-  id: string; nome: string; area: string; humana: number | null; especial?: boolean; agente: number | null; leitura: string;
+  id: string; nome: string; area: string; humana: number | null; especial?: boolean; agente: number | null;
+  confianca?: string | null; leitura: string;
   base?: number | null; delta?: number; ajuste?: string; lentes?: { l: string; n: number; piso: string | null }[];
 }> = [];
 const falhas: Array<{ id: string; erro: string }> = [];
@@ -136,6 +137,9 @@ async function classificar(p: Alvo): Promise<void> {
       humana: p.estrelas,
       especial: p.especial ?? false,
       agente: nota,
+      // ⚠️ Sem isto a medição de "alta acerta mais que média?" fica impossível depois: a run é
+      // dry, então nada vai para `especial_avaliacao` e a confiança se perde com o processo.
+      confianca: (JUIZ === 'TIME' ? s.julgamento?.confianca : s.recomendacao?.confianca) ?? null,
       leitura: (JUIZ === 'TIME' ? s.base?.leitura : s.recomendacao?.leitura) ?? s.motivo ?? '',
       // Só no TIME: dá para auditar o ajuste depois sem reabrir cada projeto.
       ...(JUIZ === 'TIME'
