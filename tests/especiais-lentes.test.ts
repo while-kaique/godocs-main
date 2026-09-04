@@ -441,3 +441,33 @@ describe("consolidação — sem média, gate como teto", () => {
     expect(a).toBe(b);
   });
 });
+
+/**
+ * A ressalva da PLATAFORMA na lente estrutural.
+ *
+ * ⚠️ Medido em 03/09/2026: no PIAPP (10★ humano) esta lente escreveu "usado continuamente por
+ * mais de dez times e abastece a geração automática do Prisma" e ainda assim respondeu 1 com
+ * prova "vaga". Como ela é o TETO das outras, o projeto fechou em 2★ mesmo com alcance 5 provado
+ * por nome. Faltava dizer o que a régua já declara para o escape: numa plataforma, o dependente
+ * NOMEADO é o lugar de conferir.
+ */
+describe("ressalva da plataforma na lente estrutural", () => {
+  it("só a lente estrutural a recebe, e ela entra no prompt", () => {
+    const gate = lentePorChave(LENTE_GATE)!;
+    expect(gate.observacao).toBeDefined();
+    expect(buildSystemPromptLente(gate)).toContain("PLATAFORMA");
+    for (const l of LENTES) {
+      if (l.chave === LENTE_GATE) continue;
+      expect(buildSystemPromptLente(l), l.chave).not.toContain("PLATAFORMA");
+    }
+  });
+
+  // A ressalva ABRE uma porta, não derruba a trava: sem nome próprio a prova segue vaga, senão
+  // meia base volta a se declarar plataforma (é o que `PROMOCAO_DEPENDENTE_NOMEADO` já barra).
+  it("a ressalva exige nome próprio e recusa a promessa", () => {
+    const obs = lentePorChave(LENTE_GATE)!.observacao!;
+    expect(obs).toContain("NOMEADO");
+    expect(obs).toContain("poderá ser usado por");
+    expect(obs).toContain("vaga");
+  });
+});

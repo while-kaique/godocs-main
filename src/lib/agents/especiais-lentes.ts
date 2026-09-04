@@ -94,6 +94,8 @@ export type Lente = {
    * nenhuma delas afrouxa a `DERRUBA` (que continua entrando no prompt inteira).
    */
   ancoras: { nota: number; definicao: string }[];
+  /** Ressalva do eixo, quando ele tem um caso que a âncora sozinha não cobre. */
+  observacao?: string;
 };
 
 /** A lente estrutural: teto das outras (ver o cabeçalho e `consolidarLentes`). */
@@ -131,6 +133,20 @@ export const LENTES: Lente[] = [
     pergunta:
       "Isto roda de novo sozinho, existe um lugar NOMEADO onde conferir o ponteiro, e alguém nomeado sente falta se desligar?",
     criterios: ["Recorrência real", "Rastreabilidade", "Contrafactual"],
+    /**
+     * ⚠️ Medido em 03/09/2026, nos dois casos que o handoff apontava: no PIAPP esta lente
+     * ESCREVEU "usado continuamente por mais de dez times e abastece a geração automática do
+     * Prisma" e mesmo assim respondeu 1, com prova "vaga". Como ela é o teto das outras, o
+     * projeto fechou em 2★ com alcance 5 provado por nome. O Prisma, idem.
+     *
+     * A âncora 3 desta lente já dizia "gente de FORA do autor depende da saída na rotina dela" —
+     * o que faltava era dizer que, numa PLATAFORMA, o dependente NOMEADO É o lugar de conferir.
+     * A régua já declara isso para o escape ("o caso da plataforma"); aqui o eixo não sabia.
+     * ⚠️ Não vale para "poderá ser usado por" nem para dependente sem nome: aí não há atividade
+     * em curso, e a prova continua vaga.
+     */
+    observacao:
+      'PLATAFORMA: quando OUTRO projeto ou time NOMEADO roda em cima deste (consome API, MCP, integração), esse dependente é a prova, e a prova é "nomeada". Não exija um relatório ou painel além dele: para uma plataforma, quem usa É onde se confere. Vale só com nome próprio; "poderá ser usado por" e dependente sem nome continuam prova vaga.',
     ancoras: [
       { nota: 0, definicao: "Rodou uma vez, ou é teste/POC. Nada volta a rodar." },
       { nota: 1, definicao: "Roda de vez em quando, disparado à mão, sem lugar nomeado onde conferir. Se desligar, só o autor sente." },
@@ -335,7 +351,7 @@ A nota MAIS ALTA de 0 a ${TETO_AGENTE} que o SEU eixo sustenta: um TETO vindo do
 
 A RÉGUA DO SEU EIXO: a escala é a MESMA da base, mas aqui está o que cada nota significa NO SEU EIXO. É contra ESTAS frases que você responde, e não contra a descrição de um projeto inteiro:
 ${descreverAncoras(lente)}
-Nota não listada fica entre a de baixo e a de cima.
+Nota não listada fica entre a de baixo e a de cima.${lente.observacao ? `\n\n⚠️ ${lente.observacao}` : ""}
 
 A ESCALA GLOBAL (só para LER a nota dos projetos vizinhos — não responda por ela):
 ${descreverEscalaGlobalCurta()}

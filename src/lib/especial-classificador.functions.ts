@@ -28,6 +28,7 @@ import {
 } from "@/integrations/db/client.server";
 import { lerResumosEspelho, lerLinhaEspelho } from "@/lib/sheet-espelho";
 import { chaveProjeto } from "@/lib/projeto-chave";
+import { TETO_AGENTE, ehEscape } from "@/lib/estrelas-regua";
 import { apenasEspeciais } from "@/lib/especiais-view";
 import { mapResumo, type ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 import type { DocumentacaoGerada } from "@/lib/agents/types";
@@ -1533,6 +1534,8 @@ export async function julgarProjetoComPainel(
   projeto_id: string;
   motivo?: string;
   julgamento?: JulgamentoPainel;
+  /** Preenchido só quando o painel encostou no teto e o escape do run 1 confirmou a faixa. */
+  escape?: { nota: number; leitura: string; evidencias: Record<string, string> } | null;
   gravado?: boolean;
 }> {
   const projetoId = chaveProjeto(projetoIdBruto);
@@ -1544,20 +1547,49 @@ export async function julgarProjetoComPainel(
     lentes: opts.lentes,
   });
 
+  // ⚠️ O PAINEL DECIDE DE 0 A 5; O ESCAPE CONTINUA SENDO O DO RUN 1.
+  //
+  // Sem este passo o painel PERDE terreno já ganho: o teto dele é `TETO_AGENTE`, então o PIAPP,
+  // que o agente único manda para a faixa 6-10 com as duas citações, fecharia em 5 e a faixa
+  // simplesmente deixaria de existir no caminho novo. As lentes refinam a posição dentro de 0-5,
+  // que é onde o run 1 erra; a entrada na faixa alta é a peça que já funciona (5 escapes no run
+  // 1, todos defensáveis) e não se reescreve, se reusa.
+  //
+  // Só pergunta quando o painel encosta no teto: abaixo disso não há escape a considerar, e a
+  // chamada extra ficaria em cada projeto da base em vez de nos poucos que chegam lá.
+  let escapado: RecomendacaoEspecial | null = null;
+  if (julgamento.nota >= TETO_AGENTE) {
+    const rec = await classificarEspecial(pronto.alvo, pronto.vizinhos);
+    // `normalizarRecomendacao` já derrubou para 5 o escape sem as duas citações, então chegar
+    // aqui acima do teto significa que as citações existem e foram conferidas.
+    if (rec && ehEscape(rec.estrelas_recomendada)) escapado = rec;
+  }
+
+  // A faixa 6-10 vai SEMPRE ao comitê humano: o número é recomendação, o veredito é a faixa.
+  const nota = escapado ? escapado.estrelas_recomendada : julgamento.nota;
+  const leitura = escapado ? escapado.leitura : julgamento.linha.motivos.join(" ");
+  const contestada = escapado ? true : julgamento.contestada;
+
   let gravado = false;
   if (!dry) {
     await upsertAvaliacaoEspecial({
       projeto_id: projetoId,
-      estrelas_recomendada: julgamento.nota,
-      confianca: julgamento.confianca,
-      leitura: julgamento.linha.motivos.join(" "),
-      contestada: julgamento.contestada,
+      estrelas_recomendada: nota,
+      confianca: escapado ? escapado.confianca : julgamento.confianca,
+      leitura,
+      contestada,
       origem: ORIGEM_PAINEL,
       modelo: modeloChatConfigurado(),
     });
     gravado = true;
   }
-  return { ok: true, projeto_id: projetoId, julgamento, gravado };
+  return {
+    ok: true,
+    projeto_id: projetoId,
+    julgamento: { ...julgamento, nota, contestada },
+    escape: escapado ? { nota, leitura, evidencias: escapado.evidencias } : null,
+    gravado,
+  };
 }
 
 /**
