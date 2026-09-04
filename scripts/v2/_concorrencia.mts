@@ -106,6 +106,14 @@ export async function rodarPoolAdaptativo<T>(o: OpcoesPool<T>): Promise<Relatori
     if (motivo && rel.motivos.length < 20) rel.motivos.push(motivo.slice(0, 90));
     const novo = Math.max(minimo, Math.floor(alvo / 2));
     if (novo < alvo) {
+      // ⚠️ O motivo vai para o TERMINAL na hora, não só para o relatório do fim.
+      //
+      // Na run 8 a concorrência caiu de 32 para 4 no meio e não havia como saber por quê sem
+      // esperar a rodada inteira terminar — uma hora de espera para descobrir se o gateway estava
+      // saturado ou se era credencial. Já custou um diagnóstico errado nesta calibragem (um 401 do
+      // fallback foi lido como saturação e derrubou a concorrência pela metade). Uma linha por
+      // recuo é barato: são poucos, e é justamente quando algo está errado que se quer olhar.
+      process.stderr.write(`\n   ↓ recuo ${alvo} -> ${novo}${motivo ? ` · ${motivo.slice(0, 90)}` : ""}\n`);
       alvo = novo;
       rel.recuos++;
       rel.alvoMin = Math.min(rel.alvoMin, alvo);
