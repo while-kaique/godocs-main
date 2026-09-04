@@ -29,6 +29,7 @@ import {
 import { lerResumosEspelho, lerLinhaEspelho } from "@/lib/sheet-espelho";
 import { chaveProjeto } from "@/lib/projeto-chave";
 import { TETO_AGENTE, ehEscape } from "@/lib/estrelas-regua";
+import { ajustarNotaComPainel, type AjustePainel } from "@/lib/especiais-ajuste";
 import { apenasEspeciais } from "@/lib/especiais-view";
 import { mapResumo, type ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 import type { DocumentacaoGerada } from "@/lib/agents/types";
@@ -88,6 +89,7 @@ import {
   avaliarComLentes,
   LENTES,
   LENTE_GATE,
+  lentePorChave,
   type AvaliacaoLente,
 } from "@/lib/agents/especiais-lentes";
 import {
@@ -1534,7 +1536,9 @@ export async function julgarProjetoComPainel(
   projeto_id: string;
   motivo?: string;
   julgamento?: JulgamentoPainel;
-  /** Preenchido só quando o painel encostou no teto e o escape do run 1 confirmou a faixa. */
+  /** A nota do run 1, que é o ponto de partida — fica visível para o ajuste ser auditável. */
+  base?: { nota: number; leitura: string };
+  ajuste?: AjustePainel;
   escape?: { nota: number; leitura: string; evidencias: Record<string, string> } | null;
   gravado?: boolean;
 }> {
@@ -1543,39 +1547,57 @@ export async function julgarProjetoComPainel(
   const pronto = await prepararAlvo(projetoId, { forcar: opts.forcar });
   if ("motivo" in pronto) return { ok: pronto.ok, projeto_id: projetoId, motivo: pronto.motivo };
 
+  // ── A BASE É O RUN 1. O TIME AJUSTA FINO EM CIMA DELA. ──────────────────────────────────
+  //
+  // ⚠️ Desenho refeito em 03/09/2026 depois de MEDIR, e a medição é o argumento inteiro. Com o
+  // painel decidindo sozinho, o PIAPP saiu **2, 5, 3, 7, 8 e 3** em seis chamadas idênticas, mesmo
+  // código e mesma entrada. As lentes até que variavam pouco; o que explodia era o resultado,
+  // porque a nota consolidada caía num degrau (encostar ou não no teto decidia se o escape era
+  // sequer perguntado) e um eixo oscilando 2 movia a nota final em 5 estrelas.
+  //
+  // Cinco chamadas de LLM não são cinco medidas do mesmo número: consolidar por mínimo e máximo
+  // AMPLIFICA a variação em vez de diluí-la, ao contrário de uma média (que este painel evita de
+  // propósito, e por bons motivos, ver `consolidarLentes`).
+  //
+  // Então a arquitetura passa a ser a que o produto pediu: o classificador de 1 agente dá a NOTA
+  // BASE, que é a de sempre, com o escape que já funciona; as lentes entram para **ajustar fino**
+  // e, principalmente, para melhorar o PORQUÊ, que é o ganho real de ter cinco olhares. O ajuste é
+  // limitado a `AJUSTE_MAX_PAINEL`: acima disso não é calibragem, é outro juiz.
+  const base = await classificarEspecial(pronto.alvo, pronto.vizinhos);
+  if (!base) return { ok: false, projeto_id: projetoId, motivo: "LLM não devolveu recomendação utilizável" };
+
   const julgamento = await julgarUmEspecialComPainel(pronto.alvo, pronto.vizinhos, {
     lentes: opts.lentes,
   });
 
-  // ⚠️ O PAINEL DECIDE DE 0 A 5; O ESCAPE CONTINUA SENDO O DO RUN 1.
-  //
-  // Sem este passo o painel PERDE terreno já ganho: o teto dele é `TETO_AGENTE`, então o PIAPP,
-  // que o agente único manda para a faixa 6-10 com as duas citações, fecharia em 5 e a faixa
-  // simplesmente deixaria de existir no caminho novo. As lentes refinam a posição dentro de 0-5,
-  // que é onde o run 1 erra; a entrada na faixa alta é a peça que já funciona (5 escapes no run
-  // 1, todos defensáveis) e não se reescreve, se reusa.
-  //
-  // Só pergunta quando o painel encosta no teto: abaixo disso não há escape a considerar, e a
-  // chamada extra ficaria em cada projeto da base em vez de nos poucos que chegam lá.
-  let escapado: RecomendacaoEspecial | null = null;
-  if (julgamento.nota >= TETO_AGENTE) {
-    const rec = await classificarEspecial(pronto.alvo, pronto.vizinhos);
-    // `normalizarRecomendacao` já derrubou para 5 o escape sem as duas citações, então chegar
-    // aqui acima do teto significa que as citações existem e foram conferidas.
-    if (rec && ehEscape(rec.estrelas_recomendada)) escapado = rec;
-  }
-
-  // A faixa 6-10 vai SEMPRE ao comitê humano: o número é recomendação, o veredito é a faixa.
-  const nota = escapado ? escapado.estrelas_recomendada : julgamento.nota;
-  const leitura = escapado ? escapado.leitura : julgamento.linha.motivos.join(" ");
-  const contestada = escapado ? true : julgamento.contestada;
+  const pisoNomeado = julgamento.avaliacoes.find((a) => a.piso != null)?.piso ?? null;
+  const ajustada = ajustarNotaComPainel(base.estrelas_recomendada, {
+    nota_lentes: julgamento.nota_lentes,
+    piso: pisoNomeado,
+  });
+  const notaFinal = ajustada.nota;
+  const contestada = ehEscape(notaFinal) || base.contestada || julgamento.contestada;
+  // O PORQUÊ é o ganho real de ter cinco olhares: a base explica o projeto, e as lentes dizem em
+  // que eixo ele para. Sem isto o time custaria cinco chamadas para devolver o mesmo texto.
+  const porEixo = julgamento.avaliacoes
+    .slice()
+    .sort((a, b) => b.nota - a.nota)
+    .map((a) => `${lentePorChave(a.lente)?.rotulo ?? a.lente} ${a.nota}`)
+    .join(", ");
+  const leitura = [
+    base.leitura,
+    `Por eixo: ${porEixo}.`,
+    ajustada.delta !== 0 ? `Nota ${ajustada.motivo}.` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   let gravado = false;
   if (!dry) {
     await upsertAvaliacaoEspecial({
       projeto_id: projetoId,
-      estrelas_recomendada: nota,
-      confianca: escapado ? escapado.confianca : julgamento.confianca,
+      estrelas_recomendada: notaFinal,
+      confianca: julgamento.confianca,
       leitura,
       contestada,
       origem: ORIGEM_PAINEL,
@@ -1586,8 +1608,10 @@ export async function julgarProjetoComPainel(
   return {
     ok: true,
     projeto_id: projetoId,
-    julgamento: { ...julgamento, nota, contestada },
-    escape: escapado ? { nota, leitura, evidencias: escapado.evidencias } : null,
+    julgamento: { ...julgamento, nota: notaFinal, contestada },
+    base: { nota: base.estrelas_recomendada, leitura: base.leitura },
+    ajuste: ajustada,
+    escape: ehEscape(notaFinal) ? { nota: notaFinal, leitura, evidencias: base.evidencias } : null,
     gravado,
   };
 }
