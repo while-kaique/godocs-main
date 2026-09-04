@@ -320,15 +320,35 @@ export function acharCamposRecomendacao(bruto: unknown): Record<string, unknown>
     const v = o[k];
     if (v && typeof v === "object" && !Array.isArray(v)) ninhos.push(v as Record<string, unknown>);
   }
-  const chavesNota = ["estrelas_recomendada", "estrelas", "nota", "recomendacao", "recomendação", "estrela"];
+  // ⚠️ **Régua, não lista fechada.** A primeira versão tinha uma lista de apelidos e o modelo
+  // devolveu `nota_recomendada`, que não estava nela — caçar apelido um a um é jogo perdido
+  // contra um formato que não é garantido. Vale qualquer chave cujo NOME fale de nota, estrela
+  // ou recomendação e cujo VALOR seja um número dentro da escala. As duas condições juntas são
+  // o que impede um `notas_dos_vizinhos: 12` de virar a nota do projeto.
+  const NOME_DE_NOTA = /(nota|estrela|recomenda)/i;
+  const preferidas = ["estrelas_recomendada", "nota_recomendada", "estrelas", "nota"];
+  const candidata = (ninho: Record<string, unknown>, chave: string): number | null => {
+    const n = numero(ninho[chave]);
+    return n != null && n >= 0 && n <= NOTA_MAX ? n : null;
+  };
   let nota: number | null = null;
+  // As canônicas primeiro, para uma chave genérica nunca ganhar da específica.
   for (const ninho of ninhos) {
-    for (const c of chavesNota) {
-      if (!(c in ninho)) continue;
-      const n = numero(ninho[c]);
+    for (const c of preferidas) {
+      const n = candidata(ninho, c);
       if (n != null) { nota = n; break; }
     }
     if (nota != null) break;
+  }
+  if (nota == null) {
+    for (const ninho of ninhos) {
+      for (const chave of Object.keys(ninho)) {
+        if (!NOME_DE_NOTA.test(chave)) continue;
+        const n = candidata(ninho, chave);
+        if (n != null) { nota = n; break; }
+      }
+      if (nota != null) break;
+    }
   }
   // ⚠️ ECO DA ENTRADA — o teste vem DEPOIS de procurar a nota, e essa ordem é o bug mais caro
   // desta sessão. O prompt manda `PROJETO A AVALIAR: {"projeto": {...}}`, e o modelo devolve o

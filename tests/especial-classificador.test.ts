@@ -521,3 +521,38 @@ describe('eco da entrada convivendo com a resposta', () => {
     expect(recuperarDeProsa('**Recomendação: 2★ — Executa** roda sozinho')).not.toBeNull();
   });
 });
+
+/**
+ * Apelidos da chave da nota: régua, não lista fechada.
+ *
+ * ⚠️ Colhido de prod: `{"projeto":"Robo subir vídeos em teste","nota_recomendada":5,...}`. A
+ * lista de apelidos não tinha `nota_recomendada`, e a resposta virava falha. Caçar apelido um a
+ * um é jogo perdido contra um formato que não é garantido.
+ */
+describe('a chave da nota é reconhecida por régua', () => {
+  it('aceita o nome que veio de prod e outros do mesmo feitio', () => {
+    const casos: [unknown, number][] = [
+      [{ projeto: 'Robo subir vídeos', nota_recomendada: 5, justificativa: 'x' }, 5],
+      [{ estrela_sugerida: 2, leitura: 'y' }, 2],
+      [{ recomendacao_estrelas: 3 }, 3],
+      [{ resultado: { nota_final: 1 } }, 1],
+    ];
+    for (const [json, esperado] of casos) {
+      const c = acharCamposRecomendacao(json);
+      expect(c, JSON.stringify(json)).not.toBeNull();
+      expect(normalizarRecomendacao(c)!.estrelas_recomendada).toBe(esperado);
+    }
+  });
+
+  // ⚠️ Nome parecido com valor fora da escala não é a nota. As duas condições juntas são o que
+  // impede um contador qualquer de virar a estrela do projeto.
+  it('nome parecido mas valor fora da escala NÃO vira nota', () => {
+    expect(acharCamposRecomendacao({ notas_dos_vizinhos: 12 })).toBeNull();
+    expect(acharCamposRecomendacao({ total_de_estrelas_da_base: 646 })).toBeNull();
+  });
+
+  it('a chave canônica ganha de uma genérica na mesma resposta', () => {
+    const c = acharCamposRecomendacao({ notas_consideradas: 4, estrelas_recomendada: 1 });
+    expect(normalizarRecomendacao(c)!.estrelas_recomendada).toBe(1);
+  });
+});
