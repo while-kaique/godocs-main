@@ -156,6 +156,7 @@ import {
 import { registrarAtividade, listarAtividades } from "@/lib/atividades.functions";
 import { listarCiclos, lerArvore, listarLog } from "@/lib/agentes-log.functions";
 import { avaliarProjetoComTime } from "@/lib/avaliacao/time.functions";
+import { auditarValorProjeto } from "@/lib/auditoria-valor.functions";
 import {
   notificarLideresPendentes,
   notificarLideresDoProjeto,
@@ -1173,6 +1174,15 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // `soComNotaHumana:true` julga exatamente o test set do T7.
     // Painel de lentes em UM projeto. ⚠️ Espelha o `/classificar`: a rota de LOTE roda em série,
     // e a rodada de calibragem na base inteira só termina com a concorrência no cliente.
+    // Auditoria do VALOR declarado de UM projeto: a dimensão financeira da mesa, sozinha.
+    // ⚠️ Só LÊ e devolve. Não grava em lugar nenhum, e a sugestão só desce ou confirma.
+    if (pathname === "/api/admin/auditar-valor" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { projetoId?: string };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
+      return json(await auditarValorProjeto(body.projetoId));
+    }
+
     if (pathname === "/api/admin/especiais/painel-projeto" && method === "POST") {
       await requireAdmin(request);
       const body = (await readBody(request)) as {
