@@ -187,6 +187,34 @@ export const LENTES: Lente[] = [
   },
 ];
 
+/**
+ * Quais itens do piso CADA lente pode declarar.
+ *
+ * ⚠️ Medido no primeiro teste do painel repointado (03/09/2026): com a lista inteira em todas as
+ * lentes, **`apenas_mensuravel` disparou em 4 das 5** num fluxo de relatório diário comum. É o
+ * mesmo defeito que a régua já registra em outra forma (o texto antigo "o ganho é mensurável"
+ * disparava em 484 de 484 não-especiais): todo projeto normal TEM número, e a lente de "risco
+ * evitado" não tem como saber se o projeto **se resume** a ele. Ela vê um eixo; o piso é fato do
+ * projeto inteiro.
+ *
+ * A régua não muda: os 7 itens continuam valendo e continuam zerando. O que muda é QUEM pode
+ * afirmá-los, e o critério é o mesmo do painel inteiro: você não julga o eixo dos outros.
+ * Item sem lente dona não seria declarável por ninguém, então cada um tem exatamente uma.
+ */
+export const PISO_POR_LENTE: Readonly<Record<string, readonly ChavePisoZero[]>> = {
+  // O que o projeto ENTREGA além do número, e se o que ele faz é tarefa isolada.
+  funcao_cadeia: ["apenas_mensuravel", "simples_local"],
+  // Existência e continuidade: parado, POC, ou o mesmo escopo de novo.
+  recorrencia_rastro: ["fora_de_uso", "experimentacao", "ressubmissao"],
+  // Quem usa, e se isso é relevante para além de um punhado de gente.
+  alcance_reuso: ["so_o_autor", "marginal"],
+};
+
+/** Os itens do piso que ESTA lente pode declarar (vazio = nenhum, e o campo vem sempre null). */
+export function pisoDaLente(chave: string): readonly ChavePisoZero[] {
+  return PISO_POR_LENTE[chave] ?? [];
+}
+
 /** O que uma lente NÃO julga — os eixos das OUTRAS lentes, derivados, nunca redigitados. */
 export function outrosEixos(chave: string): string[] {
   return LENTES.filter((l) => l.chave !== chave).map((l) => l.rotulo);
@@ -267,6 +295,22 @@ function descreverEscalaGlobalCurta(): string {
  * dele é a dos ESPECIAIS auditados, não a da base.
  */
 
+/**
+ * O bloco do piso NA LENTE — só os itens do eixo dela (ver `PISO_POR_LENTE`). Lente sem itens
+ * recebe a instrução explícita de não opinar: silêncio no prompt vira palpite na resposta.
+ */
+function textoDoPiso(lente: Lente): string {
+  const meus = PISO_ZERO.filter((d) => pisoDaLente(lente.chave).includes(d.chave));
+  if (meus.length === 0) {
+    return 'O QUE ZERA: nada disso é do seu eixo. Responda "piso": null SEMPRE — outra lente do painel cuida dos desqualificadores, e opinar aqui zera o projeto por um motivo que você não tem como verificar.';
+  }
+  return [
+    "O QUE ZERA o projeto inteiro, por melhor que o memorial esteja. Estes são os do SEU eixo:",
+    ...meus.map((d) => `- [${d.chave}] ${d.texto}`),
+    'Se nenhum for verdade, responda "piso": null. É a resposta mais comum, e é correta.',
+  ].join("\n");
+}
+
 export function buildSystemPromptLente(lente: Lente): string {
   return `Você é UM avaliador de um painel que julga projetos ESPECIAIS do GoDocs. Você olha UM eixo só — «${lente.rotulo}» — e mais nada.
 
@@ -296,8 +340,7 @@ Nota não listada fica entre a de baixo e a de cima.
 A ESCALA GLOBAL (só para LER a nota dos projetos vizinhos — não responda por ela):
 ${descreverEscalaGlobalCurta()}
 
-O QUE ZERA, por melhor que o memorial esteja. Basta UM ser verdade, e se algum for, diga QUAL:
-${PISO_ZERO.map((d) => `- [${d.chave}] ${d.texto}`).join("\n")}
+${textoDoPiso(lente)}
 
 DISCIPLINA:
 - Notas INTEIRAS.
@@ -398,8 +441,12 @@ export function normalizarAvaliacaoLente(bruto: unknown, lente: string): Avaliac
 
   // Piso declarado: só vale chave que EXISTE na régua. Chave inventada é ruído, e aceitá-la
   // deixaria o agente zerar por um motivo que ninguém consegue auditar depois.
+  // Só vale chave que EXISTE na régua **e** pertence ao eixo DESTA lente. Chave inventada é
+  // ruído; chave de outro eixo é a lente zerando o projeto por um fato que ela não tem como
+  // verificar, que foi o que se mediu quando todas viam a lista inteira.
   const pisoCru = typeof o.piso === "string" ? o.piso.trim() : "";
-  const piso = (PISO_ZERO.find((x) => x.chave === pisoCru)?.chave ?? null) as ChavePisoZero | null;
+  const permitidos = pisoDaLente(lente);
+  const piso = (permitidos.find((c) => c === pisoCru) ?? null) as ChavePisoZero | null;
 
   return {
     lente,

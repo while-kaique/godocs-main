@@ -36,7 +36,7 @@ import {
   type AvaliacaoLente,
   type Evidencia,
 } from "@/lib/agents/especiais-lentes";
-import { EIXOS } from "@/lib/agents/especiais-lentes";
+import { EIXOS, pisoDaLente } from "@/lib/agents/especiais-lentes";
 import {
   NIVEL_ZERO,
   CRITERIOS_ESTRELA,
@@ -165,9 +165,41 @@ describe("prompt de cada lente", () => {
   // medido no run 1 (nenhuma das 173 notas que subiram citou um item do piso sequer).
   it("o piso entra com as chaves da régua e é campo obrigatório da resposta", () => {
     const p = buildSystemPromptLente(LENTES[0]);
-    for (const item of PISO_ZERO) expect(p).toContain(item.chave);
+    for (const chave of pisoDaLente(LENTES[0].chave)) expect(p).toContain(chave);
     expect(p).toContain('"piso"');
     expect(p).toMatch(/piso.{0,40}OBRIGATÓRIO/s);
+  });
+
+  /**
+   * ⚠️ Medido no 1º teste do painel repointado: com a lista inteira em todas as lentes,
+   * `apenas_mensuravel` disparou em 4 das 5 num relatório diário comum. Todo projeto normal TEM
+   * número, e a lente de risco não tem como saber se o projeto se RESUME a ele.
+   */
+  it("cada lente só vê os itens do piso do PRÓPRIO eixo", () => {
+    for (const l of LENTES) {
+      const p = buildSystemPromptLente(l);
+      const meus = pisoDaLente(l.chave);
+      for (const item of PISO_ZERO) {
+        if (meus.includes(item.chave)) expect(p, `${l.chave} deveria ver ${item.chave}`).toContain(item.chave);
+        else expect(p, `${l.chave} NÃO deveria ver ${item.chave}`).not.toContain(item.chave);
+      }
+    }
+  });
+
+  it("cada item do piso tem exatamente UMA lente dona — nenhum fica órfão nem duplicado", () => {
+    const donos = LENTES.flatMap((l) => pisoDaLente(l.chave));
+    expect([...donos].sort()).toEqual(PISO_ZERO.map((x) => x.chave).sort());
+  });
+
+  it("chave de piso de OUTRO eixo é descartada na normalização", () => {
+    // `so_o_autor` é da lente de alcance: a de função não pode zerar o projeto com ela.
+    const av = normalizarAvaliacaoLente({ nota: 3, piso: "so_o_autor" }, "funcao_cadeia")!;
+    expect(av.piso).toBeNull();
+    expect(av.nota).toBe(3);
+    // e a dona dela zera normalmente
+    const dona = normalizarAvaliacaoLente({ nota: 3, piso: "so_o_autor" }, "alcance_reuso")!;
+    expect(dona.piso).toBe("so_o_autor");
+    expect(dona.nota).toBe(0);
   });
 
   it("traz as âncoras DO EIXO da lente, e não as de outra lente", () => {
