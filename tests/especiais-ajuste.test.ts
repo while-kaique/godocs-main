@@ -55,12 +55,32 @@ describe('ajuste fino da nota do run 1', () => {
    * O padrão era sistemático, não anedota: dos 9 projetos com base 5 no run 7, os 9 desceram, e o
    * nível 5 esvaziou (2 projetos, contra 5 na faixa de escape que as lentes não alcançam).
    */
-  it('NÃO desce quando as lentes discordam entre si: a base julga o projeto, a lente só um eixo', () => {
+  it('NÃO desce quando um eixo sustenta a base E as lentes discordam entre si', () => {
     const versta = { nota_lentes: 3, piso: null, notas_das_lentes: [5, 4, 2, 2] };
     const r = ajustarNotaComPainel(5, versta);
     expect(r.nota).toBe(5);
     expect(r.delta).toBe(0);
-    expect(r.motivo).toContain('discordaram');
+    expect(r.motivo).toContain('discordam');
+  });
+
+  /**
+   * ⚠️ As duas pernas são necessárias, e cada uma sozinha erra para um lado — medido no run 7.
+   * Este é o «Gohelp»: lentes 2, 1, 4, 2 contra base 5. A dispersão é 3, mas ela vem de 4 contra
+   * 1, e NENHUM eixo chega perto de 5. A base foi otimista e a descida é legítima.
+   */
+  it('desce quando as lentes discordam mas NENHUMA alcança a base', () => {
+    const gohelp = { nota_lentes: 2, piso: null, notas_das_lentes: [2, 1, 4, 2] };
+    expect(ajustarNotaComPainel(5, gohelp).nota).toBe(4);
+  });
+
+  /**
+   * O outro lado: aqui uma lente empata com a base, mas as quatro CONCORDAM que é baixo e quem
+   * puxou a nota para baixo foi o teto do gate, exercendo a função que ele tem. Sem esta perna,
+   * seis projetos do fundo da escala subiam (GO HC, Base Custos, Sucesso.AI…).
+   */
+  it('desce quando alguma alcança a base mas as lentes CONCORDAM entre si', () => {
+    const fundo = { nota_lentes: 0, piso: null, notas_das_lentes: [2, 1, 2, 1] };
+    expect(ajustarNotaComPainel(2, fundo).nota).toBe(1);
   });
 
   it('desce normalmente quando as lentes concordam que é para baixo', () => {

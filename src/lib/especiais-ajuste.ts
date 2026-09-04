@@ -51,8 +51,9 @@ export type SinalDoPainel = {
  * 2. **A faixa de escape é do run 1.** Se a base entrou em 6-10 com as duas citações conferidas,
  *    as lentes não a tiram de lá: elas julgam eixo isolado e nenhuma sozinha responde à pergunta
  *    do escape. E se a base NÃO entrou, elas também não colocam.
- * 3. **Descer exige que as lentes concordem entre si.** Dispersas, quem manda é a base, e a
- *    discordância sai como confiança mais baixa (`confiancaPorConsenso`), não como nota menor.
+ * 3. **Descer exige DUAS coisas: nenhum eixo sustentando a altura, ou as lentes concordando.**
+ *    Se algum eixo alcança a nota da base E as lentes discordam entre si, quem manda é a base, e
+ *    a discordância sai como confiança mais baixa (`confiancaPorConsenso`), não como nota menor.
  *
  *    ⚠️ Esta é a lição do run 7, e ela é estrutural, não de calibragem. A base julga o PROJETO;
  *    a lente julga UM eixo. Projeto bom quase nunca é bom em todos os eixos — o PIAPP é 1 em
@@ -62,6 +63,14 @@ export type SinalDoPainel = {
  *    contra 5 na faixa de escape, que as lentes não alcançam). O caso que fechou o diagnóstico é
  *    o «[VERSTA] Robô orçamento»: função 5, alcance 4, gate 2 — o texto dizia "controla 100% do
  *    orçamento, roda 24/7, sem aprovação manual", que é a definição literal do 5, e a nota saiu 4.
+ *
+ *    ⚠️ **As duas pernas são necessárias, e cada uma sozinha erra para um lado.** Medido no run 7:
+ *    só a dispersão segurava o «Gohelp» em 5 com as lentes em 2, 1, 4, 2, onde NENHUMA alcança a
+ *    base (a dispersão vinha de 4 contra 1, não de um eixo forte); só o "alguma alcança" levantava
+ *    seis projetos do fundo (GO HC, Base Custos, Sucesso.AI…), onde as lentes CONCORDAM que é
+ *    baixo e o teto do gate está exercendo exatamente a função que tem. Juntas: 12 projetos se
+ *    movem em 188, o erro médio contra a planilha cai de 1,14 para 1,12 e o acerto exato sobe de
+ *    36% para 39%.
  *
  *    Subir continua livre: lente que sustenta MAIS do que a base viu é informação nova, e um eixo
  *    só basta para trazê-la (a régua é disjuntiva — a nota vem de UM eixo).
@@ -78,15 +87,21 @@ export function ajustarNotaComPainel(base: number, sinal: SinalDoPainel): Ajuste
   const querido = sinal.nota_lentes;
   if (querido === base) return { nota: base, base, delta: 0, motivo: 'as lentes concordam com a base' };
 
-  const dispersao = sinal.notas_das_lentes.length >= 2
-    ? Math.max(...sinal.notas_das_lentes) - Math.min(...sinal.notas_das_lentes)
-    : 0;
-  if (querido < base && dispersao >= DISPERSAO_AMBIGUA) {
+  const notas = sinal.notas_das_lentes;
+  const maior = notas.length ? Math.max(...notas) : 0;
+  const menor = notas.length ? Math.min(...notas) : 0;
+  // As DUAS pernas têm de valer, e cada uma diz uma coisa diferente:
+  //  · `alcanca` — algum eixo sustenta aquela altura por conta própria (a régua é disjuntiva);
+  //  · `discordam` — a consolidação baixa não é veredito do grupo, é o teto do gate agindo sozinho.
+  // Quando as lentes CONCORDAM que é baixo, o gate está certo e a nota desce normalmente.
+  const alcanca = notas.length >= 2 && maior >= base;
+  const discordam = notas.length >= 2 && maior - menor >= DISPERSAO_AMBIGUA;
+  if (querido < base && alcanca && discordam) {
     return {
       nota: base,
       base,
       delta: 0,
-      motivo: `as lentes discordaram entre si (de ${Math.min(...sinal.notas_das_lentes)} a ${Math.max(...sinal.notas_das_lentes)}), então a nota do dossiê inteiro prevalece`,
+      motivo: `um eixo sustenta a nota (${maior}) e as lentes discordam entre si (de ${menor} a ${maior}), então a leitura do dossiê inteiro prevalece`,
     };
   }
 
