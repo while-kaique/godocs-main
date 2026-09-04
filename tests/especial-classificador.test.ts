@@ -485,3 +485,39 @@ describe('formas alternativas do JSON', () => {
     expect(acharCamposRecomendacao({ comentario: 'nada a dizer' })).toBeNull();
   });
 });
+
+/**
+ * O bug de 65% da run 2.
+ *
+ * ⚠️ O prompt manda `PROJETO A AVALIAR: {"projeto": {...}}`, e o modelo frequentemente devolve o
+ * projeto JUNTO com a resposta. Rejeitar pela mera presença da chave `projeto` jogava fora
+ * resposta boa por causa de uma chave a mais: 418 de 648 projetos saíram sem nota.
+ */
+describe('eco da entrada convivendo com a resposta', () => {
+  it('aceita quando o eco vem JUNTO com a nota, sob qualquer apelido', () => {
+    const casos: [string, unknown, number][] = [
+      ['eco + recomendacao', { projeto: { nome: 'X' }, recomendacao: 3, leitura: 'faz coisa' }, 3],
+      ['eco + nota', { projeto: { nome: 'X' }, nota: 1, leitura: 'y' }, 1],
+      ['eco + canônica', { projeto: { nome: 'X' }, estrelas_recomendada: 4, leitura: 'z' }, 4],
+      ['eco aninhado', { projeto: { nome: 'X' }, recomendacao: { estrelas: 0, justificativa: 'w' } }, 0],
+    ];
+    for (const [nome, json, esperado] of casos) {
+      const campos = acharCamposRecomendacao(json);
+      expect(campos, nome).not.toBeNull();
+      expect(normalizarRecomendacao(campos)!.estrelas_recomendada, nome).toBe(esperado);
+    }
+  });
+
+  it('eco SEM nota nenhuma continua sendo falha', () => {
+    expect(acharCamposRecomendacao({ projeto: { nome: 'X', area: 'Y' } })).toBeNull();
+    expect(acharCamposRecomendacao({ projeto: {} })).toBeNull();
+  });
+
+  // A recuperação de prosa não pode rodar sobre JSON: dali só sai o próprio JSON picado virando
+  // justificativa, e foi assim que a leitura do PIAPP saiu com `{ "projeto` no meio.
+  it('não tenta ler prosa de uma resposta que é JSON', () => {
+    expect(recuperarDeProsa('{"projeto":{"nome":"PIAPP"},"algo":5}')).toBeNull();
+    expect(recuperarDeProsa('[{"a":1}]')).toBeNull();
+    expect(recuperarDeProsa('**Recomendação: 2★ — Executa** roda sozinho')).not.toBeNull();
+  });
+});

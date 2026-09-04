@@ -227,6 +227,10 @@ export function extrairJson(raw: string): unknown | null {
 export function recuperarDeProsa(raw: string): Record<string, unknown> | null {
   const texto = String(raw ?? '');
   if (!texto.trim()) return null;
+  // ⚠️ Não tentar "ler prosa" de uma resposta que é JSON. Quando o JSON não serve, o que sai
+  // daqui é o próprio JSON picado virando justificativa — foi assim que a leitura do PIAPP saiu
+  // com `{ "projeto` no meio, na tela que a triagem lê.
+  if (/^\s*[{[]/.test(texto)) return null;
 
   const verbos = [NIVEL_ZERO, ...CRITERIOS_ESTRELA].map((n) => n.verbo);
   const nota = (() => {
@@ -305,9 +309,6 @@ export function acharCamposRecomendacao(bruto: unknown): Record<string, unknown>
   if (!bruto || typeof bruto !== "object") return null;
   const o = bruto as Record<string, unknown>;
 
-  // Eco da entrada: o prompt manda um objeto `projeto`, e o modelo às vezes devolve ele de volta.
-  if ("projeto" in o && !("estrelas_recomendada" in o)) return null;
-
   const numero = (v: unknown): number | null => {
     const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
     return Number.isFinite(n) ? n : null;
@@ -329,6 +330,12 @@ export function acharCamposRecomendacao(bruto: unknown): Record<string, unknown>
     }
     if (nota != null) break;
   }
+  // ⚠️ ECO DA ENTRADA — o teste vem DEPOIS de procurar a nota, e essa ordem é o bug mais caro
+  // desta sessão. O prompt manda `PROJETO A AVALIAR: {"projeto": {...}}`, e o modelo devolve o
+  // projeto JUNTO com a resposta. Rejeitando pela mera presença da chave `projeto`, jogávamos
+  // fora respostas boas por causa de uma chave a mais: **418 de 648 projetos (65%) da run 2
+  // saíram sem nota** por isto. Eco é quando NÃO HÁ nota em lugar nenhum; ter a nota e o eco
+  // junto é resposta válida com sobra.
   if (nota == null) return null;
 
   const buscar = (chaves: string[]): unknown => {
