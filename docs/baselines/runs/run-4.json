@@ -1,0 +1,2507 @@
+{
+ "meta": {
+  "run": "run 4 · TIME de 5 lentes + auditoria (58)",
+  "juiz": "TIME",
+  "rota": "/api/admin/especiais/painel-projeto",
+  "gravou": false,
+  "rodado_em": "2026-09-04T05:51:23.881Z",
+  "projetos": 58,
+  "falhas": 0,
+  "duracao_s": 1272,
+  "concorrencia": {
+   "final": 8,
+   "pico": 8,
+   "piso": 4,
+   "recuos": 3
+  }
+ },
+ "linhas": [
+  {
+   "id": "legado-152",
+   "nome": "Gostream",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "Registra automaticamente no Google Sheets cada mudança de etapa dos candidatos no InHire. Fica em 2, como o HireFlow, porque executa uma rotina recorrente, mas não valida nem bloqueia erros com impacto em outra área. Para subir, precisaria impedir movimentações inválidas antes que afetem a operação.",
+   "base": 2,
+   "delta": -2,
+   "ajuste": "zerado pelo piso (apenas_mensuravel)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "apenas_mensuravel"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 2588.1,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "Conta das horas: 30 × (21,29 + 29,90 + 33,10 + 33,10 + 55,15) = R$ 5.176,20/mês brutos. O valor declarado sob auditoria é R$ 2.588,10/mês, exatamente 50% desse total e, portanto, não está acima do ganho sustentado. Como a sugestão não pode aumentar o valor, fica nula."
+  },
+  {
+   "id": "625248d60d3858b8d808da3089d83544",
+   "nome": "Benchmark de Estampas",
+   "area": "MARKETING",
+   "humana": 4,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "Analisa semanalmente as estampas mais vendidas e gera novas artes para o portfólio, como o Gerador de Estampas Best Sellers já avaliado em 3 estrelas. Não sobe porque não há prova de que escolhe e publica estampas sem revisão humana; para subir, precisa demonstrar essa atuação em produção e seu impacto.",
+   "base": 3,
+   "delta": -3,
+   "ajuste": "zerado pelo piso (so_o_autor)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "so_o_autor"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "4e5fd243efe0a5963460a05e1491a1ae",
+   "nome": "Análise de convergência  - premissas de AVD",
+   "area": "Gente e Gestão",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "A análise consolida dados e apresenta premissas para apoiar as calibrações da AVD. Como o Dashboard de resultados AVD 2025, fica em 0 porque há apenas saving calculado e intenção de apoiar decisões, sem comprovação de uso real por gestores. Para subir, precisa demonstrar ciclos concluídos e decisões de calibração tomadas com base nela.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (experimentacao)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 0,
+     "piso": "experimentacao"
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "so_o_autor"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 196.4725,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "O valor depende da resolução da contradição. Saving efetivado: R$ 1.571,78 por ciclo × 2 ciclos ÷ 12 = R$ 261,96/mês, acima do declarado, portanto não se sugere aumento. Custo evitado: R$ 261,96 × 50% = R$ 130,98/mês. Falta confirmar qual cenário corresponde à realidade."
+  },
+  {
+   "id": "legado-032",
+   "nome": "[VERSTA] Robo orçamento - {Marca}",
+   "area": "GROWTH",
+   "humana": 8,
+   "especial": true,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "Parece automatizar a operação de Google Ads e fica próxima do Robô subir vídeos em teste, já avaliado em 5 estrelas. Não vai acima porque o material só calcula horas e custo, sem comprovar uso atual ou outros processos rodando sobre ele. Para subir, precisa mostrar essas integrações em produção e que a rotina manual foi encerrada.",
+   "base": 5,
+   "delta": -1,
+   "ajuste": "desce 1 pelas lentes",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "011154efe218d675c32636d58adfd0db",
+   "nome": "Razão Contábil Consolidado",
+   "area": "FINANÇAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "media",
+   "leitura": "Automatiza a atualização e conferência da base de custos entre três ERPs. Fica em 0, como Automação de dados - Bling Gobeaute, porque o memorial descreve o funcionamento e o saving, mas não comprova uso recorrente por outras pessoas. Logs de execução e usuários nomeados sustentariam 2 estrelas.",
+   "base": 0,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 164.74,
+   "valor_sugerido": 164.74,
+   "ajustaria": false,
+   "auditoria": "Conta auditada: R$ 264,80 da redução de 8h do Analista Sênior + R$ 64,68 da redução de 6h do Estagiário = R$ 329,48 brutos por mês. Aplicando o peso de 50% indicado pela régua: R$ 329,48 × 0,50 = R$ 164,74 líquidos por mês. Confirma-se o valor declarado."
+  },
+  {
+   "id": "legado-033",
+   "nome": "Robo subir vídeos em teste",
+   "area": "GROWTH",
+   "humana": 5,
+   "especial": true,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "O robô publica milhares de vídeos por semana no Facebook Ads, cria adsets e escolhe páginas sem intervenção humana, ficando diretamente no caminho da entrega ao mercado. É 5★ porque uma falha afeta os testes de mídia, mas não há processos novos e nomeados construídos sobre ele. Para avançar, seria preciso comprovar essas integrações e atividades em uso.",
+   "base": 5,
+   "delta": -1,
+   "ajuste": "desce 1 (as lentes sustentavam 3, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "0b92927b09b1ae84dd0c481bf6fa5214",
+   "nome": "RPA - Ajuste de inventário",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "⚠ Conferir na triagem: «Agente de apuração de Impostos» (similaridade 0.80) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. O RPA lançou ajustes fiscais no WebGex a partir de uma planilha e registrou o resultado. Como a Automação Painel de Custos DUIMP, resolveu uma tarefa local e pontual, cujo benefício já está todo representado pela economia informada. Para subir, precisaria sustentar execuções recorrentes e demonstrar uso contínuo na operação.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 0,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "so_o_autor"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 182.685,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "[sugestão de ALTA descartada: quem aumenta o ganho é gente] Confirmação do declarado. O memorial sustenta o bruto de R$ 1.461,48: 1.315 registros × 1,21 minuto = 1.591,15 minutos; ÷ 60 = 26,52h, arredondadas para 26,5h; × R$ 55,15 = R$ 1.461,48. Aplicando o fator líquido já registrado na planilha (12,5%), chega-se a R$ 182,685, arredondado para R$ 182,69. A inconsistência de cargo não exige redução adicional porque o valor auditado já representa apenas uma fração pequena do bruto."
+  },
+  {
+   "id": "5ebe736d7bd4b27ba7138ebba2de9daf",
+   "nome": "Gerador de Vistas",
+   "area": "PRODUTO",
+   "humana": 2,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "Gera vistas coloridas em escala, mas ainda deixa ajustes e validação visual com a equipe. Como o GoRender, o valor demonstrado se limita às horas economizadas, por isso não sobe. Para avançar, precisa comprovar uso recorrente por outras pessoas e assumir sozinho a geração final das imagens.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (apenas_mensuravel)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "apenas_mensuravel"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 579.09,
+   "valor_sugerido": 579.09,
+   "ajustaria": false,
+   "auditoria": "R$ 1.158,18 de impacto bruto × 50% da régua para custo evitado = R$ 579,09 por mês. A base operacional também confere: 67,50h − 13,10h = 54,40h mensais. Portanto, o valor líquido declarado é confirmado."
+  },
+  {
+   "id": "1844c74da817b98d8084ffefaf982f83",
+   "nome": "Controle de Pedidos de Compra Gobeaute",
+   "area": "Sourcing & Procurement Gobeaute",
+   "humana": 2,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "O painel consulta pedidos no Protheus, notifica aprovadores e prepara o envio aos fornecedores. Assim como a Plataforma de Cadastro de Produtos GoBeaute, descreve uma automação relevante, mas o resultado ainda aparece como esperado e não há comprovação de uso recorrente. Para subir, precisa mostrar execuções reais e recorrentes por diferentes usuários.",
+   "base": 0,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 4, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 643.695,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "O memorial comprova 71,38h: 61,65h do estagiário e 9,73h do analista. Não é possível converter essa correção em valor líquido exato porque o dossiê informa apenas R$ 1.287,39 agregados, sem separar o valor monetário atribuído a cada cargo. Aplicar apenas a proporção 71,38/97 seria inadequado, pois alteraria a composição entre os cargos."
+  },
+  {
+   "id": "0e1fd5d4dca9a13a35e0014adefc3f25",
+   "nome": "Abastecimento Lojas",
+   "area": "LOJAS",
+   "humana": 1,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "Centraliza pedidos, registros de envio e confirmações de recebimento entre três lojas. Fica em 0, como Controle de Orçamentos, porque atende um fluxo local de três pessoas e todas as ações continuam manuais. Para subir, precisa comprovar uso recorrente mais amplo e decisões operacionais tomadas a partir dos registros.",
+   "base": 0,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 5, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 749.24,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "Conta auditada: saving efetivado de R$ 1.098,48 × 100% = R$ 1.098,48; custo evitado de R$ 200 × 50% = R$ 100; líquido pela régua = R$ 1.198,48. O valor declarado de R$ 749,24 é menor e equivale a R$ 549,24 (50% do saving em horas) + R$ 200 (100% do custo evitado). Como a auditoria não pode elevar o ganho declarado, mantém-se valor_sugerido nulo."
+  },
+  {
+   "id": "0a362cd4b1b8f5f5ebb60abb6d25df5d",
+   "nome": "Gocase B2B Service Desk (RMA E CADASTROS)",
+   "area": "B2B GOCASE",
+   "humana": 1,
+   "especial": false,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Automatiza cadastros e casos simples de RMA, além de centralizar o acompanhamento do B2B. Fica em 2 porque já executa parte recorrente do fluxo, mas validações, exceções e decisões críticas continuam com a equipe. Para subir, precisaria impedir erros operacionais antes que afetem clientes ou outras áreas.",
+   "base": 2,
+   "delta": 1,
+   "ajuste": "sobe 1 pelas lentes",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 502.605,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "[sugestão de ALTA descartada: quem aumenta o ganho é gente] Horas economizadas: 32h de cadastros + 38h de RMA + 4h de Analista Júnior + 3h de Especialista/Gestor/Head = 77h/mês. Partindo do bruto registrado de R$ 1.005,21 e aplicando o peso de 50%, chega-se a R$ 502,605, que arredonda para R$ 502,61 por mês."
+  },
+  {
+   "id": "299719a729c65ca062af80b1ad6f85e5",
+   "nome": "Relatório de Cupons - Impacto de campanhas",
+   "area": "LOJAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "Automatiza a consulta de cupons e envia diariamente um resumo de desempenho para o chat, de forma semelhante ao Resumo Executivo e à Automação Cupons Beaute. Fica em 1 porque apenas informa os resultados para alguém interpretar e agir. Para subir, precisaria executar automaticamente uma ação operacional decorrente desses dados.",
+   "base": 1,
+   "delta": -1,
+   "ajuste": "zerado pelo piso (apenas_mensuravel)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "apenas_mensuravel"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 174.465,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "A conta sustentada pelo memorial chega a R$ 348,93 mensais de saving de pessoas, superior aos R$ 174,47 declarados. Não há dupla contagem, contrato evitado ou custo externo a descontar. Pela regra de não elevar ganhos, o valor sugerido fica nulo."
+  },
+  {
+   "id": "1b75bcf9e08ccb24f7247781beb4ca44",
+   "nome": "Ordens Travadas/Em Espera | Metabase -> Chat",
+   "area": "LOJAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "⚠ Conferir na triagem: «Alerta de Pedidos Travados por Responsável» (similaridade 0.89) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. A automação consulta ordens retidas e envia alertas para a liderança agir. Como nos projetos Overview Produção e Entradas de Estoque, não há prova de uso recorrente dos alertas nem de decisões tomadas a partir deles. Para subir, precisa mostrar histórico de envios e ações reais de destravamento.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 125.46,
+   "valor_sugerido": 125.46,
+   "ajustaria": false,
+   "auditoria": "Confirmação do declarado: 18h/mês × R$ 13,94 = R$ 250,92 de impacto bruto; R$ 250,92 × 50% = R$ 125,46 de impacto líquido. Não há outros valores a excluir."
+  },
+  {
+   "id": "33c884049f5fa0c017c684ec9f353a10",
+   "nome": "Resumo Executivo - Diretoria, Head/Gerente e Gerentes de Loja",
+   "area": "LOJAS",
+   "humana": 1,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "Automatiza a montagem e o envio de indicadores para diferentes lideranças, como o Report semanal. Fica em 0★ porque o único impacto comprovado é a economia de tempo, sem evidência de que os destinatários usam os resumos para decidir ou agir. Para subir, precisa mostrar decisões recorrentes tomadas a partir dos envios.",
+   "base": 0,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 3, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 1390.375,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "[sugestão de ALTA descartada: quem aumenta o ganho é gente] R$ 2.780,75 de impacto bruto × 50% = R$ 1.390,375; após arredondamento para centavos, R$ 1.390,38 mensais. As 55h estão discriminadas em 10h + 45h e não há custos externos ou outros ganhos somados."
+  },
+  {
+   "id": "50f7370646f7b8dafc071ec9615dcb31",
+   "nome": "Gestão de Contencioso | Gogroup",
+   "area": "JURIDICO",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "media",
+   "leitura": "A plataforma centraliza mais de 400 processos e produz dashboards, auditorias e relatórios para o Jurídico. Não chega a 1 porque o uso recorrente não foi comprovado e os resultados apresentados são apenas estimativas, ficando próxima da Plataforma de Pagamento de Prestadores PJ. Pode subir quando houver evidência de usuários consultando o sistema regularmente e tomando decisões com seus alertas e relatórios.",
+   "base": 0,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 2991.93,
+   "valor_sugerido": 2008.86,
+   "ajustaria": true,
+   "auditoria": "Mantêm-se integralmente R$ 683,86 de saving em horas e aplica-se 50% aos R$ 2.650,00 de custo evitado: R$ 683,86 + R$ 1.325,00 = R$ 2.008,86 por mês. O líquido atual resulta da ponderação inversa."
+  },
+  {
+   "id": "3ec81350fc444814eb61630353ae233b",
+   "nome": "Automação End-to-End de Inadimplência",
+   "area": "FINANÇAS",
+   "humana": 3,
+   "especial": false,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Automatiza de ponta a ponta uma rotina recorrente de coleta, conciliação e atualização da carteira de inadimplência. Assim como Análise Inteligente de Prazos, executa o fluxo completo, mas ainda depende de pessoas para conferir exceções e realizar a cobrança. Subiria se bloqueasse divergências antes que afetassem a operação de cobrança.",
+   "base": 2,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 4, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 816.46,
+   "valor_sugerido": 816.46,
+   "ajustaria": false,
+   "auditoria": "Confirmação do valor declarado. A memória sustenta R$ 1.632,92 de impacto bruto mensal pelas 98,73h economizadas. Aplicando ao bruto o peso de 50% já informado para o Impacto Líquido: R$ 1.632,92 × 0,50 = R$ 816,46. O corte da régua é de R$ 816,46; não há custos adicionais a descontar nem receita ou custo evitado somado às horas."
+  },
+  {
+   "id": "6910309d52726b6737d61a27d2cc6df1",
+   "nome": "GDI - Gestão de Industrialização",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 3,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "O GDI executa de forma recorrente a consulta de endereços e grande parte dos lançamentos de produção e etiquetas, com redução comprovada de 132 para 8,8 horas mensais. Fica acima de Abastecimento de tinta pelo uso real medido, mas abaixo do GoDocs porque não há bloqueio ou validação que impeça erros operacionais. Para subir, precisaria barrar ordens ou apontamentos inválidos e registrar essas ocorrências de forma auditável.",
+   "base": 2,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 5, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "27974e66b3f3cd233e153ca34156736b",
+   "nome": "Automação de envio Reinf",
+   "area": "RPA",
+   "humana": 2,
+   "especial": false,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "Envia mensalmente os eventos fiscais de 17 CNPJs à Receita Federal, assina lotes, trata retornos e arquiva comprovantes. Diferente das automações de Inputs de Saída e de NFSE, conclui a obrigação externa; não passa de 5 porque nenhum processo ativo foi criado sobre sua integração. Para avançar, precisa comprovar o uso recorrente e identificar esse processo.",
+   "base": 5,
+   "delta": -1,
+   "ajuste": "desce 1 pelas lentes",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 424.165,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "[sugestão de ALTA descartada: quem aumenta o ganho é gente] Confirmação do declarado: impacto bruto de R$ 534,38 + R$ 313,95 = R$ 848,33; com peso de 50%, R$ 848,33 × 0,5 = R$ 424,165, arredondado para R$ 424,17 mensais."
+  },
+  {
+   "id": "95cbd504a32e6f29cf5549ad1a16ae53",
+   "nome": "CTR Machine Gocase - Admaker",
+   "area": "PRODUTO",
+   "humana": 4,
+   "especial": true,
+   "agente": 7,
+   "confianca": "baixa",
+   "leitura": "O Admaker cria e publica testes no Meta e alimenta o Gerador de Briefing, o Color Drop e o padrão de PDP. Recomendo 7, igual ao CTR Machine já avaliado, pois sustenta vários fluxos, mas ainda não demonstra dependência mais ampla na empresa. Para subir, precisa comprovar novos processos integrados e uso sustentado por mais áreas.\n\nEvidência do escape:\n• Existe atividade em curso hoje que NÃO existiria sem ele. Não \"seria mais lenta\": não existiria.\n  \"A plataforma fecha o ciclo completo do produto: do teste validado sai o briefing de fábrica (Gerador de Briefing), a estratégia de cores por evidência (Color Drop, 40→1.600 testes/mês) e o padrão visual de PDP.\"\n• Removê-lo não devolve o estado anterior — o jeito antigo deixou de existir como opção.\n  \"Atende Produto, Growth e Mídia, substituindo um ciclo manual de 2 a 20 dias (pesquisa → fila de design → subida manual) que consumia a capacidade de designers, analistas e especialistas — hoje o mesmo fluxo roda em minutos, inclusive de forma autônoma via rotinas diárias agendadas.\"",
+   "base": 7,
+   "delta": 0,
+   "ajuste": "faixa 6-10 vem do escape, com as duas citações",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "2c33e5088fd9ec5c46d6c4bfd43fa1b8",
+   "nome": "Agente precificador",
+   "area": "GROWTH",
+   "humana": 4,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Recomenda mudanças de preço com inteligência agregada e, após aprovação humana, aplica-as no mercado, como o GoPrice. Fica em 4, e não 5, porque uma pessoa ainda aprova cada decisão. Para subir, precisaria operar a entrega final sem essa intervenção e comprovar uso recorrente.",
+   "base": 4,
+   "delta": -1,
+   "ajuste": "desce 1 (as lentes sustentavam 1, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "fc990e190c5bba2cef976af6f4b5f3a7",
+   "nome": "Ferramenta de testes de novos produtos ctr com agente autonomo (CTR machine)",
+   "area": "GROWTH",
+   "humana": 7,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O agente encontra produtos, cria embalagens e imagens e publica os testes no Facebook sem intervenção humana. Fica em 5, abaixo da CTR Machine já avaliada, porque não há processo novo nomeado operando sobre ele. Para subir, precisa comprovar esse uso por outro projeto em atividade.",
+   "base": 5,
+   "delta": -5,
+   "ajuste": "zerado pelo piso (ressubmissao)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 0,
+     "piso": "ressubmissao"
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "2afc53e51f6935703b474988d0840a4a",
+   "nome": "Ferramenta de comentar nos posts",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Encontra posts em alta, sugere textos e permite comentar diretamente pela marca, com uso diário pelo time. Fica em 2, próximo do Tiktok Shop Vídeo Scraper, porque executa a publicação, mas não há prova de operação sem revisão humana. Para subir, precisa publicar sozinho, com limites de segurança e metas auditáveis.",
+   "base": 2,
+   "delta": 1,
+   "ajuste": "sobe 1 pelas lentes",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "5651c09639c1f61bee22b5767ebd8ef6",
+   "nome": "Prisma",
+   "area": "GROWTH",
+   "humana": 5,
+   "especial": true,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "O Prisma escolhe produtos, adapta criativos, publica campanhas e usa o desempenho para se ajustar sozinho. Fica em 5, acima do CTR Machine Gocase Admaker, porque cobre o ciclo até a publicação, mas nenhum projeto é citado operando sobre ele. Para subir, precisa comprovar quais novas rotinas funcionam sobre o Prisma em produção.",
+   "base": 5,
+   "delta": -1,
+   "ajuste": "desce 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "084f0d94ec2ad51b4d3b0e73cda57948",
+   "nome": "Acompanhamento de Mudanças de Preço",
+   "area": "GROWTH",
+   "humana": 2,
+   "especial": true,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Sistema de alertas» (similaridade 0.81) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. Monitora mudanças de preço, registra o histórico e informa as áreas envolvidas. Fica em 1 porque apenas entrega o alerta, sem corrigir preços ou impedir erros, ao contrário do Sistema de alertas, que aciona diretamente os responsáveis. Para subir, precisaria executar a correção ou bloquear divergências automaticamente, com uso recorrente comprovado.",
+   "base": 1,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 4, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "1337c147f90a0a73c54f40526422453a",
+   "nome": "Go Select IA",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O Go Select IA entrevista candidatos por áudio, calcula aderência e recomenda quem deve avançar. Fica em 0 porque o texto alterna futuro com economia calculada, mas não mostra candidatos processados nem uso recorrente real, como o Radar Preventivo de SLA. Para subir, precisa registrar volume em produção e uso contínuo das recomendações pelo RH.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (fora_de_uso)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 0,
+     "piso": "fora_de_uso"
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 2313.95,
+   "valor_sugerido": 578.49,
+   "ajustaria": true,
+   "auditoria": "O cálculo declarou as mesmas 8 entrevistas para cada uma das 4 pessoas, embora o texto indique 8 no total. Retirando a contagem quádrupla: R$ 2.313,95 ÷ 4 = R$ 578,49 líquidos por mês. Se forem comprovadas 8 entrevistas semanais por pessoa, o valor declarado se sustenta."
+  },
+  {
+   "id": "c1538380f0aedeac9353419bce98e8f8",
+   "nome": "PIAPP",
+   "area": "GROWTH",
+   "humana": 10,
+   "especial": true,
+   "agente": 5,
+   "confianca": "baixa",
+   "leitura": "⚠ escape sem citação da doc para \"Existe atividade em curso hoje que NÃO existiria sem ele. Não \"seria mais lenta\": não existiria.\" — voltou para 5★. O Piapp gera conteúdo por IA para mais de dez times e oferece API e MCP para sistemas internos. Recomendo 8, acima do Prisma, pois o Prisma já opera sobre a plataforma. Para chegar a 9, precisaria comprovar outros projetos em operação sobre ela, além do Prisma.",
+   "base": 5,
+   "delta": 0,
+   "ajuste": "as lentes concordam com a base",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "042ceb241415c998dc98038ef31c4907",
+   "nome": "Automação de Nfs via Python",
+   "area": "Supply Gogroup",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "Baixa, converte, organiza e arquiva diariamente as notas fiscais sem início humano, como a Automação de Inputs de Saída. Não sobe porque apenas executa um fluxo fixo, sem comprovação de validação ou bloqueio de falhas com impacto operacional. Para subir, precisa identificar omissões e impedir que notas incorretas ou ausentes avancem para compras ou recebimento.",
+   "base": 2,
+   "delta": -2,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 212.9,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "A conta declarada é 20h × R$ 21,29 = R$ 425,80 bruto; com peso de 50%, resulta em R$ 212,90 líquido. Contudo, como a execução é manual, o cálculo correto é (20h − horas humanas mensais posteriores) × R$ 21,29 × 50%. Falta medir essas horas para propor uma redução numérica defensável."
+  },
+  {
+   "id": "4f83eb613abc6d704bc4f1ef3bb0877c",
+   "nome": "Portal de Jornada do Cliente B2B",
+   "area": "CSC",
+   "humana": 2,
+   "especial": false,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "O portal coordena devoluções entre sete áreas, aplica regras de encaminhamento, monitora SLA e mantém histórico auditável. Fica em 3, como o Portal de devoluções de CX, porque as decisões do caso e as tratativas continuam com as equipes. Para subir, teria de decidir situações não triviais e comprometer recursos por critérios inteligentes e auditáveis.",
+   "base": 3,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 5, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 4669.115,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "A conversão do bruto para o líquido fecha: R$ 9.338,23 × 50% = R$ 4.669,115, arredondado para R$ 4.669,12. Contudo, 12 × (44h − 0,33h) = 524,04h, enquanto 12 × (22,5h − 0,33h) = 266,04h. Como o dossiê apresenta simultaneamente os dois baselines e não comprova qual foi medido, não há valor defensável para confirmar ou sugerir."
+  },
+  {
+   "id": "04a1e4edee977d07335e203d6a67f890",
+   "nome": "Integrações multi-plataforma de CRM",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 3,
+   "confianca": "alta",
+   "leitura": "Integra Insider e Omnisend, corrige falhas de dados e evita envios duplicados ao cliente, com aumento medido no share do CRM. Fica ao lado de Fluxo de carrinho abandonado e checkout; não chega a 4 porque não escolhe campanhas ou recursos com inteligência própria. Para subir, precisaria tomar decisões auditáveis de segmentação ou acionamento.",
+   "base": 3,
+   "delta": 0,
+   "ajuste": "as lentes concordam com a base",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "0708a976f1dd189f1e8a106e93b5c2f7",
+   "nome": "Automação de Dados CTR Gocase",
+   "area": "PRODUTO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "⚠ Conferir na triagem: «Robo subir vídeos em teste» (similaridade 0.88) é quase idêntico e vale 5★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. A automação atualiza diariamente a planilha de CTR e organiza as imagens no Drive. Fica abaixo da Máquina de Criação de CTRs porque resolve uma tarefa local e o único resultado comprovado são as 16 horas economizadas. Para subir, precisa mostrar uso recorrente desses dados pelo time em decisões de produto.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 86.24,
+   "valor_sugerido": 86.24,
+   "ajustaria": false,
+   "auditoria": "Confirmação do impacto líquido: 16 horas mensais × R$ 10,78 = R$ 172,48 de impacto bruto. Como “alguém fazia: nao”, aplica-se o peso de 50% de custo evitado: R$ 172,48 × 0,50 = R$ 86,24 por mês."
+  },
+  {
+   "id": "e8d21e1041eab22d16bdafc271db909e",
+   "nome": "CX - Ticket Creator",
+   "area": "RPA",
+   "humana": 5,
+   "especial": true,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "Abre tickets diretamente nas transportadoras, com 6,2 mil casos processados e 94% concluídos sem intervenção humana. Fica em 5, como o próprio CX Ticket Creator citado entre os exemplos, porque automatiza uma operação que antes já existia por fluxo n8n ou abertura manual. Para subir, precisaria sustentar outros processos em produção criados sobre seu serviço.",
+   "base": 5,
+   "delta": -1,
+   "ajuste": "desce 1 (as lentes sustentavam 2, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "244735580d1bdff3d0a9ebef2eccd35e",
+   "nome": "Automação validação catraca refeitorio",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "Cruza a nota do refeitório com a catraca e prepara divergências para revisão e contestação. Fica em 0 porque é uma tarefa mensal, local e antes resolvida por planilha e PROCV, com impacto restrito a uma pessoa. Para subir, precisa comprovar uso recorrente por outros usuários e contestação efetiva baseada nos resultados.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 43.845,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "[sugestão de ALTA descartada: quem aumenta o ganho é gente] Conta auditada: (1,67 − 0,08) × R$ 55,15 = R$ 87,69 brutos; R$ 87,69 × 50% = R$ 43,845, arredondado para R$ 43,85 mensais. O valor declarado é confirmado."
+  },
+  {
+   "id": "110f199139399ccd797af95aee10f165",
+   "nome": "Sucesso.AI",
+   "area": "CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "O Sucesso.AI identifica insucessos e contata automaticamente o cliente para escolher reenvio ou reembolso. Fica em 2 porque executa a rotina, mas não há prova de que valide erros ou conclua a solução escolhida. Para subir, precisa comprovar volume recorrente e a conclusão auditável de reenvios ou reembolsos.",
+   "base": 2,
+   "delta": -1,
+   "ajuste": "desce 1 pelas lentes",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 12955.82,
+   "valor_sugerido": 8218.66,
+   "ajustaria": true,
+   "auditoria": "Retiro R$ 4.737,16 do declarado porque os R$ 9.474,32 foram computados integralmente, mas estão classificados como custo evitado e devem receber peso de 50%. Conta defensável: R$ 9.474,32 × 50% = R$ 4.737,16; R$ 34.815,00 × 10% = R$ 3.481,50; total líquido = R$ 8.218,66/mês."
+  },
+  {
+   "id": "43149070d81a1b405ea08f66eebec1da",
+   "nome": "GoUniform",
+   "area": "GENTE E GESTÃO | CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Centraliza estoque, funcionários e solicitações de uniformes. Como Facilities - Gestão Operacional, não comprova uso recorrente e resolve um controle simples antes feito em planilha. Para subir, precisa mostrar usuários frequentes e solicitações realmente processadas pelo aplicativo.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 1.161666667,
+   "valor_sugerido": 1.16,
+   "ajustaria": false,
+   "auditoria": "R$ 13,94 de impacto bruto semestral ÷ 6 meses = R$ 2,3233 mensais. Como ninguém executava a atividade antes, o ganho corresponde a custo evitado e recebe peso de 50%: R$ 2,3233 × 0,50 = R$ 1,1617, arredondado para R$ 1,16 mensais."
+  },
+  {
+   "id": "39d180dc4e4ee29640cffec5fe9a118a",
+   "nome": "Cadastro de Análise de Crédito RCA",
+   "area": "B2B GOBEAUTE",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Automatiza o preenchimento e envio de formulários de análise de crédito, mas depende de início manual via run.bat e atende uma rotina local de uma pessoa. Assim como o Fomrs_RCA_RDstation, o uso é real, porém o impacto é restrito e o ganho declarado resume a entrega. Para subir, precisaria operar sem acionamento humano e sustentar uma etapa relevante usada por mais áreas ou processos.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 117.095,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "A memória resulta em R$ 234,19/mês: 11h × R$ 21,29, sem custos a deduzir. Como o valor auditado de R$ 117,10/mês é menor e a diferença para o bruto decorre dos pesos da régua, não se propõe aumento nem ajuste."
+  },
+  {
+   "id": "46cf07d0ee60fd21e981405fd17265f3",
+   "nome": "GoPilot",
+   "area": "RPA",
+   "humana": 1,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O GoPilot executa automaticamente a consolidação e a previsão mensal por linha e SKU, deixando para o time apenas exceções e decisões. Fica ao lado da Análise Inteligente de Prazos e não sobe porque não bloqueia erros nem toma decisões de compra ou estoque. Subiria se validasse e impedisse projeções inadequadas antes de afetarem a operação.",
+   "base": 2,
+   "delta": -2,
+   "ajuste": "zerado pelo piso (marginal)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 1047.85,
+   "valor_sugerido": 1047.85,
+   "ajustaria": false,
+   "auditoria": "Conta auditada: (24h + 14h) × R$ 55,15 = 38h × R$ 55,15 = R$ 2.095,70 de impacto bruto. Aplicando o peso de 50% informado pela régua: R$ 2.095,70 × 0,50 = R$ 1.047,85 por mês. Não há custos externos nem outra parcela declarada a deduzir."
+  },
+  {
+   "id": "0bd70ba17882781235e433235d4f16d9",
+   "nome": "Automação Semanal de Cronograma de Mala do Monday",
+   "area": "PRODUTO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "Gera semanalmente um relatório sobre prazos dos produtos de Malas. Fica em 0, como Automação de Relatório de Malas, porque só estão comprovadas as 4h/mês economizadas e a prevenção de atrasos é esperada. Para subir, precisa mostrar que o squad consulta o relatório e age sobre os itens sinalizados.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 66.2,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "Conta auditada: 4h/mês × R$ 33,10/h = R$ 132,40/mês; menos R$ 0 de custos = R$ 132,40. Não há custo evitado sujeito ao peso de 50%. Como o declarado de R$ 66,20 é inferior ao valor defensável, não proponho aumento."
+  },
+  {
+   "id": "094f30c93878a4211fe047de14def297",
+   "nome": "Sistema de Assinatura Digital de Romaneios - TikTok",
+   "area": "ÁREA NÃO IDENTIFICADA",
+   "humana": 1,
+   "especial": true,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Automatiza assinaturas de motorista e conferente e prevê gerar o romaneio em PDF. Fica em 0 porque o memorial apresenta resultado esperado, sem comprovar uso recorrente; para subir, precisa demonstrar romaneios efetivamente assinados e expedidos com esse controle.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (experimentacao)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 0,
+     "piso": "experimentacao"
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "so_o_autor"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "3f625de8dfbba719e411e4420e71f89c",
+   "nome": "Agente Estoque Custo",
+   "area": "FINANÇAS",
+   "humana": 0,
+   "especial": false,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "O agente calcula o custo médio, faz lançamentos contábeis e concilia estoques de oito empresas em rotinas automáticas e auditáveis. Fica em 3, ao lado do Estoque ao vivo Gobeaute, mas não em 4 porque sua lógica principal é determinística. Para subir, precisaria decidir ajustes ou provisões com inteligência própria e consequência financeira direta.",
+   "base": 3,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 5, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 1075.425,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "[sugestão de ALTA descartada: quem aumenta o ganho é gente] Conta auditada: 39h mensais economizadas geram impacto bruto de R$ 2.150,85. Aplicando o peso de 50% usado no Impacto Líquido: R$ 2.150,85 × 0,50 = R$ 1.075,425, arredondado para R$ 1.075,43. Nada deve ser retirado: não há custo externo, receita bruta nem outra parcela duplicada."
+  },
+  {
+   "id": "51a339718e462d9d74709f92e621ab21",
+   "nome": "Dashboard Lives Gogroup",
+   "area": "GROWTH",
+   "humana": 1,
+   "especial": true,
+   "agente": 1,
+   "confianca": "media",
+   "leitura": "Sem leitura — o modelo não justificou a nota.",
+   "base": 0,
+   "delta": 1,
+   "ajuste": "sobe 1 pelas lentes",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "2e7661ed9d40c55958cb7cff0402c893",
+   "nome": "Mix Produtos Gobeaute",
+   "area": "GROWTH",
+   "humana": 1,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "Consolida vendas, metas, margem e estoque das oito marcas e alimenta o relatório semanal do board. Como o Haileydash, automatiza a base e orienta decisões, mas não corrige desvios nem impede erros sozinho. Para subir, precisaria bloquear falhas relevantes ou executar ações comerciais a partir dos dados.",
+   "base": 2,
+   "delta": 1,
+   "ajuste": "sobe 1 pelas lentes",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "32bfb9878a3b2f7ba7b6b6fb9bd17951",
+   "nome": "GoRender",
+   "area": "PRODUTO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "Gera em lote imagens 3D de térmicos e malas, deixando para uma assistente apenas a conferência e ajustes. Fica em 0, como Automação de Mockups de Cases, porque automatiza uma tarefa local usada por uma pessoa. Para subir, precisaria rodar sem acionamento humano e sustentar um fluxo recorrente mais amplo de publicação.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 418.2,
+   "valor_sugerido": 418.2,
+   "ajustaria": false,
+   "auditoria": "R$ 836,40 de impacto bruto × 50% da régua = R$ 418,20 por mês. O valor declarado é confirmado."
+  },
+  {
+   "id": "0948b36da6660fa70fe4e4337c46e652",
+   "nome": "SAIBBI — Sistema de Análise de Impressão BB Indústria",
+   "area": "ÁREA NÃO IDENTIFICADA",
+   "humana": 2,
+   "especial": true,
+   "agente": 3,
+   "confianca": "media",
+   "leitura": "Padroniza a inspeção UV, classifica defeitos e gera laudos rastreáveis usados em todos os turnos. Fica em 3, alinhado ao BB Indústria QC, pois protege a liberação do lote, mas aplica limites fixos em vez de decidir com inteligência própria. Para subir, teria de decidir a liberação ou o bloqueio com um modelo probabilístico auditável.",
+   "base": 3,
+   "delta": 0,
+   "ajuste": "as lentes concordam com a base",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "1502780dbd2269031d9b73afd1bc0ae5",
+   "nome": "Pzerify - Criação de malas P0",
+   "area": "PRODUTO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O Pzerify transforma imagens de malas no padrão P0, mas depende de upload e ajustes finais da equipe. Como a Central de Estampas, seu valor está concentrado na economia de uma tarefa local, sem decisão ou execução autônoma recorrente. Para subir, precisa comprovar uso contínuo e assumir o fluxo completo sem acionamento nem correções humanas.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (apenas_mensuravel)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "apenas_mensuravel"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 167.125,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "Conta auditada: 9,5 × 13,94 = R$ 132,43; 9,5 × 21,29 = R$ 202,26; total bruto de R$ 334,69. Mesmo deduzindo R$ 0,88, o ganho seria R$ 333,81, superior aos R$ 167,13 declarados. Como a sugestão não pode aumentar o ganho, nenhum novo valor é proposto."
+  },
+  {
+   "id": "4f452f2a1ef198a4d672c78485581da8",
+   "nome": "Ressarcimento CX",
+   "area": "CX",
+   "humana": 3,
+   "especial": true,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "Sem leitura — o modelo não justificou a nota.",
+   "base": 0,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 3, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "2c23b6650cf58226cf7414867764fcae",
+   "nome": "Teste de Descascamento (térmicos)",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 2,
+   "especial": true,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «BB Indústria QC» (similaridade 0.76) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. Digitaliza os testes de descascamento e oferece rastreabilidade e indicadores, mas o memorial não comprova registros reais, usuários ou frequência de uso, ficando junto de Analise Descascamento. Para chegar a 1★, precisa apresentar logs atuais de testes realizados por diferentes turnos.",
+   "base": 0,
+   "delta": 1,
+   "ajuste": "sobe 1 pelas lentes",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "1eac04cf4319ff23855348f85f0529e4",
+   "nome": "ecom-metrics-hub",
+   "area": "GROWTH",
+   "humana": 3,
+   "especial": true,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "⚠ escape sem citação da doc para \"Existe atividade em curso hoje que NÃO existiria sem ele. Não \"seria mais lenta\": não existiria.\" — voltou para 5★. Plataforma de dados central que sustenta múltiplos projetos críticos (VERSTA – Robô Orçamento, Dashboard de Planejamento e GoPilot), substituiu processos manuais e padronizou a leitura de ROI das 7 marcas. Recomendo 8★ porque habilita pelo menos três processos que não existiriam sem ela e criou dependência irreversível, posicionando-se acima do GoBrands (7★) pelo número de projetos sustentados, mas ainda abaixo de 9★ por seu alcance estar concentrado em Growth e mídia.",
+   "base": 5,
+   "delta": -1,
+   "ajuste": "desce 1 pelas lentes",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "240727795b77ff2229280029c68e8b61",
+   "nome": "Automação assinatura digital férias",
+   "area": "GENTE E GESTÃO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Automatiza o envio, acompanhamento e download de cerca de 35 a 40 recibos mensais para uma única analista. Fica em 0, como Envio de Assinatura Digital Automatizada, porque é uma tarefa local e o benefício se resume às quatro horas mensais contabilizadas; subiria com uso recorrente mais amplo e impacto operacional relevante além dessa economia.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 66.2,
+   "valor_sugerido": 66.2,
+   "ajustaria": false,
+   "auditoria": "Confirmação do valor declarado: 4h mensais economizadas × R$ 33,10 = R$ 132,40 de impacto bruto; R$ 132,40 × 50% = R$ 66,20 de impacto líquido conforme o peso da régua informado no dossiê."
+  },
+  {
+   "id": "12d5f2bcbd0cefad63af4a76d7f2dae9",
+   "nome": "Central de Estampas",
+   "area": "PRODUTO",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "A Central de Estampas aplica estampas em lote e já reduziu o trabalho mensal de duas pessoas. Fica em 0, como Pzerify, porque é uma tarefa local acionada e revisada pela equipe, e seu valor está concentrado no tempo economizado. Para subir, precisaria receber a demanda e entregar os criativos automaticamente, sem operação humana.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (apenas_mensuravel)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "apenas_mensuravel"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 438.9,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "O valor declarado não está inflado; está abaixo da conta sustentada pelo memorial. O saving de pessoas totaliza R$ 878,18 e, mesmo deduzindo o custo informado de R$ 0,76, sobra R$ 877,42 mensais. Pela regra, não cabe sugerir aumento para esse montante."
+  },
+  {
+   "id": "88b8e4e3a64454dfe4fcfa50fc3d92ee",
+   "nome": "GoPrice",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 4,
+   "especial": true,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "O GoPrice recomenda preços usando elasticidade, estoque e aprendizado contínuo, como o Agente precificador já avaliado em 4 estrelas. Não chega a 5 porque apenas sugere alterações e o memorial não comprova uso recorrente; subiria se aplicasse os preços diretamente e respondesse por uma meta auditável.",
+   "base": 4,
+   "delta": -4,
+   "ajuste": "zerado pelo piso (experimentacao)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 0,
+     "piso": "experimentacao"
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "1d37cb8155199ce91a3687dc7832c532",
+   "nome": "Análise Inteligente de Prazos",
+   "area": "TRANSPORTES",
+   "humana": null,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Automação End-to-End de Inadimplência» (similaridade 0.91) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. A plataforma coleta, cruza e atualiza diariamente os dados de prazos para orientar a equipe, como o Dashboard Analytics Gerencial Gobeaute. Fica em 1 porque as decisões de roteirização e ajuste de regras continuam humanas. Para subir, precisaria executar automaticamente essas mudanças na operação.",
+   "base": 1,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 4, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 622.42,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "O valor declarado está abaixo do cálculo sustentado pelo memorial. Cálculo: R$ 478,40 + R$ 766,44 = R$ 1.244,84 mensais, sem custos a deduzir. Como sugestões só podem confirmar ou reduzir, não proponho aumento."
+  },
+  {
+   "id": "0c708b3d696c121e7644393209235860",
+   "nome": "Conexão MCP-GTI",
+   "area": "TRANSPORTES",
+   "humana": null,
+   "especial": false,
+   "agente": 2,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Relatório Transportador» (similaridade 0.81) é quase idêntico e vale 3★ — a nota 1★ diverge muito; iguale a faixa ou justifique a diferença. O servidor permite consultar e atualizar dados do GTI por assistentes de IA, com permissões e auditoria. Fica ao lado do CFI em 1 estrela porque o usuário ainda inicia as consultas e confirma escritas, sem uma rotina autônoma de ação. Para subir, precisaria executar acompanhamentos e atualizações recorrentes sem comando humano.",
+   "base": 1,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 3, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 1028.5,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "A conta defensável do memorial é R$ 237,15 + R$ 265,05 + R$ 1.554,80 = R$ 2.057,00/mês, referente a 62,5h efetivamente economizadas. Como o declarado sob auditoria é menor (R$ 1.028,50), não cabe sugerir aumento; o valor permanece sem sugestão."
+  },
+  {
+   "id": "a5c53437050d4a5405d36ce86b594b1c",
+   "nome": "Smart Replan",
+   "area": "SUPPLY GOGROUP",
+   "humana": 4,
+   "especial": true,
+   "agente": 3,
+   "confianca": "baixa",
+   "leitura": "O Smart Replan analisa demanda e estoque para recomendar ajustes de forecast, produção e trânsito, ficando ao lado de GoPrice e Agente precificador. Não chega a 5 porque o time ainda simula, revisa e confirma as alterações. Para subir, precisaria aplicar os ajustes diretamente na operação e responder pela meta final de cobertura.",
+   "base": 4,
+   "delta": -1,
+   "ajuste": "desce 1 pelas lentes",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "02c3d43be8c6010839b18b311825747c",
+   "nome": "BID Financeiro",
+   "area": "FINANÇAS",
+   "humana": null,
+   "especial": false,
+   "agente": 0,
+   "confianca": "media",
+   "leitura": "Sem leitura — o modelo não justificou a nota.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 0,
+     "piso": "experimentacao"
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 28.9625,
+   "valor_sugerido": 28.96,
+   "ajustaria": false,
+   "auditoria": "Confirmado. O ganho bruto documentado é R$ 231,70, calculado por 7h economizadas × R$ 33,10. Como o saving é pontual, sua alocação em 8 meses resulta em R$ 231,70 ÷ 8 = R$ 28,9625, arredondado para R$ 28,96 por mês. Não há outros ganhos somados nem custos a descontar."
+  },
+  {
+   "id": "4b652006784d6d96da9027a89a46da23",
+   "nome": "Skill Cronômetro de tempo",
+   "area": "GENTE E GESTÃO | CX",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "baixa",
+   "leitura": "A skill reúne pauta, agenda e cronômetro para eventos internos. Fica em 0, como os painéis locais já avaliados, porque atende ocasiões pontuais e seu valor comprovado se limita à cronometragem de uma pessoa. Subiria com uso recorrente em vários eventos e impacto comprovado nas decisões ou na condução das agendas.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 1,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 160.3125,
+   "valor_sugerido": 0,
+   "ajustaria": true,
+   "auditoria": "Para impacto mensal: 0 horas recorrentes documentadas × custo do cargo = R$ 0/mês. O cálculo de 30h × R$ 42,75 = R$ 1.282,50 está correto, mas o próprio memorial o classifica como pontual. Portanto, retira-se a repetição mensal de R$ 160,31 e preserva-se R$ 1.282,50 somente como ganho único."
+  },
+  {
+   "id": "88a169cce620725c413d7457b3cb9ce1",
+   "nome": "GoStream - Checklist Proposta",
+   "area": "GENTE E GESTÃO",
+   "humana": 0,
+   "especial": false,
+   "agente": 0,
+   "confianca": "alta",
+   "leitura": "Automatiza uma tarefa simples de baixa complexidade, equivalente ao Gostream já avaliado com 0 estrelas. O ganho principal é economia operacional muito pequena (0,83h/mês) e envio automático de alerta, sem tomada de decisão, bloqueio ou execução crítica.",
+   "base": 0,
+   "delta": 0,
+   "ajuste": "zerado pelo piso (simples_local)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 0,
+     "piso": "simples_local"
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 0,
+     "piso": "marginal"
+    },
+    {
+     "l": "risco_evitado",
+     "n": 0,
+     "piso": null
+    }
+   ],
+   "valor_declarado": 13.505,
+   "valor_sugerido": null,
+   "ajustaria": false,
+   "auditoria": "A base declarada resulta em 0,1667 h para cada uma das cinco pessoas. A soma por cargo é R$ 1,80 + R$ 4,98 + R$ 5,52 + R$ 5,52 + R$ 9,19 = R$ 27,01 brutos; aplicando 50%, chega-se a R$ 13,505, arredondado para R$ 13,51 líquidos. Não proponho redução porque o cálculo é defensável sob as premissas, nem confirmação porque o tempo ainda é projetado e não medido."
+  },
+  {
+   "id": "8adc7e24da8543aa6aae7222b95607c7",
+   "nome": "GoHunter",
+   "area": "RPA",
+   "humana": 5,
+   "especial": true,
+   "agente": 1,
+   "confianca": "baixa",
+   "leitura": "⚠ Conferir na triagem: «Cases IA | Lógica» (similaridade 0.76) é quase idêntico e vale 3★ — a nota 0★ diverge muito; iguale a faixa ou justifique a diferença. O GoHunter possui uma proposta tecnicamente robusta, com pipeline de múltiplos agentes de IA, base proprietária de mais de 24 mil perfis avaliados e integração com InHire e Metaview. No entanto, a documentação não comprova uso recorrente por recrutadores nem resultados operacionais concretos, como vagas atendidas, candidatos enviados, avanços no funil ou contratações realizadas. Assim como o GoHire e o Go Select IA, permanece no estágio de solução construída com impacto esperado, mas sem evidência de adoção real. Para avançar, precisa demonstrar utilização contínua por múltiplos usuários e decisões de recrutamento efetivamente tomadas a partir da plataforma.",
+   "base": 0,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 5, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 1,
+     "piso": null
+    }
+   ]
+  },
+  {
+   "id": "05c4b3690bb33ff8f9bc0c039790d971",
+   "nome": "BB Indústria QC",
+   "area": "OPERAÇÕES GOCASE",
+   "humana": 3,
+   "especial": true,
+   "agente": 4,
+   "confianca": "baixa",
+   "leitura": "Centraliza a qualidade de Recebimento, Industrialização e Produção, cria rastreabilidade e executa notificações e relatórios recorrentes. O uso em produção está demonstrado pelo robô semanal, mas as decisões finais continuam com as lideranças. Para chegar a 4★, precisaria decidir liberações, bloqueios ou ações com fornecedores usando inteligência não determinística e com consequência operacional direta.",
+   "base": 3,
+   "delta": 1,
+   "ajuste": "sobe 1 (as lentes sustentavam 5, e o ajuste por rodada é de um degrau)",
+   "lentes": [
+    {
+     "l": "funcao_cadeia",
+     "n": 2,
+     "piso": null
+    },
+    {
+     "l": "recorrencia_rastro",
+     "n": 5,
+     "piso": null
+    },
+    {
+     "l": "complexidade_autonomia",
+     "n": 3,
+     "piso": null
+    },
+    {
+     "l": "alcance_reuso",
+     "n": 4,
+     "piso": null
+    },
+    {
+     "l": "risco_evitado",
+     "n": 2,
+     "piso": null
+    }
+   ]
+  }
+ ],
+ "falhas": [],
+ "dist": [
+  [
+   0,
+   25
+  ],
+  [
+   1,
+   10
+  ],
+  [
+   2,
+   3
+  ],
+  [
+   3,
+   9
+  ],
+  [
+   4,
+   9
+  ],
+  [
+   5,
+   1
+  ],
+  [
+   7,
+   1
+  ]
+ ]
+}
