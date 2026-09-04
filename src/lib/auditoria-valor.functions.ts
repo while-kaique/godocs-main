@@ -82,7 +82,20 @@ export async function auditarValorProjeto(projetoIdBruto: string): Promise<Resul
   // `comReais: true` porque é justamente o número que está sob auditoria. ⚠️ Isto é texto para o
   // AGENTE, não para o autor: a regra de nunca mostrar R$/hora ao autor vale na saída ao autor.
   const dossieTexto = dossieParaTexto(dossie, { comReais: true });
-  const prompt = buildPromptMerito({ dimensao: 'financeiro', dossieTexto, vizinhos: [] });
+  const declarado = await ganhoDeclarado(projetoId, dossie);
+
+  // ⚠️ O NÚMERO SOB AUDITORIA vai explícito, e isso não é redundância.
+  //
+  // O dossiê carrega os números do SQLite; a planilha é que guarda o ganho DECLARADO, e os dois
+  // divergem. Medido: no `legado-041` a planilha diz R$ 976,39 e a conta do memorial dá
+  // R$ 1.952,77, exatamente o dobro. Sem dizer qual dos dois está em julgamento, o auditor
+  // audita o que ele encontra e "só desce ou confirma" perde o sentido: ele parecia estar
+  // SUBINDO o valor quando na verdade estava falando de outro número.
+  const contexto =
+    declarado != null
+      ? `${dossieTexto}\n\nVALOR DECLARADO SOB AUDITORIA (o que está na planilha hoje): R$ ${declarado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por mês.\nÉ ESTE número que você audita. Confirmá-lo é resposta válida e esperada. Se a sua conta chega a um valor MAIOR, não sugira: registre no argumento e deixe valor_sugerido null, porque quem aumenta o ganho de um projeto é gente.`
+      : dossieTexto;
+  const prompt = buildPromptMerito({ dimensao: 'financeiro', dossieTexto: contexto, vizinhos: [] });
 
   const raw = await llmChat(prompt, { jsonMode: true, temperature: 0.2, maxTokens: 900 });
   const julgamento = normalizarJulgamentoMerito(extrairJson(raw), 'financeiro');
@@ -90,8 +103,12 @@ export async function auditarValorProjeto(projetoIdBruto: string): Promise<Resul
     return { ok: false, projeto_id: projetoId, motivo: 'LLM não devolveu auditoria utilizável' };
   }
 
-  const declarado = await ganhoDeclarado(projetoId, dossie);
-  const sugerido = julgamento.valor?.valor_sugerido ?? null;
+  const sugeridoCru = julgamento.valor?.valor_sugerido ?? null;
+  // ⚠️ TRAVA DETERMINÍSTICA, não confiança no prompt. A regra "só desce ou confirma" é do
+  // produto (quem aumenta o ganho de um projeto é gente), e prompt não segura: este repo já
+  // registrou isso três vezes em outras frentes. Sugestão acima do declarado é DESCARTADA, e o
+  // argumento do auditor sobrevive no texto para quem quiser ler.
+  const sugerido = sugeridoCru != null && declarado != null && sugeridoCru > declarado ? null : sugeridoCru;
   // "Ajustaria" é quando há NÚMERO proposto e ele difere do declarado. Repetir o declarado é
   // resposta válida e esperada: quer dizer "auditei e o número se sustenta".
   const ajustaria = sugerido != null && declarado != null && Math.abs(sugerido - declarado) > 0.01;
@@ -102,7 +119,10 @@ export async function auditarValorProjeto(projetoIdBruto: string): Promise<Resul
     ajustaria,
     valor_declarado: declarado,
     valor_sugerido: sugerido,
-    justificativa: julgamento.valor?.justificativa ?? julgamento.argumento,
+    justificativa:
+      sugeridoCru != null && sugerido == null
+        ? `[sugestão de ALTA descartada: quem aumenta o ganho é gente] ${julgamento.valor?.justificativa ?? julgamento.argumento}`
+        : (julgamento.valor?.justificativa ?? julgamento.argumento),
     julgamento,
   };
 }

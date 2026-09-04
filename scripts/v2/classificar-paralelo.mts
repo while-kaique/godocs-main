@@ -161,7 +161,7 @@ async function classificar(p: Alvo): Promise<void> {
     });
     const nota = (JUIZ === 'TIME' ? s.julgamento?.nota : s.recomendacao?.estrelas_recomendada) ?? null;
     if (nota != null) notas.set(nota, (notas.get(nota) ?? 0) + 1);
-    linhas.push({
+    const linha = {
       id: p.id,
       nome: p.nome,
       area: p.area ?? '',
@@ -181,19 +181,23 @@ async function classificar(p: Alvo): Promise<void> {
             lentes: (s.julgamento?.avaliacoes ?? []).map((a) => ({ l: a.lente, n: a.nota, piso: a.piso ?? null })),
           }
         : {}),
-    });
+    };
+    linhas.push(linha);
 
     // ⚠️ A auditoria vem DEPOIS e é isolada: falha nela não pode derrubar a estrela, que já
     // custou uma chamada. Sem isso, um 502 no auditor apagaria a nota do projeto inteiro.
     if (AUDITAR_VALOR && !p.especial) {
       try {
+        // ⚠️ Escreve na REFERÊNCIA da linha deste projeto, nunca em `linhas[linhas.length-1]`.
+        // Com 8 workers em paralelo, entre o push e a auditoria outro worker já empurrou a linha
+        // dele, e o "último" não é o meu. Foi assim que a run 3 saiu com auditoria em 4 projetos
+        // de 137: o guard `alvo.id === p.id` reprovava quase sempre, calado.
         const a = await post<Auditoria>('/api/admin/auditar-valor', { projetoId: p.id });
-        const alvo = linhas[linhas.length - 1];
-        if (alvo && alvo.id === p.id && a.ok) {
-          alvo.valor_declarado = a.valor_declarado ?? null;
-          alvo.valor_sugerido = a.valor_sugerido ?? null;
-          alvo.ajustaria = a.ajustaria ?? false;
-          alvo.auditoria = a.justificativa ?? '';
+        if (a.ok) {
+          linha.valor_declarado = a.valor_declarado ?? null;
+          linha.valor_sugerido = a.valor_sugerido ?? null;
+          linha.ajustaria = a.ajustaria ?? false;
+          linha.auditoria = a.justificativa ?? '';
         }
       } catch {
         /* auditoria é acessória: sem ela o projeto fica sem a coluna, não sem nota */
