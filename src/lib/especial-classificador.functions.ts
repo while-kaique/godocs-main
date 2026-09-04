@@ -30,6 +30,7 @@ import { lerResumosEspelho, lerLinhaEspelho } from "@/lib/sheet-espelho";
 import { chaveProjeto } from "@/lib/projeto-chave";
 import { TETO_AGENTE, ehEscape } from "@/lib/estrelas-regua";
 import { ajustarNotaComPainel, confiancaPorConsenso, type AjustePainel } from "@/lib/especiais-ajuste";
+import { verificarCoerencia, removerNumerosDivergentes } from "@/lib/coerencia-leitura";
 import { apenasEspeciais } from "@/lib/especiais-view";
 import { mapResumo, type ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 import type { DocumentacaoGerada } from "@/lib/agents/types";
@@ -1564,6 +1565,8 @@ export async function julgarProjetoComPainel(
   /** A nota do run 1, que é o ponto de partida — fica visível para o ajuste ser auditável. */
   base?: { nota: number; leitura: string };
   ajuste?: AjustePainel;
+  /** O que a verificação de coerência achou. Vazio = texto e nota dizem a mesma coisa. */
+  incoerencias?: string[];
   escape?: { nota: number; leitura: string; evidencias: Record<string, string> } | null;
   gravado?: boolean;
 }> {
@@ -1614,14 +1617,34 @@ export async function julgarProjetoComPainel(
   // um título que diz 4 faz a justificativa contradizer o número — medido na run 5, e é
   // exatamente o que faz a triagem desconfiar do resto. Quando nada se moveu, a base abre
   // normalmente: não há contradição a desfazer.
-  const leitura =
+  // ⚠️ Quando a nota MUDA, o texto da base é DESCARTADO, não reordenado.
+  //
+  // Ele foi escrito para defender a nota DELE e diz isso em letras ("Fica em 5★"). Reordenar não
+  // resolve: a frase contraditória continua lá dentro, e foi por isso que a run 5 ainda saiu com
+  // 39% de leituras que contradizem a própria nota (contra 3% do agente sozinho). No lugar dele
+  // entram as justificativas das LENTES, que falam por eixo e não cravam número global — que é,
+  // afinal, o que o time tem de melhor a dizer.
+  const justificativaDasLentes = julgamento.avaliacoes
+    .slice()
+    .sort((a, b) => b.nota - a.nota)
+    .map((a) => a.justificativa)
+    .filter((t) => t && t.length > 20)
+    .slice(0, 2)
+    .join(" ");
+  const leituraCrua =
     ajustada.delta !== 0
-      ? [
-          `Nota ${notaFinal}: ${ajustada.motivo}.`,
-          `Por eixo: ${porEixo}.`,
-          `Leitura da base (que sustentava ${ajustada.base}): ${base.leitura}`,
-        ].join(" ")
+      ? [`Nota ${notaFinal}: ${ajustada.motivo}.`, justificativaDasLentes, `Por eixo: ${porEixo}.`]
+          .filter(Boolean)
+          .join(" ")
       : [base.leitura, `Por eixo: ${porEixo}.`].join(" ");
+
+  // Rede final, em CÓDIGO: nenhuma frase que crave um número diferente do veredito sobrevive.
+  // As quatro etapas de verificação do time (lentes, consolidação, revisor, consenso) não olham
+  // para isto — o revisor ataca a ALTURA da nota, o consenso mede divergência entre eixos.
+  const incoerencias = verificarCoerencia(leituraCrua, notaFinal, TETO_AGENTE);
+  const leitura = incoerencias.some((i) => i.tipo === "numero_divergente")
+    ? removerNumerosDivergentes(leituraCrua, notaFinal)
+    : leituraCrua;
 
   // ⚠️ A confiança gravada é a do CONSENSO, não a que o painel declarou sozinho: se as lentes
   // divergiram entre si, ou se a base e elas discordaram, a nota sai com a certeza que ela de
@@ -1647,6 +1670,11 @@ export async function julgarProjetoComPainel(
   return {
     ok: true,
     projeto_id: projetoId,
+    // ⚠️ A pendência sai no resultado em vez de morrer: "o texto afirma que outros dependem
+    // deste projeto e a nota não escapou" é justamente o caso PIAPP, e são 60 na run 5.
+    incoerencias: incoerencias.map((i) =>
+      i.tipo === "numero_divergente" ? `texto cravava ${i.noTexto}` : `afirma dependentes ("${i.pista}") e não escapou`,
+    ),
     julgamento: { ...julgamento, nota: notaFinal, contestada, confianca },
     base: { nota: base.estrelas_recomendada, leitura: base.leitura },
     ajuste: ajustada,
