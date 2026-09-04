@@ -220,7 +220,17 @@ async function classificar(p: Alvo): Promise<void> {
             base: s.base?.nota ?? null,
             delta: s.ajuste?.delta ?? 0,
             ajuste: s.ajuste?.motivo ?? '',
-            lentes: (s.julgamento?.avaliacoes ?? []).map((a) => ({ l: a.lente, n: a.nota, piso: a.piso ?? null })),
+            // ⚠️ `a` é a CAIXA que a lente disse ter aplicado, e ela vai junto da nota de
+            // propósito: a trava "a caixa vence o número" (`especiais-lentes.ts`) corrige em
+            // silêncio quando o agente nomeia a âncora 2 e escreve 4, e sem gravar as duas não há
+            // como saber se ela corrige três vezes ou trezentas. Trava que age sem deixar rastro
+            // não é auditável, e auditar a trava é metade do trabalho da calibragem.
+            lentes: (s.julgamento?.avaliacoes ?? []).map((a) => ({
+              l: a.lente,
+              n: a.nota,
+              a: a.ancora ?? null,
+              piso: a.piso ?? null,
+            })),
           }
         : {}),
     };
