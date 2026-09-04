@@ -61,17 +61,49 @@ function numeroPtBR(v: unknown): number | null {
  * escreve a conta, e nunca marca ninguém para revisão. É o defeito mais caro possível numa
  * ferramenta cujo trabalho é apontar quem revisar.
  */
-async function ganhoDeclarado(projetoId: string, dossie: Dossie): Promise<number | null> {
+async function ganhoDeclarado(
+  projetoId: string,
+  dossie: Dossie,
+): Promise<{ liquido: number | null; bruto: number | null }> {
   try {
     const linha = await lerLinhaEspelho(projetoId);
-    const daPlanilha =
+    const liquido =
       numeroPtBR(linha?.['Impacto Líquido Mensal']) ?? numeroPtBR(linha?.['Impacto Líquido']);
-    if (daPlanilha != null) return daPlanilha;
+    const bruto = numeroPtBR(linha?.['Impacto Bruto']);
+    if (liquido != null || bruto != null) return { liquido, bruto };
   } catch {
     /* cai no dossiê */
   }
   const f = dossie.financeiro;
-  return f.ganho_total_mensal ?? f.saving_reais ?? null;
+  return { liquido: f.ganho_total_mensal ?? f.saving_reais ?? null, bruto: f.saving_reais ?? null };
+}
+
+const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * O que o auditor precisa saber sobre o número antes de julgá-lo.
+ *
+ * ⚠️ **A ponderação da régua v2 não é erro, e sem dizer isso o auditor a "descobre" toda vez.**
+ * Medido na base: **503 de 593 aprovados (85%) têm o Líquido em exatamente metade do Bruto**,
+ * porque `PESO_CUSTO_EVITADO = 0,5` — custo evitado é despesa que nunca nasceu, sem extrato que
+ * a comprove, e por isso vale metade (`impacto.ts`). O auditor comparava a aritmética crua do
+ * memorial com o Líquido ponderado e concluía "o declarado está 50% abaixo do que o memorial
+ * sustenta", em 85% da base. Uma lista de revisão em que 85% dos itens são a régua funcionando
+ * não é uma lista de revisão.
+ */
+function blocoDoValorDeclarado(liquido: number, bruto: number | null): string {
+  const linhas = [
+    `VALOR DECLARADO SOB AUDITORIA (o que está na planilha hoje): ${brl(liquido)} por mês, no campo "Impacto Líquido".`,
+  ];
+  if (bruto != null && Math.abs(bruto - liquido) > 0.01) {
+    linhas.push(
+      `O "Impacto Bruto" é ${brl(bruto)}. ⚠️ A diferença entre os dois NÃO é erro: o Líquido aplica os pesos da régua — saving efetivado vale 100%, custo evitado vale 50% (despesa que nunca nasceu, sem extrato que a comprove) e receita incremental vale 10%. Se a sua conta chega ao Bruto e o Líquido é a metade dele, isso é o peso do custo evitado, não um valor faltando: NÃO trate como discrepância.`,
+    );
+  }
+  linhas.push(
+    'É o Líquido que você audita. Confirmá-lo é resposta válida e esperada. Se a sua conta chega a um valor MAIOR, não sugira: registre no argumento e deixe valor_sugerido null, porque quem aumenta o ganho de um projeto é gente.',
+  );
+  return linhas.join('\n');
 }
 
 export async function auditarValorProjeto(projetoIdBruto: string): Promise<ResultadoAuditoriaValor> {
@@ -82,7 +114,7 @@ export async function auditarValorProjeto(projetoIdBruto: string): Promise<Resul
   // `comReais: true` porque é justamente o número que está sob auditoria. ⚠️ Isto é texto para o
   // AGENTE, não para o autor: a regra de nunca mostrar R$/hora ao autor vale na saída ao autor.
   const dossieTexto = dossieParaTexto(dossie, { comReais: true });
-  const declarado = await ganhoDeclarado(projetoId, dossie);
+  const { liquido: declarado, bruto } = await ganhoDeclarado(projetoId, dossie);
 
   // ⚠️ O NÚMERO SOB AUDITORIA vai explícito, e isso não é redundância.
   //
@@ -91,10 +123,7 @@ export async function auditarValorProjeto(projetoIdBruto: string): Promise<Resul
   // R$ 1.952,77, exatamente o dobro. Sem dizer qual dos dois está em julgamento, o auditor
   // audita o que ele encontra e "só desce ou confirma" perde o sentido: ele parecia estar
   // SUBINDO o valor quando na verdade estava falando de outro número.
-  const contexto =
-    declarado != null
-      ? `${dossieTexto}\n\nVALOR DECLARADO SOB AUDITORIA (o que está na planilha hoje): R$ ${declarado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por mês.\nÉ ESTE número que você audita. Confirmá-lo é resposta válida e esperada. Se a sua conta chega a um valor MAIOR, não sugira: registre no argumento e deixe valor_sugerido null, porque quem aumenta o ganho de um projeto é gente.`
-      : dossieTexto;
+  const contexto = declarado != null ? `${dossieTexto}\n\n${blocoDoValorDeclarado(declarado, bruto)}` : dossieTexto;
   const prompt = buildPromptMerito({ dimensao: 'financeiro', dossieTexto: contexto, vizinhos: [] });
 
   const raw = await llmChat(prompt, { jsonMode: true, temperature: 0.2, maxTokens: 900 });
