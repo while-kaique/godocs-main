@@ -236,6 +236,7 @@ describe("prompt do revisor", () => {
       {
         lente: "recorrencia_rastro",
         piso: null,
+    ancora: null,
         nota: 2,
         evidencia: "nomeada",
         confianca: "alta",
@@ -245,6 +246,7 @@ describe("prompt do revisor", () => {
       {
         lente: "alcance_reuso",
         piso: null,
+    ancora: null,
         nota: 4,
         evidencia: "nomeada",
         confianca: "alta",

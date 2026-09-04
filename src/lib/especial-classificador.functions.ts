@@ -1554,6 +1554,11 @@ export type OpcoesPainelLote = {
  * ⚠️ **`dry` é o DEFAULT**, como em todo o caminho do painel: gravar exige `{dry:false}`
  * explícito, e mesmo gravando escreve só em `especial_avaliacao`, NUNCA na coluna "Estrelas".
  */
+/** Afirmou dependentes e não escapou: vai ao humano, porque a afirmação ficou sem resposta. */
+function pendenteDependenteFlag(incs: ReturnType<typeof verificarCoerencia>): boolean {
+  return incs.some((i) => i.tipo === "dependente_sem_escape");
+}
+
 export async function julgarProjetoComPainel(
   projetoIdBruto: string,
   opts: { dry?: boolean; forcar?: boolean; lentes?: string[] } = {},
@@ -1604,7 +1609,6 @@ export async function julgarProjetoComPainel(
     piso: pisoNomeado,
   });
   const notaFinal = ajustada.nota;
-  const contestada = ehEscape(notaFinal) || base.contestada || julgamento.contestada;
   // O PORQUÊ é o ganho real de ter cinco olhares: a base explica o projeto, e as lentes dizem em
   // que eixo ele para. Sem isto o time custaria cinco chamadas para devolver o mesmo texto.
   const porEixo = julgamento.avaliacoes
@@ -1642,9 +1646,26 @@ export async function julgarProjetoComPainel(
   // As quatro etapas de verificação do time (lentes, consolidação, revisor, consenso) não olham
   // para isto — o revisor ataca a ALTURA da nota, o consenso mede divergência entre eixos.
   const incoerencias = verificarCoerencia(leituraCrua, notaFinal, TETO_AGENTE);
-  const leitura = incoerencias.some((i) => i.tipo === "numero_divergente")
+  const semNumeroErrado = incoerencias.some((i) => i.tipo === "numero_divergente")
     ? removerNumerosDivergentes(leituraCrua, notaFinal)
     : leituraCrua;
+
+  // ⚠️ A pendência do DEPENDENTE tem consequência, não é carimbo.
+  //
+  // Quando o texto afirma que outros projetos dependem deste e a nota não escapou, o agente
+  // escreveu a prova do escape e não a usou. São 60 casos na run 5, e é o caso PIAPP. Aqui isso
+  // vira duas coisas concretas: a pendência aparece ESCRITA para quem lê, e o projeto passa a
+  // ir ao comitê (`contestada`), que é a rota de quem precisa de olho humano.
+  //
+  // ⚠️ NÃO promove a nota sozinho. Entrar na faixa 6-10 exige as duas citações e é decisão do
+  // comitê; o que não pode é a afirmação morrer sem ninguém responder a ela.
+  const pendenteDependente = incoerencias.find((i) => i.tipo === "dependente_sem_escape");
+  const leitura = pendenteDependente
+    ? `${semNumeroErrado} ⚠ Conferir: o texto afirma que outros projetos dependem deste, o que é a prova da faixa 6-10, e a nota ficou em ${notaFinal}. Ou faltam as duas citações da documentação, ou a dependência não é de verdade.`
+    : semNumeroErrado;
+
+  const contestada =
+    ehEscape(notaFinal) || base.contestada || julgamento.contestada || pendenteDependente != null;
 
   // ⚠️ A confiança gravada é a do CONSENSO, não a que o painel declarou sozinho: se as lentes
   // divergiram entre si, ou se a base e elas discordaram, a nota sai com a certeza que ela de

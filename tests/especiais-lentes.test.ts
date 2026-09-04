@@ -52,6 +52,7 @@ function av(lente: string, nota: number, evidencia: Evidencia = "nomeada"): Aval
   return {
     lente,
     piso: null,
+    ancora: null,
     nota,
     evidencia,
     confianca: "media",

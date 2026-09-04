@@ -39,6 +39,7 @@ function av(
   return {
     lente,
     piso: null,
+    ancora: null,
     nota,
     evidencia,
     confianca: "media",

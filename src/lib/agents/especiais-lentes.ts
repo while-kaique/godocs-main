@@ -265,6 +265,14 @@ export type AvaliacaoLente = {
   piso: ChavePisoZero | null;
   evidencia: Evidencia;
   confianca: Confianca;
+  /**
+   * A ÂNCORA que a lente diz ter aplicado.
+   *
+   * ⚠️ É o critério virando CAIXA: a lente escolhe a frase da régua que descreve o projeto e a
+   * nota tem de ser a daquela frase. Sem isto, ela responde um número e ninguém confere contra
+   * qual critério — que é como "bateu o critério de 3 mas dei 5" passa sem ninguém ver.
+   */
+  ancora: number | null;
   /** Por que este eixo para nesta nota — 1 a 3 frases. */
   justificativa: string;
   /** O trecho do material que sustenta a nota. Vazio = alegação sem prova (ver o guard). */
@@ -376,12 +384,14 @@ ${REGRAS_DO_PORQUE}
 FORMATO — responda APENAS com JSON válido, sem texto fora do JSON:
 {
   "nota": <inteiro 0 a ${TETO_AGENTE}>,
+  "ancora": <a NOTA da frase da régua do seu eixo que descreve este projeto — tem de ser a mesma de "nota">,
   "piso": <a chave do item que ZERA, entre aspas, ou null se nenhum se aplica>,
   "evidencia": "nomeada" | "vaga" | "ausente",
   "confianca": "alta" | "media" | "baixa",
   "justificativa": "<1 a 3 frases: por que o seu eixo para nesta nota>",
   "sustentacao": "<o trecho do material que sustenta a nota, copiado. Vazio se não houver trecho nenhum.>"
 }
+⚠️ "ancora" é a frase da régua acima que você aplicou. Escolha a frase PRIMEIRO e responda a nota dela: se o projeto bate a descrição do 2, a nota é 2, mesmo que ele impressione por outro motivo. Critério é caixa, não é escala solta.
 ⚠️ "piso" é OBRIGATÓRIO e vem ANTES de pensar na nota: percorra os itens que zeram, decida se algum é verdade, e só então posicione o eixo. Preencher com null é uma resposta legítima e comum; o que não vale é não olhar.
 "evidencia": use "nomeada" SÓ quando houver nome próprio de relatório, painel, base, sistema, time ou pessoa em que se possa ir conferir — e copie esse trecho em "sustentacao". Sem trecho, é "vaga" ou "ausente".`;
 }
@@ -459,6 +469,16 @@ export function normalizarAvaliacaoLente(bruto: unknown, lente: string): Avaliac
 
   const justCrua = typeof o.justificativa === "string" ? o.justificativa.trim() : "";
 
+  // ⚠️ A CAIXA VENCE O NÚMERO. Se a lente diz ter aplicado a âncora 2 e responde 4, vale 2: ela
+  // nomeou o critério que descreve o projeto, e a nota daquele critério é a daquela caixa. Sem
+  // esta trava, "bateu o critério de 2 mas dei 4" atravessa todas as etapas sem ninguém ver.
+  const ancoraCrua = Number(o.ancora);
+  const ancora =
+    Number.isFinite(ancoraCrua) && lentePorChave(lente)?.ancoras.some((a) => a.nota === ancoraCrua)
+      ? ancoraCrua
+      : null;
+  const notaDaCaixa = ancora != null ? ancora : nota;
+
   // Piso declarado: só vale chave que EXISTE na régua. Chave inventada é ruído, e aceitá-la
   // deixaria o agente zerar por um motivo que ninguém consegue auditar depois.
   // Só vale chave que EXISTE na régua **e** pertence ao eixo DESTA lente. Chave inventada é
@@ -482,7 +502,8 @@ export function normalizarAvaliacaoLente(bruto: unknown, lente: string): Avaliac
   return {
     lente,
     // O piso é DESQUALIFICADOR: uma vez nomeado, a nota do eixo não sobrevive a ele.
-    nota: piso ? 0 : nota,
+    nota: piso ? 0 : notaDaCaixa,
+    ancora,
     piso,
     evidencia,
     confianca,
