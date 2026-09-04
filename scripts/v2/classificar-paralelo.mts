@@ -110,8 +110,8 @@ if (process.env.SOMENTE_IDS) {
 
 console.log(`juiz ${JUIZ} (${ROTA})`);
 if (VALENDO) {
-  const semNota = projetos.filter((p) => p.estrelas == null).length;
-  console.log(`gravando em ${semNota} projetos SEM nota humana; os outros ${projetos.length - semNota} são medidos mas não gravados`);
+  const comNota = projetos.filter((p) => p.estrelas != null).length;
+  console.log(`GRAVANDO recomendação em especial_avaliacao para os ${projetos.length}, incluindo ${comNota} que já têm nota humana (a coluna "Estrelas" NÃO é tocada)`);
 }
 console.log(`${projetos.length} projetos · concorrência adaptativa ${CONC_INICIAL}→${CONC_MAX} (piso ${CONC_MIN}) · ${VALENDO ? 'VALENDO' : 'ENSAIO'}\n`);
 
@@ -127,17 +127,17 @@ const t0 = Date.now();
 
 async function classificar(p: Alvo): Promise<void> {
   try {
-    // ⚠️ `dry` é decidido POR PROJETO, não pela run.
+    // ⚠️ Numa run que grava, grava para TODOS, inclusive quem já tem nota humana.
     //
-    // Numa run que grava, quem JÁ TEM nota humana continua em ensaio: a nota de gente é verdade
-    // e âncora, e escrever uma recomendação por cima dela é o ruído que o invariante
-    // "projeto com nota humana não é reclassificado" existe para evitar (o PIAPP é 10 e o
-    // agente não vai sugerir 3 no cartão dele). Mas a nota AINDA é calculada, porque sem ela não
-    // há como medir concordância justamente onde existe gabarito.
-    const temNotaHumana = p.estrelas != null;
+    // O invariante "projeto com nota humana não é reclassificado" existe para o cartão não ficar
+    // ruidoso, e `forcar` é a porta declarada para abri-lo em uso manual explícito. Decisão do
+    // dono do produto (04/09/2026): a recomendação ao lado da nota de gente é justamente o que
+    // torna a CONTESTAÇÃO DE PREÇO visível na tela, e o registro é reversível (vive em
+    // `especial_avaliacao` com a origem marcada, dá para limpar ou sobrescrever).
+    // ⚠️ O que continua intocável é a coluna "Estrelas": ela só muda por clique humano.
     const s = await post<Saida>(ROTA, {
       projetoId: p.id,
-      dry: !VALENDO || temNotaHumana,
+      dry: !VALENDO,
       forcar: true,
     });
     const nota = (JUIZ === 'TIME' ? s.julgamento?.nota : s.recomendacao?.estrelas_recomendada) ?? null;
