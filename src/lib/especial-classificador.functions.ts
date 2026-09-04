@@ -1609,13 +1609,19 @@ export async function julgarProjetoComPainel(
     .sort((a, b) => b.nota - a.nota)
     .map((a) => `${lentePorChave(a.lente)?.rotulo ?? a.lente} ${a.nota}`)
     .join(", ");
-  const leitura = [
-    base.leitura,
-    `Por eixo: ${porEixo}.`,
-    ajustada.delta !== 0 ? `Nota ${ajustada.motivo}.` : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  // ⚠️ Quando o time MOVE a nota, o veredito vem PRIMEIRO. A leitura da base foi escrita para
+  // defender a nota DELA, e ela diz isso em letras ("Fica em 5★"). Deixá-la abrindo o texto sob
+  // um título que diz 4 faz a justificativa contradizer o número — medido na run 5, e é
+  // exatamente o que faz a triagem desconfiar do resto. Quando nada se moveu, a base abre
+  // normalmente: não há contradição a desfazer.
+  const leitura =
+    ajustada.delta !== 0
+      ? [
+          `Nota ${notaFinal}: ${ajustada.motivo}.`,
+          `Por eixo: ${porEixo}.`,
+          `Leitura da base (que sustentava ${ajustada.base}): ${base.leitura}`,
+        ].join(" ")
+      : [base.leitura, `Por eixo: ${porEixo}.`].join(" ");
 
   // ⚠️ A confiança gravada é a do CONSENSO, não a que o painel declarou sozinho: se as lentes
   // divergiram entre si, ou se a base e elas discordaram, a nota sai com a certeza que ela de
