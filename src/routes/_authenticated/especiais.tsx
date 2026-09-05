@@ -87,6 +87,7 @@ import {
   tierDe,
   type AvaliacaoEspecial,
 } from '@/lib/especiais-regua';
+import { MOTIVO_MAX, MOTIVO_MIN } from '@/lib/correcoes';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 import { useTituloPagina } from '@/lib/use-titulo-pagina';
 import { SECAO } from '@/lib/titulo-pagina';
@@ -216,6 +217,47 @@ function Especiais() {
   }, [filtros]);
   /** Move o cartão de coluna = regrava a nota na planilha. Otimista: a coluna muda na hora e
    *  volta atrás se a escrita falhar (a alternativa é a tela congelar a cada clique). */
+  /**
+   * A pergunta do PORQUÊ, que só aparece quando a nota humana DIVERGE da recomendação.
+   *
+   * ⚠️ Ela vem DEPOIS da gravação e não bloqueia nada. Mover o cartão é um gesto rápido, e o
+   * backend já registra o motivo como opcional de propósito: exigir texto para mover faria a
+   * pessoa escrever "ok" para se livrar do campo, e "ok" é pior que vazio.
+   *
+   * ⚠️ E só aparece na DIVERGÊNCIA porque é só aí que o motivo ensina: `ensinaAlgo`
+   * (`correcoes.ts`) descarta correção em que a triagem confirmou o que o agente já dizia.
+   * Perguntar "por quê?" quando vocês concordaram gastaria a paciência de quem vai responder
+   * nas vezes em que a resposta importa.
+   */
+  const [pedindoMotivo, setPedindoMotivo] = useState<{
+    projetoId: string;
+    nome: string | null;
+    nota: number;
+    recomendado: number;
+    leitura: string | null;
+  } | null>(null);
+  const [motivo, setMotivo] = useState('');
+  const [salvandoMotivo, setSalvandoMotivo] = useState(false);
+
+  /** Regrava a MESMA nota levando o motivo junto — é o que registra a lição no log. */
+  async function salvarMotivo() {
+    if (!pedindoMotivo || motivo.trim().length < MOTIVO_MIN) return;
+    setSalvandoMotivo(true);
+    try {
+      await apiFetch('/api/admin/especiais/estrelas', {
+        projeto_id: pedindoMotivo.projetoId,
+        estrelas: pedindoMotivo.nota,
+        motivo: motivo.trim().slice(0, MOTIVO_MAX),
+      });
+      setPedindoMotivo(null);
+      setMotivo('');
+    } catch (e) {
+      setErro(`O motivo não foi gravado. ${e instanceof Error ? e.message : ''}`.trim());
+    } finally {
+      setSalvandoMotivo(false);
+    }
+  }
+
   async function mudarNota(projeto: ProjetoDashboardResumo, nova: number) {
     if (nova < 0 || nova > MAX_ESTRELAS_GRAVAVEL) return;
     const anterior = projeto.estrelas;
@@ -228,6 +270,17 @@ function Especiais() {
     try {
       await apiFetch('/api/admin/especiais/estrelas', { projeto_id: projeto.id, estrelas: nova });
       setErro(null);
+      const rec = avaliacaoPor.get(projeto.id);
+      if (rec && rec.estrelas_recomendada !== nova) {
+        setPedindoMotivo({
+          projetoId: projeto.id,
+          nome: projeto.nome ?? null,
+          nota: nova,
+          recomendado: rec.estrelas_recomendada,
+          leitura: rec.leitura ?? null,
+        });
+        setMotivo('');
+      }
     } catch (e) {
       setDados((d) =>
         d
@@ -488,6 +541,116 @@ function Especiais() {
           >
             <X className="h-3.5 w-3.5" aria-hidden />
           </button>
+        </div>
+      )}
+
+      {/*
+        O PORQUÊ da divergência — painel de RÉPLICA, não formulário.
+        ⚠️ Ele NÃO é modal e NÃO rouba o foco: o gesto de mover cartões continua livre enquanto
+        ele espera. Bloquear aqui faria a pessoa escrever "ok" para se livrar do campo, que é o
+        que o backend já evita deixando o motivo opcional.
+        ⚠️ O argumento do AGENTE aparece dentro dele porque o motivo humano é quase sempre uma
+        RÉPLICA a uma frase específica ("você disse que caiu por X, mas..."). Sem a frase à vista,
+        escrever o porquê vira redação; com ela, vira resposta. É a lição que o `correcoes.ts`
+        registra: guardar só a réplica é guardar metade de uma conversa.
+      */}
+      {pedindoMotivo && (
+        <div
+          role="region"
+          aria-label="Por que esta nota"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setPedindoMotivo(null);
+              setMotivo('');
+            }
+          }}
+          className="go-porque fixed bottom-4 right-4 z-40 w-[min(26rem,calc(100vw-2rem))] rounded-[var(--go-radius-lg)] border border-[var(--go-border)] bg-white p-4 shadow-[var(--go-shadow-lg)]"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[13px] font-semibold leading-tight text-[var(--go-blue)]">
+              Vocês discordaram. Por quê?
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setPedindoMotivo(null);
+                setMotivo('');
+              }}
+              aria-label="Dispensar"
+              className="rounded p-0.5 text-muted-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--go-blue)]"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          </div>
+
+          <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+            {pedindoMotivo.nome ?? pedindoMotivo.projetoId}
+          </p>
+
+          {/* Os dois vereditos frente a frente. Rótulo em TEXTO: nunca só a cor diz quem é quem. */}
+          <div className="mt-3 flex items-stretch gap-2 text-center">
+            <div className="flex-1 rounded-[var(--go-radius-md)] bg-muted/60 px-2 py-1.5">
+              <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground">O agente disse</div>
+              <div className="font-mono text-[19px] leading-tight text-muted-foreground">
+                {rotuloNotaAgente(pedindoMotivo.recomendado).rotulo}
+              </div>
+            </div>
+            <div className="flex-1 rounded-[var(--go-radius-md)] border-2 border-[var(--go-lime)] bg-[var(--go-lime)]/12 px-2 py-1.5">
+              <div className="text-[10.5px] uppercase tracking-wide text-[var(--go-blue)]">Vocês disseram</div>
+              <div className="font-mono text-[19px] font-semibold leading-tight text-[var(--go-blue)]">
+                {pedindoMotivo.nota}
+              </div>
+            </div>
+          </div>
+
+          {pedindoMotivo.leitura && (
+            <blockquote className="mt-3 border-l-2 border-[var(--go-border)] pl-2.5 text-[12px] leading-relaxed text-muted-foreground">
+              {pedindoMotivo.leitura.length > 260
+                ? `${pedindoMotivo.leitura.slice(0, 260).replace(/\s+\S*$/, '')}…`
+                : pedindoMotivo.leitura}
+            </blockquote>
+          )}
+
+          <label htmlFor="go-porque-campo" className="mt-3 block text-[12px] text-foreground">
+            O que ele deixou passar?
+          </label>
+          <textarea
+            id="go-porque-campo"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            maxLength={MOTIVO_MAX}
+            rows={3}
+            placeholder="Ex.: roda em 3 marcas e o time de Growth decide o preço a partir dele."
+            className="mt-1 w-full resize-none rounded-[var(--go-radius-md)] border border-[var(--go-border)] bg-[var(--go-cream)]/40 px-2.5 py-2 text-[13px] leading-relaxed placeholder:text-muted-foreground/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--go-blue)]"
+          />
+
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-muted-foreground">
+              {motivo.trim().length >= MOTIVO_MIN
+                ? `${MOTIVO_MAX - motivo.length} restantes`
+                : 'Uma frase basta.'}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setPedindoMotivo(null);
+                  setMotivo('');
+                }}
+                className="rounded-[var(--go-radius-md)] px-2.5 py-1.5 text-[12.5px] text-muted-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--go-blue)]"
+              >
+                Agora não
+              </button>
+              <button
+                type="button"
+                onClick={salvarMotivo}
+                disabled={motivo.trim().length < MOTIVO_MIN || salvandoMotivo}
+                className="rounded-[var(--go-radius-md)] bg-[var(--go-blue)] px-3 py-1.5 text-[12.5px] font-medium text-white disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--go-blue)]"
+              >
+                {salvandoMotivo ? 'Salvando…' : 'Salvar motivo'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

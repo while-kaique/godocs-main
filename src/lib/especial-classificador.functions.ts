@@ -25,7 +25,8 @@ import {
   upsertEmbeddingEspecial,
   parseJson,
   type EspecialEmbeddingRow,
-} from "@/integrations/db/client.server";
+
+  queryAdminActivities,} from "@/integrations/db/client.server";
 import { lerResumosEspelho, lerLinhaEspelho } from "@/lib/sheet-espelho";
 import { chaveProjeto } from "@/lib/projeto-chave";
 import { TETO_AGENTE, ehEscape, normalizarEscape} from "@/lib/estrelas-regua";
@@ -113,6 +114,7 @@ import {
 } from "@/lib/especiais-convergencia";
 import { revisarAdversarial } from "@/lib/agents/especiais-revisor";
 import { confiancaDoPainel, leituraDoPainel, ORIGEM_PAINEL } from "@/lib/especiais-painel";
+import { blocoCorrecoes, correcoesDoLog, licoesPara } from "@/lib/correcoes";
 
 /** Carimbo de origem gravado em cada recomendação do agente (distingue do seed da força-tarefa). */
 export const ORIGEM_AGENTE = "agente-classificador";
@@ -622,7 +624,7 @@ export async function classificarEspecialProjeto(
   if ("motivo" in pronto) return { ok: pronto.ok, projeto_id: projetoId, motivo: pronto.motivo, gravado: false };
   const { alvo, vizinhos, origem } = pronto;
 
-  const recomendacao = await classificarEspecial(alvo, vizinhos);
+  const recomendacao = await classificarEspecial(alvo, vizinhos, { licoes: await licoesDaTriagem(alvo.projeto_id ?? projetoId, vizinhos) });
   if (!recomendacao) {
     return { ok: false, projeto_id: projetoId, motivo: "LLM não devolveu recomendação utilizável" };
   }
@@ -768,7 +770,7 @@ export async function classificarEspeciaisPendentes(
           })
         : { vizinhos: [] as Vizinho[], origem: "sqlite" as OrigemVizinhos };
       const vizinhos = recuperado.vizinhos;
-      const rec = await classificarEspecial(montado.alvo, vizinhos);
+      const rec = await classificarEspecial(montado.alvo, vizinhos, { licoes: await licoesDaTriagem(montado.alvo.projeto_id ?? '', vizinhos) });
       if (!rec) {
         resultados.push({ ok: false, projeto_id: cand.id, motivo: "LLM sem recomendação" });
         continue;
@@ -1063,7 +1065,7 @@ export type JuizConcordancia = (
    * (agente único) ignora, e o painel usa a FUNÇÃO — que precisa sair do MESMO texto do lote, senão
    * a corrida de medição e a de produção roteariam diferente e deixariam de ser comparáveis.
    */
-  extra?: { funcao?: string | null },
+  extra?: { funcao?: string | null; licoes?: string },
 ) => Promise<{ estrelas_recomendada: number } | null>;
 
 export type ResultadoConcordancia = {
@@ -1566,6 +1568,39 @@ function pendenteDependenteFlag(incs: ReturnType<typeof verificarCoerencia>): bo
   return incs.some((i) => i.tipo === "dependente_sem_escape");
 }
 
+/**
+ * As lições que a triagem já ensinou — o bloco de correções para o prompt do agente.
+ *
+ * ⚠️ **Nunca lança.** Se o log não responder, o agente classifica como sempre classificou: uma
+ * falha de leitura de material didático não pode derrubar a recomendação de um projeto.
+ *
+ * ⚠️ Lê uma janela do `admin_activity_log` (append-only) e deixa `correcoesDoLog` filtrar: só
+ * a ação `estrelas`, uma correção por projeto (a mais recente), e só as que TÊM motivo escrito
+ * — `ensinaAlgo` descarta o resto, porque correção sem porquê ensina "concorde com o humano".
+ *
+ * ⚠️ O teto de 6 lições é do `blocoCorrecoes`. Não é economia de token: é que o prompt tem um
+ * punhado de linhas de atenção e enchê-lo de exemplos dilui a régua, que é o que manda.
+ */
+async function licoesDaTriagem(projetoId: string, vizinhos: readonly { projeto_id?: string; id?: string }[] = []): Promise<string> {
+  try {
+    const linhas = await queryAdminActivities(null, 200);
+    const correcoes = correcoesDoLog(
+      linhas.map((l) => ({
+        acao: String(l.acao ?? ""),
+        projeto_id: l.projeto_id ?? null,
+        projeto_nome: l.projeto_nome ?? null,
+        meta_json: l.meta_json ?? null,
+        created_at: l.created_at ?? null,
+      })),
+    );
+    const ids = vizinhos.map((v) => String(v.projeto_id ?? v.id ?? '')).filter(Boolean);
+    return blocoCorrecoes(licoesPara(correcoes, projetoId, ids));
+  } catch (e) {
+    console.error("[especial-classificador] falha ao ler as correções da triagem:", e);
+    return "";
+  }
+}
+
 export async function julgarProjetoComPainel(
   projetoIdBruto: string,
   opts: { dry?: boolean; forcar?: boolean; lentes?: string[] } = {},
@@ -1605,7 +1640,7 @@ export async function julgarProjetoComPainel(
   // BASE, que é a de sempre, com o escape que já funciona; as lentes entram para **ajustar fino**
   // e, principalmente, para melhorar o PORQUÊ, que é o ganho real de ter cinco olhares. O ajuste é
   // limitado a `AJUSTE_MAX_PAINEL`: acima disso não é calibragem, é outro juiz.
-  const base = await classificarEspecial(pronto.alvo, pronto.vizinhos);
+  const base = await classificarEspecial(pronto.alvo, pronto.vizinhos, { licoes: await licoesDaTriagem(projetoId, pronto.vizinhos) });
   if (!base) return { ok: false, projeto_id: projetoId, motivo: "LLM não devolveu recomendação utilizável" };
 
   const julgamento = await julgarUmEspecialComPainel(pronto.alvo, pronto.vizinhos, {
