@@ -360,3 +360,37 @@ describe('faixa de escape: um nível, não cinco posições', () => {
     expect(t).not.toMatch(/RECOMENDE um número/i);
   });
 });
+
+/**
+ * ⚠️ 05/09/2026 — o piso `experimentacao` estava sendo usado com o sentido ERRADO.
+ *
+ * A régua define experimentação como "existe para TESTAR uma ideia ou aprender uma ferramenta".
+ * Medido na run 9: das 48 notas humanas que o agente zerou, **9** caíram por `experimentacao`, e a
+ * maioria com texto que diz outra coisa — "traz apenas o resultado esperado, sem comprovar uso
+ * recorrente" (Hitmaker, Assinatura de Romaneios, Gobeaute Acompanhamentos). Isso é FALTA DE PROVA,
+ * não experimentação, e a diferença importa porque o piso ZERA o projeto inteiro a partir de UMA
+ * lente, enquanto falta de prova deveria só baixar a nota daquele eixo.
+ *
+ * O caso que fechou o diagnóstico é o GoPrice (âncora de 4★ da própria régua): três lentes o
+ * sustentavam em 3 e 4, a base disse 4, a triagem disse 4, e o texto do agente literalmente
+ * argumentava "não chega a 5 porque..." debaixo de uma nota 0.
+ */
+describe('piso experimentacao: falta de prova não é experimentação', () => {
+  const item = PISO_ZERO.find((d) => d.chave === 'experimentacao')!;
+
+  it('a definição separa "existe para testar" de "não comprova"', () => {
+    expect(item.texto).toMatch(/FALTA DE COMPROVAÇÃO NÃO É EXPERIMENTAÇÃO/);
+    expect(item.texto).toMatch(/nunca para o piso/i);
+  });
+
+  it('nomeia os sinais que VALEM, para a lente não ficar sem régua', () => {
+    for (const sinal of ['piloto', 'POC', 'sintétic', 'testar']) {
+      expect(item.texto.toLowerCase()).toContain(sinal.toLowerCase());
+    }
+  });
+
+  it('nomeia as frases que NÃO valem, que são as que apareceram na run 9', () => {
+    expect(item.texto).toMatch(/não comprova uso recorrente/i);
+    expect(item.texto).toMatch(/resultado esperado/i);
+  });
+});
