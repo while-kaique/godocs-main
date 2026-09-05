@@ -1,0 +1,961 @@
+[
+ {
+  "linha": 34,
+  "id": "legado-060",
+  "nome": "[R&S]DASH ACOMPANHAMENTO DIÁRIO",
+  "imp": 16.55,
+  "motivo": "O projeto consolida vagas e indicadores de seleção em um painel HTML a partir do Google Sheets, com valor mensal apurado de R$ 16,55.  \nPara mudar a decisão, é preciso demonstrar quem consulta o painel, com que frequência, e quais ações ou decisões ele orienta no dia a dia. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 44,
+  "id": "legado-068",
+  "nome": "Webscraping Malas",
+  "imp": 32.34,
+  "motivo": "O projeto coleta produtos de concorrentes a cada 15 dias e preenche uma planilha, com valor mensal apurado de R$ 32,34.  \nPara a decisão mudar, é preciso demonstrar uso recorrente dessa planilha por outras pessoas e decisões tomadas a partir desses dados, com evidência de impacto mensal recorrente. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 32,
+  "id": "LEGADO-057",
+  "nome": "Meta Base - Estoque",
+  "imp": 18.16,
+  "motivo": "O projeto copia diariamente a base de estoque do Metabase para uma planilha, com valor mensal apurado de R$ 18,16.  \nPara reavaliar, é preciso demonstrar uso recorrente dessa planilha em decisões de estoque, com evidência de quem usa os dados, em quais rotinas, e quais decisões dependem desse fluxo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 33,
+  "id": "legado-059",
+  "nome": "[R&S]Disparo mensgens Whats NIS",
+  "imp": 25.58,
+  "motivo": "O projeto filtra vagas e envia duas mensagens por dia no WhatsApp, com valor mensal apurado de R$ 25,58.  \nPara essa decisão mudar, seria necessário demonstrar uso do fluxo em decisões de recrutamento e impacto operacional mensurável além da economia de tempo já evidenciada, como redução de retrabalho, ganho de cobertura ou efeito direto no processo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 46,
+  "id": "legado-071",
+  "nome": "att_all_products_gobeaute_catalog",
+  "imp": 2.66125,
+  "motivo": "O projeto atualiza o catálogo da Gobeaute no Data Mart para apoiar cruzamentos com Tiny e Bling, com valor mensal apurado de R$ 2,66.  \nPara a decisão mudar, é preciso demonstrar execução contínua e uso efetivo desses dados por outra equipe em uma rotina que gere ações operacionais. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 43,
+  "id": "legado-067",
+  "nome": "Marketplace Scraper - Código de Coleta",
+  "imp": 25.555,
+  "motivo": "O projeto copia códigos do Mercado Livre e os encaminha para o fluxo da operação, com valor mensal apurado de R$ 25,55. Para mudar a decisão, seria preciso demonstrar execução recorrente sem intervenção manual e impacto comprovado em decisões ou processos operacionais relevantes. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 37,
+  "id": "legado-063",
+  "nome": "Automação de alertas de vagas com SLA ultrapassado [PEOPLE]",
+  "imp": 33.1,
+  "motivo": "O projeto monitora vagas com prazo ultrapassado e envia um relatório semanal para apoiar o time de recrutamento, com valor mensal apurado de R$ 33,10.  \nPara a decisão mudar, seria preciso evidência de uso recorrente por outras pessoas do time e de decisões tomadas a partir desses alertas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 45,
+  "id": "legado-065a",
+  "nome": "BONIFICAÇÃO ADM [PEOPLE]",
+  "imp": 10.225,
+  "motivo": "O projeto cruza indicações com colaboradores ativos, marca registros e envia a apuração mensal ao DP, com valor mensal apurado de R$ 10,22. Para a decisão mudar, seria necessário demonstrar uso recorrente em volume relevante de colaboradores ativos e impacto mensal mensurável na rotina do DP, com ganho que vá além da economia de tempo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 52,
+  "id": "legado-078",
+  "nome": "Report semanal - Acompanhamento de atividades",
+  "imp": 58.305,
+  "motivo": "O projeto automatiza a montagem e o envio semanal de atualizações para três líderes, com valor mensal apurado de R$ 58,30.  \nPara mudar a decisão, precisa demonstrar que esse relatório orienta decisões recorrentes da liderança, com uso direto e comprovável no acompanhamento das atividades. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 47,
+  "id": "legado-072",
+  "nome": "att_preco_prazo_conversao",
+  "imp": 2.66125,
+  "motivo": "Este projeto carrega dados de preço, prazo e conversão no Postgres para consulta no Metabase, com valor mensal apurado de R$ 2,66.  \nPara a decisão mudar, seria necessário comprovar operação contínua e uso recorrente desses dados por outras pessoas para orientar ações ou decisões. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 62,
+  "id": "4d35768e46b48c2b3ca1f79283aaf268",
+  "nome": "SegTrab",
+  "imp": 85.5,
+  "motivo": "O SegTrab registra DDS, inspeções de extintores e entregas de EPIs para apoiar o controle de सुरक्षा do trabalho, com valor mensal apurado de R$ 85,50.  \nPara a decisão mudar, seria necessário demonstrar uso recorrente por outras pessoas, com registros que gerem ações verificáveis e evidências de decisões tomadas a partir desses dados. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 49,
+  "id": "legado-075",
+  "nome": "Automação da geração de guias de ASO utilizando apps scripts.",
+  "imp": 90.61,
+  "motivo": "O projeto automatiza a geração, o envio e o registro de guias de ASO por meio de Apps Script, com valor mensal apurado de R$ 90,61.  \nPara mudar a decisão, seria necessário demonstrar que o fluxo opera de forma autônoma, com disparo automático, registro contínuo e uso recorrente em uma rotina mais ampla, com volume mensal comprovado acima do piso. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 88,
+  "id": "legado-110",
+  "nome": "[DUDA] Custo por pedido",
+  "imp": 48.79,
+  "motivo": "O projeto extrai pedidos do Metabase e os registra diariamente em uma planilha para apoiar o acompanhamento de custo por pedido, com valor mensal apurado de R$ 48,79.  \nPara a decisão mudar, é preciso demonstrar que essa planilha orienta decisões recorrentes de Marketing, com impacto mensurável além da economia de tempo informada. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 63,
+  "id": "legado-083",
+  "nome": "Automação - Coleta de Chamados de Admissão",
+  "imp": 46,
+  "motivo": "O projeto automatiza a coleta de chamados de admissão, registra os dados no Google Sheets e envia uma notificação, com valor mensal apurado de R$ 46,00. Para mudar essa decisão, é preciso demonstrar execuções reais e recorrentes, com rastro da automação e evidência de quem recebe os dados e toma a decisão a partir deles. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 58,
+  "id": "1f1a3b577e1b657b147aaf6058371453",
+  "nome": "Envio de Assinatura Digital Automatizada",
+  "imp": 82.75,
+  "motivo": "O projeto automatiza o cadastro de signatários e o envio de contratos para assinatura digital, com valor mensal apurado de R$ 82,75. Para essa decisão mudar, seria preciso comprovar uso recorrente por mais pessoas ou que o envio aconteça sem início manual, com impacto mensal acima de R$ 100,00. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 103,
+  "id": "legado-122",
+  "nome": "Automação - Criação de Chamados via API (Cadastro de Clientes)",
+  "imp": 43.44,
+  "motivo": "Este projeto lê uma planilha e abre chamados de cadastro de clientes no GLPI por API, com valor mensal apurado de R$ 43,44.  \nPara mudar essa decisão, seria preciso demonstrar uso recorrente com registros de execução e evidência de que a automação sustenta uma etapa operacional mais ampla, com impacto mensal acima de R$ 100,00. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 107,
+  "id": "LEGADO-127",
+  "nome": "Automação do envio do report de Melhorias do Inbound",
+  "imp": 55.15,
+  "motivo": "O projeto automatiza o envio semanal de um relatório de melhorias do Inbound pelo Google Chat, com valor mensal apurado de R$ 55,15. Para mudar a decisão, é preciso demonstrar uso recorrente por outras pessoas, quem recebe o report, quais decisões ou ações são tomadas com base nele, e o efeito dessa informação no trabalho. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 126,
+  "id": "legado-144",
+  "nome": "Envio de e-mails tropa ações e Envio de e-mails tropa",
+  "imp": 85.5,
+  "motivo": "O projeto automatiza o recebimento de menções, identifica destinatários e envia avisos por e mail, com valor mensal apurado de R$ 85,50.  \nPara a decisão mudar, é preciso comprovar envios recorrentes em produção, com volume mensal consistente e uso por mais pessoas ou por outros processos da operação. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 151,
+  "id": "legado-171",
+  "nome": "Yenzah · Dossiê de Marca Pós-Aquisição",
+  "imp": 59.8,
+  "motivo": "O projeto reúne informações da Yenzah e produz materiais para apoiar sua chegada ao grupo, com valor mensal apurado de R$ 59,80. Para mudar a decisão, seria preciso demonstrar uso contínuo do Brand Keeper por outras pessoas na criação de novos materiais e apresentar registros de consulta recorrente que tenham orientado decisões. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 138,
+  "id": "legado-166",
+  "nome": "SPG · IAGO Copiloto Q&A Operacional",
+  "imp": 50.745,
+  "motivo": "O projeto responde consultas operacionais sobre estoque, pedidos e vendas para poucas pessoas, com valor mensal apurado de R$ 50,74.  \nPara mudar a decisão, é preciso demonstrar uso recorrente por mais pessoas, com registros das consultas e das decisões operacionais tomadas a partir das respostas, além de impacto contínuo nas rotinas de estoque, pedidos e vendas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 150,
+  "id": "legado-170",
+  "nome": "Plano de Embalagens 2026",
+  "imp": 22.425,
+  "motivo": "O projeto automatiza documentos e a consolidação de uma rodada de cotação de embalagens, com valor mensal apurado de R$ 22,43. Para a decisão mudar, é preciso demonstrar novas rodadas de cotação em uso contínuo, com participação real da equipe e rastros que mostrem recorrência operacional. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 159,
+  "id": "legado-180",
+  "nome": "Awin Auto-Validator — Validação automática de pedidos de afiliados",
+  "imp": 27.575,
+  "motivo": "O projeto valida pedidos de afiliados da Awin com dados do Metabase, aprova ou cancela itens e devolve a planilha com histórico, com valor mensal apurado de R$ 27,57. Para a decisão mudar, precisaria demonstrar que também trata exceções sem regras previamente definidas e executa a decisão diretamente no fluxo, deixando para a pessoa os casos fora do padrão. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 181,
+  "id": "legado-201",
+  "nome": "Automação de Processamento de Romaneios de Expedição",
+  "imp": 74.515,
+  "motivo": "O projeto lê romaneios de expedição recebidos por e mail, extrai dados de PDFs e lança em planilha, com valor mensal apurado de R$ 74,52.  \nPara a decisão mudar, seria preciso demonstrar uso recorrente desses dados por outras pessoas ou que eles orientam decisões operacionais na rotina. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 176,
+  "id": "legado-196",
+  "nome": "[Ytalo] Itens reembolsados por Ruptura Estoque",
+  "imp": 27.575,
+  "motivo": "O projeto automatiza a coleta, a consolidação e o envio de um relatório sobre itens reembolsados por ruptura de estoque, com valor mensal apurado de R$ 27,57.  \nPara mudar a decisão, é preciso demonstrar uso recorrente por outras pessoas e decisões operacionais tomadas a partir desse relatório, com evidências de rotina e impacto na operação. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 188,
+  "id": "legado-207",
+  "nome": "GO HC",
+  "imp": 3.7375,
+  "motivo": "O GO HC acompanha diariamente a operação, reúne dados de Google Sheets e Firestore, calcula headcount por etapa e atualiza rankings, previsões e relatórios, com valor mensal apurado de R$ 3,74.  \nPara a decisão mudar, seria preciso demonstrar quem usa esses resultados fora do trabalho do autor, como eles entram na rotina da operação e o que deixa de acontecer quando o aplicativo fica indisponível, incluindo uma recomendação de alocação de pessoas adotada no fluxo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 189,
+  "id": "legado-208",
+  "nome": "ALERTA DE ETIQUETA MAUAL",
+  "imp": 69.7,
+  "motivo": "O projeto consulta pedidos parados, registra os resultados e envia alertas ao Google Chat para apoiar a identificação de etiquetas manuais, com valor mensal apurado de R$ 69,70.  \nPara a decisão mudar, seria necessário demonstrar alertas recorrentes, registros que mostrem pedidos corrigidos por causa deles e evidência de que o uso do alerta evita a emissão manual de etiquetas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 195,
+  "id": "legado-218",
+  "nome": "Dashboard Operacional B2B",
+  "imp": 50.195,
+  "motivo": "O projeto centraliza em um dashboard as consultas manuais de pedidos e status usadas na operação B2B, com valor mensal apurado de R$ 50,20.  \nPara a decisão mudar, seria necessário demonstrar uso recorrente em outras frentes da operação, com registros de decisões apoiadas pelo dashboard e efeito mensal consistente. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 205,
+  "id": "LEGADO-225",
+  "nome": "Automação de relatório de Absenteísmo",
+  "imp": 95.45,
+  "motivo": "Automatiza a elaboração de um relatório de absenteísmo, com valor mensal apurado de R$ 95,45.\nPara a decisão mudar, é preciso demonstrar uso recorrente por pessoas identificáveis, a frequência de acesso e as ações operacionais ou decisões que o relatório gera na rotina. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 207,
+  "id": "legado-228",
+  "nome": "[Ytalo] Status do Reembolso - Contatos Gocase",
+  "imp": 59.8,
+  "motivo": "O projeto acompanha o status de reembolsos e contatos da Gocase, com valor mensal apurado de R$ 59,80. Para a decisão mudar, é preciso demonstrar uso recorrente da saída, com registro de quem consulta, com que frequência e qual ação prática ela dispara no fluxo de reembolso. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 211,
+  "id": "legado-230",
+  "nome": "Catalogador de produtos",
+  "imp": 95.165,
+  "motivo": "O projeto gera catálogos comerciais em PDF a partir das imagens dos produtos, e o valor mensal apurado é de R$ 95,17.  \nPara a decisão mudar, seria preciso demonstrar uso recorrente por mais pessoas ou participação direta no envio e no controle dos catálogos no fluxo B2B, com evidências de impacto mensal. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 216,
+  "id": "legado-231",
+  "nome": "Automação do envio do comprovante via chat - Gocase",
+  "imp": 76.67,
+  "motivo": "O projeto consulta o comprovante de entrega e envia os dados ao atendimento pelo chat, com valor mensal apurado de R$ 76,67. Para a decisão mudar, seria necessário demonstrar uso recorrente por vários agentes e impacto relevante nas decisões ou no atendimento, com evidência de que esse envio pelo chat altera o fluxo operacional. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 218,
+  "id": "legado-232",
+  "nome": "Verificação de Antifraude Gocase",
+  "imp": 87.125,
+  "motivo": "O projeto consulta o antifraude sob demanda para informar o status de pedidos cancelados, e o valor mensal apurado é de R$ 87,13.  \nPara a decisão mudar, é preciso demonstrar uso recorrente do agente no atendimento, com logs que mostrem o retorno sendo aplicado em decisões de pedido e evidência de impacto direto na operação. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 240,
+  "id": "legado-258",
+  "nome": "RFQ - Request for Quotation",
+  "imp": 66.2,
+  "motivo": "O projeto recebe solicitações de cotação, valida e registra os dados no Google Forms e no Google Apps Script, e o valor mensal apurado é R$ 66,20.  \nPara a decisão mudar, seria necessário demonstrar que o fluxo avalia os dados da cotação, encaminha casos comuns sem revisão humana e comprova uso por pessoas identificadas de outra área, com requisições efetivamente processadas por elas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 248,
+  "id": "legado-268",
+  "nome": "[Goservice] - Criação de Chamados via API (Benefícios)",
+  "imp": 52.275,
+  "motivo": "O projeto automatiza a abertura de chamados via API a partir de uma planilha para uma assistente, com valor mensal apurado de R$ 52,27.  \nPara mudar a decisão, seria preciso demonstrar atendimento a mais pessoas ou processos e impacto operacional adicional, comprovado neste caso além das 7,5 horas economizadas já informadas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 271,
+  "id": "15231d3ac6615b352f194a54e14393be",
+  "nome": "Automação - Sprint Semanal",
+  "imp": 18.69,
+  "motivo": "O projeto atualiza mensalmente tabelas e gráficos usados na reunião do time de Lojas, com valor mensal apurado de R$ 18,69.  \nPara mudar a decisão, precisa demonstrar que essa rotina sustenta decisões relevantes ou executa ações recorrentes além da preparação da apresentação, com efeito mensal verificável. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 273,
+  "id": "08779c5e5c78b787f808fffbfc0a77c7",
+  "nome": "Automação - Crachá de Onboarding",
+  "imp": 3.52,
+  "motivo": "O projeto automatiza a criação de crachás de onboarding para novos colaboradores, com valor mensal apurado de R$ 3,52. Para a decisão mudar, seria preciso demonstrar uso recorrente com impacto mensurado e ampliar a atuação para etapas relevantes do onboarding, com evidências de adoção e resultado. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 289,
+  "id": "f76826e2d62b524e96a96403253a783d",
+  "nome": "Gerador de UTM",
+  "imp": 20.105,
+  "motivo": "O projeto gera links UTM e cupons a partir de dados preenchidos manualmente, com valor mensal apurado de R$ 20,11.  \nPara a decisão mudar, é necessário demonstrar uso frequente, envio efetivo aos influenciadores e aplicação recorrente desses links nas marcas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 257,
+  "id": "61798a938d844be29e148e580e5c4dde",
+  "nome": "Dashboard Recebedoria Fiscal",
+  "imp": 92.7,
+  "motivo": "Dashboard Recebedoria Fiscal reúne chamados, SLAs, prioridades e janelas de pagamento para consulta dos times Fiscal e Financeiro, com valor mensal apurado de R$ 92,70. Para mudar a decisão, é preciso demonstrar acessos frequentes, uso recorrente e decisões operacionais tomadas a partir do painel, com evidências de impacto nas rotinas de Fiscal e Financeiro. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 295,
+  "id": "93fc4b950478ba8d15006a8af54c991b",
+  "nome": "Automação de preenchimento de base - Onboarding",
+  "imp": 27.855,
+  "motivo": "O projeto automatiza o preenchimento da base de onboarding a partir de duas planilhas, registrando admissões quatro vezes por mês, com valor mensal apurado de R$ 27,86. Para a decisão mudar, seria necessário comprovar uso recorrente por outras pessoas ou áreas, com volume mensal efetivo e impacto operacional além do preenchimento local dessas admissões. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 302,
+  "id": "186b8c7553f6d9cfbbadcd75816344d8",
+  "nome": "Automação para Monitoramento de Qualidade de Estoque no Full",
+  "imp": 28.5,
+  "motivo": "O projeto automatiza a coleta diária de indicadores de qualidade de estoque no Full, envia os dados ao Google Sheets e alimenta um dashboard no n8n, com valor mensal apurado de R$ 28,50. Para a decisão mudar, seria preciso demonstrar quem consulta esse dashboard de forma recorrente, como ele entra na rotina dessa pessoa e qual impacto operacional ocorre quando a automação para. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 303,
+  "id": "dd804126e9677a45ffa1b232383ba552",
+  "nome": "CONTROLE PEDIDOS B2B",
+  "imp": 3.83375,
+  "motivo": "Este projeto centraliza pedidos B2B e envia alertas de status ao time, com valor mensal apurado de R$ 3,83.  \nPara a decisão mudar, é preciso demonstrar histórico recorrente de uso pelo time, com alertas registrados e ações tomadas por vários usuários a partir desses alertas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 300,
+  "id": "1f6318ad264374497cc9af8de3cacff3",
+  "nome": "[Meli] Monitor Catálogos",
+  "imp": 95.805,
+  "motivo": "O projeto monitora catálogos do Mercado Livre a cada 8 horas, registra o resultado no Google Sheets e envia alertas no Discord, com valor mensal apurado de R$ 95,81.  \nPara mudar a decisão, seria preciso demonstrar quem usa esses alertas na rotina, como a ausência do monitoramento afeta o trabalho dessa pessoa e que a saída do processo gera uma recomendação prática incorporada à resposta às mudanças de Buy Box. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 323,
+  "id": "a390a173a8020baaa7ec8128fc291608",
+  "nome": "Skill Momento IA",
+  "imp": 16.03,
+  "motivo": "A skill seleciona candidatas e prepara o slide semanal para apoiar a decisão final de uma assistente, com valor mensal apurado de R$ 16,03.  \nPara a decisão mudar, é preciso comprovar slides apresentados toda semana e decisões tomadas a partir deles, com registros recorrentes dessas entregas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 345,
+  "id": "054d62fcacfe6986ca1f17bfc4d764a5",
+  "nome": "Automação Status de Entrega",
+  "imp": 42.58,
+  "motivo": "Monitora as entregas e avisa os planejadores, que ainda decidem e executam a ativação dos conteúdos, com valor mensal apurado de R$ 42,58.  \nPara a decisão mudar, é preciso demonstrar uso recorrente relevante nos registros ou que a ativação passe a ocorrer de forma automática. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 299,
+  "id": "9e8799cb030793403ecdffd62983ebd0",
+  "nome": "[Tiny] - Produtos Novos",
+  "imp": 69.7,
+  "motivo": "O projeto monitora novos SKUs e registra pendências em uma planilha para apoiar a ação de um assistente, com valor mensal apurado de R$ 69,70.  \nPara alterar a decisão, é preciso demonstrar operação contínua, com uso recorrente dos alertas e decisões tomadas pelos responsáveis a partir deles, ao longo do mês. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 341,
+  "id": "53bebbcff7ffb94f919b9707ae2552b3",
+  "nome": "Criação de relatório",
+  "imp": 16.55,
+  "motivo": "O projeto gera, sob demanda, uma carta padronizada com dados do RM, substituindo a edição manual feita por um analista, e apurou R$ 16,55 por mês.  \nPara mudar essa decisão, seria necessário comprovar uso recorrente por outras pessoas e um efeito mensal relevante além dessa economia, com registros de adoção e do impacto gerado. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 346,
+  "id": "b51684eeeb45ea55dab79f50d8109b04",
+  "nome": "IA de Templates",
+  "imp": 80.975,
+  "motivo": "O projeto gera apresentações em PowerPoint personalizadas em lote, a partir de uma planilha e de um modelo enviados manualmente, com valor mensal apurado de R$ 80,97.  \nPara essa decisão mudar, é necessário demonstrar a rotina completa funcionando sem acionamento manual e uso recorrente em outros processos. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 366,
+  "id": "35dba433db330c1ef85d7b50b7d04ddf",
+  "nome": "Automação mudanças pipeline de M&A",
+  "imp": 74.75,
+  "motivo": "O projeto automatiza o registro de mudanças no CRM e o envio de um relatório semanal de M&A, com valor mensal apurado de R$ 74,75. Para a decisão mudar, é preciso demonstrar que a liderança usa esse relatório de forma recorrente para tomar decisões de M&A, com registro das decisões tomadas a partir dele. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 374,
+  "id": "244735580d1bdff3d0a9ebef2eccd35e",
+  "nome": "Automação validação catraca refeitorio",
+  "imp": 43.845,
+  "motivo": "Automação que cruza a nota do refeitório com a catraca, prepara a glosa e o e-mail para revisão, com valor mensal apurado de R$ 43,84.  \nPara a decisão mudar, seria necessário demonstrar uso recorrente nas duas unidades e contestações relevantes geradas pelo app. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 363,
+  "id": "e7829ae35b31caac8e731f804436d483",
+  "nome": "Dashboard Jornada da Copa",
+  "imp": 26.6125,
+  "motivo": "O projeto organiza métricas do Instagram durante a Copa para apoiar ajustes de conteúdo, com valor mensal apurado de R$ 26,61.  \nPara a decisão mudar, seria necessário demonstrar uso recorrente pelo time e registros de decisões de conteúdo tomadas com base no dashboard, com evidência de que ele orienta a rotina de trabalho. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 367,
+  "id": "a78d9409230671b40ff5a8c25b05951b",
+  "nome": "suzie.ia",
+  "imp": 27.41,
+  "motivo": "suzie.ia organiza demandas e lembretes a partir de conversas, imagens e reuniões, com valor mensal apurado de R$ 27,41.  \nPara mudar a decisão, seria preciso demonstrar uso recorrente por mais usuários e impacto em decisões ou ações para além da organização pessoal, com valor mensal apurado acima de R$ 100,00. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 378,
+  "id": "35fff6bdf6c73f17d59f3025ce2fc141",
+  "nome": "Lista de Presença Digital – Onboarding",
+  "imp": 55.76,
+  "motivo": "O projeto digitaliza a lista de presença, coleta assinaturas e gera o PDF de presença, com valor mensal apurado de R$ 55,76.  \nPara mudar a decisão, seria preciso demonstrar uso recorrente no onboarding e integração automática com uma etapa relevante do fluxo, reduzindo a intervenção manual na criação da turma, no compartilhamento do acesso e no acompanhamento do preenchimento. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 373,
+  "id": "3f9f89ef8068f49c0e4ec40821716917",
+  "nome": "Automação de Atualização de Estoque",
+  "imp": 53.9,
+  "motivo": "O projeto automatiza a extração, o cruzamento por SKU e a atualização de estoque no Mercos para duas filiais, com valor mensal apurado de R$ 53,90. Para mudar a decisão, é preciso demonstrar execuções reais com rastreio dos envios e resultado mensurável na disponibilidade de estoque, nos pedidos ou na redução de erros de atualização. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 370,
+  "id": "802104cc9de075fea3cd300561f8a343",
+  "nome": "Consolidador documento TROPA",
+  "imp": 82.735,
+  "motivo": "O Consolidador documento TROPA gera semanalmente o documento oficial usado por Produção, Expedição, Qualidade, Projetos e Itapeva, com valor mensal apurado de R$ 82,73.  \nPara a decisão mudar, é preciso demonstrar, neste projeto, um histórico acessível das gerações e envios, consultável por quem não participa da rotina, além de evidência de dependência ampla ou integrações mantidas por outros times. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 380,
+  "id": "d23a0d7cd5da36bb8d8950aafa494ebc",
+  "nome": "Gerenciador de OKRs - Fast Track e Agentes de IA para OKRs",
+  "imp": 55.15,
+  "motivo": "O projeto centraliza o fechamento mensal dos OKRs, calcula os resultados e redige os textos para revisão, com valor mensal apurado de R$ 55,15. Para mudar essa decisão, é preciso demonstrar uso recorrente por outras pessoas e decisões tomadas a partir desses resultados, com impacto mensal comprovado acima de R$ 100,00. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 381,
+  "id": "aaf138a9d752dff319fbb39c6348541c",
+  "nome": "Auditoria de Banco de Horas x Folha de Pagamento",
+  "imp": 6.97,
+  "motivo": "O projeto cruza banco de horas com a folha de pagamento para identificar divergências antes do fechamento, com valor mensal apurado de R$ 6,97.  \nPara a decisão mudar, é preciso demonstrar uso recorrente, com registros de execuções e correções efetivamente realizadas a partir dos alertas gerados. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 382,
+  "id": "4bff68d10d71e67e1f03e692ea25f6c1",
+  "nome": "Painel de tarefas do DP",
+  "imp": 3.7375,
+  "motivo": "O painel de tarefas do DP organiza e acompanha atividades do departamento, com valor mensal apurado de R$ 3,74.  \nPara mudar a decisão, precisaria comprovar uso recorrente por mais pessoas e que ele evita prazos perdidos de forma autônoma, sem depender de lançamentos manuais para cada tarefa. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 383,
+  "id": "0708a976f1dd189f1e8a106e93b5c2f7",
+  "nome": "Automação de Dados CTR Gocase",
+  "imp": 86.24,
+  "motivo": "Este projeto automatiza a coleta de dados do Facebook Ads, atualiza uma planilha e organiza imagens no Drive, com valor mensal apurado de R$ 86,24.  \nPara mudar a decisão, seria preciso demonstrar uso recorrente por outras pessoas, impacto direto em decisões de produto ou mídia e benefício mensurável além das 16 horas economizadas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 392,
+  "id": "bd1bbf11e5ae47f192d68ece000eda80",
+  "nome": "Vencimento contratos temporarios",
+  "imp": 97.175,
+  "motivo": "O projeto acompanha o vencimento de contratos temporários e envia alertas diários aos gestores e líderes, com valor mensal apurado de R$ 97,17.  \nPara mudar essa decisão, seria preciso demonstrar que esse acompanhamento é consultado diretamente por outras áreas, com histórico próprio e uso contínuo sem depender do autor, ou que o mesmo fluxo foi adotado em outra unidade. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 386,
+  "id": "7e90cfbe269fba6b6f5cd7cdc17d4c55",
+  "nome": "Automação Imagens Waitlist",
+  "imp": 34.85,
+  "motivo": "O projeto localiza imagens de anúncios Waitlist e as salva no Google Drive a cada dois dias, gerando R$ 34,85 por mês em valor mensal apurado.  \nPara a decisão mudar, seria necessário demonstrar que essas imagens alimentam um processo operacional definido e que há uso contínuo na rotina, com evidência de dependência real no trabalho. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 401,
+  "id": "eb044805e183bd126f884d1250c8024b",
+  "nome": "Pipeline de Projetos",
+  "imp": 98.225,
+  "motivo": "O projeto centraliza a gestão de projetos, do cronograma ao acompanhamento financeiro, e o valor mensal apurado é de R$ 98,22.  \nPara mudar a decisão, é necessário demonstrar uso recorrente por mais pessoas, com registros de acesso e ações concretas de gestores ou equipes tomadas a partir do sistema. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 406,
+  "id": "9b79a5c7119b2e7d92e3670a47eb0709",
+  "nome": "Automação de Retrospectiva Mensal de Malas",
+  "imp": 33.1,
+  "motivo": "O projeto gera o rascunho mensal da retrospectiva de malas, que depois é revisado, ilustrado e publicado pela analista, com valor mensal apurado de R$ 33,10. Para a decisão mudar, é preciso demonstrar que esse documento orienta consultas recorrentes ou decisões da liderança, com registro do uso e do desdobramento em ações. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 414,
+  "id": "50991805dcb3147e6a4b360ed4cf18a8",
+  "nome": "Alertas de Pagamento Urgente",
+  "imp": 0.8875,
+  "motivo": "O projeto captura pedidos de pagamento urgentes e envia um alerta ao time de pagamentos, com valor mensal apurado de R$ 0,89.  \nPara alterar a decisão, é preciso demonstrar histórico de alertas emitidos e das ações do time tomadas a partir deles, com evidência de uso recorrente e impacto operacional ao longo do tempo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 405,
+  "id": "d987baad481423869f32ff7fd4a81e33",
+  "nome": "Geração de Kits Gobeauty",
+  "imp": 14.01,
+  "motivo": "O projeto gera imagens PNG de kits Gobeauty, substituindo uma tarefa manual, e apurou valor mensal de R$ 14,01.  \nPara mudar a decisão, seria necessário demonstrar uso recorrente por outras equipes e geração automática integrada à publicação dos produtos, com volume mensal consistente. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 423,
+  "id": "67c6b4fa84cc48ad3ef75dce1cb164eb",
+  "nome": "SEO Gocase",
+  "imp": 8.715,
+  "motivo": "O projeto gera textos de PDP a partir de dados informados e depende de acionamento e revisão humana, com valor mensal apurado de R$ 8,71.  \nPara alterar a decisão, é preciso demonstrar uso recorrente pelo time e impacto direto e comprovado na publicação do catálogo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 416,
+  "id": "88a169cce620725c413d7457b3cb9ce1",
+  "nome": "GoStream - Checklist Proposta",
+  "imp": 13.505,
+  "motivo": "O projeto automatiza o envio de um checklist ao chat quando o candidato avança para Proposta, com valor mensal apurado de R$ 13,51.  \nPara mudar a decisão, é necessário demonstrar uso contínuo em propostas reais, com registro de recorrência e evidência de redução de retrabalho ou erros no fluxo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 411,
+  "id": "bb931ea4698ab28b97ce93a8077941e3",
+  "nome": "Automação de Acompanhamento de Notas Fiscais",
+  "imp": 80.85,
+  "motivo": "O projeto busca os XMLs no NFe Master, salva os arquivos no Drive e leva os dados para a planilha de controle do acompanhamento de notas fiscais, com valor mensal apurado de R$ 80,85.  \nPara essa decisão mudar, é preciso demonstrar que a automação identifica divergências e impede o avanço de registros com erro, e que a planilha ou o dashboard é consultado de forma recorrente por outra pessoa na rotina. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 424,
+  "id": "0f3057f1ca7036dfb26142886bebb384",
+  "nome": "Gocase Manutenção — Sistema de Ordens de Serviço",
+  "imp": 6.97,
+  "motivo": "O sistema organiza ordens de serviço, do registro ao encerramento, para colaboradores, manutenção e gerência, com valor mensal apurado de R$ 6,97.  \nPara mudar a decisão, seria preciso demonstrar prazos registrados, histórico completo auditável por terceiros e encaminhamento automático de chamados, com priorização feita pelo sistema. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 426,
+  "id": "dd0fdf7cfe95641aa22dca13428b0cee",
+  "nome": "Ingestão de volume diário para previsão de custos",
+  "imp": 55.15,
+  "motivo": "O projeto coleta, agrega e envia diariamente volumes para o app de Custos Dinâmicos Gocase, para uso nas previsões de custos, com valor mensal apurado de R$ 55,15.  \nPara mudar essa decisão, seria necessário demonstrar que esse envio atende um processo com prazo obrigatório, que terceiros conseguem conferir o histórico sem depender do autor e que dados inconsistentes são detectados antes de seguir adiante. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 429,
+  "id": "e6c942211cee075ab8f6ea65fdaf414d",
+  "nome": "GoEnvios",
+  "imp": 72.93,
+  "motivo": "O GoEnvios consolida o status dos envios e avisa cinco pessoas quando há problemas, com valor mensal apurado de R$ 72,93.  \nPara essa decisão mudar, seria preciso demonstrar uso contínuo e recorrente, com registros de casos em que os alertas evitaram falhas ou perdas concretas no fluxo de envios. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 445,
+  "id": "63f16fc5ed5addaf01a205321474ebf9",
+  "nome": "Chat bot aniversariantes do dia",
+  "imp": 17.425,
+  "motivo": "O projeto consulta aniversariantes do dia e publica mensagens automaticamente, com valor mensal apurado de R$ 17,43.  \nPara mudar esta decisão, seria necessário demonstrar uso recorrente em uma rotina de gestão de pessoas, com impacto operacional comprovado e dependência clara dessa automação no trabalho mensal da área. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 440,
+  "id": "6459c4ac1f78a46a3254dd0481c41a45",
+  "nome": "Onboarding de Líderes",
+  "imp": 40.38,
+  "motivo": "O projeto automatiza agendamentos, registros e cobranças do Plano de 100 dias para líderes, com valor mensal apurado de R$ 40,38.  \nPara a decisão mudar, seria preciso demonstrar uso recorrente por outras pessoas, além da analista, e evidência de que os alertas alteram decisões ou reduzem conferências manuais nesse fluxo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 453,
+  "id": "8747bb99425cac07482f01b58d5f0b4b",
+  "nome": "Skill - Lançamentos Aplicação Aut Mais Itaú",
+  "imp": 60.655,
+  "motivo": "O projeto transforma extratos do Itaú em lançamentos contábeis, com valor mensal apurado de R$ 60,66.  \nPara a decisão mudar, precisaria demonstrar execução automática, uso recorrente e responsabilidade pelo envio e pela validação final no NLP. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 434,
+  "id": "fd5f0bc608245c15a7ae72e38939beee",
+  "nome": "Automação Planilha Reinf",
+  "imp": 10.455,
+  "motivo": "O projeto converte arquivos do WebGex em uma planilha mensal, com uso por uma assistente, e apurou valor mensal de R$ 10,46.  \nPara mudar a decisão, precisaria demonstrar que essa automação alimenta diretamente um processo mensal da operação ou atende outras pessoas, com impacto recorrente comprovado. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 458,
+  "id": "9ef1bb9d6ddd1c418693cc3a2aaaf326",
+  "nome": "Painel de Recebimento",
+  "imp": 85.5,
+  "motivo": "O Painel de Recebimento consolida dados de recebimento B2B e B2C para apoiar a rotina de supervisão, com valor mensal apurado de R$ 85,50.  \nPara a decisão mudar, seria preciso demonstrar que ele orienta decisões recorrentes de mais pessoas ou sustenta outra rotina relevante, com impacto mensal acima de R$ 100,00. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 455,
+  "id": "cbe83a0740da0e3aa906a2c9fbf38a93",
+  "nome": "GERADOR DE GNRE",
+  "imp": 63.87,
+  "motivo": "O projeto prepara, transmite e baixa guias de GNRE para a rotina de um analista, com valor mensal apurado de R$ 63,87.  \nPara essa decisão mudar, seria preciso demonstrar execução automática sem início humano, emissão recorrente de guias para outras pessoas ou processos, e evidências de uso contínuo com rastro operacional. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 469,
+  "id": "0278114974d6e8234f58c218b92f0792",
+  "nome": "Chamados de Compras",
+  "imp": 99.34,
+  "motivo": "O projeto sincroniza chamados do GLPI e oferece busca, filtros e indicadores para apoiar o acompanhamento dos pedidos de compras, com valor mensal apurado de R$ 99,34.  \nPara mudar a decisão, é preciso demonstrar uso recorrente por um público mais amplo ou que o GLPI seja atualizado automaticamente, com operação final sem dependência do time. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 483,
+  "id": "5fe2a466ee718321e221646b2223ba3d",
+  "nome": "Envio de contratos para assinatura automático",
+  "imp": 0.87625,
+  "motivo": "Este projeto dispara o envio automático de contratos para assinatura a partir de uma ação na planilha, com valor mensal apurado de R$ 0,88.  \nPara a decisão mudar, seria necessário demonstrar que o envio sustenta uma rotina recorrente para mais pessoas ou que passa a ocorrer sem início manual. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 465,
+  "id": "909842fa77c5f2165fb0bd3967d0e802",
+  "nome": "Validador de CCT",
+  "imp": 44.13333333,
+  "motivo": "O projeto lê convenções coletivas, simula reajustes e calcula retroativos para apoiar a conferência final do analista, com valor mensal apurado de R$ 44,13.  \nPara a decisão mudar, seria necessário demonstrar uso recorrente por mais pessoas, em mais de uma rotina, com ganho mensal comprovado além da economia de horas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 462,
+  "id": "f8c9e95980b86a7ab3f7ab2a6ecde82f",
+  "nome": "Gobeaute Prompt Studio",
+  "imp": 36.595,
+  "motivo": "O projeto cria prompts e imagens por marca, com geração, revisão e aprovação manual pela equipe, e tem valor mensal apurado de R$ 36,59.  \nPara a decisão mudar, seria preciso demonstrar uso recorrente por várias pessoas, com impacto mensurável na operação e com resultados que dispensem a revisão de cada entrega. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 479,
+  "id": "5978e9979240fefb7794f59eaffa8730",
+  "nome": "Agenda de Viagens Corporativas — Gogroup Facilities",
+  "imp": 48.035,
+  "motivo": "O projeto centraliza viagens corporativas e orçamento em um painel atualizado manualmente com dados do Onfly, com valor mensal apurado de R$ 48,03.  \nPara a decisão mudar, seria necessário demonstrar uso recorrente por gestores, com registros de acessos frequentes e ações tomadas a partir do painel, como aprovações, ajustes de orçamento ou mudanças de viagem. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 471,
+  "id": "21f755a705857a9d1d267495d8a859d5",
+  "nome": "Assessor Pessoal de Agenda — Bot Telegram + Google Calendar",
+  "imp": 56.92,
+  "motivo": "O projeto cria e altera compromissos, responde convites e envia lembretes no Telegram com apoio ao Google Calendar, com valor mensal apurado de R$ 56,92.  \nPara reavaliar, seria preciso mostrar adoção contínua por mais de uma pessoa, com histórico de uso do bot no calendário e impacto mensal comprovado acima de R$ 100,00. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 484,
+  "id": "b8dd0b6a8e94a771d0efe298582e2d1c",
+  "nome": "Analise Descascamento",
+  "imp": 20.91,
+  "motivo": "O projeto organiza semanalmente os casos de descascamento em um painel para apoiar a apresentação da Qualidade, com valor mensal apurado de R$ 20,91.  \nPara essa decisão mudar, seria necessário evidenciar uso recorrente do painel, com registro de quem consulta, quais decisões são tomadas a partir dos dados e quais ações passam a ser acompanhadas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 486,
+  "id": "04637a98a2f2a7b35d9b2535e4c97069",
+  "nome": "Pesquisa satisfação Temporários",
+  "imp": 13.06875,
+  "motivo": "A aplicação reúne respostas de temporários, gera indicadores, comentários e CSV para consulta do G&G, com valor mensal apurado de R$ 13,07.  \nPara essa decisão mudar, seria necessário mostrar ciclos recorrentes de uso e registros de decisões concretas tomadas a partir dos resultados, como ações de retenção ou ajustes efetivos. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 485,
+  "id": "9d48f3b13edf7b66f3dbb1c81d2a4aa5",
+  "nome": "Reserva sala Adm",
+  "imp": 13.94,
+  "motivo": "O projeto organiza reservas de uma sala administrativa e bloqueia novas marcações ao atingir a capacidade, com valor mensal apurado de R$ 13,94.  \nPara mudar essa decisão, seria preciso demonstrar reservas reais e frequentes, com registros de uso recorrente e evidências de que o time toma decisões com base nele, como controle efetivo de ocupação e prevenção de conflitos de agenda. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 492,
+  "id": "ffccf702c5ba9a95f29710067636a777",
+  "nome": "Painel de Recebedoria de Doc Fiscais",
+  "imp": 20.91,
+  "motivo": "O projeto reúne notas fiscais em um painel e mostra tendências para apoiar a gestão, com valor mensal apurado de R$ 20,91.  \nPara a decisão mudar, é preciso demonstrar uso contínuo por outras pessoas, com consultas recorrentes e decisões de gestão tomadas a partir desses dados ao longo da operação. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 505,
+  "id": "b9289e97e84b136bdc87639c75ed8d4b",
+  "nome": "Disparo de resultados automáticos (Chat Gocase)",
+  "imp": 97.58,
+  "motivo": "O projeto dispara automaticamente resultados do Chat Gocase para os agentes, substituindo consultas manuais aos indicadores, e o valor mensal apurado é de R$ 97,58. Para alterar a decisão, seria necessário demonstrar, neste fluxo, o registro da leitura dos alertas pelos agentes e das ações tomadas a partir deles, com recorrência de uso e efeitos verificáveis nas rotinas de atendimento. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 509,
+  "id": "d498200cc74ccc2cbec075da0ee91caa",
+  "nome": "Kanban Estoques Gobeauty",
+  "imp": 76.67,
+  "motivo": "O projeto centraliza pedidos de estoque, identifica kits afetados e gera arquivos para atualização em lote, com valor mensal apurado de R$ 76,67.  \nPara a decisão mudar, é preciso demonstrar uso recorrente por mais pessoas ou que as alterações de estoque sejam executadas automaticamente, sem depender de conferência, exportação e importação manuais. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 487,
+  "id": "ad03fe8f7d8cb548c610a4e566341fbf",
+  "nome": "Avaliação performance PCDS",
+  "imp": 11.2125,
+  "motivo": "O projeto coleta avaliações de sete colaboradores PCD e consolida esses registros para consulta do RH, com valor mensal apurado de R$ 11,21. Para mudar essa decisão, é necessário demonstrar ciclos repetidos de avaliação e decisões do RH tomadas a partir desses dados, com uso confirmado no dia a dia. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 512,
+  "id": "1c7b52e556a00ac886f335edfe2da3e9",
+  "nome": "Automação relatório Business Case M&A",
+  "imp": 14.95,
+  "motivo": "Este projeto transforma documentos de uma empresa alvo em um deck de Business Case para M&A, com valor mensal apurado de R$ 14,95.  \nPara a decisão mudar, é preciso demonstrar uso em novas avaliações, consulta recorrente aos relatórios pela equipe e evidência de que esses materiais apoiam decisões de negócio. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 524,
+  "id": "f5a4861a2b68ecadf2e06be8965352a8",
+  "nome": "Painel Principal",
+  "imp": 8.275,
+  "motivo": "O Painel Principal reúne, em um único endereço, links de aplicativos internos, com valor mensal apurado de R$ 8,28. Para mudar a decisão, é preciso demonstrar uso frequente por diferentes equipes e evidências de que esse acesso sustenta rotinas ou decisões recorrentes. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 535,
+  "id": "d303dcbd80cf2f167abc8dffb35a50df",
+  "nome": "Gerador de figurinhas da copa",
+  "imp": 64.28375,
+  "motivo": "O projeto gera figurinhas personalizadas para uma ação de endomarketing, com valor mensal apurado de R$ 64,28.  \nPara a decisão mudar, seria preciso demonstrar uso recorrente e contínuo por outras áreas, com demanda sustentada ao longo do tempo e valor mensal acima de R$ 100,00. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 532,
+  "id": "3508e811bf824a7732502eb60ce35852",
+  "nome": "Automação de artes - Dia dos pais",
+  "imp": 45.245,
+  "motivo": "O projeto automatiza a criação em lote de artes e cartões de Dia dos Pais, com valor mensal apurado de R$ 45,24. Para a decisão mudar, seria necessário demonstrar uso recorrente ao longo do ano, com entregas mensais contínuas e influência em outras etapas do trabalho, além dessa produção anual. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 534,
+  "id": "9d36a35cad0b8a318e50c618c97e52c9",
+  "nome": "Experiencia PCD Gocase",
+  "imp": 5.60625,
+  "motivo": "O projeto coleta avaliações de sete colaboradores PCD e consolida médias e comentários para consulta de Gente e Gestão, com valor mensal apurado de R$ 5,61. Para alterar a decisão, seria necessário demonstrar uso recorrente do painel em ciclos repetidos, com ações de inclusão documentadas e evidência de impacto mensal contínuo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 515,
+  "id": "cbde1f4d81286eac2c2c09ad631fc628",
+  "nome": "Waitlinks",
+  "imp": 49.115,
+  "motivo": "O projeto centraliza links e documentos para as equipes de Produto e Supply, com valor mensal apurado de R$ 49,12.  \nPara a decisão mudar, é preciso demonstrar acessos frequentes e uso recorrente em rotinas específicas, como onboarding, com registros que mostrem consulta contínua pelos usuários envolvidos. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 538,
+  "id": "a48024b89c233f59c805066004afd126",
+  "nome": "Wizard",
+  "imp": 59.8,
+  "motivo": "O Wizard pesquisa celulares e organiza um ranking para apoiar a escolha de capinhas, com valor mensal apurado de R$ 59,80.  \nPara a decisão mudar, é preciso demonstrar uso recorrente pelo time e decisões de produto tomadas com base nesse ranking, com impacto comprovado nas escolhas e nas vendas. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 536,
+  "id": "103f8cdcbc55500f607ab531b5818916",
+  "nome": "Pesquisa performance PCDS",
+  "imp": 29.9,
+  "motivo": "A aplicação registra avaliações de colaboradores PCD e reúne o histórico para consulta do RH, com valor mensal apurado de R$ 29,90.  \nPara a decisão mudar, é preciso demonstrar ciclos reais de uso com recorrência e decisões de RH tomadas com base nesses registros, além de evidência de reuso do histórico nas rotinas de trabalho. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 539,
+  "id": "3d3c3e6a1e9eb81cd3a31ba734bdef70",
+  "nome": "Gente & Gestão Responde — Recrutamento Interno",
+  "imp": 31.935,
+  "motivo": "O projeto responde dúvidas e faz a triagem inicial do recrutamento interno em duas unidades, com valor mensal apurado de R$ 31,93.  \nPara mudar a decisão, é preciso demonstrar uso recorrente com interações reais de colaboradores, abrangência maior nas unidades e evidências de que a ferramenta é parte do fluxo de recrutamento interno. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 544,
+  "id": "897df98681bd7b2835fb23c953a732bc",
+  "nome": "Painel de Segurança do Trabalho",
+  "imp": 14.615,
+  "motivo": "O projeto reúne atalhos e indicadores de Segurança do Trabalho em um painel único, com valor mensal apurado de R$ 14,62. Para que a decisão mude, é preciso demonstrar consultas recorrentes por outros usuários e ações registradas a partir dos dados do painel, com uso documentado além de uma rotina individual. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 548,
+  "id": "9a3987728fd98044d7230fe417a93cbd",
+  "nome": "Controle Fiscal de Lançamentos - Goservice",
+  "imp": 27.88,
+  "motivo": "O projeto organiza chamados fiscais do GLPI para apoiar a conferência humana de lançamentos, com valor mensal apurado de R$ 27,88.  \nPara a decisão mudar, é preciso demonstrar que ele executa os lançamentos ou impede automaticamente que pagamentos com erro ou atraso avancem. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 547,
+  "id": "4dfe8611865ea88faf0cbda6f1b9e795",
+  "nome": "Análise de NFS-e de Influencers",
+  "imp": 83.64,
+  "motivo": "O projeto cruza notas fiscais de serviços e bases fiscais, gera uma planilha com divergências para revisão humana, com valor mensal apurado de R$ 83,64.  \nPara mudar essa decisão, é necessário demonstrar uso recorrente por outras pessoas e evidência concreta de que a ferramenta altera decisões fiscais ou reduz trabalho de forma mensurável neste fluxo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 550,
+  "id": "9d46f0e800eeaee241497d42b530cec0",
+  "nome": "Burndown Melhoria e Dados CX",
+  "imp": 19.96,
+  "motivo": "O projeto centraliza tarefas, pontos, burndown e histórico do time, e apura valor mensal de R$ 19,96. Para a decisão mudar, é preciso demonstrar acessos semanais recorrentes e ações reais adotadas pela liderança a partir desses dados. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 551,
+  "id": "29e41c377017218d7a48a48eacaea760",
+  "nome": "Site para Criação de mockups.",
+  "imp": 49.66125,
+  "motivo": "Este projeto cria mockups para agilizar a montagem de imagens para uso interno, com valor mensal apurado de R$ 49,66.  \nPara a decisão mudar, seria preciso demonstrar que ele sustenta uma rotina de outras equipes ou realiza o envio e a aprovação dos mockups sem intervenção humana. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 552,
+  "id": "ed370d51237e5a04350552de092da859",
+  "nome": "Cascateamento Automático",
+  "imp": 2.56,
+  "motivo": "O projeto consolida indicadores de CX e prepara o PPTX semanal para revisão humana antes da publicação, com valor mensal apurado de R$ 2,56.  \nPara a decisão mudar, é preciso demonstrar apresentações realizadas em rotina e decisões tomadas a partir delas, com evidência de uso recorrente do relatório. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 560,
+  "id": "2d7003617c012de2b14251328bec9f25",
+  "nome": "Sistema de Cotação de Malas e Acessórios",
+  "imp": 33.1,
+  "motivo": "O projeto centraliza cotações de malas e acessórios, automatiza comparações e orçamentos, e tem valor mensal apurado de R$ 33,10.  \nPara a decisão mudar, é preciso demonstrar uso recorrente por mais pessoas do time, com decisões de compra sustentadas pelo sistema e histórico de cotações que mostre dependência contínua dele. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 558,
+  "id": "764659b526839d92e93b3eccd22b692a",
+  "nome": "Dashboard de People — Admissões e Desligamentos",
+  "imp": 5.39,
+  "motivo": "O projeto consolida dados da planilha de People e mostra admissões, desligamentos e proporções por vínculo, com valor mensal apurado de R$ 5,39.  \nPara a decisão mudar, seria preciso demonstrar uso recorrente por outras pessoas, registros de consulta e decisões tomadas com base no painel, em vez de contagens pontuais na planilha. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 549,
+  "id": "49b6c631bba367728931fcb69bfa925d",
+  "nome": "Automação para listagem de pedidos travados",
+  "imp": 13.835,
+  "motivo": "Automação que copia diariamente pedidos travados do Metabase para uma planilha, para apoiar a análise da equipe, com valor mensal apurado de R$ 13,84. Para a decisão mudar, é preciso demonstrar uso recorrente da planilha e correções efetivamente aplicadas nos pedidos travados a partir desse registro. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 562,
+  "id": "5d3b781ba9a5f39992e4b54e6da63f8c",
+  "nome": "Fluxo BPMN",
+  "imp": 49,
+  "motivo": "O projeto cria e documenta fluxogramas BPMN em uma aplicação sob demanda, com valor mensal apurado de R$ 49,00.  \nPara mudar essa decisão, seria necessário demonstrar acessos frequentes de outras pessoas e registros de processos reais que passaram a ser conduzidos com base nesses fluxos. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 567,
+  "id": "323278fc6fe23f9b958a9553b1e9c827",
+  "nome": "INVENTÁRIO ESTÚDIO GOGROUP",
+  "imp": 62.73,
+  "motivo": "O projeto centraliza o estoque do estúdio e apoia o controle de materiais, com valor mensal apurado de R$ 62,73.  \nPara a decisão mudar, é preciso comprovar uso recorrente por outras pessoas do estúdio, com registros de consultas e decisões concretas tomadas a partir desses dados, como reposição, compra ou ajuste de estoque. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 605,
+  "id": "962ad4bf4282e7a84edd06894f3d5438",
+  "nome": "Automação da extração mensal de reenvios da Gocase",
+  "imp": 10.69,
+  "motivo": "O projeto automatiza a extração mensal de reenvios, gera o CSV e avisa o Financeiro, com valor mensal apurado de R$ 10,69.  \nPara a decisão mudar, seria preciso demonstrar uso recorrente dessa saída em uma rotina financeira mais relevante, com registro de decisões ou ações concretas tomadas a partir desses dados. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 611,
+  "id": "c4c87bd816245d0f1f998a5cbc226721",
+  "nome": "Gerador de Copy",
+  "imp": 32.385,
+  "motivo": "O projeto gera copies de WhatsApp a partir de briefings, com valor mensal apurado de R$ 32,38.  \nPara mudar a decisão, seria preciso demonstrar publicação e testes automáticos das copies, com uso efetivo e resultados medidos. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 613,
+  "id": "240727795b77ff2229280029c68e8b61",
+  "nome": "Automação assinatura digital férias",
+  "imp": 66.2,
+  "motivo": "Automatiza o envio, o acompanhamento e a baixa dos recibos de férias assinados, com valor mensal apurado de R$ 66,20. Para a decisão mudar, seria preciso demonstrar que a rotina passa a executar sozinha, ou que gera impacto operacional adicional além dessa economia mensal. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 571,
+  "id": "0968ef7cac0dabca3870aaabbd0cfad1",
+  "nome": "Conversor SPED-Excel",
+  "imp": 26.61,
+  "motivo": "O projeto converte arquivos SPED para Excel e recompõe o arquivo, ajudando na edição e conferência manual, com valor mensal apurado de R$ 26,61.  \nPara a decisão mudar, seria preciso demonstrar uso recorrente por mais pessoas ou que o fluxo seja concluído com validação e correção automáticas, sem intervenção humana. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 618,
+  "id": "47048111d82a03b727c832e673673ea6",
+  "nome": "Automação atualização IPCA",
+  "imp": 7.475,
+  "motivo": "O projeto atualiza mensalmente um índice IPCA em uma planilha usada para reajustar parcelas, com valor mensal apurado de R$ 7,47.  \nPara essa decisão mudar, é preciso demonstrar reajustes consecutivos aplicados no pagamento real das parcelas, ou uso efetivo da rotina em outras atividades com registro recorrente. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 570,
+  "id": "f112c0edb849757d98f244061962798a",
+  "nome": "Gerador GIA-ST",
+  "imp": 41,
+  "motivo": "O projeto converte a planilha fiscal em um TXT pronto para importação na GIA-ST, com valor mensal apurado de R$ 41,00. Para a decisão mudar, seria preciso demonstrar que ele faz o fechamento e o envio da GIA-ST sem início humano, ou que sustenta uma etapa central do fluxo fiscal com impacto mensal acima de R$ 100,00. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 631,
+  "id": "3ed3db78fa3465c4d6fe88f2ee44e113",
+  "nome": "Fórum de melhoria continua",
+  "imp": 52.16,
+  "motivo": "O projeto automatiza a preparação mensal dos dados apresentados no fórum, com valor mensal apurado de R$ 52,16.  \nPara mudar a decisão, é preciso demonstrar uso recorrente da solução e decisões operacionais tomadas a partir das análises, com evidências de impacto mensal. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 625,
+  "id": "5afa214f38acc42a1a5a377bc15650d1",
+  "nome": "Processador de XML NFe",
+  "imp": 75.79,
+  "motivo": "O projeto processa XMLs de NFe, valida assinatura e protocolo, separa os documentos com pendências e prepara os autorizados para importação no Web GEX, com valor mensal apurado de R$ 75,79.  \nPara a decisão mudar, seria necessário demonstrar o uso regular desses arquivos por outra área ou sistema no fluxo de importação, com tratamento das exceções e encaminhamento dos XMLs autorizados sem intervenção humana. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 642,
+  "id": "312330b0d164b011e1dfe8c897eb5b69",
+  "nome": "GocaLives",
+  "imp": 44.35375,
+  "motivo": "O GocaLives reúne artes, sorteios e dados de vendas das lives em uma única ferramenta, com valor mensal apurado de R$ 44,35. Para a decisão mudar, precisa demonstrar uso recorrente por outras pessoas e impacto verificado nas decisões e nos resultados das lives. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 637,
+  "id": "5071c7c3b92bf98fb2e50e8e987ae091",
+  "nome": "HireFlow",
+  "imp": 95.07,
+  "motivo": "O HireFlow consolida SLA e prioridades de quatro carteiras e exibe alertas para o report semanal, com valor mensal apurado de R$ 95,07. Para mudar essa decisão, seria preciso evidenciar uso recorrente pelas lideranças e ações tomadas a partir desses alertas, com registro do efeito mensal gerado. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 638,
+  "id": "598d24a7b65d4f2a964ddf91344645a3",
+  "nome": "Automação notas emitidas SEFAZ ES",
+  "imp": 81.095,
+  "motivo": "O projeto automatiza o download e a consolidação de notas emitidas pela SEFAZ ES em uma planilha XLSX, com valor mensal apurado de R$ 81,09. Para a decisão mudar, seria necessário comprovar uso recorrente por mais de uma pessoa ou uma aplicação operacional contínua que sustente valor mensal acima de R$ 100,00. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 634,
+  "id": "138e91892dde440624abd41fdb37741f",
+  "nome": "Fila por Marca — Monitor de Fila de Atendimento em Tempo Real",
+  "imp": 38.605,
+  "motivo": "O projeto mostra a fila de atendimento por marca em tempo real e substitui a atualização manual do Metabase, com valor mensal apurado de R$ 38,60.  \nPara mudar essa decisão, seria preciso comprovar uso recorrente pelo time e evidências de redistribuições de atendentes feitas a partir do widget, com rastro desses usos. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 643,
+  "id": "85bde7847eca496f6ecda453171406b8",
+  "nome": "Vencimentos UNILOG",
+  "imp": 85.5,
+  "motivo": "O projeto acompanha os vencimentos das unidades UNILOG G5 e G10, automatiza a rotina semanal do Supervisor e tem valor mensal apurado de R$ 85,50.  \nPara a decisão mudar, seria preciso demonstrar validação de cada alteração, bloqueio de itens vencidos ou em quarentena antes de seguir, e uso recorrente por uma equipe identificada ou em outra área. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 654,
+  "id": "a79b9029e7ea2f7dbec12793baf53712",
+  "nome": "Monitoramento de Background Check - Compliance",
+  "imp": 55.15,
+  "motivo": "O projeto cruza bases de admissões e solicitações para indicar pendências de Background Check em compliance, com valor mensal apurado de R$ 55,15.  \nPara a decisão mudar, seria necessário evidenciar acessos frequentes da equipe, registros de uso em rotina e ações tomadas a partir das pendências, com histórico que mostre recorrência no trabalho. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 645,
+  "id": "b299eaa87a2bd3d8a25168d98301cbc6",
+  "nome": "News Hunter - futebol",
+  "imp": 88.93,
+  "motivo": "O projeto reúne notícias e tendências de futebol para apoiar dois ilustradores na escolha de ações, com valor mensal apurado de R$ 88,93.  \nPara mudar a decisão, seria necessário demonstrar uso recorrente em mais áreas, com decisões concretas tomadas a partir das recomendações e evidência do efeito gerado além da economia de tempo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 649,
+  "id": "a0be9dd2308bb3491a70e27dd5a54d10",
+  "nome": "Automação de Report de CRO - Diário e Semanal",
+  "imp": 69.765,
+  "motivo": "Este projeto automatiza a geração diária e semanal de relatórios de CRO, com textos, gráficos, interpretações e recomendações, e apurou valor mensal de R$ 69,77. Para essa decisão mudar, seria preciso demonstrar que os relatórios são entregues e distribuídos automaticamente, e que as ações recomendadas passam a ser executadas no funil ou nos experimentos, com o analista atuando em exceções. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 658,
+  "id": "9597d4f444954baa017e00af1e51404a",
+  "nome": "Agente de Oportunidades B2B - Supply",
+  "imp": 42.58,
+  "motivo": "O projeto cruza estoque e vendas semanalmente, gera recomendações e prepara uma mensagem para revisão, com valor mensal apurado de R$ 42,58.  \nPara mudar a decisão, é preciso demonstrar realocações recorrentes feitas a partir dessas recomendações, com registro do antes e depois e vínculo claro entre a análise e a ação executada. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 669,
+  "id": "9defc320532d4c35371e672aa4ee1396",
+  "nome": "Agendamento Beauty Fair 2026",
+  "imp": 12.4125,
+  "motivo": "Agendamento Beauty Fair 2026 organiza reservas para o estande, controla vagas e duplicidades e envia confirmações, com valor mensal apurado de R$ 12,41.  \nPara mudar a decisão, seria preciso comprovar reservas efetivamente realizadas em operação recorrente, em eventos que se repitam, com registros das confirmações enviadas e do uso real pelo público previsto. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 656,
+  "id": "9fd7215a71459337322b52d45510d0c5",
+  "nome": "Automação da Comissões de Itens Licenciados",
+  "imp": 63.87,
+  "motivo": "O projeto gera mensalmente o relatório de comissões de itens licenciados, valida os dados, registra a execução no GitHub Actions e publica o arquivo no Google Drive, com valor mensal apurado de R$ 63,87.  \nPara a decisão mudar, seria preciso demonstrar que a automação trata divergências de dados até a correção final sem intervenção humana e identificar quem usa o relatório, como percebe sua ausência e que impacto mensal isso evita. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 680,
+  "id": "71e424e3a27c24db04289c5834292b0e",
+  "nome": "Reembolso GoGroup — automação de comprovantes → GoService",
+  "imp": 21.29,
+  "motivo": "O projeto lê comprovantes, valida despesas e abre chamados de reembolso no GoService, com valor mensal apurado de R$ 21,29.  \nPara a decisão mudar, é preciso demonstrar reembolsos recorrentes de vários usuários, com uso contínuo e impacto mensal sustentado nesse fluxo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 664,
+  "id": "5a71877fd167b37e304cba46f4db3c39",
+  "nome": "Onboarding Tech Gogroup",
+  "imp": 58.555,
+  "motivo": "O projeto centraliza conteúdos e links para novos integrantes consultarem informações e solicitarem acessos, com valor mensal apurado de R$ 58,55.  \nPara mudar a decisão, seria preciso demonstrar registros recorrentes de uso por vários novos integrantes, com solicitações de acesso, conteúdos consultados e conclusões registradas ao longo do mês, mostrando impacto mensal acima de R$ 100,00. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 682,
+  "id": "420621fb38bd761ddaed5ccd4cc61fcb",
+  "nome": "Painel de eficiência operacional de CX",
+  "imp": 53.44,
+  "motivo": "O projeto consolida métricas de CX em um painel e substitui a montagem manual de cinco relatórios mensais, com valor mensal apurado de R$ 53,44. Para mudar a decisão, seria necessário demonstrar que o painel orienta decisões recorrentes de mais gestores ou automatiza ações a partir das métricas, com impacto mensal comprovado maior. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 706,
+  "id": "02c3d43be8c6010839b18b311825747c",
+  "nome": "BID Financeiro",
+  "imp": 28.9625,
+  "motivo": "O projeto acompanha captações bancárias da cotação à liberação, dando visibilidade ao Financeiro, com valor mensal apurado de R$ 28,96.  \nPara a decisão mudar, é preciso demonstrar uso contínuo em operação real, com captações efetivamente acompanhadas de forma recorrente e registro do fluxo atendido pelo processo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 690,
+  "id": "fadb57be2e09a39b9929646a1127db3c",
+  "nome": "Retro S&P — automação dos pontos da retrospectiva mensal",
+  "imp": 22.425,
+  "motivo": "O projeto consulta os dados da retrospectiva mensal e prepara o texto do slide para cópia, com valor mensal apurado de R$ 22,43.  \nPara a decisão mudar, seria preciso demonstrar uso recorrente por mais pessoas, com o conteúdo publicado ou integrado ao fluxo mensal, e evidência de que ele alimenta decisões de forma contínua. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 703,
+  "id": "755005cfb07365d01d96f23ece1209d3",
+  "nome": "Dash de Custos Freedom Cosméticos",
+  "imp": 51.205,
+  "motivo": "O projeto organiza planilhas recebidas por e mail e mostra à área de Compras os custos atualizados por SKU e estado, com valor mensal apurado de R$ 51,20.  \nPara alterar a decisão, seria preciso demonstrar uso recorrente por outro time, impacto claro na rotina quando o painel fica indisponível e decisão de compra apoiada diretamente por essa análise nos pedidos. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 707,
+  "id": "ab2290a4b13e89edb3a95ab12fa76b11",
+  "nome": "Envio de e-mails para aprovação de ajustes dos líderes",
+  "imp": 13.94,
+  "motivo": "O projeto agrupa pendências de ponto e envia e-mails para que os líderes aprovem os ajustes, com valor mensal apurado de R$ 13,94.  \nPara essa decisão mudar, é preciso comprovar uso em vários fechamentos, com disparo e acompanhamento recorrentes, e aprovações concluídas no prazo. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 704,
+  "id": "a604a6d939cb6c9597c61770549c2a57",
+  "nome": "Radar Pix",
+  "imp": 31.03125,
+  "motivo": "O Radar Pix projeta o caixa retido pelo NuPay e indica quando os recebíveis serão liberados, com valor mensal apurado de R$ 31,03.  \nPara a decisão mudar, é preciso demonstrar alertas periódicos do Radar Pix usados pelo Financeiro para alterar a política de aceite, com registro das decisões tomadas e da recorrência desse uso. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ },
+ {
+  "linha": 715,
+  "id": "fda50921fe1966bb788145852124152d",
+  "nome": "Comparativo de Produto Acabado",
+  "imp": 89.7,
+  "motivo": "O projeto monta e salva comparativos a partir dos dados preenchidos pelo usuário, com valor mensal apurado de R$ 89,70.  \nPara a decisão mudar, seria preciso demonstrar uso recorrente por outras pessoas e que esses comparativos alimentam decisões ou processos de compra de forma automática. Se o ganho deste projeto não aparece no valor mensal, por exemplo risco evitado ou qualidade, procure o time de RPA para reavaliação."
+ }
+]

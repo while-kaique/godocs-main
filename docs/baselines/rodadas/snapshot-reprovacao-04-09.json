@@ -1,0 +1,1104 @@
+{
+  "aba": "GoDocs",
+  "colStatus": "AP",
+  "colMotivo": "AR",
+  "gravado_em": "2026-09-04T22:04:34.540Z",
+  "alvos": [
+    {
+      "linha": 32,
+      "id": "LEGADO-057",
+      "nome": "Meta Base - Estoque",
+      "imp": 18.16,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 33,
+      "id": "legado-059",
+      "nome": "[R&S]Disparo mensgens Whats NIS",
+      "imp": 25.58,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 34,
+      "id": "legado-060",
+      "nome": "[R&S]DASH ACOMPANHAMENTO DIÁRIO",
+      "imp": 16.55,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 37,
+      "id": "legado-063",
+      "nome": "Automação de alertas de vagas com SLA ultrapassado [PEOPLE]",
+      "imp": 33.1,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 43,
+      "id": "legado-067",
+      "nome": "Marketplace Scraper - Código de Coleta",
+      "imp": 25.555,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 44,
+      "id": "legado-068",
+      "nome": "Webscraping Malas",
+      "imp": 32.34,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 45,
+      "id": "legado-065a",
+      "nome": "BONIFICAÇÃO ADM [PEOPLE]",
+      "imp": 10.225,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 46,
+      "id": "legado-071",
+      "nome": "att_all_products_gobeaute_catalog",
+      "imp": 2.66125,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 47,
+      "id": "legado-072",
+      "nome": "att_preco_prazo_conversao",
+      "imp": 2.66125,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 49,
+      "id": "legado-075",
+      "nome": "Automação da geração de guias de ASO utilizando apps scripts.",
+      "imp": 90.61,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 52,
+      "id": "legado-078",
+      "nome": "Report semanal - Acompanhamento de atividades",
+      "imp": 58.305,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 58,
+      "id": "1f1a3b577e1b657b147aaf6058371453",
+      "nome": "Envio de Assinatura Digital Automatizada",
+      "imp": 82.75,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 62,
+      "id": "4d35768e46b48c2b3ca1f79283aaf268",
+      "nome": "SegTrab",
+      "imp": 85.5,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 63,
+      "id": "legado-083",
+      "nome": "Automação - Coleta de Chamados de Admissão",
+      "imp": 46,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 88,
+      "id": "legado-110",
+      "nome": "[DUDA] Custo por pedido",
+      "imp": 48.79,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 103,
+      "id": "legado-122",
+      "nome": "Automação - Criação de Chamados via API (Cadastro de Clientes)",
+      "imp": 43.44,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 107,
+      "id": "LEGADO-127",
+      "nome": "Automação do envio do report de Melhorias do Inbound",
+      "imp": 55.15,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 126,
+      "id": "legado-144",
+      "nome": "Envio de e-mails tropa ações e Envio de e-mails tropa",
+      "imp": 85.5,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 138,
+      "id": "legado-166",
+      "nome": "SPG · IAGO Copiloto Q&A Operacional",
+      "imp": 50.745,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 150,
+      "id": "legado-170",
+      "nome": "Plano de Embalagens 2026",
+      "imp": 22.425,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 151,
+      "id": "legado-171",
+      "nome": "Yenzah · Dossiê de Marca Pós-Aquisição",
+      "imp": 59.8,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 159,
+      "id": "legado-180",
+      "nome": "Awin Auto-Validator — Validação automática de pedidos de afiliados",
+      "imp": 27.575,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 176,
+      "id": "legado-196",
+      "nome": "[Ytalo] Itens reembolsados por Ruptura Estoque",
+      "imp": 27.575,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 181,
+      "id": "legado-201",
+      "nome": "Automação de Processamento de Romaneios de Expedição",
+      "imp": 74.515,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 188,
+      "id": "legado-207",
+      "nome": "GO HC",
+      "imp": 3.7375,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 189,
+      "id": "legado-208",
+      "nome": "ALERTA DE ETIQUETA MAUAL",
+      "imp": 69.7,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 195,
+      "id": "legado-218",
+      "nome": "Dashboard Operacional B2B",
+      "imp": 50.195,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 205,
+      "id": "LEGADO-225",
+      "nome": "Automação de relatório de Absenteísmo",
+      "imp": 95.45,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 207,
+      "id": "legado-228",
+      "nome": "[Ytalo] Status do Reembolso - Contatos Gocase",
+      "imp": 59.8,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 211,
+      "id": "legado-230",
+      "nome": "Catalogador de produtos",
+      "imp": 95.165,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 216,
+      "id": "legado-231",
+      "nome": "Automação do envio do comprovante via chat - Gocase",
+      "imp": 76.67,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 218,
+      "id": "legado-232",
+      "nome": "Verificação de Antifraude Gocase",
+      "imp": 87.125,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 240,
+      "id": "legado-258",
+      "nome": "RFQ - Request for Quotation",
+      "imp": 66.2,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 248,
+      "id": "legado-268",
+      "nome": "[Goservice] - Criação de Chamados via API (Benefícios)",
+      "imp": 52.275,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 257,
+      "id": "61798a938d844be29e148e580e5c4dde",
+      "nome": "Dashboard Recebedoria Fiscal",
+      "imp": 92.7,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 271,
+      "id": "15231d3ac6615b352f194a54e14393be",
+      "nome": "Automação - Sprint Semanal",
+      "imp": 18.69,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 273,
+      "id": "08779c5e5c78b787f808fffbfc0a77c7",
+      "nome": "Automação - Crachá de Onboarding",
+      "imp": 3.52,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 289,
+      "id": "f76826e2d62b524e96a96403253a783d",
+      "nome": "Gerador de UTM",
+      "imp": 20.105,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 295,
+      "id": "93fc4b950478ba8d15006a8af54c991b",
+      "nome": "Automação de preenchimento de base - Onboarding",
+      "imp": 27.855,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 299,
+      "id": "9e8799cb030793403ecdffd62983ebd0",
+      "nome": "[Tiny] - Produtos Novos",
+      "imp": 69.7,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 300,
+      "id": "1f6318ad264374497cc9af8de3cacff3",
+      "nome": "[Meli] Monitor Catálogos",
+      "imp": 95.805,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 302,
+      "id": "186b8c7553f6d9cfbbadcd75816344d8",
+      "nome": "Automação para Monitoramento de Qualidade de Estoque no Full",
+      "imp": 28.5,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 303,
+      "id": "dd804126e9677a45ffa1b232383ba552",
+      "nome": "CONTROLE PEDIDOS B2B",
+      "imp": 3.83375,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 323,
+      "id": "a390a173a8020baaa7ec8128fc291608",
+      "nome": "Skill Momento IA",
+      "imp": 16.03,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 341,
+      "id": "53bebbcff7ffb94f919b9707ae2552b3",
+      "nome": "Criação de relatório",
+      "imp": 16.55,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 345,
+      "id": "054d62fcacfe6986ca1f17bfc4d764a5",
+      "nome": "Automação Status de Entrega",
+      "imp": 42.58,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 346,
+      "id": "b51684eeeb45ea55dab79f50d8109b04",
+      "nome": "IA de Templates",
+      "imp": 80.975,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 363,
+      "id": "e7829ae35b31caac8e731f804436d483",
+      "nome": "Dashboard Jornada da Copa",
+      "imp": 26.6125,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 366,
+      "id": "35dba433db330c1ef85d7b50b7d04ddf",
+      "nome": "Automação mudanças pipeline de M&A",
+      "imp": 74.75,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 367,
+      "id": "a78d9409230671b40ff5a8c25b05951b",
+      "nome": "suzie.ia",
+      "imp": 27.41,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 370,
+      "id": "802104cc9de075fea3cd300561f8a343",
+      "nome": "Consolidador documento TROPA",
+      "imp": 82.735,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 373,
+      "id": "3f9f89ef8068f49c0e4ec40821716917",
+      "nome": "Automação de Atualização de Estoque",
+      "imp": 53.9,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 374,
+      "id": "244735580d1bdff3d0a9ebef2eccd35e",
+      "nome": "Automação validação catraca refeitorio",
+      "imp": 43.845,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 378,
+      "id": "35fff6bdf6c73f17d59f3025ce2fc141",
+      "nome": "Lista de Presença Digital – Onboarding",
+      "imp": 55.76,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 380,
+      "id": "d23a0d7cd5da36bb8d8950aafa494ebc",
+      "nome": "Gerenciador de OKRs - Fast Track e Agentes de IA para OKRs",
+      "imp": 55.15,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 381,
+      "id": "aaf138a9d752dff319fbb39c6348541c",
+      "nome": "Auditoria de Banco de Horas x Folha de Pagamento",
+      "imp": 6.97,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 382,
+      "id": "4bff68d10d71e67e1f03e692ea25f6c1",
+      "nome": "Painel de tarefas do DP",
+      "imp": 3.7375,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 383,
+      "id": "0708a976f1dd189f1e8a106e93b5c2f7",
+      "nome": "Automação de Dados CTR Gocase",
+      "imp": 86.24,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 386,
+      "id": "7e90cfbe269fba6b6f5cd7cdc17d4c55",
+      "nome": "Automação Imagens Waitlist",
+      "imp": 34.85,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 392,
+      "id": "bd1bbf11e5ae47f192d68ece000eda80",
+      "nome": "Vencimento contratos temporarios",
+      "imp": 97.175,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 401,
+      "id": "eb044805e183bd126f884d1250c8024b",
+      "nome": "Pipeline de Projetos",
+      "imp": 98.225,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 405,
+      "id": "d987baad481423869f32ff7fd4a81e33",
+      "nome": "Geração de Kits Gobeauty",
+      "imp": 14.01,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 406,
+      "id": "9b79a5c7119b2e7d92e3670a47eb0709",
+      "nome": "Automação de Retrospectiva Mensal de Malas",
+      "imp": 33.1,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 411,
+      "id": "bb931ea4698ab28b97ce93a8077941e3",
+      "nome": "Automação de Acompanhamento de Notas Fiscais",
+      "imp": 80.85,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 414,
+      "id": "50991805dcb3147e6a4b360ed4cf18a8",
+      "nome": "Alertas de Pagamento Urgente",
+      "imp": 0.8875,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 416,
+      "id": "88a169cce620725c413d7457b3cb9ce1",
+      "nome": "GoStream - Checklist Proposta",
+      "imp": 13.505,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 423,
+      "id": "67c6b4fa84cc48ad3ef75dce1cb164eb",
+      "nome": "SEO Gocase",
+      "imp": 8.715,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 424,
+      "id": "0f3057f1ca7036dfb26142886bebb384",
+      "nome": "Gocase Manutenção — Sistema de Ordens de Serviço",
+      "imp": 6.97,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 426,
+      "id": "dd0fdf7cfe95641aa22dca13428b0cee",
+      "nome": "Ingestão de volume diário para previsão de custos",
+      "imp": 55.15,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 429,
+      "id": "e6c942211cee075ab8f6ea65fdaf414d",
+      "nome": "GoEnvios",
+      "imp": 72.93,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 434,
+      "id": "fd5f0bc608245c15a7ae72e38939beee",
+      "nome": "Automação Planilha Reinf",
+      "imp": 10.455,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 440,
+      "id": "6459c4ac1f78a46a3254dd0481c41a45",
+      "nome": "Onboarding de Líderes",
+      "imp": 40.38,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 445,
+      "id": "63f16fc5ed5addaf01a205321474ebf9",
+      "nome": "Chat bot aniversariantes do dia",
+      "imp": 17.425,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 453,
+      "id": "8747bb99425cac07482f01b58d5f0b4b",
+      "nome": "Skill - Lançamentos Aplicação Aut Mais Itaú",
+      "imp": 60.655,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 455,
+      "id": "cbe83a0740da0e3aa906a2c9fbf38a93",
+      "nome": "GERADOR DE GNRE",
+      "imp": 63.87,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 458,
+      "id": "9ef1bb9d6ddd1c418693cc3a2aaaf326",
+      "nome": "Painel de Recebimento",
+      "imp": 85.5,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 462,
+      "id": "f8c9e95980b86a7ab3f7ab2a6ecde82f",
+      "nome": "Gobeaute Prompt Studio",
+      "imp": 36.595,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 465,
+      "id": "909842fa77c5f2165fb0bd3967d0e802",
+      "nome": "Validador de CCT",
+      "imp": 44.13333333,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 469,
+      "id": "0278114974d6e8234f58c218b92f0792",
+      "nome": "Chamados de Compras",
+      "imp": 99.34,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 471,
+      "id": "21f755a705857a9d1d267495d8a859d5",
+      "nome": "Assessor Pessoal de Agenda — Bot Telegram + Google Calendar",
+      "imp": 56.92,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 479,
+      "id": "5978e9979240fefb7794f59eaffa8730",
+      "nome": "Agenda de Viagens Corporativas — Gogroup Facilities",
+      "imp": 48.035,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 483,
+      "id": "5fe2a466ee718321e221646b2223ba3d",
+      "nome": "Envio de contratos para assinatura automático",
+      "imp": 0.87625,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 484,
+      "id": "b8dd0b6a8e94a771d0efe298582e2d1c",
+      "nome": "Analise Descascamento",
+      "imp": 20.91,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 485,
+      "id": "9d48f3b13edf7b66f3dbb1c81d2a4aa5",
+      "nome": "Reserva sala Adm",
+      "imp": 13.94,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 486,
+      "id": "04637a98a2f2a7b35d9b2535e4c97069",
+      "nome": "Pesquisa satisfação Temporários",
+      "imp": 13.06875,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 487,
+      "id": "ad03fe8f7d8cb548c610a4e566341fbf",
+      "nome": "Avaliação performance PCDS",
+      "imp": 11.2125,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 492,
+      "id": "ffccf702c5ba9a95f29710067636a777",
+      "nome": "Painel de Recebedoria de Doc Fiscais",
+      "imp": 20.91,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 505,
+      "id": "b9289e97e84b136bdc87639c75ed8d4b",
+      "nome": "Disparo de resultados automáticos (Chat Gocase)",
+      "imp": 97.58,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 509,
+      "id": "d498200cc74ccc2cbec075da0ee91caa",
+      "nome": "Kanban Estoques Gobeauty",
+      "imp": 76.67,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 512,
+      "id": "1c7b52e556a00ac886f335edfe2da3e9",
+      "nome": "Automação relatório Business Case M&A",
+      "imp": 14.95,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 515,
+      "id": "cbde1f4d81286eac2c2c09ad631fc628",
+      "nome": "Waitlinks",
+      "imp": 49.115,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 524,
+      "id": "f5a4861a2b68ecadf2e06be8965352a8",
+      "nome": "Painel Principal",
+      "imp": 8.275,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 532,
+      "id": "3508e811bf824a7732502eb60ce35852",
+      "nome": "Automação de artes - Dia dos pais",
+      "imp": 45.245,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 534,
+      "id": "9d36a35cad0b8a318e50c618c97e52c9",
+      "nome": "Experiencia PCD Gocase",
+      "imp": 5.60625,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 535,
+      "id": "d303dcbd80cf2f167abc8dffb35a50df",
+      "nome": "Gerador de figurinhas da copa",
+      "imp": 64.28375,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 536,
+      "id": "103f8cdcbc55500f607ab531b5818916",
+      "nome": "Pesquisa performance PCDS",
+      "imp": 29.9,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 538,
+      "id": "a48024b89c233f59c805066004afd126",
+      "nome": "Wizard",
+      "imp": 59.8,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 539,
+      "id": "3d3c3e6a1e9eb81cd3a31ba734bdef70",
+      "nome": "Gente & Gestão Responde — Recrutamento Interno",
+      "imp": 31.935,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 544,
+      "id": "897df98681bd7b2835fb23c953a732bc",
+      "nome": "Painel de Segurança do Trabalho",
+      "imp": 14.615,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 547,
+      "id": "4dfe8611865ea88faf0cbda6f1b9e795",
+      "nome": "Análise de NFS-e de Influencers",
+      "imp": 83.64,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 548,
+      "id": "9a3987728fd98044d7230fe417a93cbd",
+      "nome": "Controle Fiscal de Lançamentos - Goservice",
+      "imp": 27.88,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 549,
+      "id": "49b6c631bba367728931fcb69bfa925d",
+      "nome": "Automação para listagem de pedidos travados",
+      "imp": 13.835,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 550,
+      "id": "9d46f0e800eeaee241497d42b530cec0",
+      "nome": "Burndown Melhoria e Dados CX",
+      "imp": 19.96,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 551,
+      "id": "29e41c377017218d7a48a48eacaea760",
+      "nome": "Site para Criação de mockups.",
+      "imp": 49.66125,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 552,
+      "id": "ed370d51237e5a04350552de092da859",
+      "nome": "Cascateamento Automático",
+      "imp": 2.56,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 558,
+      "id": "764659b526839d92e93b3eccd22b692a",
+      "nome": "Dashboard de People — Admissões e Desligamentos",
+      "imp": 5.39,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 560,
+      "id": "2d7003617c012de2b14251328bec9f25",
+      "nome": "Sistema de Cotação de Malas e Acessórios",
+      "imp": 33.1,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 562,
+      "id": "5d3b781ba9a5f39992e4b54e6da63f8c",
+      "nome": "Fluxo BPMN",
+      "imp": 49,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 567,
+      "id": "323278fc6fe23f9b958a9553b1e9c827",
+      "nome": "INVENTÁRIO ESTÚDIO GOGROUP",
+      "imp": 62.73,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 570,
+      "id": "f112c0edb849757d98f244061962798a",
+      "nome": "Gerador GIA-ST",
+      "imp": 41,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 571,
+      "id": "0968ef7cac0dabca3870aaabbd0cfad1",
+      "nome": "Conversor SPED-Excel",
+      "imp": 26.61,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 605,
+      "id": "962ad4bf4282e7a84edd06894f3d5438",
+      "nome": "Automação da extração mensal de reenvios da Gocase",
+      "imp": 10.69,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 611,
+      "id": "c4c87bd816245d0f1f998a5cbc226721",
+      "nome": "Gerador de Copy",
+      "imp": 32.385,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 613,
+      "id": "240727795b77ff2229280029c68e8b61",
+      "nome": "Automação assinatura digital férias",
+      "imp": 66.2,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 618,
+      "id": "47048111d82a03b727c832e673673ea6",
+      "nome": "Automação atualização IPCA",
+      "imp": 7.475,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 625,
+      "id": "5afa214f38acc42a1a5a377bc15650d1",
+      "nome": "Processador de XML NFe",
+      "imp": 75.79,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 631,
+      "id": "3ed3db78fa3465c4d6fe88f2ee44e113",
+      "nome": "Fórum de melhoria continua",
+      "imp": 52.16,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 634,
+      "id": "138e91892dde440624abd41fdb37741f",
+      "nome": "Fila por Marca — Monitor de Fila de Atendimento em Tempo Real",
+      "imp": 38.605,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 637,
+      "id": "5071c7c3b92bf98fb2e50e8e987ae091",
+      "nome": "HireFlow",
+      "imp": 95.07,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 638,
+      "id": "598d24a7b65d4f2a964ddf91344645a3",
+      "nome": "Automação notas emitidas SEFAZ ES",
+      "imp": 81.095,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 642,
+      "id": "312330b0d164b011e1dfe8c897eb5b69",
+      "nome": "GocaLives",
+      "imp": 44.35375,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 643,
+      "id": "85bde7847eca496f6ecda453171406b8",
+      "nome": "Vencimentos UNILOG",
+      "imp": 85.5,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 645,
+      "id": "b299eaa87a2bd3d8a25168d98301cbc6",
+      "nome": "News Hunter - futebol",
+      "imp": 88.93,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 649,
+      "id": "a0be9dd2308bb3491a70e27dd5a54d10",
+      "nome": "Automação de Report de CRO - Diário e Semanal",
+      "imp": 69.765,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 654,
+      "id": "a79b9029e7ea2f7dbec12793baf53712",
+      "nome": "Monitoramento de Background Check - Compliance",
+      "imp": 55.15,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 656,
+      "id": "9fd7215a71459337322b52d45510d0c5",
+      "nome": "Automação da Comissões de Itens Licenciados",
+      "imp": 63.87,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 658,
+      "id": "9597d4f444954baa017e00af1e51404a",
+      "nome": "Agente de Oportunidades B2B - Supply",
+      "imp": 42.58,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 664,
+      "id": "5a71877fd167b37e304cba46f4db3c39",
+      "nome": "Onboarding Tech Gogroup",
+      "imp": 58.555,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 669,
+      "id": "9defc320532d4c35371e672aa4ee1396",
+      "nome": "Agendamento Beauty Fair 2026",
+      "imp": 12.4125,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 680,
+      "id": "71e424e3a27c24db04289c5834292b0e",
+      "nome": "Reembolso GoGroup — automação de comprovantes → GoService",
+      "imp": 21.29,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 682,
+      "id": "420621fb38bd761ddaed5ccd4cc61fcb",
+      "nome": "Painel de eficiência operacional de CX",
+      "imp": 53.44,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 690,
+      "id": "fadb57be2e09a39b9929646a1127db3c",
+      "nome": "Retro S&P — automação dos pontos da retrospectiva mensal",
+      "imp": 22.425,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 703,
+      "id": "755005cfb07365d01d96f23ece1209d3",
+      "nome": "Dash de Custos Freedom Cosméticos",
+      "imp": 51.205,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 704,
+      "id": "a604a6d939cb6c9597c61770549c2a57",
+      "nome": "Radar Pix",
+      "imp": 31.03125,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 706,
+      "id": "02c3d43be8c6010839b18b311825747c",
+      "nome": "BID Financeiro",
+      "imp": 28.9625,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 707,
+      "id": "ab2290a4b13e89edb3a95ab12fa76b11",
+      "nome": "Envio de e-mails para aprovação de ajustes dos líderes",
+      "imp": 13.94,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    },
+    {
+      "linha": 715,
+      "id": "fda50921fe1966bb788145852124152d",
+      "nome": "Comparativo de Produto Acabado",
+      "imp": 89.7,
+      "statusAntes": "Aprovado",
+      "motivoAntes": "—"
+    }
+  ]
+}
