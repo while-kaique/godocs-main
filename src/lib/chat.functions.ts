@@ -568,7 +568,22 @@ const iniciarSubmissaoSchema = z.object({
   membros_papeis: membrosPapeisSchema,
   membros_contribuicoes: membrosContribuicoesSchema,
   nome_projeto: z.string().min(1).max(200),
-  data_criacao: z.string(),
+  /**
+   * ⚠️ **OPCIONAL desde 07/09/2026, e era o que quebrava TODA submissão nova em produção.**
+   *
+   * A v2 tirou "Data de criação" do formulário (a data que vale é a de SUBMISSÃO), e o cliente
+   * deixou de mandar a chave — mas aqui ela continuou `z.string()` obrigatória. Resultado: o zod
+   * recusava com 400, `iniciar-submissao` não criava o projeto, e a tela mostrava "Não foi
+   * possível registrar o projeto agora, tente novamente em alguns segundos" — um texto que manda
+   * a pessoa repetir uma ação que nunca ia funcionar. Reproduzido contra prod.
+   *
+   * ⚠️ A mesma chave já era `.optional()` na rota de metadados (`atualizarMetadados`): só esta
+   * ficou para trás na migração, e é a diferença entre um campo sumir do form e sumir do
+   * CONTRATO. Ao remover campo do formulário, varra os schemas das rotas que o recebiam.
+   *
+   * Segue aceita para não quebrar cliente antigo em cache (version skew, que este repo já viu).
+   */
+  data_criacao: z.string().optional(),
   tipo_projeto: z.enum(["saving", "receita_incremental"]).optional(),
   tipos_projeto: z.array(z.enum(["saving", "receita_incremental"])).optional(),
   descricao_breve: z.string().max(1000).optional(),
@@ -784,7 +799,8 @@ export async function iniciarSubmissao(
       membros_contribuicoes: data.membros_contribuicoes ?? null,
       nome: nomeFinal,
       projeto_pai_id: paiId,
-      data_criacao_projeto: data.data_criacao,
+      // `?? null` porque a chave virou opcional: sem isto o insert receberia `undefined`.
+      data_criacao_projeto: data.data_criacao ?? null,
       // Projeto especial: marca "Tipo de Projeto" como "especial" (banco + planilha)
       // e ignora os tipos financeiros — o fluxo não passa pelas fases de saving/receita.
       tipo_projeto: data.especial ? "especial" : (data.tipo_projeto ?? null),
@@ -883,7 +899,7 @@ export async function iniciarSubmissao(
     ferramenta: data.ferramenta,
     membros: data.membros,
     nome_projeto: data.nome_projeto,
-    data_criacao: data.data_criacao,
+    data_criacao: data.data_criacao ?? null,
     doc_texto: docTexto || null,
     descricao_breve: data.descricao_breve ?? null,
     tipo_projeto: data.tipo_projeto ?? null,

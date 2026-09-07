@@ -57,6 +57,13 @@ export type Correcao = {
 export const MOTIVO_MAX = 400;
 
 /**
+ * Piso do motivo — o mesmo que `ensinaAlgo` cobra, para a tela não aceitar o que o prompt vai
+ * descartar em silêncio. É baixo de propósito: "roda em 3 marcas" ensina, e cobrar redação
+ * faria a pessoa desistir de escrever.
+ */
+export const MOTIVO_MIN = 10;
+
+/**
  * A correção vale como lição quando MUDA alguma coisa e diz por quê.
  *
  * ⚠️ Correção sem motivo NÃO vira exemplar de primeira classe: ela continua valendo como âncora
@@ -64,7 +71,7 @@ export const MOTIVO_MAX = 400;
  * ela ensina é "a nota é essa porque sim", que é exatamente o decorar-gabarito.
  */
 export function ensinaAlgo(c: Correcao): boolean {
-  if (!c.motivo || c.motivo.trim().length < 10) return false;
+  if (!c.motivo || c.motivo.trim().length < MOTIVO_MIN) return false;
   const referencia = c.recomendado ?? c.de;
   return referencia != null && referencia !== c.para;
 }
@@ -161,13 +168,37 @@ export function correcoesDoLog(linhas: LinhaAtividade[]): Correcao[] {
 }
 
 /**
- * As correções que valem a pena mostrar, mais recentes primeiro.
+ * As correções que valem a pena mostrar — **as dos VIZINHOS primeiro**, recentes depois.
  *
  * ⚠️ Exclui a do PRÓPRIO projeto que está sendo julgado: mostrar ao agente a nota que a triagem
  * já cravou naquele cartão não é ensinar critério, é entregar a resposta.
+ *
+ * ⚠️ **A ordem é o desenho, e ela vem de uma pergunta do dono do produto (05/09/2026):** "não
+ * seria melhor uma base de consulta em vez de tudo no prompt?". A intuição está certa — o que
+ * ensina é a correção de um projeto PARECIDO, não a mais recente —, mas a base de consulta já
+ * existe: é o RAG, que a esta altura já recuperou os `K_VIZINHOS` mais similares. Então a
+ * correção viaja JUNTO do vizinho a que pertence, em vez de virar lista à parte.
+ *
+ * ⚠️ **Uma tool foi considerada e descartada, com motivo:** o `llm.ts` não expõe `tools` e o
+ * proxy não faz tool-calling nativo (ver `avaliacao/ferramentas.ts`), então cada consulta seria
+ * mais um round-trip de JSON parseado à mão — e falha de parse é o defeito que já custou 65% de
+ * uma rodada inteira. Some-se que o bloco é capado em 6 lições: não há prompt crescendo sem
+ * limite para justificar o custo.
  */
-export function licoesPara(correcoes: Correcao[], projetoId: string): Correcao[] {
+export function licoesPara(
+  correcoes: Correcao[],
+  projetoId: string,
+  /** Ids dos vizinhos que o RAG recuperou para ESTE projeto. Vazio = só a ordem cronológica. */
+  idsVizinhos: readonly string[] = [],
+): Correcao[] {
+  const vizinho = new Set(idsVizinhos.map((id) => id.trim().toLowerCase()));
+  const recente = (c: Correcao) => String(c.quando ?? '');
   return correcoes
     .filter((c) => c.projeto_id !== projetoId && ensinaAlgo(c))
-    .sort((a, b) => String(b.quando ?? '').localeCompare(String(a.quando ?? '')));
+    .sort((a, b) => {
+      const va = vizinho.has(a.projeto_id.toLowerCase()) ? 1 : 0;
+      const vb = vizinho.has(b.projeto_id.toLowerCase()) ? 1 : 0;
+      if (va !== vb) return vb - va;
+      return recente(b).localeCompare(recente(a));
+    });
 }

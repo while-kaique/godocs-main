@@ -606,3 +606,17 @@
   font-weight: 700;
 }
 
+
+/* O painel do PORQUÊ (/especiais) entra deslizando de baixo — e não entra quando a pessoa
+   pediu menos movimento. Ele aparece do lado do cartão que a pessoa acabou de mover, então
+   um surgimento seco parece bug; 160ms é o suficiente para ler como "isto veio do meu clique". */
+.go-porque {
+  animation: go-porque-entra 160ms ease-out;
+}
+@keyframes go-porque-entra {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .go-porque { animation: none; }
+}

@@ -104,7 +104,12 @@ export const PISO_ZERO = [
   {
     chave: 'experimentacao',
     texto:
-      'É experimentação: existe para testar uma ideia ou aprender uma ferramenta, não para sustentar uma rotina.',
+      'É experimentação: existe para testar uma ideia ou aprender uma ferramenta, não para sustentar uma rotina. ' +
+      '⚠️ FALTA DE COMPROVAÇÃO NÃO É EXPERIMENTAÇÃO. "O memorial não comprova uso recorrente", "traz apenas o ' +
+      'resultado esperado" ou "não mostra quem usa" são motivos para a NOTA BAIXA do seu eixo, nunca para o piso. ' +
+      'Só marque aqui se o material disser que o projeto EXISTE para testar ou aprender: piloto declarado, POC, ' +
+      'prova de conceito, dados sintéticos, "estamos testando". Sustentar uma rotina sem prova documentada ' +
+      'continua sendo sustentar uma rotina.',
   },
   { chave: 'ressubmissao', texto: 'É ressubmissão do mesmo escopo já documentado.' },
 ] as const;

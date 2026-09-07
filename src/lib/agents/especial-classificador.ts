@@ -155,7 +155,23 @@ Responda APENAS com JSON válido, exatamente neste formato, sem texto fora do JS
 Use confiança BAIXA quando o memorial for ausente/fraco ou o uso não for comprovado (o normal em projeto recém-submetido).`;
 }
 
-export function buildUserMessageEspecial(alvo: AlvoClassificacao, vizinhos: Vizinho[]): string {
+export function buildUserMessageEspecial(
+  alvo: AlvoClassificacao,
+  vizinhos: Vizinho[],
+  /**
+   * O que a triagem já corrigiu na recomendação do agente, **e por quê** — `blocoCorrecoes`
+   * (`correcoes.ts`), vazio quando não há nada que ensine.
+   *
+   * ⚠️ Entra DEPOIS dos vizinhos e ANTES do projeto, de propósito: os vizinhos ancoram a
+   * MAGNITUDE ("isto é maior ou menor que o PIAPP") e as correções ancoram o CRITÉRIO ("você leu
+   * isto como alcance quando era plataforma"). Invertido, o agente lê a lição sem ter contra o
+   * que compará-la.
+   *
+   * ⚠️ A correção do PRÓPRIO projeto nunca chega aqui (`licoesPara` a exclui): mostrar ao agente
+   * a nota que a triagem já cravou naquele cartão não é ensinar critério, é entregar a resposta.
+   */
+  licoes = '',
+): string {
   const dados = {
     projeto: {
       nome: alvo.nome,
@@ -170,7 +186,7 @@ export function buildUserMessageEspecial(alvo: AlvoClassificacao, vizinhos: Vizi
   };
   return `PROJETOS ESPECIAIS PARECIDOS JÁ AVALIADOS (use como âncora — posicione o novo projeto RELATIVO a eles):
 ${montarBlocoFewShot(vizinhos)}
-
+${licoes ? `\n${licoes}\n` : ''}
 PROJETO A CLASSIFICAR:
 ${JSON.stringify(dados, null, 2)}
 
@@ -475,14 +491,22 @@ export function aplicarGuardVizinhoDivergente(
 export async function classificarEspecial(
   alvo: AlvoClassificacao,
   vizinhos: Vizinho[],
+  /**
+   * Contexto derivado que o chamador já tem em mãos. Mesmo saco de opções do `JuizConcordancia`,
+   * de propósito: dois parâmetros posicionais diferentes para "contexto extra" fariam o harness
+   * de concordância e a produção rotearem por assinaturas distintas, que é justamente o que o
+   * tipo do juiz existe para impedir.
+   */
+  extra?: { funcao?: string | null; licoes?: string },
 ): Promise<RecomendacaoEspecial | null> {
+  const licoes = extra?.licoes ?? '';
   // ⚠️ UMA segunda chance quando a resposta vem inútil. É o mesmo padrão do `orchestrator.ts`, e
   // existe porque a falha aqui é ESTOCÁSTICA: o mesmo projeto responde no formato canônico numa
   // chamada e ecoa a entrada na seguinte (medido: `legado-031` fez as duas coisas em minutos).
   // Sem a repescagem, o relatório atribui ao PROJETO um defeito que é do sorteio.
   const mensagens = [
     { role: 'system' as const, content: buildSystemPromptEspecial() },
-    { role: 'user' as const, content: buildUserMessageEspecial(alvo, vizinhos) },
+    { role: 'user' as const, content: buildUserMessageEspecial(alvo, vizinhos, licoes) },
   ];
   let raw = await llmChat(mensagens, { jsonMode: true, temperature: 0.2, maxTokens: 900 });
   let json = extrairJson(raw);
