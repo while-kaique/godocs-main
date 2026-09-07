@@ -19,7 +19,7 @@ import {
   FieldError,
   RadioGroup,
   AfetadosInput,
-} from "./form-components";
+ InfoTooltip,} from "./form-components";
 import { useSugestoesParticipantes } from "./participantes-sugestoes";
 import { useAreas } from "./areas-sugestoes";
 
@@ -714,23 +714,30 @@ export function Step2({
 
       {/* Upload de arquivos */}
       <FormGroup>
-        <FormLabel required>
-          Arquivos do Projeto
-        </FormLabel>
-
-        <div
-          className="mb-2.5 rounded-lg p-3 text-[12px] leading-relaxed"
-          style={{ background: "rgba(0,89,169,0.03)", border: "1px solid rgba(0,89,169,0.08)", color: "var(--go-text-primary)" }}
-        >
-          🤖 <strong style={{ color: "var(--go-blue)" }}>A IA vai ler toda a codebase</strong> e gerar a documentação automaticamente.
-          Pode enviar a pasta inteira do projeto (com subpastas) ou os documentos.
-          <br />
-          <span className="mt-1 block" style={{ color: "#8b8b9a" }}>
-            Aceita: código ({ACCEPTED_CODE_EXT.join(" ")}) · docs (PDF, DOCX, TXT, MD) · <strong>.zip</strong> (descompactado automaticamente) · máx. {MAX_FILE_MB}MB por arquivo
+        {/* ⚠️ O que a IA faz e o que o campo aceita saiu da tela e virou TOOLTIP.
+            Era um bloco de 3 parágrafos entre o rótulo e a área de soltar arquivo: quem já sabe
+            o que fazer (a maioria, da segunda submissão em diante) lia tudo de novo, e quem não
+            sabe encontrava o botão empurrado para baixo da dobra. Detalhe de formato é consulta,
+            não instrução: fica a um hover ou a um Tab de distância. */}
+        <div className="mb-1.5 flex items-center gap-2">
+          <span className="text-[13px] font-semibold" style={{ color: "var(--go-text-primary)" }}>
+            Arquivos do Projeto
+            <span className="ml-0.5" style={{ color: "#dc2626" }}>*</span>
           </span>
-          <span className="mt-1 block" style={{ color: "#8b8b9a" }}>
-            💡 Sem limite de arquivos — <strong>node_modules</strong>, <strong>.git</strong>, <strong>dist</strong> e afins são ignorados. O único limite é ~200k tokens de conteúdo (a barra abaixo avisa se passar).
-          </span>
+          <InfoTooltip largura={340} ariaLabel="O que enviar e o que a IA faz com os arquivos">
+            <strong className="mb-1 block text-white">A IA lê os arquivos e escreve a documentação</strong>
+            <span className="mb-2 block" style={{ color: "rgba(255,255,255,0.85)" }}>
+              Pode mandar a pasta inteira do projeto, com subpastas, ou só os documentos.
+            </span>
+            <span className="mb-2 block" style={{ color: "rgba(255,255,255,0.85)" }}>
+              <strong style={{ color: "var(--go-lime)" }}>Aceita</strong> código ({ACCEPTED_CODE_EXT.join(" ")}),
+              documentos (PDF, DOCX, TXT, MD) e .zip, que é descompactado sozinho. Até {MAX_FILE_MB}MB por arquivo.
+            </span>
+            <span className="block" style={{ color: "rgba(255,255,255,0.85)" }}>
+              <strong style={{ color: "var(--go-lime)" }}>Sem limite de arquivos.</strong>{" "}
+              node_modules, .git e dist são ignorados. O teto é o conteúdo: a barra abaixo avisa se passar.
+            </span>
+          </InfoTooltip>
         </div>
 
         {/* Arquivos anteriores — exibidos apenas quando ainda não há novos.
@@ -880,33 +887,11 @@ export function Step2({
         </div>
 
         <FieldError message={errors.documentacao} />
-
-        {/* Status do processamento em segundo plano — não bloqueia a navegação.
-            A doc começa a ser analisada assim que os arquivos são subidos, para a
-            Etapa 3 abrir sem espera. Estado nunca só por cor: ícone + rótulo. */}
-        {arquivos.length > 0 && bgStatus && bgStatus !== "idle" && (
-          <div
-            className="mt-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold"
-            style={
-              bgStatus === "pronto"
-                ? { background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.22)", color: "#16a34a" }
-                : bgStatus === "erro"
-                  ? { background: "rgba(0,89,169,0.04)", border: "1px solid rgba(0,89,169,0.15)", color: "var(--go-blue)" }
-                  : { background: "rgba(0,89,169,0.04)", border: "1px solid rgba(0,89,169,0.15)", color: "var(--go-blue)" }
-            }
-            role="status"
-            aria-live="polite"
-          >
-            {bgStatus === "processando" && (
-              <>
-                <span className="go-spinner" style={{ width: 12, height: 12 }} />
-                Lendo os arquivos em segundo plano. Pode seguir preenchendo.
-              </>
-            )}
-            {bgStatus === "pronto" && <>✅ Arquivos lidos. Pode avançar.</>}
-            {bgStatus === "erro" && <>ℹ️ A leitura dos arquivos vai ser refeita quando você avançar.</>}
-          </div>
-        )}
+        {/* ⚠️ NÃO existe aviso de "processando/pronto" aqui, e a ausência é decisão (07/09/2026).
+            A leitura dos arquivos roda sozinha em segundo plano desde o upload e não bloqueia
+            nada: dizer isso na tela dava à pessoa uma coisa para vigiar, e um estado a mais para
+            interpretar, num passo em que ela só precisa clicar em Avançar. Quando algo falha de
+            verdade, quem avisa é o toast do "Avançar", com o motivo real. */}
 
         {/* Árvore de arquivos */}
         {arquivos.length > 0 && (
