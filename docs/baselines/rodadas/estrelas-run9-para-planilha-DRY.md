@@ -6,13 +6,12 @@
 
 | | projetos |
 |---|---:|
-| **a escrever** (sem nota humana, nota 1 a 5) | **80** |
+| **a escrever** (sem nota humana, nota 0 a 5) | **129** |
 | faixa 6-10, deixada para o comitê | 0 |
-| recomendação 0 em célula vazia, não escrito | 49 |
 | preservados (já têm nota de vocês) | 508 |
 | sem recomendação na run 9 | 97 |
 
-Distribuição do que entra: **1★** 25 · **2★** 27 · **3★** 14 · **4★** 9 · **5★** 5
+Distribuição do que entra: **0★** 49 · **1★** 25 · **2★** 27 · **3★** 14 · **4★** 9 · **5★** 5
 
 ## As três regras que impedem o estrago
 
@@ -39,7 +38,7 @@ O PIAPP é a flagship 10★. O Prisma e o GoPrice são os dois casos que a sess�
 
 _nenhum_
 
-**3. Não escreve 0 em célula vazia.** Vazio ("—") e 0 ("Zero") são estados diferentes na tela, e virar "avaliado, vale zero" é afirmação que a rodada não sustenta.
+**3. ~~Não escreve 0 em célula vazia.~~ Removida em 05/09** por decisão do Luis: 0 é a caixa «Experimenta» da régua, com verbo e critério como qualquer outro nível, não "não avaliado". Tratá-lo como ausência inventava uma sétima categoria que a régua não tem.
 
 ## Rollback
 

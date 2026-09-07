@@ -18,9 +18,12 @@
  *    uma posição que a régua se recusa a afirmar, porque não existe critério que separe um 7 de um
  *    8. A faixa é veredito de COMITÊ; estes projetos saem em lista à parte, para decisão humana.
  *
- * 3. **Não escreve 0 por cima de célula vazia.** Célula vazia e `0` são estados diferentes na
- *    tela ("—" contra "Zero"), e transformar "ninguém avaliou" em "avaliado, vale zero" é uma
- *    afirmação que a rodada não tem como sustentar.
+ * 3. ~~Não escreve 0 por cima de célula vazia.~~ **REMOVIDA em 05/09/2026, por decisão do Luis:**
+ *    *"0 estrelas é um número totalmente possível. Se dentro dos critérios que definimos o time de
+ *    agentes definiu 0, então é 0."* E ele está certo pela própria régua: o 0 é a caixa
+ *    «Experimenta», com verbo, critério e exemplos como qualquer outro nível (`NIVEL_ZERO`), não
+ *    um "não avaliado". Tratá-lo como ausência era eu inventar uma sétima categoria que a régua
+ *    não tem. São 49 projetos a mais.
  *
  * Uso:
  *   npx tsx scripts/v2/estrelas-run9-para-planilha.mts             # ENSAIO (default)
@@ -80,17 +83,15 @@ ls.forEach((l, k) => {
   if (rec === undefined) { semRec.push(base.nome); return; }
   if (humana !== null) { preservados.push(base); return; }   // regra 1
   if (rec > TETO_AGENTE) { faixa.push(base); return; }        // regra 2
-  if (rec === 0) return;                                      // regra 3
-  escrever.push(base);
+  escrever.push(base);                                        // 0 incluído: é a caixa «Experimenta»
 });
 
 const rebaixados = preservados.filter((p) => p.humana !== null && p.rec < p.humana);
 const f = (n: number) => String(n).padStart(4);
 
 console.log(`${VALENDO ? 'VALENDO' : 'ENSAIO'} · aba ${ABA} · coluna "Estrelas" = ${col(iEst)}`);
-console.log(`  A ESCREVER (sem nota humana, 1..${TETO_AGENTE}): ${escrever.length}`);
+console.log(`  A ESCREVER (sem nota humana, 0..${TETO_AGENTE}): ${escrever.length}`);
 console.log(`  faixa 6-10, NÃO escrita (decisão de comitê):     ${faixa.length}`);
-console.log(`  sem nota humana e recomendação 0, não escrito:   ${REC.size - escrever.length - faixa.length - preservados.length}`);
 console.log(`  PRESERVADOS (já têm nota humana):                ${preservados.length}   destes, o agente rebaixaria ${rebaixados.length}`);
 console.log(`  sem recomendação na run 9:                       ${semRec.length}`);
 
@@ -105,9 +106,8 @@ let md = `# Estrelas da run 9 → coluna "Estrelas" (ENSAIO)
 
 | | projetos |
 |---|---:|
-| **a escrever** (sem nota humana, nota 1 a ${TETO_AGENTE}) | **${escrever.length}** |
+| **a escrever** (sem nota humana, nota 0 a ${TETO_AGENTE}) | **${escrever.length}** |
 | faixa 6-10, deixada para o comitê | ${faixa.length} |
-| recomendação 0 em célula vazia, não escrito | ${REC.size - escrever.length - faixa.length - preservados.length} |
 | preservados (já têm nota de vocês) | ${preservados.length} |
 | sem recomendação na run 9 | ${semRec.length} |
 
@@ -127,7 +127,7 @@ O PIAPP é a flagship 10★. O Prisma e o GoPrice são os dois casos que a sess�
 
 ${faixa.map((p) => `- ${p.nome}${p.esp ? ' _(especial)_' : ''}`).join('\n') || '_nenhum_'}
 
-**3. Não escreve 0 em célula vazia.** Vazio ("—") e 0 ("Zero") são estados diferentes na tela, e virar "avaliado, vale zero" é afirmação que a rodada não sustenta.
+**3. ~~Não escreve 0 em célula vazia.~~ Removida em 05/09** por decisão do Luis: 0 é a caixa «Experimenta» da régua, com verbo e critério como qualquer outro nível, não "não avaliado". Tratá-lo como ausência inventava uma sétima categoria que a régua não tem.
 
 ## Rollback
 
