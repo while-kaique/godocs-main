@@ -16,6 +16,11 @@ import {
   AlertTriangle,
   HelpCircle,
 } from "lucide-react";
+import { gravarCacheSessao, lerCacheSessao } from "@/lib/cache-sessao";
+
+/** Chave e validade do cache do bloco de FAQ na home. 15 min: título de assunto muda raramente. */
+const FAQ_CACHE_KEY = "godocs:faq-home-v1";
+const FAQ_CACHE_MS = 15 * 60 * 1000;
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -103,7 +108,22 @@ function Home() {
   // Categorias do FAQ para o bloco de perguntas frequentes (substituiu as pílulas de
   // status). Busca silenciosa, como as duas acima: sem resposta, o bloco não aparece —
   // a home nunca depende do FAQ para funcionar.
-  const [faq, setFaq] = useState<{ slug: string; titulo: string; resumo: string | null }[]>([]);
+  // ⚠️ Pinta do CACHE primeiro, revalida por baixo.
+  //
+  // O bloco só aparecia depois que `/api/faq` respondia, e neste app **cada requisição custa
+  // ~750 ms de overhead FIXO do edge**, mais o cold start do worker quando ele está dormindo.
+  // Resultado: o bloco entrava com atraso VARIÁVEL (às vezes rápido, às vezes não), o que é pior
+  // que ser lento sempre, porque a pessoa não aprende a esperar e a página "pula" embaixo dela.
+  //
+  // Os títulos do FAQ mudam raramente e não são sigilosos, então a última resposta serve de
+  // pintura imediata enquanto a nova vem. Da segunda visita em diante, o bloco nasce junto com a
+  // tela. `sessionStorage`, então some ao fechar o navegador.
+  //
+  // ⚠️ A busca continua SILENCIOSA: falha não limpa o que está na tela e não pinta erro. Sem
+  // cache e sem resposta, o bloco simplesmente não aparece, que é o comportamento de sempre.
+  const [faq, setFaq] = useState<{ slug: string; titulo: string; resumo: string | null }[]>(
+    () => lerCacheSessao<{ slug: string; titulo: string; resumo: string | null }[]>(FAQ_CACHE_KEY, FAQ_CACHE_MS) ?? [],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -111,10 +131,15 @@ function Home() {
       "/api/faq",
     )
       .then((r) => {
-        if (alive) setFaq((r.categorias ?? []).filter((c) => !c.arquivado));
+        const vivas = (r.categorias ?? [])
+          .filter((c) => !c.arquivado)
+          .map((c) => ({ slug: c.slug, titulo: c.titulo, resumo: c.resumo }));
+        gravarCacheSessao(FAQ_CACHE_KEY, vivas);
+        if (alive) setFaq(vivas);
       })
       .catch(() => {
-        // Silencioso: sem o FAQ, o bloco de perguntas não é pintado.
+        // Silencioso: sem o FAQ, o bloco de perguntas não é pintado. O que já veio do cache
+        // FICA — apagá-lo trocaria uma lista levemente velha por um buraco na página.
       });
     return () => {
       alive = false;

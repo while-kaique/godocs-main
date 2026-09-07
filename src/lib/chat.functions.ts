@@ -911,17 +911,16 @@ export async function iniciarSubmissao(
     nome_projeto: data.nome_projeto,
   };
 
-  if (docTexto || data.descricao_breve) {
-    try {
-      log("iniciarSubmissao", "Rodando extrator automático...");
-      coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || "");
-      const preenchidos = Object.values(coletadoInicial).filter((v) => v !== null).length;
-      log("iniciarSubmissao", `Extrator: ${preenchidos}/7 campos preenchidos`);
-    } catch (extractorErr) {
-      err("iniciarSubmissao", "Extrator falhou — continuando sem pré-preenchimento:", extractorErr);
-      coletadoInicial = { ...documentacaoVazia(), nome_projeto: data.nome_projeto };
-    }
-  }
+  // ⚠️ O EXTRATOR também é uma chamada de LLM, e ele saiu do caminho crítico em 07/09/2026.
+  //
+  // A compilação já ia para segundo plano, mas o extrator continuava sendo AGUARDADO antes de
+  // devolver o id do projeto. Com uma pasta de 10 arquivos (~19k tokens) isso são dezenas de
+  // segundos com o botão "Avançar" preso em "Preparando…" — o mesmo defeito que a T7 tirou da
+  // compilação, sobrevivendo uma linha acima. O critério nº 1 da v2 é a submissão nunca esperar
+  // a IA, e esperar metade dela não cumpre metade do critério: cumpre zero.
+  //
+  // Agora os DOIS vão juntos no background (`extrairECompilarDoc`), e o projeto nasce na hora.
+  const precisaExtrair = Boolean(docTexto || data.descricao_breve);
 
   // ── GoDocs v2 (T7 + T9) — CAMINHO PADRÃO: a doc é INVISÍVEL ─────────────────
   //
@@ -946,10 +945,14 @@ export async function iniciarSubmissao(
   // a pendência e o cron nunca reprocessaria (fallback prematuro vira doc pobre definitiva).
   if (!data.modo_conversa) {
     await upsertDocumentacao(projeto.id, placeholderDocPendente(coletadoInicial));
-    runBackground(compilarEPersistirDoc(projeto.id, ctx, coletadoInicial));
+    runBackground(
+      precisaExtrair
+        ? extrairECompilarDoc(projeto.id, ctx, docTexto || "", coletadoInicial)
+        : compilarEPersistirDoc(projeto.id, ctx, coletadoInicial),
+    );
     log(
       "iniciarSubmissao",
-      `Doc encomendada em segundo plano — projeto ${projeto.id} liberado sem esperar o LLM.`,
+      `Doc encomendada em segundo plano (extrator incluso) — projeto ${projeto.id} liberado sem esperar o LLM.`,
     );
     return { projeto_id: projeto.id, fluxo_direto: true };
   }
@@ -959,6 +962,17 @@ export async function iniciarSubmissao(
   // cenários. O orquestrador, os 7 gates e os prompts continuam vivos e exercitáveis por
   // aqui — "não vamos excluir os agentes, vamos tirá-los do fluxo de submissão novo, mas
   // vamos reaproveitá-los eventualmente" (Luis, 02/09/2026).
+  // O modo CONVERSA (painel de cenários) segue extraindo SÍNCRONO: ali não há botão de usuário
+  // esperando, e o orquestrador precisa do `coletado` para montar a primeira pergunta.
+  if (precisaExtrair) {
+    try {
+      coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || "");
+    } catch (extractorErr) {
+      err("iniciarSubmissao", "Extrator falhou — continuando sem pré-preenchimento:", extractorErr);
+      coletadoInicial = { ...documentacaoVazia(), nome_projeto: data.nome_projeto };
+    }
+  }
+
   log("iniciarSubmissao", "Rodando orquestrador (fase doc) — modo CONVERSA (painel de cenários)...");
   const resultado = await runOrchestrator(
     ctx,
@@ -3652,6 +3666,41 @@ function patchDaDocCompilada(
 // sem tocar em saving/receita — não há mais janela de lost-update do blob. FAIL-SAFE: se a
 // compilação lançar, deixa o placeholder pendente — `submeterParaValidacao` reconcilia antes
 // do envio, então uma falha aqui nunca submete doc incompleta. Disparada via runBackground.
+/**
+ * Extrator + compilação, os dois em SEGUNDO PLANO.
+ *
+ * ⚠️ O extrator precisa persistir o `coletado` no PLACEHOLDER assim que termina, antes de
+ * compilar. Sem isso, um isolate que morresse no meio deixaria a doc pendente com o coletado
+ * VAZIO, e a rede do submit (`reconciliarDocSePendente`) recompilaria a partir do nada — ela
+ * recompila do coletado snapshotado, não re-extrai. Gravar em duas etapas custa um upsert e
+ * transforma "morreu no meio" em "só falta compilar".
+ *
+ * ⚠️ Nunca lança: falha aqui deixa a doc pendente, e há DUAS redes depois (o submit e o cron
+ * `recompilarDocsPendentes`).
+ */
+export async function extrairECompilarDoc(
+  projetoId: string,
+  ctx: ProjetoContexto,
+  docTexto: string,
+  coletadoBase: DocumentacaoColetada,
+): Promise<void> {
+  let coletado = coletadoBase;
+  try {
+    coletado = await extrairCamposDocumentacao(ctx, docTexto);
+    const preenchidos = Object.values(coletado).filter((v) => v !== null).length;
+    log("extrairECompilarDoc", `Extrator: ${preenchidos}/7 campos (projeto ${projetoId}).`);
+    await upsertDocumentacao(projetoId, placeholderDocPendente(coletado));
+  } catch (extractorErr) {
+    err(
+      "extrairECompilarDoc",
+      `Extrator falhou (projeto ${projetoId}) — compila sem pré-preenchimento:`,
+      extractorErr,
+    );
+    coletado = coletadoBase;
+  }
+  await compilarEPersistirDoc(projetoId, ctx, coletado);
+}
+
 export async function compilarEPersistirDoc(
   projetoId: string,
   ctx: ProjetoContexto,

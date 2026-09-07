@@ -40,25 +40,24 @@ import {
 const CRITERIOS = [
   {
     nome: "Recorrência",
-    pergunta: "Roda de novo sem alguém pedir — agendado, por evento ou em uso contínuo?",
+    pergunta: "Roda de novo sozinha? Agendada, por evento ou em uso contínuo.",
   },
   {
     nome: "Contrafactual",
-    pergunta: "Se desligar hoje, quem reclama e o que piora?",
+    pergunta: "Se desligar hoje, quem reclama?",
   },
   {
     nome: "Rastreabilidade",
-    pergunta:
-      "Qual indicador se move e onde isso é conferido? Nomeie o relatório, painel, sistema ou base.",
+    pergunta: "Que número mudou, e onde a gente confere? Diga o relatório, painel ou sistema.",
   },
 ];
 
 // O que cada etapa pede, na ordem do wizard. O RÓTULO não é redigitado aqui —
 // sai de `STEPS` (fonte única), para a intro nunca divergir do stepper.
 const RESUMO_ETAPAS: Record<number, string> = {
-  1: "Confirme quem participou do projeto e anexe a documentação que já existir.",
-  2: "Marque o tipo de projeto e os números: horas economizadas, gastos que deixaram de existir e/ou receita.",
-  3: "Um chat com IA completa a documentação técnica e escreve o memorial de impacto com você. Traga números reais e onde eles podem ser conferidos.",
+  1: "Quem participou e os arquivos do projeto.",
+  2: "O que a automação faz e onde ela roda.",
+  3: "O ganho em números: horas, gastos que acabaram, receita.",
 };
 
 // O predicado `deveMostrarIntro` mora em `constants.ts`, junto dos outros
@@ -143,9 +142,8 @@ export function IntroSubmissao({
             className="mb-4"
             style={{ fontSize: 14.5, lineHeight: 1.65, color: "var(--go-text-primary)" }}
           >
-            O GoDocs é onde o Gogroup documenta suas automações de RPA e IA. Você conta o que a sua
-            automação faz e quanto ela já economizou ou gerou; a equipe de RPA &amp; IA valida
-            depois.
+            Aqui o Gogroup registra o que suas automações fazem e quanto elas já renderam. Você
+            preenche, a equipe de RPA &amp; IA confere depois.
           </p>
 
           {/* Entra / não entra: a premissa nº 1 (produção + ganho medido). Fica ACIMA
@@ -195,8 +193,8 @@ export function IntroSubmissao({
           {/* A régua de "isto é projeto?" — recorrência · contrafactual ·
               rastreabilidade. É a MESMA régua que o analisador aplica depois
               (`SPEC_CRITERIOS_PROJETO.md`, docs/criterios-projeto-recorrencia-evidencia.md),
-              e a mais cara de descobrir tarde: quem não tem resposta para a 3ª
-              trava na seção "Ponteiro movido e onde verificar", no meio do chat.
+              e a mais cara de descobrir tarde: sem resposta para a 3ª, a
+              validação da equipe volta pedindo justamente isso.
               Aqui elas são PERGUNTAS para a pessoa responder a si mesma — não um
               formulário e não uma barreira. */}
           {/* Não repetir o eyebrow "Antes de começar" — o título aqui é a PERGUNTA,
@@ -205,8 +203,8 @@ export function IntroSubmissao({
             Seu projeto responde a estas 3 perguntas?
           </h3>
           <p className="mb-4" style={{ fontSize: 13, lineHeight: 1.55, color: "#475569" }}>
-            São as 3 perguntas que a equipe de RPA &amp; IA usa para julgar se algo é projeto. Ter a
-            resposta na ponta da língua encurta muito a conversa com o agente na Etapa 3.
+            São as mesmas perguntas que a equipe usa para decidir se algo é projeto. Com as
+            respostas na mão, o preenchimento é rápido.
           </p>
 
           {/* Sem numeração: os 3 critérios não são uma sequência (≠ as etapas
@@ -235,8 +233,7 @@ export function IntroSubmissao({
           </ul>
 
           <p style={{ fontSize: 12.5, lineHeight: 1.55, color: "#475569" }}>
-            Não travou nada se você ainda não souber alguma: o agente ajuda a montar a resposta, e o
-            que ficar em aberto vai para a revisão humana.
+            Não sabe alguma? Segue assim mesmo. O que ficar em aberto a equipe vê na validação.
           </p>
 
           <div className="my-6" style={{ height: 1, background: "rgba(0,89,169,0.08)" }} />
