@@ -303,7 +303,7 @@ function ConfirmarRecomecoModal({
           <ul className="mt-3 space-y-2">
             {[
               "As respostas das etapas e os arquivos anexados",
-              "Toda a conversa com o agente e a documentação gerada",
+              "A documentação gerada a partir dos arquivos",
               "Os valores de saving e receita informados",
             ].map((item) => (
               <li key={item} className="flex items-start gap-2 text-[12.5px] leading-snug" style={{ color: "#5b5b6a" }}>
@@ -407,12 +407,12 @@ function SalvarRascunhoModal({
         {/* Body */}
         <div className="px-6 py-5">
           <p className="text-[12.5px] leading-snug" style={{ color: "#6b6b7a" }}>
-            Este projeto fica salvo em <span className="font-semibold">Meus Projetos › Rascunhos</span> —
-            você pode voltar e continuar de onde parou quando quiser. Antes de sair, vale saber:
+            Este projeto fica salvo em <span className="font-semibold">Meus Projetos › Rascunhos</span>.
+            Você volta quando quiser e continua de onde parou. Antes de sair:
           </p>
           <ul className="mt-3 space-y-2">
             {[
-              "O rascunho ainda NÃO foi enviado para análise — a equipe de RPA & IA só vê o projeto depois que você concluir e clicar em enviar.",
+              "O rascunho ainda NÃO foi enviado. A equipe de RPA & IA só vê o projeto depois que você clicar em enviar.",
               "Ao sair, você volta para a tela inicial e pode começar uma nova submissão.",
             ].map((item) => (
               <li key={item} className="flex items-start gap-2 text-[12.5px] leading-snug" style={{ color: "#5b5b6a" }}>
@@ -1612,7 +1612,7 @@ export function SubmeterPageContent({
             >
               Sua documentação foi recebida e está em análise pela equipe de RPA & IA.
               <br />
-              Pode fechar esta página — o resultado ficará disponível em <strong>Meus Projetos</strong> e você receberá um retorno por e-mail.
+              Pode fechar esta página. O resultado aparece em <strong>Meus Projetos</strong>, e você recebe um retorno por e-mail.
             </p>
             <div
               className="mb-7 text-left"

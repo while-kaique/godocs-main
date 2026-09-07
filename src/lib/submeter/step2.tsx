@@ -900,11 +900,11 @@ export function Step2({
             {bgStatus === "processando" && (
               <>
                 <span className="go-spinner" style={{ width: 12, height: 12 }} />
-                Analisando a documentação em segundo plano — pode continuar preenchendo.
+                Lendo os arquivos em segundo plano. Pode seguir preenchendo.
               </>
             )}
-            {bgStatus === "pronto" && <>✅ Documentação analisada — pode avançar sem espera.</>}
-            {bgStatus === "erro" && <>ℹ️ A análise vai rodar quando você avançar para o chat.</>}
+            {bgStatus === "pronto" && <>✅ Arquivos lidos. Pode avançar.</>}
+            {bgStatus === "erro" && <>ℹ️ A leitura dos arquivos vai ser refeita quando você avançar.</>}
           </div>
         )}
 
