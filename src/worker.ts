@@ -386,7 +386,28 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       if (!request.headers.get("x-godeploy-cron")) {
         return errorJson("Rota exclusiva de cron.", 403);
       }
-      return json(await reconciliarComplexidade());
+      // ⚠️ Este cron carrega DUAS reconciliações, e a segunda está aqui de carona por um
+      // limite de PLATAFORMA: o Godeploy permite 10 crons por app e o godocs já usa os 10,
+      // então `/api/cron/recompilar-docs-pendentes` nunca chegou a ser agendado — a rota
+      // existia sem ninguém a chamar. Sem ela a doc adiada não é recompilada por NINGUÉM
+      // (o próprio `reconciliarDocSePendente` diz que pressupõe esse cron), e o projeto
+      // fica sem documentação e sem análise, porque o redisparo mora no mesmo lugar.
+      //
+      // ⚠️ **Bounded em 1 por rodada, de propósito.** Este cron roda a cada MINUTO e
+      // compilar uma doc é uma chamada de LLM de dezenas de segundos: sem o teto, duas
+      // rodadas se sobrepõem e a fila vira concorrência sobre os mesmos projetos.
+      // Uma por minuto esvazia qualquer fila real deste app com folga.
+      //
+      // ⚠️ A recompilação NÃO pode derrubar a reconciliação de complexidade, que é o motivo
+      // original deste cron: por isso vai em `Promise.allSettled`, não em série.
+      const [complexidade, docs] = await Promise.allSettled([
+        reconciliarComplexidade(),
+        recompilarDocsPendentes(1),
+      ]);
+      return json({
+        ...(complexidade.status === "fulfilled" ? complexidade.value : { erro_complexidade: true }),
+        docs: docs.status === "fulfilled" ? docs.value : { erro: true },
+      });
     }
 
     // ── Cron: reconcilia SNAPSHOTS de auditoria (projeto_versions) ──
@@ -398,6 +419,29 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         return errorJson("Rota exclusiva de cron.", 403);
       }
       return json(await reconciliarSnapshots());
+    }
+
+    // ── Empurra a compilação da doc de UM projeto, sob demanda ───────────────
+    //
+    // ⚠️ Existe porque o `waitUntil` NÃO chega ao fim neste runtime. A compilação é
+    // disparada em segundo plano no `iniciar-submissao`, mas a plataforma cancela as
+    // tarefas de `waitUntil` pouco depois de a resposta fechar — e a resposta agora fecha
+    // em ~2s (o extrator saiu do caminho crítico). O log de produção diz isso em letras:
+    // "waitUntil() tasks did not complete within the allowed time and have been cancelled".
+    //
+    // Esta rota dá à compilação o que faltava: o tempo de vida de uma REQUISIÇÃO inteira.
+    // O cliente a dispara ao entrar na Etapa 3 e **não espera** — enquanto a pessoa
+    // preenche o ganho, a doc fica pronta.
+    //
+    // ⚠️ É IDEMPOTENTE e barata quando não há o que fazer: `recompilarDocsPendentes` só
+    // toca doc marcada como pendente. Chamar duas vezes não compila duas vezes.
+    //
+    // ⚠️ Autenticada, não-admin: quem submete precisa poder chamá-la. Não recebe conteúdo
+    // nenhum e não escolhe o que compilar além do próprio projeto pendente, então o pior
+    // que um usuário mal-intencionado consegue é adiantar trabalho que o cron faria.
+    if (pathname === "/api/chat/compilar-doc" && method === "POST") {
+      const r = await recompilarDocsPendentes(1);
+      return json(r);
     }
 
     // ── Cron: recompila docs PENDENTES (compilação assíncrona) ──

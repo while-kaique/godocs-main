@@ -1370,6 +1370,18 @@ export function SubmeterPageContent({
         return;
       }
       await sincronizarMetadados(id);
+      // ⚠️ Empurra a compilação da doc AGORA, e NÃO espera.
+      //
+      // O `iniciar-submissao` já a disparou em segundo plano, mas a plataforma cancela as
+      // tarefas de `waitUntil` pouco depois de a resposta fechar ("waitUntil() tasks did not
+      // complete within the allowed time and have been cancelled", visto no log de produção).
+      // Esta chamada dá à compilação o tempo de vida de uma requisição inteira — que corre
+      // enquanto a pessoa preenche o ganho na Etapa 3.
+      //
+      // ⚠️ Sem `await` de propósito: nada na tela depende dela. E o `.catch` vazio é
+      // deliberado — falhar aqui não muda nada para quem está preenchendo, porque a fila
+      // (o cron) e a reconciliação do envio continuam de pé. Barulho aqui só assustaria.
+      void apiFetch("/api/chat/compilar-doc", {}).catch(() => {});
       setRevisando(false);
       setTelaGanho("tipos");
       goToStep(3, "forward");
