@@ -1163,6 +1163,9 @@ export function SubmeterPageContent({
      definidos na Etapa 2.5 — o backend não precisa deles p/ documentar). Cria o rascunho
      UMA vez; depois disso o botão da 2.5 vira "Continuar com Agente" (handleContinuarAgente),
      que sincroniza tipos/meta e navega. Resolve com o projeto_id (ou null em falha). */
+  /** O motivo REAL da última falha do background, para o toast não mentir que é transitório. */
+  const bgErroRef = useRef<string | null>(null);
+
   const dispararDocBackground = useCallback((): Promise<string | null> => {
     const sig = `${arquivosSig()}::${JSON.stringify(snapshotMeta())}`;
     bgSigRef.current = sig;
@@ -1214,6 +1217,12 @@ export function SubmeterPageContent({
         return result.projeto_id;
       } catch (e) {
         console.warn("[submeter] processamento em background falhou (seguirá no Continuar):", e);
+        // ⚠️ GUARDA o motivo. Ele existia e era claro ("Data de criação: preencha este campo") e
+        // morria aqui, num console.warn que ninguém abre — a pessoa via só "tente novamente em
+        // alguns segundos" e repetia uma ação que nunca ia funcionar. Foi o que aconteceu em
+        // 07/09/2026, quando um campo saiu do formulário na v2 e continuou obrigatório no schema
+        // da rota: erro determinístico, mensagem de erro transitório.
+        bgErroRef.current = e instanceof Error ? e.message : String(e);
         bgSigRef.current = ""; // libera novo disparo (e o fluxo síncrono cria normalmente)
         setBgStatus("erro");
         return null;
@@ -1348,9 +1357,15 @@ export function SubmeterPageContent({
         if (!id) id = await dispararDocBackground();
       }
       if (!id) {
+        // ⚠️ O texto muda conforme o erro seja TRANSITÓRIO ou não. Mandar "tente novamente em
+        // alguns segundos" para um 400 de validação é pedir que a pessoa repita o que nunca vai
+        // dar certo, e ela repete: foi o caso de 07/09/2026.
+        const motivo = bgErroRef.current;
         toast.error(
-          "Não foi possível registrar o projeto agora. Nada se perdeu — tente novamente em alguns segundos.",
-          { duration: 10000 },
+          motivo
+            ? `Não foi possível registrar o projeto. Nada se perdeu. ${motivo}`
+            : "Não foi possível registrar o projeto agora. Nada se perdeu, tente novamente em alguns segundos.",
+          { duration: 20000 },
         );
         return;
       }
