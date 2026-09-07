@@ -25,6 +25,26 @@
  *    um "não avaliado". Tratá-lo como ausência era eu inventar uma sétima categoria que a régua
  *    não tem. São 49 projetos a mais.
  *
+ * ## Célula VAZIA é o "—", e ela tem significado próprio
+ *
+ * ⚠️ Depois desta rodada, os três estados da coluna passaram a querer dizer coisas diferentes,
+ * e confundi-los apaga informação:
+ *
+ * | célula | tela | significa |
+ * |---|---|---|
+ * | `0` | Zero | o time AVALIOU e é a caixa «Experimenta» |
+ * | vazia | — | **ninguém avaliou** (a run não cobriu, ou o projeto nunca foi aprovado) |
+ * | 1..5 | a nota | avaliado |
+ *
+ * ⚠️ **NUNCA gravar o texto `-` para representar "não avaliado".** A coluna é NUMÉRICA: texto ali
+ * a converte e quebra a soma e a ordenação de quem usa a planilha (é a razão de
+ * `definirEstrelasEspecial` não passar por `ouTraco`). A célula VAZIA já é renderizada como "—"
+ * pelas telas — o "—" é apresentação, não conteúdo.
+ *
+ * ⚠️ E **não preencher o vazio com 0** para "completar a coluna": isso afirmaria que o time
+ * julgou um projeto que ele nunca viu. Medido em 05/09: das 41 vazias, 34 são `Pendente` (nunca
+ * foram aprovadas, então nunca entraram na rodada) e só 2 são aprovados que a run não cobriu.
+ *
  * Uso:
  *   npx tsx scripts/v2/estrelas-run9-para-planilha.mts             # ENSAIO (default)
  *   npx tsx scripts/v2/estrelas-run9-para-planilha.mts --valendo   # escreve
