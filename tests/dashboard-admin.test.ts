@@ -37,6 +37,9 @@ vi.mock('@/integrations/db/client.server', async () => ({
   getDeliberacao: vi.fn(async () => null),
   getDeliberacoesPorIds: vi.fn(async () => new Map()),
   getAvaliacaoRetroativa: vi.fn(async () => null),
+  // A estrela do time vive no log em árvore (`agente_log`); por padrão o time nunca rodou.
+  getUltimoConsensoDoTime: vi.fn(async () => null),
+  getUltimosConsensosDoTimePorIds: vi.fn(async () => new Map()),
   getAvaliacoesRetroativasPorIds: vi.fn(async () => new Map()),
   getFeedbacksPorIds: vi.fn(async () => new Map()),
   getAvaliacaoFeedback: vi.fn(async () => null),

@@ -4,9 +4,18 @@
  * Dois contratos que a fiação não pode quebrar:
  *  1. **Byte-idêntico com a mesa LLM OFF**: sem `julgamentos`, o JSON de auditoria é o de sempre —
  *     a chave `julgamentos` nem aparece.
- *  2. **Sem vazamento no modo LLM**: com `julgamentos`, cada parecer entra ENXUTO
- *     (`dimensao`/`preocupa`/`confianca`/`origem`) — nunca o `argumento` livre nem os `sinais`
- *     (o texto do parecer vive no `motivo` da avaliação, não aqui), e nenhum R$ cru é serializado.
+ *  2. **`julgamentos` segue ENXUTO**: cada parecer entra com `dimensao`/`preocupa`/`confianca`/
+ *     `origem` e nada mais — sem `argumento` e sem `sinais`. Essa chave é a TRILHA DE AUDITORIA da
+ *     rodada e não é lida pela tela.
+ *
+ * ⚠️ **MUDOU em 08/09/2026:** o argumento passou a ser gravado, mas numa chave PRÓPRIA
+ * (`pareceres`, de `montarPareceresDaMesa`), porque sem ele a ficha não conseguia mostrar o
+ * veredito dos QUATRO agentes — só o de quem objetou, e só na última rodada (o `motivo` é
+ * `motivos.join`, que descarta os tranquilos). A régua antiga *"o texto do parecer vive no
+ * `motivo`"* caiu junto: o `motivo` nunca carregou o parecer inteiro.
+ * ⚠️ O que **não** mudou: `julgamentos` continua enxuto, e a exposição é a MESMA de sempre — a
+ * ficha do `/dashboard` é `requireAdmin`, e o `motivo` que ela já exibia sempre teve R$. O que
+ * segue proibido é o R$ chegar ao SUBMISSOR (INV-02), e nada disto vai para ele.
  */
 import { describe, it, expect } from 'vitest';
 import { serializarVotos, type VotosPainel } from '@/lib/avaliacao-normais.functions';
@@ -110,15 +119,23 @@ describe('serializarVotos — modo mesa LLM (sem vazamento)', () => {
     });
   });
 
-  it('nunca vaza o `argumento` nem R$ cru dos pareceres LLM', () => {
+  it('`julgamentos` continua enxuto: sem argumento e sem sinais na trilha de auditoria', () => {
     const bruto = serializarVotos({ ...votosBase(), julgamentos });
-    // A chave `argumento` NÃO é serializada em lugar nenhum (o texto do parecer vive no `motivo`).
-    expect(bruto).not.toContain('argumento');
-    // O texto livre dos pareceres (com R$ e valor/hora por cargo) NÃO pode aparecer na auditoria.
-    expect(bruto).not.toContain('51.000');
-    expect(bruto).not.toContain('valor/hora');
-    // Os `sinais` do JULGAMENTO ficam de fora (os do voto cético determinístico seguem, à parte).
     const json = JSON.parse(bruto) as { julgamentos: Record<string, unknown>[] };
-    for (const j of json.julgamentos) expect('sinais' in j).toBe(false);
+    for (const j of json.julgamentos) {
+      expect('argumento' in j).toBe(false);
+      expect('sinais' in j).toBe(false);
+    }
+  });
+
+  it('o argumento vai na chave PRÓPRIA `pareceres`, com os QUATRO agentes', () => {
+    const json = JSON.parse(serializarVotos({ ...votosBase(), julgamentos })) as {
+      pareceres: { dimensao: string; preocupa: boolean; argumento: string }[];
+    };
+    expect(json.pareceres.map((p) => p.dimensao)).toEqual(['fte', 'financeiro', 'rag', 'cetico']);
+    // Inclusive o de quem NÃO preocupou — era exatamente o que se perdia.
+    const cetico = json.pareceres.find((p) => p.dimensao === 'cetico')!;
+    expect(cetico.preocupa).toBe(false);
+    expect(cetico.argumento).toContain('Nada a refutar');
   });
 });

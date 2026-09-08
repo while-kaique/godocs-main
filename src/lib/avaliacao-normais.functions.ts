@@ -81,6 +81,7 @@ import {
 import {
   montarEntradasEspecialistas,
   conciliarJulgamentos,
+  montarPareceresDaMesa,
   type VotosDeterministicos,
 } from '@/lib/agents/mesa-especialistas';
 import { carregarCorrecoesDaTriagem, licoesParaPrompt } from '@/lib/correcoes.functions';
@@ -474,6 +475,11 @@ export function serializarVotos(v: VotosPainel): string {
     cetico: { refuta: v.cetico.refuta, confianca: v.cetico.confianca, sinais: v.cetico.sinais },
     grau: v.conciliado.grau,
     ceticoRefutou: v.conciliado.ceticoRefutou,
+    // ⚠️ O parecer dos QUATRO, com o ARGUMENTO de cada um — inclusive dos tranquilos. Sem isto a
+    // ficha só conseguia mostrar quem objetou (e só na rodada mais recente), que era a queixa do
+    // Luis em 08/09/2026. Ver `montarPareceresDaMesa`. Fica só no `votos` da linha do PROJETO: a
+    // listagem não o carrega (teto de 32 MiB de RPC / gotcha 4 do dashboard).
+    pareceres: montarPareceresDaMesa(v),
     ...(v.julgamentos?.length
       ? {
           julgamentos: v.julgamentos.map((j) => ({

@@ -19,6 +19,9 @@ import {
   ThumbsDown,
   Bot,
   ChevronDown,
+  AlertTriangle,
+  Check,
+  Play,
 } from 'lucide-react';
 import {
   Dialog,
@@ -50,7 +53,7 @@ import {
   aparenciaConfianca,
 } from '@/lib/avaliacao-sombra-rotulos';
 import type { Calibragem } from '@/lib/avaliacao-calibragem';
-import { partirParecerMesa } from '@/lib/mesa-parecer';
+import { partirParecerMesa, ROTULO_CURTO_DIMENSAO } from '@/lib/mesa-parecer';
 import {
   DiscordanciaForm,
   type DadosDiscordancia,
@@ -92,6 +95,22 @@ type AvaliacaoSombra = {
     divergencia: boolean;
     aplicar: boolean;
     motivo: string | null;
+  } | null;
+  /**
+   * O parecer dos QUATRO agentes, com o argumento de cada um — inclusive de quem NÃO preocupou.
+   * ⚠️ É isto que a tela exibe agora. O `mesa.motivo` só carrega a objeção de quem preocupou NA
+   * ÚLTIMA rodada, e por isso o painel mostrava 4 porquês numa abertura e 2 na seguinte.
+   * `[]` em avaliação antiga (gravada antes de o argumento ser persistido) → cai no `motivo`.
+   */
+  especialistas?: { dimensao: string; preocupa: boolean; argumento: string; confianca: number | null }[];
+  /** Último veredito do TIME (quem raciocina a ESTRELA). `null` = o time nunca rodou aqui. */
+  time?: {
+    estrela: number | null;
+    saida: string | null;
+    confianca: string | null;
+    quando: string | null;
+    motivos: string[];
+    divergencias: string[];
   } | null;
   deliberacao: {
     estado: string;
@@ -406,6 +425,117 @@ function ConfiancaDestaque({
   );
 }
 
+/** Saída do time → rótulo curto. Desconhecida cai no valor cru (nunca num texto falso). */
+function rotuloSaidaTime(saida: string): string {
+  switch (saida) {
+    case 'aprovar':
+      return 'Aprovar';
+    case 'ajuste':
+      return 'Pedir ajuste';
+    case 'humano':
+      return 'Decisão humana';
+    case 'reprovar':
+      return 'Reprovar';
+    default:
+      return saida;
+  }
+}
+
+/**
+ * O parecer dos QUATRO agentes: um por linha, com o veredito de cada um em RÓTULO (nunca só cor) e
+ * o porquê inteiro — sem `line-clamp`, que era o que cortava o texto com reticências.
+ */
+function ParecerDosAgentes({
+  itens,
+}: {
+  itens: { dimensao: string; preocupa: boolean; argumento: string; confianca: number | null }[];
+}) {
+  return (
+    <ul className="space-y-2">
+      {itens.map((a) => {
+        const cor = a.preocupa ? '#8a5a00' : '#186a3b';
+        const fundo = a.preocupa ? 'rgba(138,90,0,0.10)' : 'rgba(24,106,59,0.09)';
+        return (
+          <li key={a.dimensao} className="text-[12.5px] leading-relaxed">
+            <span className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-semibold" style={{ color: '#475569' }}>
+                {ROTULO_CURTO_DIMENSAO[a.dimensao as keyof typeof ROTULO_CURTO_DIMENSAO] ?? a.dimensao}
+              </span>
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-1.5 py-[1px] text-[10.5px] font-semibold"
+                style={{ background: fundo, border: `1px solid ${cor}55`, color: cor }}
+              >
+                {a.preocupa ? (
+                  <AlertTriangle className="h-3 w-3" aria-hidden />
+                ) : (
+                  <Check className="h-3 w-3" aria-hidden />
+                )}
+                {a.preocupa ? 'Aponta problema' : 'Sem ressalva'}
+              </span>
+            </span>
+            {a.argumento ? (
+              <p className="text-muted-foreground">{a.argumento}</p>
+            ) : (
+              <p className="text-muted-foreground">Nada a apontar neste eixo.</p>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** A estrela recomendada pelo TIME (não pela mesa) + a saída dele. */
+function EstrelaDoTime({ time }: { time: NonNullable<AvaliacaoSombra['time']> }) {
+  return (
+    <div
+      className="rounded-lg border px-3 py-2"
+      style={{ borderColor: 'rgba(0,89,169,0.22)', background: 'rgba(0,89,169,0.05)' }}
+    >
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="text-[11px] font-bold uppercase tracking-[0.06em]" style={{ color: '#0059A9' }}>
+          Time de agentes
+        </span>
+        {time.estrela != null && (
+          <span className="inline-flex items-baseline gap-1 text-[13.5px] font-bold" style={{ color: '#0059A9' }}>
+            {time.estrela}
+            <Star className="h-3.5 w-3.5 self-center" aria-hidden />
+            <span className="text-[11px] font-semibold">
+              {time.estrela === 1 ? 'estrela sugerida' : 'estrelas sugeridas'}
+            </span>
+          </span>
+        )}
+        {time.saida && (
+          <span className="text-[12px] font-semibold" style={{ color: '#475569' }}>
+            {rotuloSaidaTime(time.saida)}
+          </span>
+        )}
+        {time.confianca && (
+          <span className="text-[11.5px] text-muted-foreground">confiança {time.confianca}</span>
+        )}
+      </span>
+      {time.motivos.length > 0 && (
+        <ul className="mt-1.5 space-y-1">
+          {time.motivos.map((m, i) => (
+            <li key={i} className="text-[12.5px] leading-relaxed text-muted-foreground">
+              {m}
+            </li>
+          ))}
+        </ul>
+      )}
+      {time.divergencias.length > 0 && (
+        <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: '#8a5a00' }}>
+          {time.divergencias.join(' ')}
+        </p>
+      )}
+      {/* ⚠️ A nota NÃO tem botão de aplicar: quem escreve a coluna "Estrelas" é gente. */}
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        Sugestão do agente. Quem grava a nota é a triagem, no campo acima.
+      </p>
+    </div>
+  );
+}
+
 function LinhaSombra({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -435,10 +565,15 @@ function AvaliacaoSombraPainel({
   onDiscordar,
   onLimparVoto,
   calibragem,
+  onRodar,
+  rodando,
 }: {
   sombra: AvaliacaoSombra;
   /** Calibragem por faixa (vem da listagem, é global). Ausente → nenhuma taxa é exibida. */
   calibragem?: Calibragem | null;
+  /** Dispara a análise: a MESA (rápida) ou o TIME completo (dá a estrela, roda em background). */
+  onRodar: (qual: 'mesa' | 'time') => Promise<void> | void;
+  rodando: 'mesa' | 'time' | null;
   feedback: 'like' | 'dislike' | null;
   votando: boolean;
   /** Registra a discordância COM motivo (o que vira lição). */
@@ -448,7 +583,10 @@ function AvaliacaoSombraPainel({
 }) {
   const [formAberto, setFormAberto] = useState(false);
   const { mesa, deliberacao, retroativo } = sombra;
+  const time = sombra.time ?? null;
+  const especialistas = sombra.especialistas ?? [];
   const [aberto, setAberto] = useState(false);
+  const [rodadasAbertas, setRodadasAbertas] = useState(false);
   // O parecer vem com uma linha por especialista ("Financeiro: ..."); parecer LEGADO (parágrafo
   // corrido, sem prefixo) volta como uma única linha sem autor e é exibido como sempre.
   const linhas = partirParecerMesa(mesa?.motivo);
@@ -484,6 +622,17 @@ function AvaliacaoSombraPainel({
                 Divergiram
               </span>
             )}
+            {/* A estrela sugerida pelo TIME vale no cabeçalho: é o número que a triagem procura. */}
+            {time?.estrela != null && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
+                style={{ background: 'rgba(0,89,169,0.09)', border: '1px solid rgba(0,89,169,0.3)', color: '#0059A9' }}
+              >
+                {time.estrela}
+                <Star className="h-3 w-3" aria-hidden />
+                <span className="font-semibold">sugeridas</span>
+              </span>
+            )}
           </>
         ) : (
           <span className="text-[12.5px] text-muted-foreground">Sem recomendação ainda</span>
@@ -511,25 +660,33 @@ function AvaliacaoSombraPainel({
             decisão segue sendo da triagem.
           </p>
 
-          {linhas.length > 0 && (
-            <ul className="space-y-1.5">
-              {linhas.map((l, i) => (
-                <li key={i} className="text-[12.5px] leading-relaxed">
-                  {l.autor ? (
-                    <>
-                      <span className="font-semibold" style={{ color: '#475569' }}>
-                        {l.autor}
-                      </span>
-                      <span className="text-muted-foreground"> · </span>
-                      {l.texto}
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">{l.texto}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
+          {/* O veredito dos QUATRO. Avaliação ANTIGA não tem os argumentos gravados: aí cai no
+              parecer de sempre (só quem objetou), que é o melhor que existe para aquela linha. */}
+          {especialistas.length > 0 ? (
+            <ParecerDosAgentes itens={especialistas} />
+          ) : (
+            linhas.length > 0 && (
+              <ul className="space-y-1.5">
+                {linhas.map((l, i) => (
+                  <li key={i} className="text-[12.5px] leading-relaxed">
+                    {l.autor ? (
+                      <>
+                        <span className="font-semibold" style={{ color: '#475569' }}>
+                          {l.autor}
+                        </span>
+                        <span className="text-muted-foreground"> · </span>
+                        {l.texto}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">{l.texto}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )
           )}
+
+          {time && <EstrelaDoTime time={time} />}
 
           {deliberacao && (
             <div className="space-y-1">
@@ -538,34 +695,48 @@ function AvaliacaoSombraPainel({
                 {deliberacao.grau ? ` · confiança ${deliberacao.grau}` : ''}
                 {` · rodada ${deliberacao.rodada}`}
               </LinhaSombra>
+              {/* ⚠️ As rodadas ficam FECHADAS por padrão e, abertas, mostram o texto INTEIRO.
+                  Antes vinham abertas com `line-clamp-2`, o que dava as reticências que cortavam o
+                  parecer no meio (queixa do Luis, 08/09/2026). O parecer que importa é o dos 4
+                  agentes, acima; aqui é a trajetória, e quem quer a trajetória quer lê-la toda. */}
               {(deliberacao.historico?.length ?? 0) > 1 && (
-                <ol
-                  className="mt-1.5 space-y-1.5 border-l-2 pl-3"
-                  style={{ borderColor: 'rgba(71,85,105,0.22)' }}
-                >
-                  {deliberacao.historico!.map((r, i) => (
-                    <li key={`${r.rodada}-${i}`} className="text-[12px]">
-                      <span className="font-semibold" style={{ color: '#475569' }}>
-                        Rodada {r.rodada}
-                        {r.estado ? ` · ${rotuloEstadoDeliberacao(r.estado)}` : ''}
-                        {/* grau em PALAVRA: o percentual daqui era o mesmo float não-medido. */}
-                        {typeof r.confianca === 'number'
-                          ? ` · ${rotuloGrau(grauConfianca(r.confianca))}`
-                          : ''}
-                      </span>
-                      {/* clampado: o parecer da rodada CORRENTE já está acima em bullets — aqui
-                          interessa a trajetória, não reler o texto inteiro. */}
-                      {r.motivo && (
-                        <p
-                          className="mt-0.5 line-clamp-2 leading-relaxed text-muted-foreground"
-                          title={r.motivo}
-                        >
-                          {r.motivo}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ol>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setRodadasAbertas((v) => !v)}
+                    aria-expanded={rodadasAbertas}
+                    className="mt-1 inline-flex items-center gap-1 rounded text-[11.5px] font-semibold underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0059A9]"
+                    style={{ color: '#475569' }}
+                  >
+                    {rodadasAbertas ? 'Ocultar' : 'Ver'} as {deliberacao.historico!.length} rodadas
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${rodadasAbertas ? 'rotate-180' : ''}`}
+                      aria-hidden
+                    />
+                  </button>
+                  {rodadasAbertas && (
+                    <ol
+                      className="mt-1.5 space-y-1.5 border-l-2 pl-3"
+                      style={{ borderColor: 'rgba(71,85,105,0.22)' }}
+                    >
+                      {deliberacao.historico!.map((r, i) => (
+                        <li key={`${r.rodada}-${i}`} className="text-[12px]">
+                          <span className="font-semibold" style={{ color: '#475569' }}>
+                            Rodada {r.rodada}
+                            {r.estado ? ` · ${rotuloEstadoDeliberacao(r.estado)}` : ''}
+                            {/* grau em PALAVRA: o percentual daqui era o mesmo float não-medido. */}
+                            {typeof r.confianca === 'number'
+                              ? ` · ${rotuloGrau(grauConfianca(r.confianca))}`
+                              : ''}
+                          </span>
+                          {r.motivo && (
+                            <p className="mt-0.5 leading-relaxed text-muted-foreground">{r.motivo}</p>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -577,6 +748,46 @@ function AvaliacaoSombraPainel({
               {rotuloVeredito(retroativo.veredito_agregado)} × {rotuloVeredito(retroativo.veredito_humano)}
             </LinhaSombra>
           )}
+
+          {/* Rodar / rerodar a análise NESTE projeto. Duas ações porque são duas coisas: a MESA é
+              o que preenche este painel (rápida) e o TIME é quem raciocina a ESTRELA (~30 chamadas
+              de LLM, roda em background). ⚠️ Nenhuma delas muda status nem escreve a coluna
+              "Estrelas". */}
+          <div className="flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'rgba(71,85,105,0.18)' }}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={rodando !== null}
+              onClick={() => void onRodar('mesa')}
+              className="h-8 text-[12px]"
+            >
+              {rodando === 'mesa' ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+              )}
+              {mesa ? 'Rerodar a mesa' : 'Rodar a mesa'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={rodando !== null}
+              onClick={() => void onRodar('time')}
+              className="h-8 text-[12px]"
+            >
+              {rodando === 'time' ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <Play className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+              )}
+              {time ? 'Rerodar o time (estrela)' : 'Rodar o time (estrela)'}
+            </Button>
+            <span className="text-[11px] text-muted-foreground">
+              A mesa responde na hora. O time leva ~1 min e roda em segundo plano.
+            </span>
+          </div>
 
           {/* Sinal de treinamento — ⚠️ o 👍 SAIU (decisão do Luis, 08/09/2026): a AUSÊNCIA de
               discordância já é concordância, e um polegar para cima não ensinava nada ao agente
@@ -673,6 +884,8 @@ export function ProjetoDetalheDialog({
   // servidor e é otimista: clicar reflete na hora e desfaz se o POST falhar.
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
   const [votando, setVotando] = useState(false);
+  /** Qual análise está rodando agora (`null` = nenhuma) — desabilita os dois botões. */
+  const [rodandoAnalise, setRodandoAnalise] = useState<'mesa' | 'time' | null>(null);
   // Guarda o texto original da coluna "Observações": só mandamos a coluna quando o
   // validador realmente mexeu nela (evitar reescrever a célula com o mesmo conteúdo).
   const obsOriginal = useRef('');
@@ -805,6 +1018,63 @@ export function ProjetoDetalheDialog({
       toast.error(e instanceof Error ? e.message : 'Não foi possível desfazer o voto.');
     } finally {
       setVotando(false);
+    }
+  }
+
+  /**
+   * Recarrega só o `detalhe` (o painel sombra), **sem** reescrever os campos do formulário.
+   *
+   * ⚠️ De propósito não repete o que o `useEffect` de abertura faz: ele semeia "Observações",
+   * "Motivo Reenvio", "Motivo Reprovado" e as estrelas a partir do servidor, e fazer isso aqui
+   * apagaria o que o validador já digitou e ainda não salvou.
+   */
+  async function recarregarDetalhe() {
+    if (!projeto) return;
+    try {
+      setDetalhe(await obterDetalhe<Detalhe>(projeto.id));
+    } catch (e) {
+      console.error('[ficha] falha ao recarregar o detalhe', e);
+    }
+  }
+
+  /**
+   * Roda (ou reroda) a análise dos agentes NESTE projeto.
+   *
+   * ⚠️ Reusa as duas rotas de admin que já existem (`avaliar-normais` e `avaliacao/time`) — nenhuma
+   * rota nova. A MESA é sincrona e preenche este painel; o TIME devolve **202 agendado** (são ~30
+   * chamadas de LLM, uma request morreria no meio e deixaria o ciclo aberto), então aqui só
+   * avisamos e recarregamos quando a pessoa reabrir a ficha.
+   * ⚠️ `invalidarDetalhe` antes de recarregar: a ficha tem cache de 30 s e sem isso o painel
+   * voltaria com o parecer velho, exatamente como se nada tivesse rodado.
+   */
+  async function rodarAnalise(qual: 'mesa' | 'time') {
+    if (!projeto || rodandoAnalise) return;
+    setRodandoAnalise(qual);
+    try {
+      if (qual === 'mesa') {
+        const r = (await apiFetch('/api/admin/avaliar-normais', {
+          projetoId: projeto.id,
+          dry: false,
+        })) as { ok?: boolean; gravado?: boolean; motivo?: string };
+        invalidarDetalhe(projeto.id);
+        if (r?.ok === false) {
+          toast.error(r.motivo ?? 'A mesa não conseguiu avaliar este projeto.');
+        } else if (r?.gravado === false) {
+          // NO-OP legítimo: projeto especial, ou a flag `AVALIACAO_NORMAIS` desligada.
+          toast.info(r.motivo ?? 'A mesa não avaliou este projeto.');
+        } else {
+          toast.success('Mesa rodou. Recarregando o parecer.');
+        }
+        await recarregarDetalhe();
+      } else {
+        await apiFetch('/api/admin/avaliacao/time', { projetoId: projeto.id });
+        invalidarDetalhe(projeto.id);
+        toast.success('Time de agentes rodando. A estrela aparece aqui em cerca de 1 minuto.');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível rodar a análise.');
+    } finally {
+      setRodandoAnalise(null);
     }
   }
 
@@ -986,15 +1256,29 @@ export function ProjetoDetalheDialog({
 
             {/* Teste sombra: o que o time de AGENTES recomendaria, ao lado da decisão
                 humana. NADA aqui muda o status — é para calibrar os agentes. */}
-            {detalhe.avaliacaoSombra && (
+            {/* ⚠️ A seção aparece SEMPRE (para admin), mesmo sem avaliação: era condicionada a
+                `avaliacaoSombra` existir, e então projeto que o agente nunca avaliou não tinha
+                onde MANDAR avaliar — o botão de rodar ficava inalcançável justo em quem precisa
+                dele. Sem avaliação, o painel diz "Sem recomendação ainda" e oferece os botões. */}
+            {(
               <Secao titulo="Avaliação em sombra (agente)">
                 <AvaliacaoSombraPainel
-                  sombra={detalhe.avaliacaoSombra}
+                  sombra={
+                    detalhe.avaliacaoSombra ?? {
+                      mesa: null,
+                      deliberacao: null,
+                      retroativo: null,
+                      especialistas: [],
+                      time: null,
+                    }
+                  }
                   feedback={feedback}
                   votando={votando}
                   onDiscordar={discordarDaSombra}
                   onLimparVoto={limparVotoSombra}
                   calibragem={calibragem}
+                  onRodar={rodarAnalise}
+                  rodando={rodandoAnalise}
                 />
               </Secao>
             )}

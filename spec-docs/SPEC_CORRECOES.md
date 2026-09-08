@@ -6,6 +6,58 @@
 
 ---
 
+## 2026-09-08 — O painel de sombra mostrava só quem OBJETOU (e mudava de tamanho entre duas aberturas), com o texto cortado em reticências
+
+**Sintoma.** Três coisas, todas relatadas pelo Luis olhando a ficha do `/dashboard`: *"eu tinha
+clicado uma vez ai e tinha visto vários porquês, ai dps cliquei dnv e só vi 2"*; o parecer aparecia
+cortado com reticências; e *"não consigo ver o veredito de cada agente e o porquê exato da
+reprovação/confiança baixa"*.
+
+**Causa-raiz.** O painel exibia `projeto_avaliacao.motivo`, e esse campo é
+`conciliado.motivos.join('\n')` — e `agregarJulgamentos` **só empilha o argumento de quem
+PREOCUPOU**. Consequências, as três de uma vez: **(1)** o veredito dos agentes tranquilos nunca
+aparecia; **(2)** cada corrida do cron (10 min) e cada rodada da deliberação **sobrescrevem** o
+campo com os preocupados DAQUELA rodada, então o número de linhas muda de uma abertura para a
+outra (o projeto do print estava na **rodada 5**); **(3)** o `votos` gravado por `serializarVotos`
+guardava `{dimensao, preocupa, confianca, origem}` **sem o argumento**, então o porquê dos
+tranquilos era **descartado na gravação** — não havia como mostrar os 4 sem mudar a persistência.
+As reticências eram `line-clamp-2` no histórico de rodadas, que vinha ABERTO por padrão.
+
+**Fix.** `montarPareceresDaMesa` (`agents/mesa-especialistas.ts`, PURA) monta o parecer dos
+**QUATRO** nos dois modos (com a mesa LLM, o argumento raciocinado; sem ela, o motivo do voto
+determinístico), e `serializarVotos` passa a gravá-lo na chave própria **`pareceres`**. A ficha lê
+por `pareceresDosVotos` e desenha **um bloco por agente** com rótulo textual
+(«Aponta problema» / «Sem ressalva») e o porquê **inteiro**. O histórico de rodadas ficou
+**colapsado** e, aberto, sem clamp.
+
+**Junto, dois pedidos do mesmo print.** **(a)** A **estrela** — ela nunca sai da mesa (que só
+produz veredito e confiança); quem a raciocina é o TIME (`avaliacao/time.ts`), que só roda sob
+demanda. A ficha passa a ler o último nó `tipo='consenso'` do `agente_log`
+(`getUltimoConsensoDoTime` + a versão em LOTE, uma consulta por `IN` com `ROW_NUMBER()`) e exibe
+"N estrelas sugeridas". **(b)** **Dois botões** na ficha: "Rerodar a mesa" (síncrona, é o que
+preenche o painel) e "Rodar o time (estrela)" (~30 chamadas de LLM, 202 em background), **reusando
+as rotas de admin que já existiam** — nenhuma rota nova.
+
+**⚠️ O que não pode regredir.**
+- A seção de sombra aparece **mesmo sem avaliação** — era condicionada a `avaliacaoSombra` existir,
+  e aí o projeto que o agente nunca avaliou não tinha onde MANDAR avaliar.
+- O `pareceres` é lido **na ficha**, não na listagem (gotcha 4 do dashboard). No LOTE ele vem, de
+  propósito: sem isso, abrir uma linha semeada mostraria "o time não rodou" mentindo.
+- `julgamentos` **continua ENXUTO** (sem argumento, sem sinais): aquela chave é trilha de
+  auditoria. A régua antiga *"o argumento nunca é serializado"* caiu com motivo escrito em
+  `tests/mesa-fiada-serializacao.test.ts` — a exposição é a mesma de sempre (ficha `requireAdmin`,
+  e o `motivo` já exibia R$); o que segue proibido é R$ chegar ao SUBMISSOR (INV-02).
+- A leitura do consenso usa **`Promise.resolve().then(...)`** para converter throw SÍNCRONO em
+  rejeição, e falha só omite a seção.
+- **A estrela do agente NÃO tem botão de aplicar** — quem grava a coluna "Estrelas" é gente.
+- ⚠️ Estrela automática em **TODO** projeto continua sendo a **T8 do plano da v2**, não feita: hoje
+  a estrela aparece só depois de alguém rodar o time naquele projeto.
+
+**Status.** Testes: `tests/painel-sombra-quatro-agentes.test.ts` (inclui os canários do clamp, da
+seção sempre visível e do reuso das rotas). Suíte 3877 verde.
+
+---
+
 ## 2026-09-08 — A confiança do time era o PLACAR DA VOTAÇÃO exibido como percentual, e o circuito de medição estava aberto em 4 pontos
 
 **Sintoma.** A coluna "Sombra" e a ficha do `/dashboard` mostravam "confiança 71%" e "43%" — sempre

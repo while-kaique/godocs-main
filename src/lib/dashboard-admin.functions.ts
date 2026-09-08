@@ -79,6 +79,10 @@ import {
 } from "@/lib/sheet-espelho";
 import { syncSheetsToSqlite } from "@/lib/google/sync-reverse";
 import { carregarCalibragem } from "@/lib/avaliacao-calibragem.functions";
+import {
+  getUltimoConsensoDoTime,
+  getUltimosConsensosDoTimePorIds,
+} from "@/integrations/db/client.server";
 import type { Calibragem } from "@/lib/avaliacao-calibragem";
 import {
   montarContribuicoesPorProjeto,
@@ -224,6 +228,33 @@ export type DetalheDashboard = {
       divergencia: boolean;
       aplicar: boolean;
       motivo: string | null;
+    } | null;
+    /**
+     * O parecer dos **QUATRO** agentes, com o argumento de cada um — inclusive de quem NÃO
+     * preocupou. Vem do `votos` da linha do projeto (`montarPareceresDaMesa`).
+     *
+     * ⚠️ É o que substitui a leitura do `motivo` para exibir o painel: o `motivo` só carrega a
+     * objeção de quem preocupou NA ÚLTIMA rodada, então o painel mostrava 4 porquês numa abertura
+     * e 2 na seguinte (queixa do Luis, 08/09/2026). Vazio em avaliação ANTIGA, gravada antes de o
+     * argumento passar a ser persistido — aí a tela cai no `motivo` de sempre.
+     */
+    especialistas: {
+      dimensao: string;
+      preocupa: boolean;
+      argumento: string;
+      confianca: number | null;
+    }[];
+    /**
+     * O último veredito do TIME de agentes (o que raciocina a ESTRELA). `null` quando o time nunca
+     * rodou neste projeto — o que é o normal, porque ele só roda sob demanda (botão da ficha).
+     */
+    time: {
+      estrela: number | null;
+      saida: string | null;
+      confianca: string | null;
+      quando: string | null;
+      motivos: string[];
+      divergencias: string[];
     } | null;
     /** Estado da deliberação multi-turno (fatia C). */
     deliberacao: {
@@ -381,6 +412,66 @@ export function parseHistoricoDeliberacao(
 }
 
 /**
+ * Extrai os 4 pareceres do `votos` gravado. PURA e TOLERANTE: JSON inválido, ausente ou de uma
+ * gravação ANTIGA (antes de o argumento passar a ser persistido) devolve `[]`, e a tela cai no
+ * `motivo` de sempre — nenhum backfill é necessário para o painel não quebrar.
+ */
+export function pareceresDosVotos(
+  votosJson: string | null | undefined,
+): NonNullable<DetalheDashboard["avaliacaoSombra"]>["especialistas"] {
+  if (!votosJson) return [];
+  let bruto: unknown;
+  try {
+    bruto = JSON.parse(votosJson);
+  } catch {
+    return [];
+  }
+  const lista = (bruto as { pareceres?: unknown })?.pareceres;
+  if (!Array.isArray(lista)) return [];
+  const out: NonNullable<DetalheDashboard["avaliacaoSombra"]>["especialistas"] = [];
+  for (const item of lista) {
+    if (!item || typeof item !== "object") continue;
+    const p = item as Record<string, unknown>;
+    const dimensao = typeof p.dimensao === "string" ? p.dimensao : null;
+    if (!dimensao) continue;
+    out.push({
+      dimensao,
+      preocupa: p.preocupa === true,
+      argumento: typeof p.argumento === "string" ? p.argumento : "",
+      confianca: typeof p.confianca === "number" && Number.isFinite(p.confianca) ? p.confianca : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Interpreta o nó de consenso do TIME. PURA e TOLERANTE (o `saida` é JSON gravado pelo log; se ele
+ * mudar de forma, a seção some em vez de a ficha cair).
+ */
+export function interpretarConsensoDoTime(
+  no: { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null } | null | undefined,
+): NonNullable<DetalheDashboard["avaliacaoSombra"]>["time"] {
+  if (!no) return null;
+  let c: Record<string, unknown> = {};
+  try {
+    const parsed = no.saida ? JSON.parse(no.saida) : null;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) c = parsed as Record<string, unknown>;
+  } catch {
+    c = {};
+  }
+  const textos = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim() !== "") : [];
+  return {
+    estrela: typeof c.estrela === "number" && Number.isFinite(c.estrela) ? c.estrela : null,
+    saida: typeof c.saida === "string" ? c.saida : no.veredito,
+    confianca: typeof c.confianca === "string" ? c.confianca : no.confianca,
+    quando: no.created_at,
+    motivos: textos(c.motivos),
+    divergencias: textos(c.divergencias),
+  };
+}
+
+/**
  * Monta o bloco `avaliacaoSombra` da ficha a partir das três linhas (agregador, deliberação,
  * retroativo). PURA. `null` quando nenhuma das três existe (o agente ainda não avaliou).
  *
@@ -394,6 +485,8 @@ export function montarAvaliacaoSombra(
     divergencia: number;
     aplicar: number;
     motivo: string | null;
+    /** JSON gravado por `serializarVotos` — é de onde saem os 4 pareceres. */
+    votos?: string | null;
   } | null,
   delib: {
     estado: string;
@@ -409,8 +502,10 @@ export function montarAvaliacaoSombra(
     grau: string | null;
     motivo: string | null;
   } | null,
+  /** O último consenso do TIME (nó `tipo='consenso'` do log em árvore), quando houver. */
+  time?: { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null } | null,
 ): DetalheDashboard["avaliacaoSombra"] {
-  if (!mesa && !delib && !retro) return null;
+  if (!mesa && !delib && !retro && !time) return null;
   return {
     mesa: mesa
       ? {
@@ -421,6 +516,8 @@ export function montarAvaliacaoSombra(
           motivo: mesa.motivo,
         }
       : null,
+    especialistas: pareceresDosVotos(mesa?.votos),
+    time: interpretarConsensoDoTime(time),
     deliberacao: delib
       ? {
           estado: delib.estado,
@@ -556,8 +653,18 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
         return [];
       }),
     // Avaliação em SOMBRA (teste sombra) — tabelas INTERNAS, acessório: falha só omite a seção.
-    Promise.all([getAvaliacaoNormal(id), getDeliberacao(id), getAvaliacaoRetroativa(id)])
-      .then(([mesa, delib, retro]) => montarAvaliacaoSombra(mesa, delib, retro))
+    Promise.all([
+      getAvaliacaoNormal(id),
+      getDeliberacao(id),
+      getAvaliacaoRetroativa(id),
+      // A estrela do time vive no log em árvore, não na mesa. Falha aqui só omite a seção.
+      // ⚠️ `Promise.resolve().then(...)` converte um throw SÍNCRONO em rejeição — o `.catch` solto
+      // não pegaria (é o padrão do repo, do gatilho da notificação de pré-aprovação).
+      Promise.resolve()
+        .then(() => getUltimoConsensoDoTime(id))
+        .catch(() => null),
+    ])
+      .then(([mesa, delib, retro, time]) => montarAvaliacaoSombra(mesa, delib, retro, time))
       .catch((e): DetalheDashboard["avaliacaoSombra"] => {
         console.error("[dashboard-admin] falha ao ler avaliação em sombra:", e);
         return null;
@@ -635,6 +742,7 @@ export async function getProjetosDashboardLote(
     mesas,
     delibs,
     retros,
+    consensosTime,
     votos,
     aprovacoesPai,
   ] = await Promise.all([
@@ -678,6 +786,14 @@ export async function getProjetosDashboardLote(
       console.error("[dashboard-admin] falha ao ler retroativo (sombra) em lote:", e);
       return new Map<string, AvaliacaoRetroativaRow>();
     }),
+    // O último consenso do TIME (a estrela) — uma consulta por `IN`, com a linha mais recente de
+    // cada projeto escolhida no próprio SQL. Acessório: falha → nenhuma ficha mostra a estrela.
+    Promise.resolve()
+      .then(() => getUltimosConsensosDoTimePorIds(alvos))
+      .catch((e) => {
+        console.error("[dashboard-admin] falha ao ler consenso do time em lote:", e);
+        return new Map<string, { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null }>();
+      }),
     getFeedbacksPorIds(alvos).catch((e) => {
       console.error("[dashboard-admin] falha ao ler feedback (sombra) em lote:", e);
       return new Map<string, AvaliacaoFeedbackRow>();
@@ -726,6 +842,9 @@ export async function getProjetosDashboardLote(
         mesas.get(chave) ?? null,
         delibs.get(chave) ?? null,
         retros.get(chave) ?? null,
+        // ⚠️ Precisa vir no LOTE: sem isto a estrela do time apareceria só nas fichas abertas fora
+        // do lote (o clique numa linha semeada mostraria "o time não rodou" mentindo).
+        consensosTime.get(chave) ?? null,
       ),
       feedback: normalizarVoto(votos.get(chave)?.voto),
       preAprovacaoPai: parecerEstagio2ParaFicha(aprovacoesPai.get(chave) ?? []),

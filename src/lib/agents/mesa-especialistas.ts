@@ -175,3 +175,66 @@ export function conciliarJulgamentos(
     ceticoRefutou: !!cetico?.preocupa,
   };
 }
+
+// ─── O parecer dos QUATRO, para a tela ───────────────────────────────────────
+
+/** Teto do argumento guardado por agente. 400 chars cabem a frase inteira do parecer real. */
+export const ARGUMENTO_GRAVADO_MAX = 400;
+
+export type ParecerDeAgente = {
+  dimensao: DimensaoAvaliacao;
+  /** O agente vê problema? É o que separa "Preocupa" de "Sem ressalva" na tela. */
+  preocupa: boolean;
+  /** O PORQUÊ, dele. Vazio só quando o voto não tem motivo (tranquilo determinístico). */
+  argumento: string;
+  confianca: number | null;
+};
+
+function cortar400(s: string): string {
+  const t = (s ?? '').trim();
+  return t.length > ARGUMENTO_GRAVADO_MAX ? `${t.slice(0, ARGUMENTO_GRAVADO_MAX - 1)}…` : t;
+}
+
+/**
+ * O parecer dos **QUATRO** agentes, na ordem canônica da mesa — PURA.
+ *
+ * ⚠️ **Por que existe.** O que a ficha mostrava era `projeto_avaliacao.motivo`, e esse campo é
+ * `conciliado.motivos.join('\n')`, que só carrega o argumento de **quem PREOCUPOU**. Efeitos, os
+ * dois relatados pelo Luis em 08/09/2026: (1) o veredito de cada agente era invisível — só se via
+ * a objeção de alguns; (2) o número de linhas MUDAVA entre uma abertura e outra da ficha, porque
+ * cada corrida do cron sobrescreve o campo com os preocupados DAQUELA rodada ("vi vários porquês,
+ * depois só 2"). E o `votos` gravado guardava `{dimensao, preocupa, confianca}` **sem o
+ * argumento**, então o porquê dos tranquilos era descartado na gravação: não havia como mostrar os
+ * 4 sem mudar a persistência. É esta função que passa a ser gravada.
+ *
+ * Funciona nos DOIS modos: com a mesa LLM ligada usa o argumento raciocinado de cada especialista;
+ * sem ela, o `motivo` que o voto determinístico já redige.
+ */
+export function montarPareceresDaMesa(v: {
+  fte: { implausivel: boolean; motivo: string | null };
+  financeiro: { veredito: string; motivo: string | null; confianca: number };
+  rag: { apoio: boolean; motivo: string | null; confianca: number };
+  cetico: { refuta: boolean; motivo: string | null; confianca: number };
+  julgamentos?: JulgamentoEspecialista[] | null;
+}): ParecerDeAgente[] {
+  const porDim = new Map((v.julgamentos ?? []).map((j) => [j.dimensao, j]));
+  const det: Record<DimensaoAvaliacao, { preocupa: boolean; motivo: string | null; confianca: number | null }> = {
+    fte: { preocupa: v.fte.implausivel, motivo: v.fte.motivo, confianca: null },
+    financeiro: { preocupa: v.financeiro.veredito !== 'ok', motivo: v.financeiro.motivo, confianca: v.financeiro.confianca },
+    rag: { preocupa: !v.rag.apoio, motivo: v.rag.motivo, confianca: v.rag.confianca },
+    cetico: { preocupa: v.cetico.refuta, motivo: v.cetico.motivo, confianca: v.cetico.confianca },
+  };
+  return DIMENSOES.map((dim) => {
+    const llm = porDim.get(dim);
+    if (llm) {
+      return {
+        dimensao: dim,
+        preocupa: llm.preocupa,
+        argumento: cortar400(llm.argumento ?? ''),
+        confianca: typeof llm.confianca === 'number' ? llm.confianca : null,
+      };
+    }
+    const d = det[dim];
+    return { dimensao: dim, preocupa: d.preocupa, argumento: cortar400(d.motivo ?? ''), confianca: d.confianca };
+  });
+}
