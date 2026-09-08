@@ -95,3 +95,41 @@ export const NOME_LEGADO: Readonly<Record<string, string>> = {
   'Freq. Custo para Rodar': 'Custo do Projeto Mensal ou Pontual',
   'Racional Custo Evitado': 'Justificativa Saving Escalado e Real',
 } as const;
+
+/**
+ * Nomes LEGADOS que **não** ganham alias de leitura, e por quê.
+ *
+ * O alias resolve POSIÇÃO, não SIGNIFICADO (aviso do topo), e para estes dois o significado
+ * mudou de verdade:
+ *   • **`Saving Reais`** (v1: só saving) ↔ `Impacto Bruto` (v2: saving + custo evitado +
+ *     **receita**). Ler um pelo outro faz o julgamento financeiro do agente contar receita
+ *     DENTRO do saving — a dupla contagem que o repo já pagou caro no caso Sucesso.AI.
+ *   • **`Ganho Total`** (v1: saving + receita ÷ 10) ↔ `Impacto Líquido` (v2: pesos 1,0/0,5/0,1
+ *     menos o custo para rodar). São ambos compostos, mas de fórmulas diferentes: quem quiser um
+ *     deles escolhe a coluna EXPLICITAMENTE, em vez de herdar a que o alias apontar.
+ *
+ * ⚠️ Quem precisa desses dois números numa aba v2 pede a coluna v2 pelo nome dela.
+ */
+export const SEM_ALIAS_DE_LEITURA: ReadonlySet<string> = new Set(['Saving Reais', 'Ganho Total']);
+
+/** v1 → v2: o INVERSO de `NOME_LEGADO`, já sem os nomes de `SEM_ALIAS_DE_LEITURA`. */
+const V2_DE_LEGADO: Readonly<Record<string, string>> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(NOME_LEGADO)
+      .filter(([, legado]) => !SEM_ALIAS_DE_LEITURA.has(legado))
+      .map(([v2, legado]) => [chaveColuna(legado), v2]),
+  ),
+);
+
+/**
+ * O nome v2 equivalente a um nome LEGADO de coluna — `null` quando não há um (ou quando o alias
+ * é proibido para leitura, ver `SEM_ALIAS_DE_LEITURA`).
+ *
+ * ⚠️ Existe para quem LÊ a planilha por nome v1 numa aba já migrada para a v2: sem isto, cada
+ * campo pedido volta vazio e o consumidor não tem como saber que a coluna existe com outro nome.
+ * Foi assim que o dossiê do time de avaliação passou a entregar TODO o financeiro `null` aos
+ * agentes depois que a aba `GoDocs` virou v2.
+ */
+export function nomeV2De(nomeLegado: string): string | null {
+  return V2_DE_LEGADO[chaveColuna(nomeLegado)] ?? null;
+}
