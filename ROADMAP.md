@@ -6,6 +6,33 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
+**Frente Calibragem do time de agentes de avaliação 🟡 (branch `feat/calibragem-time-avaliacao`, plano APROVADO em 08/09/2026):**
+Plano: [`docs/plans/calibragem-time-avaliacao.md`](docs/plans/calibragem-time-avaliacao.md) ·
+Spec: `SPEC.md` §4 (RF-230..RF-248) + INV-16..INV-18.
+Investigação de 08/09 fechada com arquivo e linha: a **confiança** exibida é o **placar da votação**
+(`concordanciaDirecional × confiancaMedia`, só 3 valores possíveis — 3-1×0,95 = **71%**, 2-2×0,85 = **43%**);
+o time **não reprova porque reprovar não existe** no enum, e o financeiro tem teto de R$ 5k e **nenhum piso**
+(R$ 18,16/mês volta `ok`/0,9 — o eixo dos 137 reprovados à mão em 04/09); o **circuito de feedback está aberto
+em 3 pontos** (`politicaDeLiberacao(null)` hardcoded, `avaliacao_feedback` write-only, gabarito congelado por
+`getIdsRetroativos`); e **todos os 8 agentes são score-first** (número antes do raciocínio — a literatura mede
++9,3pt na inversão, e a run 9 está em 52%, sobre o baseline deles).
+
+- ✅ **Planejamento (08/09)** — plano aprovado, spec cristalizada (19 requisitos EARS + 3 invariantes),
+  blast-radius por 3 exploradores independentes: **(a) BAIXO · (b) MÉDIO · (c) ALTO**. Dois achados mudaram o
+  desenho: o **banco de calibração já existe** (`correcoes.ts`, decisão de 05/09 de não criar índice
+  separado — o RAG já é a base de consulta), e reprovar por qualquer motivo do `PISO_ZERO` reprovaria
+  **336 de 637** projetos (0★ é 53% da base), então a reprovação por juízo fica só em `fora_de_uso` +
+  `ressubmissao`, com motivo **nomeado e citado**.
+- ⬜ **(a) T1-T4** — racional-primeiro nos 8 blocos de FORMATO + tirar o `outrosVotos` do prompt do
+  especialista; medir na **run 10** contra o baseline da run 9.
+- ⬜ **(b) T5-T9** — a discordância humana vira lição: eixo em `Correcao`, `correcoesDoLog` reconhecendo a
+  ação da mesa, o 👍 sai da ficha e o 👎 passa a exigir nota certa + eixo + motivo.
+- ⬜ **(c) T10-T17** — confiança **medida** (acerto por faixa), descongelar o gabarito, ligar o
+  `politicaDeLiberacao`, piso de impacto, 5ª saída `reprovar` e canários.
+
+**Próximo:** codar a fatia **(a)** com `/ggsd:code` (T1-T4) — é a única que se mede sozinha e não depende das
+outras duas.
+
 **Frente GoDocs v2 — submissão determinística sem agente no cliente 🟡 (branch `feat/godocs-v2`, plano APROVADO em 02/09/2026):**
 Plano: [`docs/plans/godocs-v2-submissao-deterministica.md`](docs/plans/godocs-v2-submissao-deterministica.md) ·
 Spec: `SPEC.md` §4 Fase 3 (RF-200..RF-227) + INV-10..INV-15.

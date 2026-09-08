@@ -1,5 +1,48 @@
 # NEXT-SESSION
 
+## Plano ativo
+**→ [docs/plans/calibragem-time-avaliacao.md](plans/calibragem-time-avaliacao.md)** · Status: ✅ aprovado (Luis, 08/09/2026)
+· branch `feat/calibragem-time-avaliacao` · worktree `~/godocs-wt-calibragem-time` (sobre `origin/main`
+`e8d26de`)
+
+Três entregas independentes e paráveis: **(a)** racional-primeiro nos 8 agentes + independência dos
+especialistas · **(b)** a discordância humana vira lição, estendendo o `correcoes.ts` que já existe ·
+**(c)** confiança MEDIDA em vez de percentual inventado, fechando o circuito
+(`politicaDeLiberacao(null)`, gabarito congelado, piso de materialidade, 5ª saída `reprovar`).
+
+> ⚠️ Os ponteiros das seções abaixo são de OUTRAS branches (`feat/godocs-v2`,
+> `regua-estrelas-e-time-unificado`) e ficam preservados de propósito.
+
+### Próximo passo
+**Codar a fatia (a) com `/ggsd:code`: T1-T4** — inverter os 8 blocos de FORMATO para o raciocínio vir
+antes do número, tirar o `outrosVotos` do prompt do especialista, e medir na **run 10** contra o
+baseline da run 9 (`docs/baselines/runs/run-9.json`, n=637, idêntica 52%, ±1 76% — ⚠️ contar só
+`humana > 0`). É a única fatia que se mede sozinha, é só prompt e o blast é BAIXO.
+
+### O que esta sessão fez (08/09, planejamento — nenhum código tocado)
+Investigação do time de avaliação + plano aprovado + spec cristalizada. Os 4 achados, os 3 blast-radius
+e as decisões (D1-D4.2) estão no plano; **não re-derivar**. Dois pontos que mudaram o desenho no meio do
+caminho e são o que a próxima sessão precisa saber:
+- **O banco de calibração já existe** (`src/lib/correcoes.ts`, 05/09). Falta só o **eixo** e falta
+  `correcoesDoLog` reconhecer a ação da MESA (hoje filtra `acao === 'estrelas'`). **Não** criar índice,
+  namespace nem tool — a decisão de 05/09 (o RAG já é a base de consulta) fica.
+- **Reprovar por qualquer motivo do `PISO_ZERO` reprovaria 336 de 637 projetos.** A reprovação por juízo
+  fica só em `fora_de_uso` + `ressubmissao` (os 2 do `ROTULO_DESQ`), com motivo **nomeado e citado**.
+
+### Pendências declaradas
+- ⚠️ **Os marcadores de revisão vieram STALE da base da branch** (`.review-status = diverge-baixa`,
+  `.quality-status = sugestoes`, herdados do `origin/main`). Esta sessão **não tocou código-fonte**, então
+  não há diff a revisar; quem produz o diff que precisa dos revisores §9 é a próxima sessão de código, e
+  o `git push`/`/ggsd:ship` vai barrar até eles rodarem sobre esse diff.
+- ⚠️ **Assunção a confirmar antes da T15:** piso de **R$ 100/mês** (a régua que o Luis aplicou aos 137 em
+  04/09). Ele confirmou que "isso é um piso" sem cravar o número. O snapshot de 04/09 é o gabarito: o piso
+  está certo se reprovar aqueles 137 e mais ninguém.
+- ⚠️ **Lacuna dos exploradores:** `especiais-calibrador.ts` não foi aberto. Se o "banco de calibração"
+  colidir com esse calibrador de rodada, precisa de pesquisa dedicada **antes** da T10.
+- Os 8 agentes de avaliação **não estão** no `prompt-registry.ts`/`prompt-inspector.tsx` (regra 3 do
+  `CLAUDE.md` sem alvo aqui). Lacuna **pré-existente**, deixada fora do escopo de propósito.
+
+
 ## ✅ SESSÃO 02/09 (noite) — GoDocs v2: a Etapa 3 do jeito da v1 + cabeçalho da planilha
 
 Branch **`feat/godocs-v2`**, pasta `/home/notebook/godocs-main`. Suíte **2800 verde** (entrou a sessão com
