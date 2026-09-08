@@ -15,6 +15,7 @@
  */
 
 import { chaveColuna } from '@/lib/coluna-chave';
+import { FAQ_INDICE } from '@/lib/faq/indice';
 
 /**
  * Uma categoria = UM documento. Não há mais nível de "tópico": a parte interna do FAQ é um
@@ -157,19 +158,19 @@ O projeto não passou no critério e o motivo aparece junto do veredito. Antes d
 
 Marque o projeto como **Descontinuado** em "Meus Projetos". Nada é apagado: o histórico fica e o app para de cobrar regularização. Se ela voltar a rodar, reative — ou edite e reenvie, o que reativa sozinho.`;
 
-export const FAQ_SEED: FaqCategoriaSeed[] = [
-  {
-    slug: 'tipos_projetos',
-    titulo: 'Tipos de Projeto',
-    resumo:
-      'O que o GoDocs entende por saving operacional, receita incremental e projeto especial — e como escolher na Etapa 2.',
-    corpo: DOC_TIPOS,
-  },
-  {
-    slug: 'acompanhamento',
-    titulo: 'Acompanhamento e status',
-    resumo:
-      'O que cada status do seu projeto significa, quem age em cada um e o que você precisa fazer.',
-    corpo: DOC_ACOMPANHAMENTO,
-  },
-];
+/**
+ * ⚠️ Slug, título e resumo vêm do `FAQ_INDICE` (`faq/indice.ts`); aqui só se casa o CORPO.
+ *
+ * A separação existe porque a HOME precisa da lista sem esperar a rede, e importar este
+ * arquivo levaria os documentos inteiros em markdown para o bundle da página de entrada.
+ * Fonte única continua sendo uma: mudar um título lá muda nos dois lugares.
+ */
+const CORPOS: Record<string, string> = {
+  tipos_projetos: DOC_TIPOS,
+  acompanhamento: DOC_ACOMPANHAMENTO,
+};
+
+export const FAQ_SEED: FaqCategoriaSeed[] = FAQ_INDICE.map((a) => ({
+  ...a,
+  corpo: CORPOS[a.slug] ?? '',
+}));

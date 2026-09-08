@@ -20,24 +20,66 @@ export const AUTH_CACHE_KEY = 'godocs:auth-v1';
 /** Mesmo TTL do cache em memória: 5 min é curto o bastante para não fixar permissão velha. */
 export const AUTH_CACHE_MS = 5 * 60 * 1000;
 
-/**
- * ⚠️ **O corpo mora em `cache-sessao.ts`**, que é o mesmo mecanismo com a chave e o TTL como
- * parâmetro. Este arquivo continua existindo porque o NOME importa: quem lê `lerAuthCache` sabe
- * o que está lendo, e o cabeçalho acima guarda o porquê de o cache de PERMISSÃO ser seguro.
- */
-import { gravarCacheSessao, lerCacheSessao, limparCacheSessao } from '@/lib/cache-sessao';
+type Entrada<T> = { user: T; at: number };
 
-/** Lê o usuário cacheado. Nunca lança; entrada vencida é removida no caminho. */
+function storagePadrao(): Storage | null {
+  try {
+    return typeof sessionStorage === 'undefined' ? null : sessionStorage;
+  } catch {
+    // Navegador com storage bloqueado (modo restrito / iframe sem permissão).
+    return null;
+  }
+}
+
+/**
+ * Lê o usuário cacheado. Devolve `null` — nunca lança — quando não há storage, a chave
+ * está ausente/corrompida, o formato não é o esperado ou a entrada passou do TTL.
+ * Entrada vencida é removida no caminho, para não ficar lixo na aba.
+ */
 export function lerAuthCache<T>(agora = Date.now(), storage?: Storage | null): T | null {
-  return lerCacheSessao<T>(AUTH_CACHE_KEY, AUTH_CACHE_MS, agora, storage);
+  const s = storage === undefined ? storagePadrao() : storage;
+  if (!s) return null;
+  let cru: string | null = null;
+  try {
+    cru = s.getItem(AUTH_CACHE_KEY);
+  } catch {
+    return null;
+  }
+  if (!cru) return null;
+  let entrada: Entrada<T> | null = null;
+  try {
+    entrada = JSON.parse(cru) as Entrada<T>;
+  } catch {
+    return null; // JSON corrompido (aba antiga, extensão, edição manual)
+  }
+  if (!entrada || typeof entrada !== 'object' || typeof entrada.at !== 'number') return null;
+  if (entrada.user == null) return null;
+  if (agora - entrada.at >= AUTH_CACHE_MS) {
+    limparAuthCache(s);
+    return null;
+  }
+  return entrada.user;
 }
 
 /** Grava o usuário. Falha de gravação (quota, storage bloqueado) degrada em silêncio. */
 export function gravarAuthCache<T>(user: T, agora = Date.now(), storage?: Storage | null): void {
-  gravarCacheSessao(AUTH_CACHE_KEY, user, agora, storage);
+  const s = storage === undefined ? storagePadrao() : storage;
+  if (!s) return;
+  try {
+    const entrada: Entrada<T> = { user, at: agora };
+    s.setItem(AUTH_CACHE_KEY, JSON.stringify(entrada));
+  } catch {
+    // Sem cache é só mais lento, não é erro de produto.
+  }
 }
 
 /** Remove a entrada (usado quando o auth falha ou o usuário perde o acesso). */
 export function limparAuthCache(storage?: Storage | null): void {
-  limparCacheSessao(AUTH_CACHE_KEY, storage);
+  const s = storage === undefined ? storagePadrao() : storage;
+  if (!s) return;
+  try {
+    s.removeItem(AUTH_CACHE_KEY);
+  } catch {
+    // idem
+  }
 }
