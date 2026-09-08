@@ -51,15 +51,15 @@ export const NOTA_ANCORA_CONGELADA = 6;
 
 const FORMATO_JSON = `FORMATO DE RESPOSTA — responda APENAS com um objeto JSON, sem texto fora dele:
 {
-  "nota": <inteiro 0 a ${TETO_AGENTE} quando escape.indicado=false; quando true, a nota que você acha dentro de 6 a 10 — o comitê humano decide o número final>,
+  "evidencias": ["<citação LITERAL do dossiê que sustenta o critério>", "..."],
+  "racional": "<2 a 3 frases curtas, até 600 caracteres, em português comum: o que o projeto faz, por que este nível e não o de cima, o que faria subir. Sem o vocabulário interno da régua — ver COMO ESCREVER O PORQUÊ.>",
   "criterio_aplicado": "<verbo do nível: Experimenta | Informa | Executa | Garante | Decide | Assume>",
   "desqualificador": "<quando nota 0: a chave do piso — ${PISO_ZERO.map((p) => p.chave).join(' | ')} — senão null>",
-  "evidencias": ["<citação LITERAL do dossiê que sustenta o critério>", "..."],
   "dependente_nomeado": "<nome do projeto/processo que depende deste como fonte, ou null>",
   "escape": { "indicado": <bool>, "por_que_nao": "<OBRIGATÓRIO quando indicado=false: qual gatilho falta e por quê, em uma frase>", "evidencias": { "${GATILHOS_ESCAPE[0].chave}": "<citação>", "${GATILHOS_ESCAPE[1].chave}": "<citação>" } },
   "tipo": "<dashboard | app | automacao | agente | sistema>",
   "nivel": "<deterministico | inteligente | autonomo>",
-  "racional": "<2 a 3 frases curtas, até 600 caracteres, em português comum: o que o projeto faz, por que este nível e não o de cima, o que faria subir. Sem o vocabulário interno da régua — ver COMO ESCREVER O PORQUÊ.>",
+  "nota": <inteiro 0 a ${TETO_AGENTE} quando escape.indicado=false; quando true, a nota que você acha dentro de 6 a 10 — o comitê humano decide o número final>,
   "gatilho_que_falhou": "<só quando o dossiê traz uma nota humana MAIOR que a sua: qual critério/gatilho dela não se sustenta, com a citação>"
 }`;
 

@@ -26,7 +26,82 @@
  * campo, e não dois módulos.
  */
 
-export type TipoCorrecao = 'estrela' | 'valor';
+/**
+ * O que a mão humana corrigiu: a NOTA de um especial, o VALOR financeiro na planilha, ou o
+ * DESFECHO que o time de avaliação propôs (o 👎 da ficha de triagem).
+ *
+ * ⚠️ O `veredito` não é numérico, e é por isso que ele tem par de campos próprio
+ * (`veredito_de`/`veredito_para`): "reprovar → aprovar" não cabe em `de`/`para`, e forçá-lo num
+ * número inventaria uma escala que ninguém definiu.
+ */
+export type TipoCorrecao = 'estrela' | 'valor' | 'veredito';
+
+/**
+ * QUAL lente do agente errou — o eixo da discordância.
+ *
+ * ⚠️ Existe porque o `tipo` diz o que foi corrigido, não QUEM errou. Sem o eixo, a lição
+ * ensina "esta nota estava errada"; com ele, ensina "foi o seu raciocínio de HORAS que estava
+ * errado", que é o que o especialista daquele eixo precisa ler.
+ */
+export type EixoCorrecao = 'horas' | 'financeiro' | 'precedente' | 'impacto_irrelevante' | 'outro';
+
+/** Os eixos aceitos. Eixo fora desta lista vira `null` — nunca um eixo inventado. */
+export const EIXOS_CORRECAO: readonly EixoCorrecao[] = [
+  'horas',
+  'financeiro',
+  'precedente',
+  'impacto_irrelevante',
+  'outro',
+];
+
+/**
+ * Como o eixo é NOMEADO na lição e na tela — FONTE ÚNICA.
+ *
+ * ⚠️ Não redigite estes textos no formulário da ficha: o rótulo que a pessoa escolhe tem de ser
+ * o mesmo que o agente lê, senão a lição fala de um eixo com um nome que o prompt não usa.
+ */
+export const ROTULO_EIXO: Record<EixoCorrecao, string> = {
+  horas: 'horas',
+  financeiro: 'financeiro',
+  precedente: 'precedente',
+  impacto_irrelevante: 'impacto irrelevante',
+  outro: 'outro',
+};
+
+/**
+ * Uma linha explicando cada eixo — para a TELA escolher com sentido, não por adivinhação.
+ *
+ * ⚠️ Vive ao lado do `ROTULO_EIXO` de propósito: rótulo e sentido têm de andar juntos, senão a
+ * tela ensina um significado e o prompt lê outro.
+ */
+export const AJUDA_EIXO: Record<EixoCorrecao, string> = {
+  horas: 'as horas declaradas não são plausíveis para quem fazia o trabalho',
+  financeiro: 'o valor não fecha, ou o mesmo dinheiro foi contado duas vezes',
+  precedente: 'comparou com os projetos errados, ou ignorou um parecido já decidido',
+  impacto_irrelevante: 'o ganho existe mas é pequeno demais para o que o projeto afirma',
+  outro: 'o erro não é de nenhum eixo acima',
+};
+
+/**
+ * Os desfechos que a triagem pode apontar como o certo — FONTE ÚNICA da tela, do servidor e da
+ * lição. O `valor` é o que vai gravado; o `rotulo` é o que a pessoa lê.
+ *
+ * ⚠️ São 3 e não 2: "precisa de olho humano" não é meio-aprovar, é o desfecho legítimo de quem
+ * viu sinal e não quer decidir sozinho. Sem ele, quem discorda é empurrado a escolher um extremo
+ * que não pensou.
+ */
+export const VEREDITOS_CERTOS = [
+  { valor: 'aprovar', rotulo: 'Deveria aprovar' },
+  { valor: 'em_validacao', rotulo: 'Precisa de olho humano' },
+  { valor: 'reprovar', rotulo: 'Deveria reprovar' },
+] as const;
+
+/** Interpreta o eixo cru (de `meta_json` ou do formulário). Desconhecido/ausente → `null`. */
+export function eixoValido(bruto: unknown): EixoCorrecao | null {
+  return typeof bruto === 'string' && (EIXOS_CORRECAO as readonly string[]).includes(bruto)
+    ? (bruto as EixoCorrecao)
+    : null;
+}
 
 export type Correcao = {
   tipo: TipoCorrecao;
@@ -34,8 +109,14 @@ export type Correcao = {
   projeto_nome: string | null;
   /** O que estava lá antes da mão humana. `null` quando não havia nada. */
   de: number | null;
-  /** O que a pessoa cravou. */
-  para: number;
+  /** O que a pessoa cravou. `null` no `veredito`, que não é número. */
+  para: number | null;
+  /** Qual lente do agente errou. `null` quando a correção não declarou eixo (legado). */
+  eixo: EixoCorrecao | null;
+  /** Só no `tipo: 'veredito'`: o desfecho que o agente propôs. */
+  veredito_de: string | null;
+  /** Só no `tipo: 'veredito'`: o desfecho que a triagem diz ser o certo. */
+  veredito_para: string | null;
   /** O que o AGENTE tinha recomendado, quando havia recomendação. */
   recomendado: number | null;
   /**
@@ -72,20 +153,37 @@ export const MOTIVO_MIN = 10;
  */
 export function ensinaAlgo(c: Correcao): boolean {
   if (!c.motivo || c.motivo.trim().length < MOTIVO_MIN) return false;
+  // ⚠️ O veredito tem a MESMA régua ("mudou alguma coisa?"), só não é numérica: sem os dois
+  // desfechos, ou com os dois iguais, não há correção nenhuma a ensinar.
+  if (c.tipo === 'veredito') {
+    const de = c.veredito_de?.trim();
+    const para = c.veredito_para?.trim();
+    return !!de && !!para && de !== para;
+  }
   const referencia = c.recomendado ?? c.de;
   return referencia != null && referencia !== c.para;
 }
 
 /** Uma linha por correção, para o bloco de exemplos do prompt. */
 export function descreverCorrecao(c: Correcao): string {
-  const dir = c.recomendado != null && c.para > c.recomendado ? 'SUBIU' : 'BAIXOU';
-  const origem = c.recomendado != null ? `o agente recomendou ${c.recomendado}` : `estava ${c.de}`;
-  const unidade = c.tipo === 'estrela' ? '★' : '';
   // O PAR é a lição: o que o agente argumentou, e o que a réplica humana disse sobre AQUILO.
   const oQueOAgenteDisse = c.leitura_agente
     ? `\n    o agente argumentou: "${recortar(c.leitura_agente)}"`
     : '';
-  return `• «${c.projeto_nome ?? c.projeto_id}»: ${origem}, a triagem ${dir} para ${c.para}${unidade}.${oQueOAgenteDisse}\n    a triagem respondeu: "${c.motivo}"`;
+  const alvo = `«${c.projeto_nome ?? c.projeto_id}»`;
+  // O eixo entra NOMEADO, logo depois do projeto: é a primeira coisa que o especialista daquele
+  // eixo precisa reconhecer como sendo sobre ele.
+  const eixo = c.eixo ? ` (eixo: ${ROTULO_EIXO[c.eixo]})` : '';
+  const replica = `\n    a triagem respondeu: "${c.motivo}"`;
+
+  if (c.tipo === 'veredito') {
+    return `• ${alvo}${eixo}: o agente concluiu "${c.veredito_de}", a triagem corrigiu para "${c.veredito_para}".${oQueOAgenteDisse}${replica}`;
+  }
+
+  const dir = c.recomendado != null && (c.para ?? 0) > c.recomendado ? 'SUBIU' : 'BAIXOU';
+  const origem = c.recomendado != null ? `o agente recomendou ${c.recomendado}` : `estava ${c.de}`;
+  const unidade = c.tipo === 'estrela' ? '★' : '';
+  return `• ${alvo}${eixo}: ${origem}, a triagem ${dir} para ${c.para}${unidade}.${oQueOAgenteDisse}${replica}`;
 }
 
 /** O argumento do agente entra recortado: o que ensina é a tese dele, não o texto inteiro. */
@@ -134,33 +232,101 @@ export type LinhaAtividade = {
  * que ensina é onde ela parou, não o caminho — e repetir o mesmo projeto no bloco de exemplos
  * gastaria as poucas linhas que ele tem.
  */
+/**
+ * As ações do `admin_activity_log` que carregam correção — e são só estas DUAS.
+ *
+ * ⚠️ Ação desconhecida continua sendo IGNORADA. Ampliar o union do `AcaoAdmin` não pode virar
+ * porta aberta: uma ação sem o `meta_json` no formato certo entraria como lição vazia, e lição
+ * vazia é pior que lição nenhuma (ocupa uma das 6 linhas do bloco e não ensina nada).
+ */
+export const ACOES_COM_CORRECAO = ['estrelas', 'avaliacao_discordancia'] as const;
+
+/** Texto não-vazio do `meta`, ou `null`. */
+function texto(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() ? v.trim() : null;
+}
+
+/**
+ * Número finito do `meta`, ou `null`.
+ *
+ * ⚠️ ESTRITO de propósito. Com `Number(v)` solto, `''`, `' '`, `false` e `[]` viram **0** — e um
+ * `nota_certa` em branco entraria no prompt como "a triagem corrigiu para 0★", que é uma lição
+ * inventada. Aceita número finito, ou string que É um número.
+ */
+function numero(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  if (!/^-?\d+(?:[.,]\d+)?$/.test(t)) return null;
+  const n = Number(t.replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
 export function correcoesDoLog(linhas: LinhaAtividade[]): Correcao[] {
   const porProjeto = new Map<string, Correcao>();
   for (const l of linhas) {
-    if (l.acao !== 'estrelas' || !l.projeto_id) continue;
+    if (!l.projeto_id) continue;
+    if (!(ACOES_COM_CORRECAO as readonly string[]).includes(l.acao)) continue;
     let meta: Record<string, unknown>;
     try {
       meta = JSON.parse(l.meta_json ?? '{}') as Record<string, unknown>;
     } catch {
       continue;
     }
-    const para = Number(meta.estrelas);
-    if (!Number.isFinite(para)) continue;
-    const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : null);
-    const c: Correcao = {
-      tipo: 'estrela',
+
+    const comum = {
       projeto_id: l.projeto_id,
       projeto_nome: l.projeto_nome,
-      de: num(meta.estrelas_anterior),
-      para,
-      recomendado: num(meta.recomendado_pelo_agente),
-      motivo: typeof meta.motivo === 'string' && meta.motivo.trim() ? meta.motivo.trim() : null,
-      leitura_agente:
-        typeof meta.leitura_do_agente === 'string' && meta.leitura_do_agente.trim()
-          ? meta.leitura_do_agente.trim()
-          : null,
+      eixo: eixoValido(meta.eixo),
+      motivo: texto(meta.motivo),
+      leitura_agente: texto(meta.leitura_do_agente),
       quando: l.created_at,
     };
+
+    let c: Correcao | null = null;
+
+    if (l.acao === 'estrelas') {
+      const para = numero(meta.estrelas);
+      if (para == null) continue;
+      c = {
+        ...comum,
+        tipo: 'estrela',
+        de: numero(meta.estrelas_anterior),
+        para,
+        recomendado: numero(meta.recomendado_pelo_agente),
+        veredito_de: null,
+        veredito_para: null,
+      };
+    } else {
+      // A discordância da ficha de triagem (o 👎). Ela chega de dois jeitos, e o campo
+      // preenchido é que decide o `tipo`: quem corrige a NOTA manda `nota_certa`, quem
+      // corrige o DESFECHO manda `veredito_certo`. Sem nenhum dos dois não há correção.
+      const notaCerta = numero(meta.nota_certa);
+      const vereditoCerto = texto(meta.veredito_certo);
+      if (notaCerta != null) {
+        c = {
+          ...comum,
+          tipo: 'estrela',
+          de: null,
+          para: notaCerta,
+          recomendado: numero(meta.recomendado_pelo_agente),
+          veredito_de: null,
+          veredito_para: null,
+        };
+      } else if (vereditoCerto) {
+        c = {
+          ...comum,
+          tipo: 'veredito',
+          de: null,
+          para: null,
+          recomendado: null,
+          veredito_de: texto(meta.veredito_do_agente),
+          veredito_para: vereditoCerto,
+        };
+      }
+    }
+
+    if (!c) continue;
     // O log vem do mais novo para o mais antigo: o primeiro que aparece é o que vale.
     if (!porProjeto.has(l.projeto_id)) porProjeto.set(l.projeto_id, c);
   }
@@ -191,13 +357,19 @@ export function licoesPara(
   /** Ids dos vizinhos que o RAG recuperou para ESTE projeto. Vazio = só a ordem cronológica. */
   idsVizinhos: readonly string[] = [],
 ): Correcao[] {
-  const vizinho = new Set(idsVizinhos.map((id) => id.trim().toLowerCase()));
+  // ⚠️ As DUAS pontas da comparação são canonizadas. O `!==` cru era sensível a caixa enquanto
+  // os vizinhos já vinham em minúscula: para LEGADO (a planilha guarda `LEGADO-049`, o sync cria
+  // `legado-049`), a correção do PRÓPRIO projeto em julgamento entrava no prompt como lição — que
+  // é exatamente o vazamento que esta função existe para evitar.
+  const chave = (id: string) => String(id ?? '').trim().toLowerCase();
+  const alvo = chave(projetoId);
+  const vizinho = new Set(idsVizinhos.map(chave));
   const recente = (c: Correcao) => String(c.quando ?? '');
   return correcoes
-    .filter((c) => c.projeto_id !== projetoId && ensinaAlgo(c))
+    .filter((c) => chave(c.projeto_id) !== alvo && ensinaAlgo(c))
     .sort((a, b) => {
-      const va = vizinho.has(a.projeto_id.toLowerCase()) ? 1 : 0;
-      const vb = vizinho.has(b.projeto_id.toLowerCase()) ? 1 : 0;
+      const va = vizinho.has(chave(a.projeto_id)) ? 1 : 0;
+      const vb = vizinho.has(chave(b.projeto_id)) ? 1 : 0;
       if (va !== vb) return vb - va;
       return recente(b).localeCompare(recente(a));
     });

@@ -172,6 +172,85 @@ local (reflexo/cache) via sync bidirecional; a submissão também notifica o Goo
   e DEVE não emitir mensagens de Google Chat nem avisos ao Gomoon.
 
 
+### Calibragem do time de avaliação — raciocínio, discordância humana e confiança medida
+> Plano: `docs/plans/calibragem-time-avaliacao.md`. Decisões do dono do produto (Luis, 08/09/2026):
+> o registro de concordância explícito **sai** (ausência de discordância é concordância); a
+> concordância implícita só conta com **prova de olhada**; nada de ajuste automático de limiar; e o
+> time passa a poder **reprovar**, com a reprovação nascendo de **régua declarada** — piso de impacto
+> **e** projeto inválido —, nunca de juízo livre do agente.
+
+**(a) O raciocínio vem antes do número**
+
+- **RF-230** — QUANDO um agente de avaliação recebe o formato da resposta que deve devolver, O SISTEMA
+  DEVE pedir o campo de raciocínio **antes** do campo de nota, veredito ou confiança.
+- **RF-231** — ENQUANTO um especialista da mesa escreve o primeiro parecer sobre o próprio eixo, O
+  SISTEMA DEVE esconder dele o parecer dos outros especialistas, e conciliar os pareceres só depois de
+  todos estarem escritos.
+- **RF-232** — QUANDO uma rodada de calibragem termina, O SISTEMA DEVE gravar o resultado no mesmo
+  formato da rodada anterior, com o comparativo escrito, contando apenas os projetos que têm nota
+  humana maior que zero.
+
+**(b) A discordância humana vira lição**
+
+- **RF-233** — ENQUANTO a ficha de um projeto mostra a recomendação do time, O SISTEMA DEVE oferecer
+  apenas o registro de **discordância**; não existe botão de concordar.
+- **RF-234** — QUANDO alguém da triagem registra uma discordância, O SISTEMA DEVE exigir **o desfecho
+  certo**, o eixo em que o agente errou e um motivo escrito de pelo menos 10 caracteres, e DEVE recusar
+  no servidor o motivo mais curto que isso.
+  _(Revisado em 08/09/2026 ao implementar e **confirmado pelo Luis no mesmo dia**: era "a nota certa". A ficha do `/dashboard` **não exibe
+  nota do agente** — a única nota ali é a coluna MANUAL "Estrelas" —, então não havia nota a corrigir
+  nem referência com que `ensinaAlgo` comparasse, e um segundo controle de estrela na mesma tela seria
+  dois canais para a mesma coisa. Quem corrige NOTA segue fazendo isso pelo canal da estrela
+  (`definirEstrelasEspecial`), que já grava motivo e leitura do agente.)_
+- **RF-234.1** — SE a discordância registrada não puder virar lição (o desfecho apontado é o mesmo que
+  o agente deu, ou o time ainda não avaliou aquele projeto), ENTÃO O SISTEMA DEVE dizer isso a quem
+  registrou, em vez de afirmar que a lição foi aprendida.
+- **RF-235** — QUANDO a discordância é registrada, O SISTEMA DEVE guardar junto o texto que o agente
+  havia escrito e que a pessoa estava lendo ao discordar — **a frase do especialista do eixo
+  escolhido**, resolvida no servidor e nunca vinda do cliente; SE não houver frase daquele eixo (eixo
+  "outro", ou parecer legado num parágrafo só), ENTÃO O SISTEMA DEVE guardar o parecer inteiro.
+- **RF-236** — SE uma discordância tem motivo válido, ENTÃO O SISTEMA DEVE apresentá-la como lição no
+  julgamento de **outros** projetos, na frente das demais quando o projeto corrigido está entre os
+  vizinhos recuperados; SE não tem motivo, ENTÃO O SISTEMA DEVE não apresentá-la.
+- **RF-237** — SE o projeto que está sendo julgado é o próprio projeto da discordância, ENTÃO O SISTEMA
+  DEVE deixá-la fora das lições daquele julgamento.
+- **RF-238** — SE um projeto avaliado depois do marco não recebeu discordância **e** alguém da triagem
+  gravou o Status ou as estrelas dele depois de a avaliação existir, ENTÃO O SISTEMA DEVE contá-lo como
+  concordância; SE ninguém da triagem gravou nada nele, ENTÃO O SISTEMA DEVE deixá-lo fora da conta.
+
+**(c) A confiança passa a ser medida**
+
+- **RF-239** — ENQUANTO a interface mostra a confiança do time num projeto, O SISTEMA DEVE mostrar a
+  taxa medida de concordância com a triagem naquela faixa e o tamanho da amostra; SE a faixa tem menos
+  casos medidos que o mínimo declarado (`MIN_AMOSTRA_FAIXA`, constante nomeada), ENTÃO O SISTEMA DEVE
+  dizer que ainda não há medição, sem exibir percentual nenhum.
+- **RF-240** — QUANDO o retroativo mede um projeto, O SISTEMA DEVE registrar a faixa de confiança junto
+  do acerto e DEVE agrupar o acerto por faixa.
+- **RF-241** — SE o veredito humano de um projeto já medido mudou desde a medição, ENTÃO O SISTEMA DEVE
+  devolvê-lo à fila de medição; SE não mudou, ENTÃO O SISTEMA DEVE mantê-lo fora dela.
+- **RF-242** — QUANDO a política de liberação é consultada, O SISTEMA DEVE entregar-lhe a acurácia
+  medida; ENQUANTO a acurácia estiver abaixo da meta, O SISTEMA DEVE manter o time em sombra e dizer
+  qual meta faltou.
+
+**(c) A reprovação, e o que ela exige**
+
+- **RF-243** — QUANDO o impacto mensal declarado do projeto fica abaixo do piso, O SISTEMA DEVE emitir
+  a saída **reprovar**.
+- **RF-244** — SE a reprovação vem do julgamento do agente e não do piso, ENTÃO O SISTEMA DEVE exigir
+  que ele **nomeie** um dos motivos declarados de projeto inválido (está fora de uso, ou é
+  ressubmissão do mesmo escopo já documentado) **e** cite o trecho do material que comprova; SE ele não
+  nomear ou não citar, ENTÃO O SISTEMA DEVE não reprovar.
+- **RF-245** — SE o projeto recebeu nota zero por qualquer outro motivo do piso da régua de estrelas,
+  ENTÃO O SISTEMA DEVE **não** reprová-lo — nota zero diz a altura do projeto, não que ele seja
+  inválido.
+- **RF-246** — ENQUANTO a liberação para agir sozinho não estiver autorizada, O SISTEMA DEVE não
+  alterar o status de nenhum projeto por causa de uma reprovação do time.
+- **RF-247** — QUANDO o time reprova um projeto que a triagem humana aprovou, O SISTEMA DEVE contar
+  isso como uma classe de erro própria, separada da aprovação indevida.
+- **RF-248** — QUANDO o relatório do retroativo é montado, SE o time aprovou um dos casos-canário
+  (projetos que ninguém deveria aprovar), ENTÃO O SISTEMA DEVE marcar o relatório como suspeito em vez
+  de reportar o acerto.
+
 ## 5. Invariantes (regras que nunca podem quebrar)
 > Destilados do `CLAUDE.md` (que continua sendo o detalhe). Cada um tem ponto de verdade + guarda.
 
@@ -224,6 +303,22 @@ local (reflexo/cache) via sync bidirecional; a submissão também notifica o Goo
 - **INV-15 — Coluna nova no recorte do espelho exige bump da `VERSAO_RECORTE_RESUMO` no mesmo commit.**
   - Ponto de verdade: `src/lib/dashboard-resumo.ts`.
   - Guarda: sem o bump, o hash impede o re-espelhamento e o campo nasce vazio para sempre.
+
+- **INV-16 — A reprovação automática nasce de régua DECLARADA; o agente nunca reprova por juízo livre.**
+  - Ponto de verdade: piso de impacto (constante nomeada) + a lista fechada de motivos de invalidez
+    (`fora_de_uso`, `ressubmissao`, os mesmos que `ROTULO_DESQ` já reconhece), com citação obrigatória
+    do trecho que comprova. ⚠️ Os outros motivos do `PISO_ZERO` significam nota **zero**, não
+    reprovação: 336 dos 637 projetos da run 9 são 0★, e reprovar por qualquer motivo do piso
+    reprovaria metade da base.
+  - Guarda: teste de que nenhum caminho de LLM alcança `reprovar` sem motivo nomeado e citado.
+- **INV-17 — Correção humana sem motivo escrito não vira lição para o agente.**
+  - Ponto de verdade: `ensinaAlgo` (`src/lib/correcoes.ts`), motivo com no mínimo `MOTIVO_MIN` chars.
+  - Guarda: `tests/correcoes.test.ts` — sem a razão, tudo que a correção ensina é "concorde com o
+    humano", que é o viés vetado pelo dono do produto.
+- **INV-18 — Confiança exibida é frequência MEDIDA ou nada.**
+  - Ponto de verdade: acerto por faixa vindo de `avaliacao_retroativa`; faixa sem amostra declara
+    ausência de medição em vez de mostrar percentual.
+  - Guarda: canário de que nenhum componente chama `pctConfianca`.
 
 ## 6. Fora de escopo
 - Reescrever em EARS o que já está em `spec-docs/`/`CLAUDE.md` (decisão do init: SPEC fino).

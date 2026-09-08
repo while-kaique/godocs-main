@@ -12,6 +12,7 @@ import {
   Users,
   Gavel,
   ClipboardCheck,
+  ThumbsDown,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -136,6 +137,11 @@ function visualDe(a: Atividade): { Icon: LucideIcon; tom: Tom; rotuloAcao: strin
       return { Icon: Gavel, tom: 'lider', rotuloAcao: 'Pré-aprovação' };
     case 'reabrir_fila':
       return { Icon: RotateCcw, tom: 'reabrir', rotuloAcao: 'Fila reaberta' };
+    // A discordância com o time de avaliação. Tom de reprovação porque é isso que ela é: a
+    // triagem dizendo que o agente errou. O `default:` abaixo já a mostraria sem quebrar, mas
+    // com o rótulo cru ('avaliacao_discordancia'), que ninguém lê.
+    case 'avaliacao_discordancia':
+      return { Icon: ThumbsDown, tom: 'reprovado', rotuloAcao: 'Discordou do agente' };
     default:
       return { Icon: ClipboardCheck, tom: 'neutro', rotuloAcao: a.acao };
   }

@@ -49,9 +49,9 @@ const FORMATO = `${REGUA_DE_PREOCUPACAO}
 
 FORMATO DE RESPOSTA — responda APENAS com um objeto JSON:
 {
-  "preocupa": <bool — há SINAL CONCRETO que impede aprovar como está?>,
-  "argumento": "<até 600 caracteres, o seu raciocínio; pode citar R$; ressalvas sem sinal concreto vão aqui, não em preocupa>",
   "evidencias": ["<citação literal do dossiê>", "..."],
+  "argumento": "<até 600 caracteres, o seu raciocínio; pode citar R$; ressalvas sem sinal concreto vão aqui, não em preocupa>",
+  "preocupa": <bool — há SINAL CONCRETO que impede aprovar como está?>,
   "pergunta_ao_autor": "<UMA pergunta concreta e respondível pelo autor quando preocupa, senão null. PROIBIDO citar R$ por hora ou o valor/hora de qualquer cargo — o autor não vê esse número>",
   "valor": <só a dimensão financeiro: { "absurdo": bool, "valor_sugerido": number|null, "justificativa": "..." }; as outras dimensões devolvem null>
 }

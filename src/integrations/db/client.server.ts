@@ -1567,6 +1567,37 @@ export async function insertAdminActivity(data: {
 // Página do feed por keyset (created_at, id) DESC — estável mesmo com escrita concorrente
 // (offset "escorregaria" quando chega linha nova). Cursor null = primeira página.
 // Pede `limit + 1` para saber se há próxima página sem uma segunda consulta.
+/**
+ * As últimas `limit` atividades DE UM CONJUNTO DE AÇÕES — a janela das correções.
+ *
+ * ⚠️ Existe porque `queryAdminActivities` devolve as últimas N ações de QUALQUER tipo, e
+ * `status` é a mais frequente do painel: quem lê correção com a janela genérica perde as lições
+ * assim que passam ~200 mudanças de status, **sem sinal nenhum** (o bloco só volta vazio). Aqui a
+ * janela significa o que quem a usa quer que ela signifique.
+ */
+export async function queryAdminActivitiesPorAcao(
+  acoes: readonly string[],
+  limit: number,
+): Promise<AdminActivityRow[]> {
+  if (!acoes.length) return [];
+  // ⚠️ O datasource do Godeploy limita as variáveis por statement (ver `MAX_VARS_IN`), e este
+  // `IN` soma +1 pelo `LIMIT`. Hoje o único chamador passa 2 ações fixas, mas a função é
+  // exportada e genérica — e este repo já queimou com "too many SQL variables".
+  if (acoes.length + 1 > MAX_VARS_IN) {
+    throw new Error(
+      `queryAdminActivitiesPorAcao: ${acoes.length} ações passam do teto de ${MAX_VARS_IN - 1} por statement`,
+    );
+  }
+  const marcas = acoes.map(() => "?").join(",");
+  return queryAll<AdminActivityRow>(
+    `SELECT * FROM admin_activity_log
+      WHERE acao IN (${marcas})
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?`,
+    [...acoes, limit],
+  );
+}
+
 export async function queryAdminActivities(
   cursor: { created_at: string; id: string } | null,
   limit: number,

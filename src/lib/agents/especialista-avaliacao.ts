@@ -60,7 +60,26 @@ export type EntradaEspecialista = {
   voto: VotoDeterministico;
   /** Vizinhos aprovados do corpus (texto pronto), como precedente. */
   vizinhos: string[];
-  /** Os votos das outras dimensões, para o especialista situar o dele na mesa. */
+  /**
+   * O que a TRIAGEM já corrigiu na recomendação do agente, **e por quê** — o bloco já
+   * renderizado por `blocoCorrecoes` (`correcoes.ts`), ou `''` quando não há nada que ensine.
+   *
+   * ⚠️ Não confundir com `outrosVotos`: são correções de OUTROS PROJETOS, feitas por gente,
+   * com o motivo escrito. Ver o parecer dos colegas no 1º turno é interferência de rubrica (é o
+   * que a RF-231 fechou); ler o que a triagem corrigiu é aprender critério.
+   *
+   * ⚠️ Só entra o que TEM motivo — `ensinaAlgo` filtra o resto, porque correção sem porquê
+   * ensina "concorde com o humano", que é o viés vetado pelo dono do produto.
+   */
+  licoes: string;
+  /**
+   * Os votos das outras dimensões, montados por `montarEntradasEspecialistas`.
+   *
+   * ⚠️ **NÃO entra no prompt do 1º parecer** (RF-231) — `buildPromptEspecialista` o ignora de
+   * propósito, para o julgamento de cada eixo ser independente. Fica no contrato porque é a mesa
+   * quem concilia (`agregarJulgamentos`) e porque reintroduzi-lo no prompt tem de ser DECISÃO, não
+   * deslize: o teste `tests/racional-primeiro.test.ts` trava isso.
+   */
   outrosVotos: VotoResumido[];
 };
 
@@ -124,34 +143,29 @@ function blocoVizinhos(vizinhos: string[]): string {
   return vizinhos.map((v, i) => `${i + 1}. ${v}`).join("\n");
 }
 
-/** Monta o bloco dos votos das outras dimensões. */
-function blocoOutrosVotos(outros: VotoResumido[]): string {
-  if (!outros.length) return "(nenhum outro voto ainda)";
-  return outros
-    .map(
-      (o) =>
-        `- ${ROTULO_DIMENSAO[o.dimensao]}: ${o.preocupa ? "PREOCUPA" : "sem preocupação"}. ${o.argumento}`,
-    )
-    .join("\n");
-}
-
 /**
  * Constrói as mensagens do especialista. Persona por dimensão (system) + os dados do projeto, o voto
- * determinístico do eixo, os votos dos outros e os vizinhos (user). ⚠️ Structured Outputs está morta
- * no proxy — pedimos JSON puro e o `.functions` parseia por `extrairJson`.
+ * determinístico do eixo e os vizinhos (user). ⚠️ Structured Outputs está morta no proxy — pedimos
+ * JSON puro e o `.functions` parseia por `extrairJson`.
+ *
+ * ⚠️ **O 1º parecer é CEGO ao dos outros especialistas** (RF-231): `entrada.outrosVotos` NÃO entra
+ * neste prompt. Motivo: com o parecer dos outros no contexto, o veredito de um eixo muda conforme os
+ * eixos presentes (interferência de rubrica) — e a mesa perde justamente a independência que faz o
+ * quórum valer algo. A conciliação continua onde sempre esteve, DEPOIS de todos escreverem
+ * (`agregarJulgamentos`), e a `divergencia` segue calculada lá.
  */
 export function buildPromptEspecialista(entrada: EntradaEspecialista): LLMMessage[] {
-  const { dimensao, texto, voto, vizinhos, outrosVotos } = entrada;
+  const { dimensao, texto, voto, vizinhos, licoes } = entrada;
   const system = `${PERSONA[dimensao]}
 
-Você recebe: o texto do projeto, o CÁLCULO determinístico do seu eixo (um SINAL, não um veredito — você pode discordar dele com argumento), o que os outros especialistas acharam, e projetos parecidos já aprovados. Raciocine sobre os dados; não repita o cálculo, INTERPRETE-o.
+Você recebe: o texto do projeto, o CÁLCULO determinístico do seu eixo (um SINAL, não um veredito — você pode discordar dele com argumento) e projetos parecidos já aprovados. Você julga SOZINHO: o parecer dos outros especialistas não vem aqui, e é a mesa que concilia depois. Raciocine sobre os dados; não repita o cálculo, INTERPRETE-o.
 
 FORMATO — responda APENAS com JSON válido, sem texto fora do JSON:
 {
-  "preocupa": true | false,
   "argumento": "<1 ou 2 frases CURTAS, em português simples (ver as regras abaixo)>",
-  "confianca": <número 0 a 1: quão seguro você está do seu parecer>,
-  "sinais": ["<pista curta>", "..."]
+  "sinais": ["<pista curta>", "..."],
+  "preocupa": true | false,
+  "confianca": <número 0 a 1: quão seguro você está do seu parecer>
 }
 
 COMO ESCREVER O "argumento" (quem lê é a pessoa da TRIAGEM, com a fila cheia, não um analista):
@@ -179,12 +193,9 @@ CÁLCULO DETERMINÍSTICO DO SEU EIXO (${ROTULO_DIMENSAO[dimensao]}):
 - Motivo: ${voto.motivo ?? "(sem motivo declarado)"}
 - Sinais: ${voto.sinais.length ? voto.sinais.join("; ") : "(nenhum)"}
 
-O QUE OS OUTROS ESPECIALISTAS ACHARAM:
-${blocoOutrosVotos(outrosVotos)}
-
 PROJETOS PARECIDOS JÁ APROVADOS (precedente):
 ${blocoVizinhos(vizinhos)}
-
+${licoes ? `\n${licoes}\n` : ''}
 Dê o seu parecer sobre o eixo «${ROTULO_DIMENSAO[dimensao]}».`;
 
   return [

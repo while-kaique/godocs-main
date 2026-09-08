@@ -147,10 +147,10 @@ ${REGRAS_DO_PORQUE}
 FORMATO DE RESPOSTA:
 Responda APENAS com JSON válido, exatamente neste formato, sem texto fora do JSON:
 {
-  "estrelas_recomendada": <inteiro 0 a ${NOTA_MAX}>,
-  "confianca": "alta" | "media" | "baixa",
   "leitura": "<2 a 3 frases curtas, no máximo ~400 caracteres, em português comum: o que o projeto faz · por que é essa nota e não a de cima · o que faria subir. Sem o vocabulário interno da régua — ver as regras acima.>",
-  "evidencias": { ${GATILHOS_ESCAPE.map((g) => `"${g.chave}": "<citação literal>"`).join(', ')} }
+  "evidencias": { ${GATILHOS_ESCAPE.map((g) => `"${g.chave}": "<citação literal>"`).join(', ')} },
+  "estrelas_recomendada": <inteiro 0 a ${NOTA_MAX}>,
+  "confianca": "alta" | "media" | "baixa"
 }
 Use confiança BAIXA quando o memorial for ausente/fraco ou o uso não for comprovado (o normal em projeto recém-submetido).`;
 }

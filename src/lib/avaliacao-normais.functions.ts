@@ -83,6 +83,8 @@ import {
   conciliarJulgamentos,
   type VotosDeterministicos,
 } from '@/lib/agents/mesa-especialistas';
+import { carregarCorrecoesDaTriagem, licoesParaPrompt } from '@/lib/correcoes.functions';
+import type { Correcao } from '@/lib/correcoes';
 import type {
   JulgamentoEspecialista,
   TextoProjeto,
@@ -248,6 +250,21 @@ type ContextoAvaliacao = {
   /** Corpus de aprovados JÁ montado — construído UMA vez pelo chamador (não por candidato). */
   corpus: ExemplarEspecial[];
   embeddings: MapaEmbedding;
+  /**
+   * As correções que a triagem já fez — carregadas UMA vez, como o corpus.
+   *
+   * ⚠️ Mora aqui e não dentro de `computarVotos` porque `computarVotos` roda EM LAÇO (por
+   * candidato do lote e por deliberação aberta): a consulta ao log seria idêntica em todas as
+   * iterações. É a mesma régua do corpus logo acima, e a do gotcha "a listagem não faz I/O por
+   * projeto — agregue no SQL".
+   *
+   * ⚠️ **OBRIGATÓRIO de propósito.** Nasceu opcional e isso escondeu o defeito: o caminho de UM
+   * projeto (`avaliarProjetoNormal`, o que roda em TODA submissão real pelo
+   * `processarPosSubmissao`) não o preenchia, então a lição chegava ao cron e **nunca** à
+   * submissão — sem log, sem campo, sem sinal. Campo obrigatório força cada construtor de
+   * contexto a decidir; lista vazia é decisão explícita.
+   */
+  correcoes: Correcao[];
 };
 
 /** Votos crus dos especialistas + juiz + cético (SEM I/O de escrita). Reusado pelo painel, pela
@@ -397,8 +414,15 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
       doc: entrada?.doc ?? '',
     };
     const vizinhosTexto = vizinhosArr.map((v) => [v.nome, v.area].filter(Boolean).join(', '));
+    // As LIÇÕES da triagem — o que gente corrigiu na recomendação do agente, e por quê. Os ids
+    // dos vizinhos que o RAG acabou de recuperar entram para a correção de um projeto PARECIDO
+    // vir primeiro (é ela que ensina; a mais recente é só a mais recente).
+    // ⚠️ Aqui não há I/O: `licoesParaPrompt` é PURA. A rede de falha está em
+    // `carregarCorrecoesDaTriagem`, que nunca lança e devolve `[]` — sem lição, a mesa julga como
+    // julgava antes. Material didático não pode derrubar um parecer.
+    const licoes = licoesParaPrompt(ctx.correcoes, projetoId, vizinhosArr);
     const votosDet: VotosDeterministicos = { fte, financeiro, rag, cetico };
-    const entradas = montarEntradasEspecialistas(votosDet, texto, vizinhosTexto);
+    const entradas = montarEntradasEspecialistas(votosDet, texto, vizinhosTexto, licoes);
     // `julgarComEspecialista` NUNCA lança (fail-safe → voto determinístico daquela dimensão), então
     // um agente que falhe não derruba a mesa nem o lote de background.
     julgamentos = await Promise.all(entradas.map(julgarComEspecialista));
@@ -612,11 +636,16 @@ export async function avaliarProjetoNormal(
   const ger = await garantirEmbeddings([projetoId], resumoPorId, embeddings, { capGeracao: 1 });
 
   const corpus = montarCorpusNormais(selecionarAprovadosNormais(resumos), embMapDe(ger.mapa));
+  // ⚠️ Caminho de UM projeto (pós-submissão): aqui NÃO há laço, então a versão com I/O é a certa.
+  // Sem esta linha a submissão real julgaria sem lição enquanto o cron julgava com — foi o defeito
+  // que o campo opcional escondia.
+  const correcoes = await carregarCorrecoesDaTriagem('avaliacao-normais');
   return avaliarComContexto(projetoId, {
     dry: opts.dry ?? false,
     resumoPorId,
     corpus,
     embeddings: ger.mapa,
+    correcoes,
   });
 }
 
@@ -667,9 +696,12 @@ export async function carregarContextoPainel(
   });
   embeddings = ger.mapa;
   const corpus = montarCorpusNormais(aprovados, embMapDe(embeddings));
+  // As lições da triagem, UMA vez para o lote inteiro (ver o campo no `ContextoAvaliacao`).
+  // Nunca lança: sem correções, a mesa julga como julgava.
+  const correcoes = await carregarCorrecoesDaTriagem('avaliacao-normais');
 
   return {
-    ctx: { dry: opts.dry, resumoPorId, corpus, embeddings },
+    ctx: { dry: opts.dry, resumoPorId, corpus, embeddings, correcoes },
     resumos,
     aprovados,
     gerados: ger.gerados,
