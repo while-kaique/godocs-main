@@ -675,9 +675,6 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         ferramenta: ouTraco(p.projeto.ferramenta),
         escopo: ouTraco(p.projeto.escopo),
         // Eixo TIPO da categorização. ⚠️ Substituiu a linha "Tipos" (que lia
-        // `tipos_projeto` e saía "—" em todo projeto da v2). Ausente aqui é o caso
-        // NORMAL: quem escreve esta coluna é o analisador, que roda DEPOIS da submissão.
-        tipoProjeto: p.projeto.categoria_projeto as string | null,
         nomeCompleto: ouTraco(p.projeto.responsavel_nome),
         email: ouTraco(p.projeto.responsavel_email),
         participantes,

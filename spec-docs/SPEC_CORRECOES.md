@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-09-08 — O card do Chat dizia "Tipo: —" na pré-aprovação
+
+**Sintoma.** O alerta de pré-aprovação chegou no Google Chat com a linha **`Tipo: —`** ao lado da
+Área.
+
+**Causa-raiz.** A linha existia para mostrar o eixo TIPO da categorização
+(`agente`/`sistema`/`app`/`dashboard`/`automacao`) e era declarada como *"ausente OMITE a linha,
+não vira —"*. Só que a coluna `Tipo de Projeto` da planilha **nunca está ausente**: o analisador
+grava o **travessão**. E o `texto()` de `notificacao-ganho.ts` só descartava string vazia, não o
+travessão — então `—` passava como se fosse valor, `ROTULO_TIPO['—']` não existia, e o helper caía
+no *"valor desconhecido volta como veio"*, imprimindo o travessão.
+
+**Fix (decisão do Luis).** A linha **saiu**. Além de errada quando vazia, ela era **redundante
+quando cheia**: ao lado de "Área" e chamada "Tipo", lê-se como **tipo de GANHO**, e isso o card já
+diz em **"Ganhos declarados"**, logo acima. Saiu do card e do `fallbackTexto`, e o campo
+`tipoProjeto` saiu do `ParamsSubmitMessage` (o TypeScript apontou os 4 chamadores: `google/sync.ts`,
+`notificacao-projeto.functions.ts` e 2 fixtures de teste).
+
+**Junto, a causa raiz.** O `texto()` daquele módulo passou a tratar `—`/`-` como vazio, alinhando
+com o resto do repo (`ouTraco`, o `texto` do dossiê, o `vazio()` do cron da complexidade). A linha
+foi removida, mas a régua vale para os outros campos que passam por ali (evidência do saving
+efetivado, racionais): um travessão gravado neles viraria texto no card do mesmo jeito.
+
+**⚠️ O que não pode regredir.** `rotuloTipoProjeto` **fica** em `notificacao-ganho.ts`, testada: se
+a linha voltar, volta com **rótulo próprio** ("Categoria"), nunca pendurada na Área com o nome
+"Tipo". Canário em `tests/chat-message-especial.test.ts` proíbe `Tipo:` no card e no fallback.
+
+**Status.** Suíte 3895 verde.
+
+---
+
 ## 2026-09-08 — O botão "rodar o time" prometia a estrela e o `waitUntil` era cancelado; e o dossiê chamava saving efetivado de "custo evitado"
 
 **Sintoma 1 (a estrela que nunca vinha).** O clique respondia "Time de agentes rodando, a estrela

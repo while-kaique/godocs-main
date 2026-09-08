@@ -1,6 +1,6 @@
 // Notificação via webhook do Google Chat (não precisa de auth Google — URL contém key+token).
 
-import { rotuloTipoProjeto, type ResumoGanho } from '@/lib/notificacao-ganho';
+import type { ResumoGanho } from '@/lib/notificacao-ganho';
 
 // Projetos de teste E2E (nome com prefixo "[E2E-") NÃO notificam o Google Chat —
 // o harness de validação roda contra produção e gravaria N pings no espaço do time.
@@ -189,16 +189,6 @@ export type ParamsSubmitMessage = {
   area: string;
   ferramenta: string;
   escopo: string;
-  /**
-   * Eixo TIPO da categorização (slug de `TIPOS_PROJETO`: `agente`/`sistema`/`app`/
-   * `dashboard`/`automacao`), da coluna `projetos.categoria_projeto`.
-   *
-   * ⚠️ Substituiu a linha "Tipos", que lia `tipos_projeto` e saía **"—"** em todo projeto
-   * da v2 (o cliente da v2 não manda mais aquele campo). Ausente → a linha é OMITIDA, não
-   * vira "—": o tipo é escrito pelo ANALISADOR, que roda DEPOIS da submissão, então na
-   * hora do alerta ele legitimamente ainda não existe.
-   */
-  tipoProjeto?: string | null;
   nomeCompleto: string;
   email: string;
   participantes: string;
@@ -247,12 +237,11 @@ function subtituloDe(p: ParamsSubmitMessage): string {
  * O card do "Alerta de Automações": um projeto chegando à triagem.
  *
  * Compacto por construção: o que decide se vale abrir a ficha fica VISÍVEL (estado, ganho,
- * tipo, área, autor, pré-aprovação) e todo o resto — descrição, racionais, evidência,
+ * área, autor, pré-aprovação) e todo o resto — descrição, racionais, evidência,
  * metadados — vive em duas seções `collapsible`. Ver o bloco de comentário acima.
  */
 export function buildSubmitMessage(p: ParamsSubmitMessage): MensagemChat {
   const link = linkDashboardProjeto(p.projetoId);
-  const tipo = rotuloTipoProjeto(p.tipoProjeto);
 
   // ── visível: só o que decide se vale abrir a ficha ──
   const resumo: WidgetCard[] = [];
@@ -278,7 +267,15 @@ export function buildSubmitMessage(p: ParamsSubmitMessage): MensagemChat {
     resumo.push(linha('Ganhos declarados', p.ganho.categorias));
   }
 
-  resumo.push(linha('Área', p.area, tipo ? `Tipo: ${tipo}` : null));
+  // ⚠️ A nota "Tipo: …" SAIU daqui (decisão do Luis, 08/09/2026). Ela mostrava o eixo TIPO da
+  // categorização (`agente`/`sistema`/`app`/`dashboard`/`automacao`), mas ao lado de "Área" e com
+  // o rótulo "Tipo" era lida como **tipo de GANHO** — informação que o card já dá em "Ganhos
+  // declarados", logo acima. Pior: na prática ela saía **"Tipo: —"**, porque a coluna
+  // `Tipo de Projeto` da planilha nunca está AUSENTE (o analisador grava o travessão), e o
+  // "ausente omite a linha" nunca disparava. Redundante quando preenchida, errada quando não.
+  // ⚠️ `rotuloTipoProjeto` FICA em `notificacao-ganho.ts`, testada: se um dia a linha voltar, ela
+  // volta com rótulo próprio ("Categoria"), não pendurada na Área.
+  resumo.push(linha('Área', p.area));
   resumo.push(linha('Autor', p.nomeCompleto, p.email));
 
   // ── colapsável 1: os números por bloco (só v1/v2 com ganho) ──
@@ -325,7 +322,7 @@ export function buildSubmitMessage(p: ParamsSubmitMessage): MensagemChat {
       },
     ],
     // Degradação: a MESMA informação em texto plano, caso o webhook recuse o card.
-    fallbackTexto: fallbackTextoDe(p, link, tipo),
+    fallbackTexto: fallbackTextoDe(p, link),
   };
 }
 
@@ -337,16 +334,12 @@ export function buildSubmitMessage(p: ParamsSubmitMessage): MensagemChat {
  * ⚠️ Sem "exibir mais" possível, os textos longos ficam de FORA e sobra o link: o
  * fallback existe para o alerta EXISTIR, não para reproduzir o card.
  */
-function fallbackTextoDe(
-  p: ParamsSubmitMessage,
-  link: string,
-  tipo: string | null,
-): string {
+function fallbackTextoDe(p: ParamsSubmitMessage, link: string): string {
   const linhas = [
     `${subtituloDe(p)}`,
     `*${p.projeto || '—'}*`,
     '',
-    `📌 *Área:* ${p.area}${tipo ? ` · *Tipo:* ${tipo}` : ''}`,
+    `📌 *Área:* ${p.area}`,
     `👤 *Autor:* ${p.nomeCompleto} (${p.email})`,
   ];
   if (p.preAprovacao) {

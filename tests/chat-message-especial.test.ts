@@ -17,6 +17,7 @@
 // Estes testes trancam o CONTRATO do payload (nada de comparar strings inteiras: o card é
 // estrutura) e a régua de cada um dos 3 pontos acima.
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { buildSubmitMessage, linkDashboardProjeto } from '@/lib/google/chat';
 import { resumirGanhoV1, type ResumoGanho } from '@/lib/notificacao-ganho';
 
@@ -210,23 +211,26 @@ describe('buildSubmitMessage — o ganho vem do resumo, não das colunas da v1',
   });
 });
 
-// ─── O bug #2: a linha "Tipos" ────────────────────────────────────────────────
+// ─── A linha "Tipo" saiu do card (08/09/2026) ────────────────────────────────
 
-describe('buildSubmitMessage — o TIPO do projeto (era "Tipos: —")', () => {
-  it('slug conhecido vira rótulo legível', () => {
-    const t = textoDoCard(buildSubmitMessage({ ...base, tipoProjeto: 'automacao' }));
-    expect(t).toContain('Automação');
-    expect(t).not.toContain('automacao');
+describe('buildSubmitMessage — a linha "Tipo" não existe mais', () => {
+  // ⚠️ Ela mostrava o eixo TIPO da categorização, mas ao lado de "Área" e chamada "Tipo" era
+  // lida como **tipo de GANHO** — o que o card já diz em "Ganhos declarados". E na prática saía
+  // **"Tipo: —"**, porque a coluna `Tipo de Projeto` nunca está ausente na planilha (o analisador
+  // grava o travessão), então o "ausente omite a linha" nunca disparava.
+  it('o card não fala de "Tipo" em lugar nenhum', () => {
+    const t = textoDoCard(buildSubmitMessage(base));
+    expect(t).not.toContain('Tipo:');
+    expect(t).not.toContain('Tipo de');
   });
 
-  it('ausente OMITE a linha — não vira "—" (o analisador escreve isso depois)', () => {
-    const semTipo = textoDoCard(buildSubmitMessage(base));
-    expect(semTipo).not.toContain('Tipo:');
+  it('e o fallback de texto também não', () => {
+    const msg = buildSubmitMessage(base) as { fallbackTexto?: string };
+    expect(msg.fallbackTexto ?? '').not.toContain('Tipo:');
   });
 
-  it('valor fora da escala aparece como veio (mostra o que existe)', () => {
-    const t = textoDoCard(buildSubmitMessage({ ...base, tipoProjeto: 'coisa-nova' }));
-    expect(t).toContain('coisa-nova');
+  it('a Área continua no card, sozinha na linha', () => {
+    expect(textoDoCard(buildSubmitMessage(base))).toContain(base.area);
   });
 });
 
@@ -350,5 +354,19 @@ describe('buildSubmitMessage — projeto pré-aprovado pelo líder', () => {
     const msg = buildSubmitMessage({ ...base, preAprovacao: parecer }) as Card;
     expect(msg.fallbackTexto).toContain('Lucas Gonçalves Queiroz');
     expect(msg.fallbackTexto).toContain('/dashboard');
+  });
+});
+
+describe('a linha "Tipo" saiu do card (08/09/2026)', () => {
+  it('nem o card nem o fallback de texto citam "Tipo:"', () => {
+    const src = readFileSync('src/lib/google/chat.ts', 'utf8');
+    // A CHAMADA/render, não os comentários que registram a remoção.
+    expect(src).not.toMatch(/`Tipo: \$\{/);
+    expect(src).not.toMatch(/\*Tipo:\*/);
+  });
+
+  it('o contrato do card não recebe mais `tipoProjeto`', () => {
+    const src = readFileSync('src/lib/google/chat.ts', 'utf8');
+    expect(src).not.toMatch(/tipoProjeto\??:/);
   });
 });
