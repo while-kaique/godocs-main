@@ -16,7 +16,6 @@ import {
   FileText,
   Star,
   RotateCcw,
-  ThumbsUp,
   ThumbsDown,
   Bot,
   ChevronDown,
@@ -51,6 +50,10 @@ import {
   aparenciaConfianca,
 } from '@/lib/avaliacao-sombra-rotulos';
 import { partirParecerMesa } from '@/lib/mesa-parecer';
+import {
+  DiscordanciaForm,
+  type DadosDiscordancia,
+} from '@/components/dashboard/discordancia-form';
 import type { ContribuicaoParticipante } from '@/lib/participantes-contribuicoes';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 
@@ -404,13 +407,18 @@ function AvaliacaoSombraPainel({
   sombra,
   feedback,
   votando,
-  onVotar,
+  onDiscordar,
+  onLimparVoto,
 }: {
   sombra: AvaliacaoSombra;
   feedback: 'like' | 'dislike' | null;
   votando: boolean;
-  onVotar: (v: 'like' | 'dislike') => void;
+  /** Registra a discordância COM motivo (o que vira lição). */
+  onDiscordar: (dados: DadosDiscordancia) => Promise<void> | void;
+  /** Desfaz um voto já dado (inclusive um 👍 legado). */
+  onLimparVoto: () => Promise<void> | void;
 }) {
+  const [formAberto, setFormAberto] = useState(false);
   const { mesa, deliberacao, retroativo } = sombra;
   const [aberto, setAberto] = useState(false);
   // O parecer vem com uma linha por especialista ("Financeiro: ..."); parecer LEGADO (parágrafo
@@ -539,42 +547,59 @@ function AvaliacaoSombraPainel({
             </LinhaSombra>
           )}
 
-          {/* Sinal de treinamento: o admin diz se concorda com o agente. Estado nunca só por cor —
-              o botão marcado leva rótulo, ícone preenchido e aria-pressed. */}
+          {/* Sinal de treinamento — ⚠️ o 👍 SAIU (decisão do Luis, 08/09/2026): a AUSÊNCIA de
+              discordância já é concordância, e um polegar para cima não ensinava nada ao agente
+              (gravava estado e ninguém lia de volta). O que ficou é o caminho que ENSINA: o 👎
+              com eixo e motivo. Estado nunca só por cor: rótulo em texto + ícone. */}
           <div
-            className="flex flex-wrap items-center gap-2 border-t pt-3"
+            className="space-y-2.5 border-t pt-3"
             style={{ borderColor: 'rgba(71,85,105,0.18)' }}
           >
-            <span className="text-[12px] font-medium text-muted-foreground">
-              A recomendação está certa?
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant={feedback === 'like' ? 'default' : 'outline'}
-              aria-pressed={feedback === 'like'}
-              disabled={votando}
-              onClick={() => onVotar('like')}
-            >
-              <ThumbsUp className="h-4 w-4" fill={feedback === 'like' ? 'currentColor' : 'none'} />
-              Concordo
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={feedback === 'dislike' ? 'destructive' : 'outline'}
-              aria-pressed={feedback === 'dislike'}
-              disabled={votando}
-              onClick={() => onVotar('dislike')}
-            >
-              <ThumbsDown className="h-4 w-4" fill={feedback === 'dislike' ? 'currentColor' : 'none'} />
-              Discordo
-            </Button>
-            {feedback && (
-              <span className="text-[12px] text-muted-foreground">
-                {feedback === 'like' ? 'Você concordou.' : 'Você discordou.'} Clique de novo para
-                desmarcar.
-              </span>
+            {formAberto ? (
+              <DiscordanciaForm
+                parecer={linhas}
+                vereditoDoAgente={mesa?.veredito ?? null}
+                salvando={votando}
+                onCancelar={() => setFormAberto(false)}
+                onEnviar={async (dados) => {
+                  await onDiscordar(dados);
+                  setFormAberto(false);
+                }}
+              />
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {feedback === 'dislike' ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-medium" style={{ color: '#b91c1c' }}>
+                      <ThumbsDown className="h-3.5 w-3.5" fill="currentColor" aria-hidden />
+                      Você discordou desta recomendação.
+                    </span>
+                    <Button type="button" size="sm" variant="outline" disabled={votando} onClick={() => setFormAberto(true)}>
+                      Registrar de novo
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" disabled={votando} onClick={() => onLimparVoto()}>
+                      Desfazer
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[12px] font-medium text-muted-foreground">
+                      Discorda desta recomendação?
+                    </span>
+                    <Button type="button" size="sm" variant="outline" disabled={votando} onClick={() => setFormAberto(true)}>
+                      <ThumbsDown className="h-4 w-4" aria-hidden />
+                      Discordo, e explico por quê
+                    </Button>
+                    {/* Um 👍 LEGADO (de antes de o botão sair) segue visível e desfazível — some
+                        sozinho quando desmarcado, e nada o recria. */}
+                    {feedback === 'like' && (
+                      <Button type="button" size="sm" variant="ghost" disabled={votando} onClick={() => onLimparVoto()}>
+                        Limpar o "concordo" que você marcou antes
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -691,20 +716,56 @@ export function ProjetoDetalheDialog({
     }
   }
 
-  // Vota (ou desmarca, clicando de novo no voto atual) na recomendação em sombra.
-  // ⚠️ Não toca no status do projeto — é só sinal de treinamento. Otimista, com rollback.
-  async function votarSombra(voto: 'like' | 'dislike') {
+  // Registra a DISCORDÂNCIA com eixo e motivo — o caminho que vira lição para o agente.
+  // ⚠️ Não toca no status do projeto (segue humano). NÃO é otimista, ao contrário do voto simples
+  // que existia antes: aqui a pessoa escreveu um texto, e marcar "discordou" antes de o servidor
+  // aceitar faria o formulário fechar sobre um motivo que pode ter sido recusado (o piso de
+  // caracteres é cobrado nos dois lados).
+  async function discordarDaSombra(dados: DadosDiscordancia) {
     if (!projeto || votando) return;
-    const novo = feedback === voto ? null : voto;
-    const anterior = feedback;
-    setFeedback(novo);
     setVotando(true);
     try {
-      await apiFetch('/api/admin/avaliacao/feedback', { projetoId: projeto.id, voto: novo });
+      // ⚠️ O servidor devolve se aquilo VIROU LIÇÃO (ele pergunta ao mesmo leitor que o prompt
+      // usa) — a tela repete o que ele disse em vez de prometer. Prometer lição que o
+      // `ensinaAlgo` descarta era mentir para quem acabou de escrever o motivo.
+      const r = (await apiFetch('/api/admin/avaliacao/feedback', {
+        projetoId: projeto.id,
+        projetoNome: projeto.nome ?? null,
+        voto: 'dislike',
+        eixo: dados.eixo,
+        vereditoCerto: dados.vereditoCerto,
+        motivo: dados.motivo,
+      })) as { virouLicao?: boolean; porque?: string | null };
+      setFeedback('dislike');
+      invalidarDetalhe(projeto.id);
+      if (r?.virouLicao === false && r.porque) {
+        toast.warning(`Discordância registrada, mas ela não vira lição: ${r.porque}.`, {
+          duration: 12000,
+        });
+      } else {
+        toast.success(
+          'Discordância registrada. Ela entra como lição nos próximos projetos parecidos.',
+        );
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível registrar a discordância.');
+    } finally {
+      setVotando(false);
+    }
+  }
+
+  // Desfaz o voto (inclusive um 👍 legado). Otimista, com rollback — aqui não há texto em jogo.
+  async function limparVotoSombra() {
+    if (!projeto || votando) return;
+    const anterior = feedback;
+    setFeedback(null);
+    setVotando(true);
+    try {
+      await apiFetch('/api/admin/avaliacao/feedback', { projetoId: projeto.id, voto: null });
       invalidarDetalhe(projeto.id);
     } catch (e) {
       setFeedback(anterior);
-      toast.error(e instanceof Error ? e.message : 'Não foi possível registrar o voto.');
+      toast.error(e instanceof Error ? e.message : 'Não foi possível desfazer o voto.');
     } finally {
       setVotando(false);
     }
@@ -894,7 +955,8 @@ export function ProjetoDetalheDialog({
                   sombra={detalhe.avaliacaoSombra}
                   feedback={feedback}
                   votando={votando}
-                  onVotar={votarSombra}
+                  onDiscordar={discordarDaSombra}
+                  onLimparVoto={limparVotoSombra}
                 />
               </Secao>
             )}

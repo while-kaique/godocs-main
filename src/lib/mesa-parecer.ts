@@ -9,6 +9,7 @@
  * ⚠️ Sem imports de servidor. O `DimensaoAvaliacao` entra como `import type` (apagado no build).
  */
 import type { DimensaoAvaliacao } from '@/lib/agents/especialista-avaliacao';
+import type { EixoCorrecao } from '@/lib/correcoes';
 
 /**
  * Rótulo CURTO da dimensão — para a TELA. Separado do `ROTULO_DIMENSAO` de
@@ -22,10 +23,52 @@ export const ROTULO_CURTO_DIMENSAO: Record<DimensaoAvaliacao, string> = {
   cetico: 'Cético',
 };
 
+/**
+ * De qual especialista é a frase que cada EIXO de discordância contesta — FONTE ÚNICA da tela
+ * (que mostra a citação) e do servidor (que a grava como `leitura_do_agente`).
+ *
+ * ⚠️ `impacto_irrelevante` cai no FINANCEIRO de propósito: "o ganho é pequeno demais" é objeção
+ * do eixo do dinheiro, e é justamente ali que o repo tinha teto de materialidade e NENHUM piso.
+ * `outro` não aponta ninguém — quando o erro não é de um eixo, citar um seria pôr palavra na boca
+ * de quem não falou.
+ */
+export const AUTOR_DO_EIXO: Record<EixoCorrecao, string | null> = {
+  horas: ROTULO_CURTO_DIMENSAO.fte,
+  financeiro: ROTULO_CURTO_DIMENSAO.financeiro,
+  precedente: ROTULO_CURTO_DIMENSAO.rag,
+  impacto_irrelevante: ROTULO_CURTO_DIMENSAO.financeiro,
+  outro: null,
+};
+
 /** Uma linha do parecer: com autor (frase de um especialista) ou sem (nota de fechamento da mesa). */
 export type LinhaParecer = { autor: string | null; texto: string };
 
 const AUTORES = Object.values(ROTULO_CURTO_DIMENSAO);
+
+/**
+ * A frase do parecer que o EIXO escolhido contesta — `null` quando não há uma.
+ *
+ * ⚠️ Quem a resolve é sempre este helper, nos DOIS lados: a tela mostra a citação para a pessoa
+ * responder a ela, e o servidor grava a MESMA frase como `leitura_do_agente` da lição. Se cada
+ * lado escolhesse a frase por conta, o par argumento/réplica guardaria uma réplica a uma frase
+ * que o agente nem disse ali. E é o servidor que resolve, não o cliente: a palavra do agente não
+ * chega pelo payload de quem está discordando dele.
+ *
+ * ⚠️ Parecer LEGADO (parágrafo corrido, sem autor) e eixo `outro` devolvem `null` — não há frase
+ * DAQUELE eixo a citar, e inventar uma seria pior. Cabe ao chamador decidir o que fazer com o
+ * `null`: quem grava a lição cai no parecer INTEIRO, porque ali o defeito que se evitava era
+ * outro (a frase de um especialista sendo atribuída ao eixo errado), e um contexto genérico do
+ * que o agente disse ainda é melhor que meio par vazio.
+ */
+export function linhaDoEixo(
+  parecer: LinhaParecer[],
+  eixo: EixoCorrecao | null | undefined,
+): LinhaParecer | null {
+  if (!eixo) return null;
+  const autor = AUTOR_DO_EIXO[eixo];
+  if (!autor) return null;
+  return parecer.find((l) => l.autor === autor) ?? null;
+}
 
 /**
  * Parte o `motivo` gravado em linhas atribuídas. Reconhece o prefixo `"<Autor>: "` **só** quando o

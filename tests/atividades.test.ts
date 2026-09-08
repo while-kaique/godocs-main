@@ -122,15 +122,24 @@ describe('registrarAtividade', () => {
     );
   });
 
-  it('NUNCA lança — erro do banco é engolido', async () => {
+  // ⚠️ O invariante segue sendo "NUNCA lança" (D3: auditoria não desfaz a ação que já
+  // aconteceu). O que mudou é ela REPORTAR: quem afirma algo ao usuário com base na gravação
+  // precisa distinguir "gravou" de "engoliu a falha".
+  it('NUNCA lança — erro do banco é engolido, e ela REPORTA que não gravou', async () => {
     insertAdminActivity.mockRejectedValueOnce(new Error('DB fora'));
     await expect(
       registrarAtividade({ ator_email: 'ana@gocase.com', acao: 'status' }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(false);
   });
 
-  it('sem ator não grava nada (não há o que auditar)', async () => {
-    await registrarAtividade({ ator_email: '', acao: 'status' });
+  it('gravou → true (é o que autoriza afirmar que a ação foi auditada)', async () => {
+    await expect(
+      registrarAtividade({ ator_email: 'ana@gocase.com', acao: 'status' }),
+    ).resolves.toBe(true);
+  });
+
+  it('sem ator não grava nada (não há o que auditar) e reporta false', async () => {
+    await expect(registrarAtividade({ ator_email: '', acao: 'status' })).resolves.toBe(false);
     expect(insertAdminActivity).not.toHaveBeenCalled();
   });
 });

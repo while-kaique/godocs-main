@@ -34,7 +34,7 @@ function votosBase(over: Partial<VotosDeterministicos> = {}): VotosDeterministic
 
 describe('montarEntradasEspecialistas', () => {
   it('produz uma entrada por dimensão, na ordem fte/financeiro/rag/cetico', () => {
-    const entradas = montarEntradasEspecialistas(votosBase(), TEXTO, ['Bot Y (Fiscal)']);
+    const entradas = montarEntradasEspecialistas(votosBase(), TEXTO, ['Bot Y (Fiscal)'], '');
     expect(entradas.map((e) => e.dimensao)).toEqual(['fte', 'financeiro', 'rag', 'cetico']);
     for (const e of entradas) {
       expect(e.texto).toEqual(TEXTO);
@@ -47,6 +47,7 @@ describe('montarEntradasEspecialistas', () => {
       votosBase({ fte: { implausivel: true, fte: 3, pessoas: 1, motivo: '3 FTE p/ 1 pessoa' } }),
       TEXTO,
       [],
+      '',
     );
     const fte = entradas.find((e) => e.dimensao === 'fte')!;
     expect(fte.voto.preocupa).toBe(true);
@@ -55,7 +56,7 @@ describe('montarEntradasEspecialistas', () => {
   });
 
   it('FTE plausível → preocupa=false com confiança 0.9', () => {
-    const entradas = montarEntradasEspecialistas(votosBase(), TEXTO, []);
+    const entradas = montarEntradasEspecialistas(votosBase(), TEXTO, [], '');
     const fte = entradas.find((e) => e.dimensao === 'fte')!;
     expect(fte.voto.preocupa).toBe(false);
     expect(fte.voto.confianca).toBe(0.9);
@@ -70,6 +71,7 @@ describe('montarEntradasEspecialistas', () => {
       }),
       TEXTO,
       [],
+      '',
     );
     expect(entradas.find((e) => e.dimensao === 'financeiro')!.voto.preocupa).toBe(true);
     expect(entradas.find((e) => e.dimensao === 'rag')!.voto.preocupa).toBe(true);
@@ -80,7 +82,7 @@ describe('montarEntradasEspecialistas', () => {
   });
 
   it('cada entrada vê os OUTROS 3 votos (nunca o próprio) em outrosVotos', () => {
-    const entradas = montarEntradasEspecialistas(votosBase(), TEXTO, []);
+    const entradas = montarEntradasEspecialistas(votosBase(), TEXTO, [], '');
     for (const e of entradas) {
       const dims = e.outrosVotos.map((o) => o.dimensao);
       expect(dims).not.toContain(e.dimensao);

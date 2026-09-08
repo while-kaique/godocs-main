@@ -61,6 +61,18 @@ export type EntradaEspecialista = {
   /** Vizinhos aprovados do corpus (texto pronto), como precedente. */
   vizinhos: string[];
   /**
+   * O que a TRIAGEM já corrigiu na recomendação do agente, **e por quê** — o bloco já
+   * renderizado por `blocoCorrecoes` (`correcoes.ts`), ou `''` quando não há nada que ensine.
+   *
+   * ⚠️ Não confundir com `outrosVotos`: são correções de OUTROS PROJETOS, feitas por gente,
+   * com o motivo escrito. Ver o parecer dos colegas no 1º turno é interferência de rubrica (é o
+   * que a RF-231 fechou); ler o que a triagem corrigiu é aprender critério.
+   *
+   * ⚠️ Só entra o que TEM motivo — `ensinaAlgo` filtra o resto, porque correção sem porquê
+   * ensina "concorde com o humano", que é o viés vetado pelo dono do produto.
+   */
+  licoes: string;
+  /**
    * Os votos das outras dimensões, montados por `montarEntradasEspecialistas`.
    *
    * ⚠️ **NÃO entra no prompt do 1º parecer** (RF-231) — `buildPromptEspecialista` o ignora de
@@ -143,7 +155,7 @@ function blocoVizinhos(vizinhos: string[]): string {
  * (`agregarJulgamentos`), e a `divergencia` segue calculada lá.
  */
 export function buildPromptEspecialista(entrada: EntradaEspecialista): LLMMessage[] {
-  const { dimensao, texto, voto, vizinhos } = entrada;
+  const { dimensao, texto, voto, vizinhos, licoes } = entrada;
   const system = `${PERSONA[dimensao]}
 
 Você recebe: o texto do projeto, o CÁLCULO determinístico do seu eixo (um SINAL, não um veredito — você pode discordar dele com argumento) e projetos parecidos já aprovados. Você julga SOZINHO: o parecer dos outros especialistas não vem aqui, e é a mesa que concilia depois. Raciocine sobre os dados; não repita o cálculo, INTERPRETE-o.
@@ -183,7 +195,7 @@ CÁLCULO DETERMINÍSTICO DO SEU EIXO (${ROTULO_DIMENSAO[dimensao]}):
 
 PROJETOS PARECIDOS JÁ APROVADOS (precedente):
 ${blocoVizinhos(vizinhos)}
-
+${licoes ? `\n${licoes}\n` : ''}
 Dê o seu parecer sobre o eixo «${ROTULO_DIMENSAO[dimensao]}».`;
 
   return [

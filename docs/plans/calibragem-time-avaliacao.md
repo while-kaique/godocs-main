@@ -123,6 +123,15 @@ sobre o baseline score-first deles.
 
 - **D1 — Feedback humano = nota certa + eixo que errou + texto livre.** O botão **👍 SAI**: ausência
   de 👎 é concordância.
+  - ✅ **REVISADO na implementação e CONFIRMADO pelo Luis (08/09/2026).** A ficha do
+    `/dashboard` **não exibe nota do agente**: a única nota ali é a coluna MANUAL "Estrelas", e não
+    havia com o que `ensinaAlgo` comparasse (sem referência que mudou, a lição era descartada 100%
+    das vezes). Um segundo controle de estrela na mesma tela seria dois canais para a mesma coisa.
+    Então o que a ficha coleta é o **DESFECHO certo** (`tipo: 'veredito'`); quem corrige NOTA segue
+    pelo canal da estrela (`definirEstrelasEspecial`), que já grava motivo e leitura do agente, e o
+    parser aceita `nota_certa` para quando aquele canal declarar o eixo. Registrado em `SPEC.md`
+    RF-234 + RF-234.1. **A substância da D1 está entregue** (👍 fora, eixo, motivo ≥10, a lição
+    reaparecendo em projeto diferente); o que mudou é o CAMPO do "certo".
 - **D2 — Concordância implícita vale SÓ com PROVA DE OLHADA.** Avaliação nascida após um marco +
   admin gravou Status ou Estrelas naquele projeto **depois** de a avaliação existir + sem 👎. Projeto
   que ninguém abriu fica **FORA** da conta, não vira acerto de graça. A base passada **não** conta

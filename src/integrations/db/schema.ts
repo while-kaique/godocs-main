@@ -264,7 +264,7 @@ const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS admin_activity_log (
     id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     ator_email    TEXT NOT NULL,                     -- e-mail @gocase da borda (quem fez)
-    acao          TEXT NOT NULL,                     -- 'status'|'estrelas'|'dono_area'|'lider_decisao'|'reabrir_fila'
+    acao          TEXT NOT NULL,                     -- ver AcaoAdmin em atividades.functions.ts (a lista viva)
     projeto_id    TEXT,                              -- null em ações sem projeto (ex. divisão de área)
     projeto_nome  TEXT,
     detalhe       TEXT,                              -- frase pronta para exibir ("Reprovado", "10 estrelas"...)
@@ -274,6 +274,10 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_admin_activity_criado ON admin_activity_log(created_at);
   CREATE INDEX IF NOT EXISTS idx_admin_activity_projeto ON admin_activity_log(projeto_id);
+  -- (acao, created_at) serve a janela das CORREÇÕES ('estrelas' e 'avaliacao_discordancia')
+  -- ⚠️ Sem ele a consulta filtra ações RARAS por construção e percorre o log quase inteiro
+  -- a cada chamada -- 'status' domina a tabela, que é append-only e só cresce
+  CREATE INDEX IF NOT EXISTS idx_admin_activity_acao_criado ON admin_activity_log(acao, created_at);
 
   -- Pré-aprovação do LÍDER (integração TeamGuide). O liderado submete e o líder direto
   -- (derivado de /teams + membros) recebe uma DM no Chat e aprova/reprova DENTRO do

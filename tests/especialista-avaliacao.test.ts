@@ -44,6 +44,8 @@ function entradaFixture(
       sinais: ['s1'],
     },
     vizinhos: ['Projeto vizinho A aprovado', 'Projeto vizinho B aprovado'],
+    // Sem lição da triagem por default: quem testa a lição é `tests/mesa-licoes.test.ts`.
+    licoes: '',
     outrosVotos: [
       { dimensao: 'fte', preocupa: true, argumento: 'FTE alto para 2 pessoas.' },
       { dimensao: 'financeiro', preocupa: true, argumento: 'Acima do teto de materialidade.' },

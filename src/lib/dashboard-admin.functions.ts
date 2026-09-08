@@ -25,6 +25,16 @@
 import { z } from "zod";
 import { updateRowByProjectId, type SheetRow } from "@/lib/google/sheets";
 import { registrarAtividade } from "@/lib/atividades.functions";
+// A discordância da ficha vira LIÇÃO pelo módulo puro das correções: o eixo, o piso e o teto do
+// motivo saem de lá para a tela e o servidor cobrarem exatamente o que o prompt vai aceitar.
+import {
+  correcoesDoLog,
+  EIXOS_CORRECAO,
+  ensinaAlgo,
+  MOTIVO_MAX,
+  MOTIVO_MIN,
+  type EixoCorrecao,
+} from "@/lib/correcoes";
 import {
   insertAdminStatusLog,
   getAdminStatusLogs,
@@ -58,6 +68,8 @@ import {
   type AfetadoTipo,
 } from "@/lib/submeter/constants";
 import { parecerEstagio2ParaFicha, type ParecerEstagio2 } from "@/lib/aprovacoes.functions";
+// A frase do parecer que o eixo da discordância contesta — a MESMA função que a tela usa.
+import { linhaDoEixo, partirParecerMesa } from "@/lib/mesa-parecer";
 import {
   lerResumosEspelho,
   lerLinhaEspelho,
@@ -828,7 +840,34 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
 const feedbackSchema = z.object({
   projetoId: z.string().min(1).max(120),
   // `null` = limpar o voto (o admin clicou de novo no botão que já estava marcado).
+  // ⚠️ `"like"` continua no schema mesmo tendo SAÍDO da tela: uma aba com JS em cache
+  // (version skew, que este repo já viu) postaria o voto antigo, e um 400 ali seria erro sem
+  // saída para quem só clicou num botão que existia até o deploy. Ele grava o estado e não
+  // ensina nada — que é exatamente o que ele já fazia.
   voto: z.enum(["like", "dislike"]).nullable(),
+  /** Nome do projeto, só para o feed de auditoria ficar legível (o id sempre basta). */
+  projetoNome: z.string().max(300).nullish(),
+  /** Qual lente do agente errou. Fora da lista → recusado pelo enum. */
+  eixo: z.enum(EIXOS_CORRECAO as unknown as [EixoCorrecao, ...EixoCorrecao[]]).nullish(),
+  /**
+   * A razão escrita por quem discordou — o que transforma gabarito em critério.
+   *
+   * ⚠️ O piso é o MESMO `MOTIVO_MIN` que `ensinaAlgo` cobra, e é cobrado AQUI também: aceitar
+   * um motivo de 3 caracteres gravaria uma linha que o prompt descarta em silêncio, e a pessoa
+   * sairia da tela achando que ensinou algo.
+   */
+  motivo: z.string().trim().max(MOTIVO_MAX).nullish(),
+  /**
+   * O desfecho que a triagem diz ser o certo (discordância do VEREDITO).
+   *
+   * ⚠️ Esta rota NÃO aceita "nota certa", e é deliberado: a ficha do `/dashboard` não exibe nota
+   * do agente (a única nota ali é a coluna MANUAL "Estrelas"), então não haveria com o que
+   * comparar — e `ensinaAlgo` reprovaria a lição por não ter referência que mudou. Quem corrige
+   * NOTA faz isso pelo canal da estrela (`definirEstrelasEspecial`), que já grava motivo e
+   * leitura do agente. O parser (`correcoesDoLog`) entende `nota_certa` para quando aquele canal
+   * passar a declarar o eixo.
+   */
+  vereditoCerto: z.string().trim().max(80).nullish(),
 });
 
 /**
@@ -837,7 +876,18 @@ const feedbackSchema = z.object({
  * Guarda junto o veredito do agente a que o voto se refere (contexto para análise depois).
  */
 export async function registrarFeedbackSombra(raw: unknown, adminEmail: string) {
-  const { projetoId, voto } = feedbackSchema.parse(raw);
+  const dados = feedbackSchema.parse(raw);
+  const { projetoId, voto } = dados;
+  const motivo = dados.motivo?.trim() || null;
+
+  // ⚠️ Motivo CURTO é recusado; motivo AUSENTE não. São coisas diferentes: um texto de 3
+  // caracteres é lixo que o prompt descartaria calado (`ensinaAlgo`), enquanto a ausência é o
+  // 👎 simples de sempre — que segue valendo como estado do botão e não vira lição.
+  if (motivo && motivo.length < MOTIVO_MIN) {
+    throw new Error(
+      `O porquê precisa de pelo menos ${MOTIVO_MIN} caracteres. É ele que transforma a discordância em lição para o agente: sem a razão, o que o agente aprende é "concorde com o humano".`,
+    );
+  }
 
   if (voto === null) {
     await deleteAvaliacaoFeedback(projetoId);
@@ -846,11 +896,22 @@ export async function registrarFeedbackSombra(raw: unknown, adminEmail: string) 
 
   // O veredito a que o voto se refere — best-effort (o agente pode não ter avaliado ainda).
   let veredito: string | null = null;
+  let parecerCompleto: string | null = null;
   try {
-    veredito = (await getAvaliacaoNormal(projetoId))?.veredito ?? null;
+    const avaliacao = await getAvaliacaoNormal(projetoId);
+    veredito = avaliacao?.veredito ?? null;
+    parecerCompleto = avaliacao?.motivo ?? null;
   } catch (e) {
     console.error("[dashboard-admin] falha ao ler veredito da sombra para o feedback:", e);
   }
+
+  // ⚠️ A `leitura_do_agente` da lição é a frase do especialista DO EIXO escolhido, não o parecer
+  // inteiro: o `recortar` de 220 chars do `descreverCorrecao` cortaria justamente as primeiras
+  // linhas, quase nunca a que a pessoa respondeu — e aí o par argumento/réplica fica trocado.
+  // Sem linha daquele eixo (parecer legado num parágrafo só, ou eixo "outro"), cai no parecer
+  // completo: metade do par é melhor que a metade errada.
+  const linhaCitada = linhaDoEixo(partirParecerMesa(parecerCompleto), dados.eixo ?? null);
+  const parecerDoAgente = linhaCitada?.texto ?? parecerCompleto;
 
   await upsertAvaliacaoFeedback({
     projeto_id: projetoId,
@@ -858,5 +919,68 @@ export async function registrarFeedbackSombra(raw: unknown, adminEmail: string) 
     veredito_referente: veredito,
     admin_email: adminEmail,
   });
-  return { ok: true as const, voto };
+
+  // A DISCORDÂNCIA COM MOTIVO é o que vira lição, e ela mora no `admin_activity_log` —
+  // append-only, com `meta_json` livre, o mesmo caminho que a correção de estrela já usa.
+  // ⚠️ `avaliacao_feedback` NÃO serve para isso: é upsert de 1 linha por projeto (guarda o
+  // estado do botão, perde o histórico) e não tem coluna para eixo/motivo/parecer.
+  // ⚠️ `registrarAtividade` nunca lança: auditoria não desfaz o clique que já aconteceu.
+  if (voto !== "dislike" || !motivo) return { ok: true as const, voto, virouLicao: false };
+
+  const meta = {
+    eixo: dados.eixo ?? null,
+    motivo,
+    leitura_do_agente: parecerDoAgente,
+    veredito_do_agente: veredito,
+    veredito_certo: dados.vereditoCerto ?? null,
+  };
+
+  // ⚠️ O retorno importa AQUI e só aqui: `registrarAtividade` engole a falha (D3), e afirmar
+  // "virou lição" sobre uma escrita engolida é prometer o que não existe.
+  const gravou = await registrarAtividade({
+    ator_email: adminEmail,
+    acao: "avaliacao_discordancia",
+    projeto_id: projetoId,
+    projeto_nome: dados.projetoNome ?? null,
+    detalhe: dados.vereditoCerto
+      ? `discordou do veredito: deveria ser ${dados.vereditoCerto}`
+      : "discordou da recomendação do time de avaliação",
+    meta,
+  });
+
+  // ⚠️ Pergunta ao LEITOR REAL se aquilo virou lição, em vez de afirmar que virou. `correcoesDoLog`
+  // + `ensinaAlgo` são os mesmos que o prompt usa, então o que a tela promete e o que o agente vai
+  // ler não podem divergir — e havia dois jeitos concretos de divergirem em silêncio: a mesa ainda
+  // não ter avaliado o projeto (sem `veredito_do_agente` não há "de → para" a ensinar) e a pessoa
+  // escolher o MESMO desfecho que o agente deu.
+  const [correcao] = correcoesDoLog([
+    {
+      acao: "avaliacao_discordancia",
+      projeto_id: projetoId,
+      projeto_nome: dados.projetoNome ?? null,
+      meta_json: JSON.stringify(meta),
+      created_at: null,
+    },
+  ]);
+  const virouLicao = gravou && !!correcao && ensinaAlgo(correcao);
+
+  return {
+    ok: true as const,
+    voto,
+    virouLicao,
+    // O motivo de NÃO ter virado lição, para a tela dizer a verdade em vez de prometer.
+    porque: virouLicao
+      ? null
+      : !gravou
+        ? "o registro da discordância não pôde ser gravado agora, então ela não vai chegar ao agente"
+        : // ⚠️ Este ramo vem ANTES dos outros dois: sem desfecho declarado não há "de → para", e
+          // reaproveitar o texto do empate afirmaria que a pessoa apontou algo que ela não apontou.
+          // O formulário nunca manda esse payload (ele exige o desfecho), mas a resposta não pode
+          // mentir para um cliente fora da tela.
+          !dados.vereditoCerto
+          ? "a discordância não disse qual era o desfecho certo, e é isso que o agente precisa para aprender"
+          : veredito
+            ? "o desfecho que você apontou é o mesmo que o agente deu, então não há correção de raciocínio a ensinar"
+            : "o time de avaliação ainda não avaliou este projeto, então não há recomendação a corrigir",
+  };
 }

@@ -118,6 +118,17 @@ export function montarEntradasEspecialistas(
   votos: VotosDeterministicos,
   texto: TextoProjeto,
   vizinhosTexto: string[],
+  /**
+   * As lições da triagem, já renderizadas (`blocoCorrecoes`). A MESMA para as 4 dimensões: a
+   * correção é do PROJETO, não de um eixo — e quem decide se ela fala com o seu eixo é o
+   * especialista, lendo o par argumento/réplica.
+   *
+   * ⚠️ **OBRIGATÓRIO**, não opcional-com-default. Nasceu `licoes = ''` e isso repetia, uma camada
+   * abaixo, o mesmo defeito que o `correcoes` obrigatório do `ContextoAvaliacao` fechou: quem
+   * esquecesse o argumento produziria prompt sem lição, sem erro de compilação e sem sinal em log.
+   * String vazia é decisão explícita de quem chama.
+   */
+  licoes: string,
 ): EntradaEspecialista[] {
   const votoPorDim = new Map<DimensaoAvaliacao, VotoDeterministico>(
     DIMENSOES.map((d) => [d, votoDeDimensao(d, votos)]),
@@ -127,6 +138,7 @@ export function montarEntradasEspecialistas(
     texto,
     voto: votoPorDim.get(dim)!,
     vizinhos: vizinhosTexto,
+    licoes,
     outrosVotos: DIMENSOES.filter((d) => d !== dim).map((d) => resumoVoto(d, votoPorDim.get(d)!)),
   }));
 }

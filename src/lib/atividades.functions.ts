@@ -24,8 +24,17 @@ export type AcaoAdmin =
   | 'dono_area' // divisão da validação por área
   | 'lider_decisao' // pré-aprovação do líder feita em modo admin (?como=)
   | 'reabrir_fila' // reabertura da fila de pré-aprovação
-  | 'aglutinacao'; // aceite/rejeição de "X é feature de Y" no painel de aglutinação
+  | 'aglutinacao' // aceite/rejeição de "X é feature de Y" no painel de aglutinação
+  | 'avaliacao_discordancia'; // a triagem discordou da recomendação do time de avaliação (o 👎)
 
+/**
+ * O que `registrarAtividade` devolve: `true` só quando a linha foi REALMENTE gravada.
+ *
+ * ⚠️ Ela continua NUNCA lançando (D3: auditoria não desfaz a ação que já aconteceu) — o que muda
+ * é ela deixar de ser `void`. Quem afirma algo ao usuário com base nessa gravação (a discordância
+ * que "vira lição") precisa saber se ela aconteceu: prometer sobre uma escrita engolida é a mesma
+ * família de defeito que o `rowsWritten` do `decidirAprovacao`.
+ */
 export type RegistroAtividade = {
   ator_email: string;
   acao: AcaoAdmin;
@@ -36,12 +45,15 @@ export type RegistroAtividade = {
 };
 
 /**
- * Registra uma ação no feed. Fire-and-forget consciente: o chamador NÃO precisa (nem deve)
- * ficar preso ao resultado. Engole qualquer erro.
+ * Registra uma ação no feed. Fire-and-forget consciente: o chamador NÃO precisa (nem deve) ficar
+ * preso ao resultado. Engole qualquer erro.
+ *
+ * ⚠️ Devolve `true` só quando gravou. O retorno é **aditivo** e quase todo chamador o ignora (é
+ * auditoria); quem o lê é só quem AFIRMA algo ao usuário com base nessa gravação.
  */
-export async function registrarAtividade(reg: RegistroAtividade): Promise<void> {
+export async function registrarAtividade(reg: RegistroAtividade): Promise<boolean> {
   try {
-    if (!reg.ator_email) return; // sem ator não há o que auditar
+    if (!reg.ator_email) return false; // sem ator não há o que auditar
     await insertAdminActivity({
       ator_email: reg.ator_email,
       acao: reg.acao,
@@ -50,8 +62,10 @@ export async function registrarAtividade(reg: RegistroAtividade): Promise<void> 
       detalhe: reg.detalhe ?? null,
       meta_json: reg.meta ? JSON.stringify(reg.meta) : null,
     });
+    return true;
   } catch (e) {
     console.error('[atividades] falha ao registrar atividade (ignorado):', e);
+    return false;
   }
 }
 

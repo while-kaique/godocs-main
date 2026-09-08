@@ -194,11 +194,21 @@ local (reflexo/cache) via sync bidirecional; a submissão também notifica o Goo
 
 - **RF-233** — ENQUANTO a ficha de um projeto mostra a recomendação do time, O SISTEMA DEVE oferecer
   apenas o registro de **discordância**; não existe botão de concordar.
-- **RF-234** — QUANDO alguém da triagem registra uma discordância, O SISTEMA DEVE exigir a nota certa,
-  o eixo em que o agente errou e um motivo escrito de pelo menos 10 caracteres, e DEVE recusar no
-  servidor o motivo mais curto que isso.
+- **RF-234** — QUANDO alguém da triagem registra uma discordância, O SISTEMA DEVE exigir **o desfecho
+  certo**, o eixo em que o agente errou e um motivo escrito de pelo menos 10 caracteres, e DEVE recusar
+  no servidor o motivo mais curto que isso.
+  _(Revisado em 08/09/2026 ao implementar e **confirmado pelo Luis no mesmo dia**: era "a nota certa". A ficha do `/dashboard` **não exibe
+  nota do agente** — a única nota ali é a coluna MANUAL "Estrelas" —, então não havia nota a corrigir
+  nem referência com que `ensinaAlgo` comparasse, e um segundo controle de estrela na mesma tela seria
+  dois canais para a mesma coisa. Quem corrige NOTA segue fazendo isso pelo canal da estrela
+  (`definirEstrelasEspecial`), que já grava motivo e leitura do agente.)_
+- **RF-234.1** — SE a discordância registrada não puder virar lição (o desfecho apontado é o mesmo que
+  o agente deu, ou o time ainda não avaliou aquele projeto), ENTÃO O SISTEMA DEVE dizer isso a quem
+  registrou, em vez de afirmar que a lição foi aprendida.
 - **RF-235** — QUANDO a discordância é registrada, O SISTEMA DEVE guardar junto o texto que o agente
-  havia escrito e que a pessoa estava lendo ao discordar.
+  havia escrito e que a pessoa estava lendo ao discordar — **a frase do especialista do eixo
+  escolhido**, resolvida no servidor e nunca vinda do cliente; SE não houver frase daquele eixo (eixo
+  "outro", ou parecer legado num parágrafo só), ENTÃO O SISTEMA DEVE guardar o parecer inteiro.
 - **RF-236** — SE uma discordância tem motivo válido, ENTÃO O SISTEMA DEVE apresentá-la como lição no
   julgamento de **outros** projetos, na frente das demais quando o projeto corrigido está entre os
   vizinhos recuperados; SE não tem motivo, ENTÃO O SISTEMA DEVE não apresentá-la.

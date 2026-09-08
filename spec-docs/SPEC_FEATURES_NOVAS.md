@@ -1995,3 +1995,102 @@ do lado do Gomoon (o GoDocs só disponibiliza o vínculo).
 (copy + notify do estágio 2), `dashboard-admin.functions.ts` + `projeto-detalhe-dialog.tsx`
 (ficha mostra o parecer do estágio 2). Testes: `tests/projeto-vinculo.test.ts`,
 `tests/aprovacoes-sequencial.test.ts`.
+
+---
+
+## Feature — A discordância da triagem vira LIÇÃO para os agentes (08/09/2026)
+
+Fatia **(b)** do plano `docs/plans/calibragem-time-avaliacao.md` (RF-233 a RF-238, INV-17). O 👎 da
+ficha de triagem deixa de ser um polegar e passa a coletar **qual lente errou** + **qual era o
+desfecho certo** + **por quê** — e isso entra como exemplo no prompt dos próximos projetos
+parecidos.
+
+**O buraco que ela fecha.** O 👍/👎 gravava uma linha em `avaliacao_feedback` que **ninguém lia de
+volta** (só para redesenhar o botão): nenhum prompt, limiar ou métrica a consumia. Era um dos 3
+pontos em que o circuito de feedback do time de avaliação estava aberto. E o **banco de lições já
+existia** (`src/lib/correcoes.ts`, 05/09/2026, para as estrelas dos especiais) — faltavam três
+coisas pequenas: o **eixo**, o `correcoesDoLog` reconhecer a ação da mesa, e o 👎 ter onde escrever.
+
+**Decisões.**
+- **O 👍 SAIU** (decisão do Luis): a AUSÊNCIA de discordância já é concordância, e um polegar para
+  cima não ensinava nada. Um 👍 LEGADO segue visível e desfazível; nada o recria.
+- **A discordância rica mora em `admin_activity_log`**, com a ação nova `'avaliacao_discordancia'` e
+  o payload em `meta_json`. ⚠️ **`avaliacao_feedback` NÃO serve para isso**: é upsert de 1 linha por
+  projeto (guarda o estado do botão e perde o histórico) e não tem coluna para eixo/motivo/parecer.
+  O log é append-only e já era o caminho da correção de estrela — zero migração de schema.
+- **O que a ficha coleta é o DESFECHO, não uma nota** (`tipo: 'veredito'`, par `veredito_de` →
+  `veredito_para`). Motivo: a ficha do `/dashboard` **não exibe nota do agente** — a única nota ali é
+  o campo "Estrelas", que é a coluna MANUAL da planilha. Um segundo controle de estrela na mesma
+  tela seria dois canais para a mesma coisa. Quem corrige a NOTA continua fazendo isso pelo
+  "Estrelas" e pelo `/especiais`; o parser aceita `nota_certa` para quando esse canal quiser o eixo.
+- **Os 3 desfechos** (`VEREDITOS_CERTOS`, fonte única): *deveria aprovar* · *precisa de olho humano*
+  · *deveria reprovar*. São 3 e não 2 porque "precisa de olho humano" não é meio-aprovar: é o
+  desfecho legítimo de quem viu sinal e não quer decidir sozinho.
+- **O eixo é lista fechada** (`EIXOS_CORRECAO`): horas · financeiro · precedente ·
+  impacto irrelevante · outro. Eixo fora da lista vira `null`, nunca um eixo inventado.
+
+**O elemento central da tela é a CITAÇÃO.** Ao escolher o eixo, o formulário mostra a frase
+**daquele especialista** (do parecer da mesa que está na ficha) e a pessoa responde a ELA. Não é
+enfeite: a lição que o prompt lê é um PAR — *"o agente argumentou X / a triagem respondeu Y"* — e
+sem o lado do agente a réplica humana chega solta, sem o raciocínio a que responde. Sem linha
+daquele especialista (parecer legado, que é um parágrafo só, ou eixo "outro"), o bloco simplesmente
+não aparece: nunca uma citação inventada.
+
+**A tela não promete lição que o leitor descarta** (RF-234.1). O servidor monta a `Correcao` que
+`correcoesDoLog` produziria e roda `ensinaAlgo` **antes de responder** — e devolve `virouLicao` +
+`porque`. Havia dois jeitos concretos de a promessa ser falsa em silêncio: a mesa ainda não ter
+avaliado o projeto (sem recomendação não há "de → para" a ensinar) e a pessoa escolher o MESMO
+desfecho que o agente deu. O formulário também **não oferece** o desfecho que o agente concluiu.
+⚠️ A conferência usa o LEITOR REAL, não uma cópia da régua: writer e reader não podem divergir.
+
+**A citação é resolvida no SERVIDOR, por `linhaDoEixo`** (`mesa-parecer.ts`, fonte única com a tela).
+⚠️ Gravar o parecer INTEIRO como `leitura_do_agente` degradava o par em silêncio: o `recortar` de
+220 chars do `descreverCorrecao` corta as primeiras linhas, quase nunca a do especialista que a
+pessoa respondeu. E é o servidor que escolhe a frase porque a palavra do agente não pode chegar pelo
+payload de quem está discordando dele.
+
+**Invariantes que não podem regredir.**
+- ⚠️ **`ensinaAlgo` continua sendo o portão** (INV-17): correção **sem motivo** (≥ `MOTIVO_MIN` = 10
+  chars) **não vira lição**. O `veredito` ganhou um RAMO com a MESMA régua ("mudou algo + diz por
+  quê"), só não-numérica: sem os dois desfechos, ou com os dois iguais, não há o que ensinar.
+- ⚠️ **Motivo CURTO é recusado no servidor; motivo AUSENTE não.** São coisas diferentes: 3
+  caracteres é lixo que o prompt descartaria calado, e a ausência é o 👎 simples de sempre (que
+  segue valendo como estado do botão e não vira lição). Isso também é o que impede uma aba com JS
+  em cache de levar 400 no meio do clique — o `'like'` legado segue aceito no schema pela mesma
+  razão, mesmo tendo saído da tela.
+- ⚠️ **Ação desconhecida continua IGNORADA** por `correcoesDoLog` (`ACOES_COM_CORRECAO`): ampliar o
+  union do `AcaoAdmin` não pode virar porta aberta — ação sem o `meta_json` no formato certo entraria
+  como lição vazia, que é pior que lição nenhuma (ocupa uma das 6 linhas do bloco e não ensina).
+- ⚠️ **`registrarAtividade` nunca lança**: auditoria não desfaz o clique que já aconteceu.
+- ⚠️ **A leitura das lições NUNCA lança** (`licoesDaTriagemParaPrompt`): falha devolve `''` e o
+  agente julga como julgava. Material didático não pode derrubar um parecer.
+- ⚠️ **Nada disso muda status de projeto.** O time segue em sombra.
+- ⚠️ **A janela do log filtra por ação no SQL** (`queryAdminActivitiesPorAcao` + `ACOES_COM_CORRECAO`),
+  não em memória: com a janela genérica das últimas 200 AÇÕES, `status` (a mais frequente do painel)
+  empurrava as lições para fora dela **sem sinal nenhum** — o bloco só voltava vazio.
+- ⚠️ **A leitura das correções é UMA por lote, não por projeto** (`ContextoAvaliacao.correcoes`,
+  carregada em `carregarContextoPainel`; a parte por projeto é a pura `licoesParaPrompt`).
+  `computarVotos` roda EM LAÇO (por candidato e por deliberação aberta), então a consulta ali seria
+  idêntica em todas as iterações — é a mesma régua do corpus e do gotcha "a listagem não faz I/O por
+  projeto, agregue no SQL".
+- ⚠️ **`licoesPara` compara id por chave CANÔNICA** nas duas pontas: com `!==` cru (sensível a caixa),
+  a correção do PRÓPRIO projeto em julgamento vazava como lição para todo LEGADO (a planilha guarda
+  `LEGADO-049`, o sync cria `legado-049`) — o vazamento que a função existe para evitar.
+- ⚠️ **Nenhum índice, namespace ou tool novo** — a decisão de 05/09/2026 fica de pé: a base de
+  consulta já é o RAG, e a correção viaja JUNTO do vizinho a que pertence (`licoesPara` ordena
+  vizinho primeiro, cronológico depois), capada em 6 lições.
+
+**Fonte única compartilhada.** `licoesDaTriagem`, que era privado no classificador de especiais, foi
+extraído para **`src/lib/correcoes.functions.ts`** (`licoesDaTriagemParaPrompt`) e é reusado pelos
+dois pipelines. ⚠️ A janela do log (200 linhas), o tratamento de falha e o teto de 6 lições têm de
+ser os MESMOS nos dois lados — copiar as 15 linhas faria "o agente aprendeu" passar a depender de
+QUAL agente.
+
+**Onde aterrissou.** `correcoes.ts` (eixo, `tipo: 'veredito'`, `AJUDA_EIXO`, `VEREDITOS_CERTOS`,
+`eixoValido`) · `correcoes.functions.ts` (novo) · `atividades.functions.ts` (ação nova) ·
+`dashboard-admin.functions.ts` (a rota do 👎 grava a lição) · `avaliacao-normais.functions.ts` (a
+mesa lê as lições) · `agents/especialista-avaliacao.ts` + `agents/mesa-especialistas.ts` (o bloco
+entra no prompt das 4 dimensões) · `components/dashboard/discordancia-form.tsx` (novo) +
+`projeto-detalhe-dialog.tsx` · `components/historico/historico-drawer.tsx` (rótulo da ação).
+Testes: `tests/correcoes.test.ts` (31 casos), `tests/feedback-sombra.test.ts` (11 — o ESCRITOR,
+com o round-trip pelo `correcoesDoLog` real), `tests/mesa-licoes.test.ts` (7).

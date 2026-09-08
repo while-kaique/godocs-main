@@ -67,6 +67,7 @@ function entradaEspecialista(over: Partial<EntradaEspecialista> = {}): EntradaEs
       sinais: ['materialidade'],
     },
     vizinhos: ['Projeto vizinho A aprovado'],
+    licoes: '',
     outrosVotos: [
       { dimensao: 'fte', preocupa: true, argumento: 'FTE alto para 2 pessoas.' },
       { dimensao: 'rag', preocupa: false, argumento: 'Precedente aprovado sem ressalva.' },
