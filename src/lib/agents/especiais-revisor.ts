@@ -84,10 +84,10 @@ DUAS REFUTAÇÕES DIFERENTES — e é o campo "derruba" que as separa:
 
 FORMATO — responda APENAS com JSON válido, sem texto fora do JSON:
 {
+  "motivo": "<1 a 3 frases: o ataque concreto, ou por que a nota se sustentou>",
   "refutada": true | false,
   "derruba": true | false,
-  "nota_sugerida": <inteiro 0 a ${NOTA_MAX}, ou null se você não propõe outra nota>,
-  "motivo": "<1 a 3 frases: o ataque concreto, ou por que a nota se sustentou>"
+  "nota_sugerida": <inteiro 0 a ${NOTA_MAX}, ou null se você não propõe outra nota>
 }`;
 }
 

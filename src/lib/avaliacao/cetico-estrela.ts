@@ -50,7 +50,7 @@ O QUE NÃO É MOTIVO: "não é auditável", "não há anexo", "falta evidência 
 ⚠️ VOCÊ SÓ REBAIXA. "nota_sugerida" nunca pode ser MAIOR que a nota proposta. Se você acha que o projeto merece mais, não refute: diga que não refuta e registre isso em "sinais". Quem promove é gente.
 
 FORMATO DE RESPOSTA — responda APENAS com um objeto JSON:
-{ "refuta": <bool>, "nota_sugerida": <inteiro 0 a 10, nunca acima da proposta>, "motivo": "<uma frase concreta com a evidência citada do dossiê, ou null>", "sinais": ["<condição-limite detectada>", "..."] }`;
+{ "sinais": ["<condição-limite detectada>", "..."], "motivo": "<uma frase concreta com a evidência citada do dossiê, ou null>", "refuta": <bool>, "nota_sugerida": <inteiro 0 a 10, nunca acima da proposta> }`;
 
   const viz = args.vizinhos.length
     ? args.vizinhos.map((v) => `- ${v.nome} (nota ${v.nota}, similaridade ${v.similaridade.toFixed(2)}): ${v.resumo}`).join('\n')

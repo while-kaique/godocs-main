@@ -90,7 +90,13 @@ function votoDeDimensao(dim: DimensaoAvaliacao, v: VotosDeterministicos): VotoDe
 /** As 4 dimensões, na ordem canônica da mesa. */
 const DIMENSOES: DimensaoAvaliacao[] = ['fte', 'financeiro', 'rag', 'cetico'];
 
-/** Resumo de um voto para os `outrosVotos` (o especialista vê a mesa, não só o próprio eixo). */
+/**
+ * Resumo de um voto para os `outrosVotos` do contrato.
+ *
+ * ⚠️ **O especialista NÃO vê isto no 1º parecer** (RF-231) — `buildPromptEspecialista` ignora
+ * `outrosVotos` de propósito, para o julgamento de cada eixo ser independente. Quem lê a mesa
+ * inteira é a conciliação (`agregarJulgamentos`), depois de todos escreverem.
+ */
 function resumoVoto(dim: DimensaoAvaliacao, voto: VotoDeterministico): VotoResumido {
   return {
     dimensao: dim,
@@ -101,8 +107,12 @@ function resumoVoto(dim: DimensaoAvaliacao, voto: VotoDeterministico): VotoResum
 
 /**
  * Monta uma `EntradaEspecialista` por dimensão a partir dos votos determinísticos: cada especialista
- * recebe o PRÓPRIO voto como input (Decisão 2 do plano: sinal, não trava), os votos das OUTRAS três
- * dimensões como contexto, o texto do projeto e os vizinhos aprovados (precedente). PURA.
+ * recebe o PRÓPRIO voto como input (Decisão 2 do plano: sinal, não trava), o texto do projeto e os
+ * vizinhos aprovados (precedente). PURA.
+ *
+ * ⚠️ Os votos das OUTRAS três dimensões continuam sendo montados em `outrosVotos`, mas **não vão
+ * ao prompt do 1º parecer** desde a RF-231 (ver `resumoVoto` acima e o campo em
+ * `EntradaEspecialista`). Eles seguem no contrato porque a conciliação é que lê a mesa inteira.
  */
 export function montarEntradasEspecialistas(
   votos: VotosDeterministicos,

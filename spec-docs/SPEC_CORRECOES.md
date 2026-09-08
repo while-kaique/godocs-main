@@ -6,6 +6,59 @@
 
 ---
 
+## 2026-09-08 — Os 8 agentes de avaliação pediam o NÚMERO antes do raciocínio (score-first), e o especialista da mesa julgava vendo o parecer dos outros
+
+**Sintoma.** A run 9 da calibragem (`docs/baselines/runs/run-9.json`, n=637) parou em **52% de nota
+idêntica** à humana, com ±1 em 76%. O racional que cada agente escreve descrevia bem a nota que ele
+já tinha emitido, mas a nota não melhorava de rodada para rodada por mais que a régua fosse ajustada.
+
+**Causa-raiz (duas, ambas de prompt).**
+1. **Score-first.** Os **8** blocos `FORMATO — responda APENAS com JSON` pediam o número/booleano
+   como PRIMEIRA chave e o raciocínio como uma das últimas — no caso mais grave
+   (`especial-classificador.ts`), a própria **confiança** vinha antes da `leitura`. Como a geração é
+   autoregressiva, o modelo emite o número e depois **confabula o racional para justificá-lo**: o
+   texto deixa de ser o julgamento e passa a ser a defesa dele. A inversão para racional-primeiro é
+   medida na literatura em **+9,3 pontos** de concordância exata (42,6% → 51,9%, MAE −0,15) — e a
+   nossa run 9 estava praticamente sobre aquele baseline score-first.
+2. **Interferência de rubrica.** `buildPromptEspecialista` injetava `O QUE OS OUTROS ESPECIALISTAS
+   ACHARAM` no **primeiro** parecer, e o system prometia "o que os outros especialistas acharam".
+   Com o parecer dos outros no contexto, o veredito de um eixo muda conforme os eixos presentes — a
+   mesa perde a independência que faz o quórum de 2 significar alguma coisa.
+
+**Fix.**
+- **Ordem invertida nos 8 blocos**, sem adicionar nem remover uma única chave: raciocínio e
+  evidência primeiro, número/veredito depois, **confiança por último**. Onde o repo já tinha régua de
+  precedência, ela virou também ordem de chave: em `especiais-lentes.ts` o `piso` (que o prompt já
+  mandava decidir "ANTES de pensar na nota") e a `ancora` (a caixa que vence o número) agora vêm
+  antes de `nota`; em `cerebro-estrela.ts` a `nota` vem depois do `escape`, que ela referencia.
+  ⚠️ **Ao reordenar os 8 blocos de FORMATO, nem uma palavra de instrução foi acrescentada**, e isso é
+  deliberado: a T4 é uma MEDIÇÃO contra o baseline da run 9, e qualquer texto novo faria a run 10
+  medir duas mudanças ao mesmo tempo. (Uma linha "⚠️ ORDEM OBRIGATÓRIA DAS CHAVES" chegou a ser
+  escrita e foi **retirada** por isso, mais o fato de estar redigitada 8× sem fonte única.)
+- **O 1º parecer do especialista virou CEGO** (RF-231): `blocoOutrosVotos` foi removido, o system
+  passa a dizer "você julga SOZINHO", e `entrada.outrosVotos` **continua no contrato** mas não entra
+  no prompt (o campo carrega o porquê em comentário). A conciliação segue exatamente onde estava,
+  DEPOIS de todos escreverem (`agregarJulgamentos`), e a `divergencia` continua calculada lá. A
+  réplica do `cerebro-merito` (rodada 2 do debate) **não** muda: ali os pareceres já estão escritos.
+
+⚠️ **Nada disso é gate — é prompt**, e por isso o que segura é o **canário**: `tests/racional-primeiro.test.ts`
+(16 casos) trava a ordem das chaves nos 8 blocos e a cegueira do especialista, comparando POSIÇÃO da
+chave no texto e provando antes que as **duas** chaves existem (senão `-1 < 0` passaria por acidente).
+Reintroduzir o parecer dos outros no 1º prompt tem de ser DECISÃO, não deslize.
+
+⚠️ **Nenhum parser depende de ordem** — os 8 `normalizar*` acessam por nome (`o.nota`, `o.argumento`,
+`o.refutada`), então a inversão é invisível para o código e visível só para o modelo.
+
+**Onde aterrissou.** `src/lib/agents/{especialista-avaliacao,especiais-lentes,especial-classificador,especiais-revisor}.ts`
+· `src/lib/avaliacao/{cerebro-estrela,cerebro-merito,cetico-estrela,time}.ts` ·
+`tests/racional-primeiro.test.ts`. ⚠️ `src/lib/agents/cetico-avaliacao.ts` fica FORA: é PURO, sem LLM
+e sem bloco de FORMATO.
+
+**Status.** Fatia (a) do plano `docs/plans/calibragem-time-avaliacao.md` (RF-230/231/232). ⏳ A
+**medição** (run 10 contra o baseline da run 9, contando só `humana > 0`) exige deploy na staging: o
+harness `scripts/v2/classificar-paralelo.mts` bate numa rota HTTP com `E2E_COOKIE`, não roda local.
+Sem a run 10, a inversão está **implementada e travada por teste, mas não medida**.
+
 ## 2026-09-08 — Card do "Alerta de Automações" com ganho ZERADO e "Tipos: —" em todo projeto da v2
 
 **Sintoma.** Com o GoDocs **v2** em validação, o alerta do grupo do Google Chat anunciava

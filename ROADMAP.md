@@ -23,15 +23,25 @@ em 3 pontos** (`politicaDeLiberacao(null)` hardcoded, `avaliacao_feedback` write
   separado — o RAG já é a base de consulta), e reprovar por qualquer motivo do `PISO_ZERO` reprovaria
   **336 de 637** projetos (0★ é 53% da base), então a reprovação por juízo fica só em `fora_de_uso` +
   `ressubmissao`, com motivo **nomeado e citado**.
-- ⬜ **(a) T1-T4** — racional-primeiro nos 8 blocos de FORMATO + tirar o `outrosVotos` do prompt do
-  especialista; medir na **run 10** contra o baseline da run 9.
+- 🟡 **(a) T1-T4 — T1/T2/T3 CODADAS (08/09), T4 NÃO MEDIDA.** Os 8 blocos de FORMATO invertidos
+  (raciocínio e evidência antes do número, **confiança por último**), `confianca` depois de `leitura` no
+  classificador, e o **1º parecer do especialista virou CEGO** (`outrosVotos` fora do prompt; contrato,
+  `mesa-especialistas.ts` e a conciliação intactos). Canário `tests/racional-primeiro.test.ts` (16 casos)
+  trava a ordem e a cegueira. Suíte **3724 verde** (era 3708), `worker.js` rebuildado, correção registrada
+  no `SPEC_CORRECOES.md`. Conformidade §9: **`diverge-baixa`** (não barra o envio) — a única divergência que
+  sobrou é a T4. ⚠️ **A run 10 exige deploy na staging**: o harness `scripts/v2/classificar-paralelo.mts`
+  faz POST numa rota HTTP com `E2E_COOKIE`, não roda local. Sem ela, a inversão está **travada por teste e
+  não medida**. ⚠️ Nada de instrução nova foi acrescentado aos prompts, de propósito: a run 10 tem de medir
+  **uma** mudança, não duas.
 - ⬜ **(b) T5-T9** — a discordância humana vira lição: eixo em `Correcao`, `correcoesDoLog` reconhecendo a
   ação da mesa, o 👍 sai da ficha e o 👎 passa a exigir nota certa + eixo + motivo.
 - ⬜ **(c) T10-T17** — confiança **medida** (acerto por faixa), descongelar o gabarito, ligar o
   `politicaDeLiberacao`, piso de impacto, 5ª saída `reprovar` e canários.
 
-**Próximo:** codar a fatia **(a)** com `/ggsd:code` (T1-T4) — é a única que se mede sozinha e não depende das
-outras duas.
+**Próximo:** **medir a fatia (a)** — deploy na staging (`edf400b4`) e rodar a run 10 com
+`npx tsx --env-file=.env scripts/v2/classificar-paralelo.mts --staging` (precisa do `.env` com `E2E_COOKIE`,
+que não existe na worktree), gravando `docs/baselines/runs/run-10.json` + `run-10-comparacao.txt` e contando
+só `humana > 0`. Depois disso, a fatia **(b) T5-T9** com `/ggsd:code`.
 
 **Frente GoDocs v2 — submissão determinística sem agente no cliente 🟡 (branch `feat/godocs-v2`, plano APROVADO em 02/09/2026):**
 Plano: [`docs/plans/godocs-v2-submissao-deterministica.md`](docs/plans/godocs-v2-submissao-deterministica.md) ·

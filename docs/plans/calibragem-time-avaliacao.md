@@ -13,8 +13,15 @@ votação disfarçado de percentual.
 São **três fatias com deploy e PR próprios**, nesta ordem — cada uma fecha sozinha, e parar em
 qualquer uma deixa o sistema coerente:
 
-1. **(a) T1-T4** — só prompt, blast BAIXO, e a run 10 diz na hora se ganhou. É a única fatia que se
-   mede sem depender das outras duas, e a literatura projeta +9,3 pontos. **Comece por ela.**
+1. **(a) T1-T4** — ✅ **T1/T2/T3 EXECUTADAS em 08/09** (suíte 3724 verde, conformidade `diverge-baixa`,
+   canário `tests/racional-primeiro.test.ts`). ⏳ **T4 pendente e é o que falta para a fatia FECHAR:** a
+   run 10 exige **deploy na staging** — o harness `scripts/v2/classificar-paralelo.mts` faz POST numa rota
+   HTTP com `E2E_COOKIE`, não roda local. Enquanto ela não roda, a inversão está travada por teste e **não
+   medida**, e o critério de aceitação 1 (e a RF-232) segue sem cobertura.
+   ⚠️ **Nada de instrução nova entrou nos 8 prompts, de propósito** — uma linha "⚠️ ORDEM OBRIGATÓRIA DAS
+   CHAVES" chegou a ser escrita e foi **retirada**: a T4 é uma MEDIÇÃO contra a run 9, e texto novo faria a
+   run 10 medir duas mudanças ao mesmo tempo. Se alguém quiser aquele reforço no prompt, é **rodada
+   separada**, depois de a inversão estar medida.
 2. **(b) T5-T9** — abre a coleta. Quanto mais cedo entrar, mais lições existem quando a (c) for medir,
    porque o marco da concordância implícita começa a contar no deploy dela (D2).
 3. **(c) T10-T17** — blast ALTO e a maior. ⚠️ **Sozinha ela já é um plano** (8 tarefas, 3 tabelas na
@@ -191,20 +198,20 @@ Pinecone, nada de tool. O que falta em `correcoes.ts` é outra coisa, e é peque
 
 ### Entrega (a) — racional-primeiro + independência · blast BAIXO
 
-- **T1 —** Inverter a ordem das chaves nos **8** blocos de FORMATO para que o campo de raciocínio
+- **T1 — ✅ FEITA (08/09).** Inverter a ordem das chaves nos **8** blocos de FORMATO para que o campo de raciocínio
   venha **antes** do número/booleano. Nenhuma chave é adicionada ou removida.
   *(guarda: `npm run test` verde; os parsers acessam por nome — `extrairJson`/`extrairJsonSeguro` +
   os 7 `normalizar*` —, nenhum depende de ordem, e não há teste de snapshot de prompt.)*
-- **T2 —** No `especial-classificador.ts:147`, mover `confianca` para **depois** de `leitura` (hoje
+- **T2 — ✅ FEITA (08/09).** No `especial-classificador.ts`, mover `confianca` para **depois** de `leitura` (hoje
   declara a confiança antes de raciocinar, que é o caso mais grave).
   *(guarda: teste de normalização existente segue verde.)*
-- **T3 —** Tirar `outrosVotos` do prompt do especialista (`buildPromptEspecialista`): a 1ª passada
+- **T3 — ✅ FEITA (08/09).** Tirar `outrosVotos` do prompt do especialista (`buildPromptEspecialista`): a 1ª passada
   julga **cega**, e a conciliação continua onde está (`agregarJulgamentos`). A interferência de
   rubrica medida em 2026 é exatamente o veredito de um critério mudar conforme os outros presentes no
   contexto.
   *(guarda: teste novo provando que o prompt do especialista não cita o parecer dos outros; a
   `divergencia` do agregador segue calculada.)*
-- **T4 —** Rodar o harness contra o baseline da **run 9** (`docs/baselines/runs/run-9.json`,
+- **T4 — ⏳ PENDENTE (exige deploy na staging + `E2E_COOKIE`).** Rodar o harness contra o baseline da **run 9** (`docs/baselines/runs/run-9.json`,
   n=637, idêntica 52%, ±1 76%) e gravar a **run 10** no mesmo formato, com o comparativo em
   `run-10-comparacao.txt`.
   *(guarda: o comparativo existe e diz se a concordância subiu, caiu ou empatou — ⚠️ medir só com

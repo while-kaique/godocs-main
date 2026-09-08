@@ -14,12 +14,49 @@ especialistas · **(b)** a discordância humana vira lição, estendendo o `corr
 > `regua-estrelas-e-time-unificado`) e ficam preservados de propósito.
 
 ### Próximo passo
-**Codar a fatia (a) com `/ggsd:code`: T1-T4** — inverter os 8 blocos de FORMATO para o raciocínio vir
-antes do número, tirar o `outrosVotos` do prompt do especialista, e medir na **run 10** contra o
-baseline da run 9 (`docs/baselines/runs/run-9.json`, n=637, idêntica 52%, ±1 76% — ⚠️ contar só
-`humana > 0`). É a única fatia que se mede sozinha, é só prompt e o blast é BAIXO.
+**Medir a fatia (a) — a T4, que é o que falta para ela fechar.** Deploy na **staging (`edf400b4`)** com o
+fluxo do "Deploy rápido" (regra 13: staging antes de prod) e depois a run 10:
+`npx tsx --env-file=.env scripts/v2/classificar-paralelo.mts --staging` — ⚠️ **precisa do `.env` com
+`E2E_COOKIE`, que NÃO existe nesta worktree** (copiar de `~/godocs-main` ou renovar o cookie). Gravar
+`docs/baselines/runs/run-10.json` + `run-10-comparacao.txt` no formato da run 9 e comparar contando **só
+`humana > 0`** (baseline: n=637, idêntica **52%**, ±1 **76%**). O critério do plano **não é "subiu"**, é
+**estar medido**. Feito isso, a fatia **(b) T5-T9** com `/ggsd:code`.
 
-### O que esta sessão fez (08/09, planejamento — nenhum código tocado)
+### ✅ O que a sessão de CÓDIGO de 08/09 entregou — fatia (a), T1/T2/T3
+
+Branch `feat/calibragem-time-avaliacao`, worktree `~/godocs-wt-calibragem-time`. Suíte **3724 verde**
+(entrou em 3708), `tsc` nos **9 erros pré-existentes** (nenhum em arquivo tocado), `worker.js` rebuildado
+(regra 1), correção registrada no `SPEC_CORRECOES.md` (regra 12).
+
+- **T1 — os 8 blocos de FORMATO invertidos**, com o **conjunto de chaves idêntico** (conferido chave por
+  chave pelo revisor de conformidade): raciocínio e evidência primeiro, número/veredito depois, **confiança
+  por último**. Onde o repo já tinha régua de precedência escrita em prosa, ela virou também ordem de chave:
+  em `especiais-lentes.ts` o `piso` (que o prompt já mandava decidir "ANTES de pensar na nota") e a `ancora`
+  (a caixa que vence o número) vêm antes de `nota`; em `cerebro-estrela.ts` a `nota` vem depois do `escape`,
+  que ela referencia.
+- **T2 —** `confianca` foi para **depois** de `leitura` no `especial-classificador.ts` (era o pior caso: o
+  agente declarava a confiança antes de escrever uma linha de raciocínio).
+- **T3 — o 1º parecer do especialista virou CEGO** (RF-231): `blocoOutrosVotos` removido, o system diz
+  "você julga SOZINHO", e `entrada.outrosVotos` **fica no contrato** mas não entra no prompt (o porquê está
+  em comentário nos DOIS lados — produtor `mesa-especialistas.ts` e consumidor `especialista-avaliacao.ts`,
+  porque o comentário do produtor ainda afirmava o contrário). `mesa-especialistas.ts:120` intacto, e a
+  conciliação (`agregarJulgamentos`) + a `divergencia` seguem exatamente onde estavam.
+- **Canário `tests/racional-primeiro.test.ts` (16 casos)** — escrito por um test-writer **isolado**, cego à
+  implementação, com red evidenciado ANTES (15 falhas). Ele compara **posição** da chave no bloco de FORMATO
+  e afirma que as **duas** chaves existem antes de comparar (senão `-1 < 0` passaria por acidente), e prende
+  a cegueira do T3 com uma sentinela literal em `outrosVotos`.
+
+**Duas coisas que a próxima sessão precisa saber e não deve re-derivar:**
+- ⚠️ **Nenhuma palavra de instrução foi acrescentada aos 8 prompts, de propósito.** Uma linha "⚠️ ORDEM
+  OBRIGATÓRIA DAS CHAVES" chegou a ser escrita nos 8 e foi **retirada**: a T4 é uma **medição** contra a
+  run 9, e texto novo faria a run 10 medir duas mudanças ao mesmo tempo (além de estar redigitada 8× sem
+  fonte única, contra a doutrina do repo). Querer aquele reforço é **rodada separada**, depois de medir.
+- ⚠️ **Nenhum dos 8 normalizadores depende de ordem** — todos acessam por nome (`o.nota`, `o.argumento`,
+  `o.refutada`), e o `recuperarDeProsa` do classificador casa por nome de chave/verbo da régua, nunca por
+  posição. Foi isso que fez o blast ser BAIXO de verdade: a inversão é invisível para o código e visível só
+  para o modelo.
+
+### O que a sessão de PLANEJAMENTO fez (08/09 — nenhum código tocado)
 Investigação do time de avaliação + plano aprovado + spec cristalizada. Os 4 achados, os 3 blast-radius
 e as decisões (D1-D4.2) estão no plano; **não re-derivar**. Dois pontos que mudaram o desenho no meio do
 caminho e são o que a próxima sessão precisa saber:
@@ -30,10 +67,12 @@ caminho e são o que a próxima sessão precisa saber:
   fica só em `fora_de_uso` + `ressubmissao` (os 2 do `ROTULO_DESQ`), com motivo **nomeado e citado**.
 
 ### Pendências declaradas
-- ⚠️ **Os marcadores de revisão vieram STALE da base da branch** (`.review-status = diverge-baixa`,
-  `.quality-status = sugestoes`, herdados do `origin/main`). Esta sessão **não tocou código-fonte**, então
-  não há diff a revisar; quem produz o diff que precisa dos revisores §9 é a próxima sessão de código, e
-  o `git push`/`/ggsd:ship` vai barrar até eles rodarem sobre esse diff.
+- ✅ **Revisão §9 RODADA sobre o diff da fatia (a)** (o marcador stale herdado do `origin/main` foi
+  reconciliado pela régua do `verify-tier.sh`, que mediu faixa **`padrao`** → só o revisor de
+  conformidade; `.quality-status` apagado, como a faixa manda). Veredito: **`diverge-baixa`** em duas
+  passadas — a 1ª pegou a linha de instrução extra (removida) e os comentários do
+  `mesa-especialistas.ts` que ainda afirmavam que o especialista vê os outros votos (corrigidos). A
+  divergência que **sobra é a T4**, declarada. `diverge-baixa` **libera** `git push`/`/ggsd:ship`.
 - ⚠️ **Assunção a confirmar antes da T15:** piso de **R$ 100/mês** (a régua que o Luis aplicou aos 137 em
   04/09). Ele confirmou que "isso é um piso" sem cravar o número. O snapshot de 04/09 é o gabarito: o piso
   está certo se reprovar aqueles 137 e mais ninguém.
