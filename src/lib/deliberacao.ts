@@ -41,7 +41,11 @@ export function grauConfianca(n: number): Confianca {
 
 // ─── Concilia o voto do cético no preliminar do agregador ──────────────────────
 
-export type VeredictoMesa = 'aprovar' | 'em_validacao' | 'isento';
+/**
+ * ⚠️ `reprovar` entra aqui como desfecho MECÂNICO (piso de impacto, D4) — nunca por juízo do
+ * cético nem da deliberação. Ele atravessa este módulo INTACTO: não há rodada que o discuta.
+ */
+export type VeredictoMesa = 'aprovar' | 'em_validacao' | 'reprovar' | 'isento';
 
 export type AgregadoPreliminar = {
   veredito: VeredictoMesa;
@@ -70,6 +74,12 @@ export function conciliarComCetico(
     return { ...agregado, grau: 'alta', ceticoRefutou: false };
   }
 
+  // Reprovação MECÂNICA (piso de impacto): o cético existe para desafiar aprovações — não há o que
+  // ele contra-argumente num número abaixo da régua. Passa intacta, com a confiança que veio.
+  if (agregado.veredito === 'reprovar') {
+    return { ...agregado, grau: grauConfianca(agregado.confianca), ceticoRefutou: false };
+  }
+
   const refutaAprovacao = cetico.refuta && agregado.veredito === 'aprovar';
   if (!refutaAprovacao) {
     return { ...agregado, grau: grauConfianca(agregado.confianca), ceticoRefutou: false };
@@ -93,7 +103,17 @@ export function conciliarComCetico(
 
 // ─── Máquina de estados da deliberação (avançada pelo cron) ────────────────────
 
-export type EstadoDeliberacao = 'deliberando' | 'consenso' | 'nao_consenso' | 'isento';
+/**
+ * ⚠️ `reprovado` é terminal e nasce SÓ do piso mecânico: não se delibera sobre um número que está
+ * abaixo da régua. Sem este estado, o `reprovar` do agregador moía até `nao_consenso` e a
+ * recomendação gravada voltava a dizer `em_validacao` — a reprovação DESAPARECERIA na máquina.
+ */
+export type EstadoDeliberacao =
+  | 'deliberando'
+  | 'consenso'
+  | 'nao_consenso'
+  | 'reprovado'
+  | 'isento';
 
 export type SinaisRodada = {
   agregadoVeredito: VeredictoMesa;
@@ -113,11 +133,12 @@ export type ResultadoDeliberacao = {
   encerrada: boolean;
 };
 
-const TERMINAIS: EstadoDeliberacao[] = ['consenso', 'nao_consenso', 'isento'];
+const TERMINAIS: EstadoDeliberacao[] = ['consenso', 'nao_consenso', 'reprovado', 'isento'];
 
 function veredictoDeEstadoTerminal(estado: EstadoDeliberacao): VeredictoMesa {
   if (estado === 'consenso') return 'aprovar';
   if (estado === 'isento') return 'isento';
+  if (estado === 'reprovado') return 'reprovar';
   return 'em_validacao';
 }
 
@@ -151,6 +172,19 @@ export function avancarDeliberacao(
     sinais.limiarConfianca > 0
       ? sinais.limiarConfianca
       : LIMIAR_CONFIANCA_PADRAO;
+
+  // Reprovação mecânica (piso): encerra sem gastar rodada — não há o que deliberar.
+  if (sinais.agregadoVeredito === 'reprovar') {
+    return {
+      estado: 'reprovado',
+      rodada: rodadaAnterior,
+      veredito: 'reprovar',
+      confianca: sinais.confianca,
+      grau: grauConfianca(sinais.confianca),
+      motivo: 'Impacto mensal declarado abaixo do piso. A régua é mecânica e não se delibera.',
+      encerrada: true,
+    };
+  }
 
   // Isento: a decisão é 100% humana — encerra sem gastar rodada.
   if (sinais.agregadoVeredito === 'isento') {

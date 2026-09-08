@@ -50,7 +50,9 @@ function num(v: number | null | undefined, fallback: number): number {
  * por condição-limite e refuta se houver ≥1. Confiança = min(1, nº de sinais × 0,3).
  */
 export function avaliarCetico(input: {
-  agregadoVeredito: 'aprovar' | 'em_validacao' | 'isento';
+  // ⚠️ `reprovar` (piso mecânico) entra no tipo mas o cético NÃO o desafia: ele só ataca
+  // aprovações (regra de ouro anti-bajulação, no topo).
+  agregadoVeredito: 'aprovar' | 'em_validacao' | 'reprovar' | 'isento';
   fte: { implausivel: boolean; fte: number; pessoas: number };
   financeiro: { veredito: 'ok' | 'atencao' | 'inconclusivo'; confianca: number };
   rag: { apoio: boolean; confianca: number; vizinhos: number; topSimilaridade: number };

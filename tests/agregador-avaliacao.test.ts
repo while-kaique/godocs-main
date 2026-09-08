@@ -60,6 +60,7 @@ const financeiroOk: ResultadoFinanceiro = {
   confianca: 0.9,
   motivo: null,
   sinais: [],
+  abaixoDoPiso: false,
 };
 const ragApoio = {
   apoio: true,
@@ -73,7 +74,7 @@ describe("agregarVotos — juiz agregador puro com confiança", () => {
   it("especial:true → isento, veredito 'isento', não aplica em_validacao, confiança 1 (independe dos votos)", () => {
     const r = agregarVotos({
       fte: { implausivel: true, fte: 5, pessoas: 1, motivo: "absurdo" },
-      financeiro: { veredito: "atencao", confianca: 0.3, motivo: "x", sinais: ["y"] },
+      financeiro: { veredito: "atencao", confianca: 0.3, motivo: "x", sinais: ["y"], abaixoDoPiso: false },
       rag: { apoio: false, confianca: 0.4, vizinhos: 0, topSimilaridade: 0, motivo: "z" },
       especial: true,
     });
@@ -133,7 +134,7 @@ describe("agregarVotos — juiz agregador puro com confiança", () => {
     const motivoFin = "materialidade acima do teto";
     const r = agregarVotos({
       fte: fteOk,
-      financeiro: { veredito: "atencao", confianca: 0.3, motivo: motivoFin, sinais: [motivoFin] },
+      financeiro: { veredito: "atencao", confianca: 0.3, motivo: motivoFin, sinais: [motivoFin], abaixoDoPiso: false },
       rag: ragApoio,
     });
     expect(r.veredito).toBe("em_validacao");
@@ -167,7 +168,7 @@ describe("agregarVotos — juiz agregador puro com confiança", () => {
   it("NUNCA devolve reprovar/rejeitado — com todos os votos ruins o veredito é 'em_validacao'", () => {
     const r = agregarVotos({
       fte: { implausivel: true, fte: 12, pessoas: 1, motivo: "absurdo" },
-      financeiro: { veredito: "atencao", confianca: 0.3, motivo: "dupla contagem", sinais: ["dupla contagem"] },
+      financeiro: { veredito: "atencao", confianca: 0.3, motivo: "dupla contagem", sinais: ["dupla contagem"], abaixoDoPiso: false },
       rag: { apoio: false, confianca: 0.4, vizinhos: 0, topSimilaridade: 0, motivo: "sem apoio" },
     });
     expect(r.veredito).toBe("em_validacao");
@@ -182,7 +183,7 @@ describe("agregarVotos — juiz agregador puro com confiança", () => {
       agregarVotos({ fte: fteOk, financeiro: financeiroOk, rag: ragApoio, especial: true }),
       agregarVotos({
         fte: { implausivel: true, fte: 12, pessoas: 1, motivo: "absurdo" },
-        financeiro: { veredito: "atencao", confianca: 0.3, motivo: "x", sinais: ["x"] },
+        financeiro: { veredito: "atencao", confianca: 0.3, motivo: "x", sinais: ["x"], abaixoDoPiso: false },
         rag: { apoio: false, confianca: 0.4, vizinhos: 0, topSimilaridade: 0, motivo: "z" },
       }),
     ];

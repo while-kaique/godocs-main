@@ -6,6 +6,164 @@
 
 ---
 
+## 2026-09-08 — O painel de sombra mostrava só quem OBJETOU (e mudava de tamanho entre duas aberturas), com o texto cortado em reticências
+
+**Sintoma.** Três coisas, todas relatadas pelo Luis olhando a ficha do `/dashboard`: *"eu tinha
+clicado uma vez ai e tinha visto vários porquês, ai dps cliquei dnv e só vi 2"*; o parecer aparecia
+cortado com reticências; e *"não consigo ver o veredito de cada agente e o porquê exato da
+reprovação/confiança baixa"*.
+
+**Causa-raiz.** O painel exibia `projeto_avaliacao.motivo`, e esse campo é
+`conciliado.motivos.join('\n')` — e `agregarJulgamentos` **só empilha o argumento de quem
+PREOCUPOU**. Consequências, as três de uma vez: **(1)** o veredito dos agentes tranquilos nunca
+aparecia; **(2)** cada corrida do cron (10 min) e cada rodada da deliberação **sobrescrevem** o
+campo com os preocupados DAQUELA rodada, então o número de linhas muda de uma abertura para a
+outra (o projeto do print estava na **rodada 5**); **(3)** o `votos` gravado por `serializarVotos`
+guardava `{dimensao, preocupa, confianca, origem}` **sem o argumento**, então o porquê dos
+tranquilos era **descartado na gravação** — não havia como mostrar os 4 sem mudar a persistência.
+As reticências eram `line-clamp-2` no histórico de rodadas, que vinha ABERTO por padrão.
+
+**Fix.** `montarPareceresDaMesa` (`agents/mesa-especialistas.ts`, PURA) monta o parecer dos
+**QUATRO** nos dois modos (com a mesa LLM, o argumento raciocinado; sem ela, o motivo do voto
+determinístico), e `serializarVotos` passa a gravá-lo na chave própria **`pareceres`**. A ficha lê
+por `pareceresDosVotos` e desenha **um bloco por agente** com rótulo textual
+(«Aponta problema» / «Sem ressalva») e o porquê **inteiro**. O histórico de rodadas ficou
+**colapsado** e, aberto, sem clamp.
+
+**Junto, dois pedidos do mesmo print.** **(a)** A **estrela** — ela nunca sai da mesa (que só
+produz veredito e confiança); quem a raciocina é o TIME (`avaliacao/time.ts`), que só roda sob
+demanda. A ficha passa a ler o último nó `tipo='consenso'` do `agente_log`
+(`getUltimoConsensoDoTime` + a versão em LOTE, uma consulta por `IN` com `ROW_NUMBER()`) e exibe
+"N estrelas sugeridas". **(b)** **Dois botões** na ficha: "Rerodar a mesa" (síncrona, é o que
+preenche o painel) e "Rodar o time (estrela)" (~30 chamadas de LLM, 202 em background), **reusando
+as rotas de admin que já existiam** — nenhuma rota nova.
+
+**⚠️ O que não pode regredir.**
+- A seção de sombra aparece **mesmo sem avaliação** — era condicionada a `avaliacaoSombra` existir,
+  e aí o projeto que o agente nunca avaliou não tinha onde MANDAR avaliar.
+- O `pareceres` é lido **na ficha**, não na listagem (gotcha 4 do dashboard). No LOTE ele vem, de
+  propósito: sem isso, abrir uma linha semeada mostraria "o time não rodou" mentindo.
+- `julgamentos` **continua ENXUTO** (sem argumento, sem sinais): aquela chave é trilha de
+  auditoria. A régua antiga *"o argumento nunca é serializado"* caiu com motivo escrito em
+  `tests/mesa-fiada-serializacao.test.ts` — a exposição é a mesma de sempre (ficha `requireAdmin`,
+  e o `motivo` já exibia R$); o que segue proibido é R$ chegar ao SUBMISSOR (INV-02).
+- A leitura do consenso usa **`Promise.resolve().then(...)`** para converter throw SÍNCRONO em
+  rejeição, e falha só omite a seção.
+- **A estrela do agente NÃO tem botão de aplicar** — quem grava a coluna "Estrelas" é gente.
+- ⚠️ Estrela automática em **TODO** projeto continua sendo a **T8 do plano da v2**, não feita: hoje
+  a estrela aparece só depois de alguém rodar o time naquele projeto.
+
+**Status.** Testes: `tests/painel-sombra-quatro-agentes.test.ts` (inclui os canários do clamp, da
+seção sempre visível e do reuso das rotas). Suíte 3877 verde.
+
+---
+
+## 2026-09-08 — A confiança do time era o PLACAR DA VOTAÇÃO exibido como percentual, e o circuito de medição estava aberto em 4 pontos
+
+**Sintoma.** A coluna "Sombra" e a ficha do `/dashboard` mostravam "confiança 71%" e "43%" — sempre
+os mesmos números, variando pouco, num intervalo que se anunciava como 0 a 100%. Reclamação do Luis
+(08/09/2026): *"tinha reclamado a respeito dela estar 41% e 71%, valores sempre iguais e variando
+pouco entre 0 a 100%"*.
+
+**Causa-raiz (quatro, medidas).**
+1. **O número não era medida, era placar.** `agregarJulgamentos` faz
+   `confianca = concordanciaDirecional × confiancaMedia`. Com **4** especialistas fixos, a
+   direcional só pode valer **0,5 · 0,75 · 1,0**, e a `confiancaMedia` é auto-declaração do LLM,
+   colada em 0,85-0,95. Os "71%" são **3-1 × 0,95**; os "43%", **2-2 × 0,85**. Não existia faixa
+   intermediária porque nada a produzia — e `pctConfianca` exibia isso com 2 dígitos
+   significativos, como se fosse frequência. A outra metade do repo já sabia:
+   `estrelas-regua.ts` registra que "confiança que sai de julgamento do LLM não é auditável".
+2. **Ninguém agrupava o acerto por faixa.** A coluna `avaliacao_retroativa.grau` era **gravada e
+   nunca lida de volta**; `agregarAcuracia` media taxa GLOBAL. O dado para calibrar já estava no
+   banco.
+3. **Gabarito congelado.** `getIdsRetroativos` devolvia *todos* os medidos e o retroativo os pulava
+   para sempre — os 137 projetos que viraram `Aprovado → Reprovado` em 04/09/2026 seguiam medidos
+   contra a verdade antiga, e um `aprovar` ali era um `erro_grave` que nunca seria contado.
+4. **`politicaDeLiberacao(null, …)` literal** em `avaliacao/time.functions.ts`: a política que
+   decide se o time age sozinho lê acurácia medida e **nunca recebia nenhuma**. O time estava em
+   sombra por argumento hardcoded, não por medição.
+
+**Fix.** A confiança exibida passa a ser **frequência MEDIDA ou nada** (INV-18):
+`src/lib/avaliacao-calibragem.ts` (PURO) agrupa `avaliacao_retroativa` por faixa e devolve
+acerto/erro/n; faixa com menos de `MIN_AMOSTRA_FAIXA` (20) casos tem `taxa_acerto: null` e a tela
+diz **"ainda sem medição"** — nunca 0%, que se leria como "erra sempre". `pctConfianca` foi
+**removida** (canário de teste impede reintrodução nas 3 telas). A tela mostra "**8**/10" (fração,
+denominador em peso leve) e o `n` da amostra. `getIdsRetroativos` virou `getMedicoesRetroativas`
+(com o veredito humano de referência): quem mudou de Status volta à fila. `politicaDeLiberacao`
+recebe `carregarAcuraciaMedida()` e passa a dizer QUAL meta faltou.
+
+**Onde aterrissou.** `avaliacao-calibragem.ts` (novo) · `avaliacao-calibragem.functions.ts` (novo)
+· `avaliacao-sombra-rotulos.ts` · `components/dashboard/chip-sombra.tsx` ·
+`components/dashboard/projeto-detalhe-dialog.tsx` · `routes/_authenticated/dashboard.tsx` ·
+`dashboard-admin.functions.ts` (a calibragem viaja no payload da listagem — é UM objeto global, não
+um campo por projeto) · `client.server.ts` · `avaliacao-retroativa.functions.ts` ·
+`avaliacao/time.functions.ts`.
+
+**⚠️ O que não pode regredir.** O float interno **não mudou** (a lógica segue comparando por
+limiar) — a mudança é de EXIBIÇÃO e MEDIÇÃO. Faixa sem amostra **não exibe número**. `ajuste` fica
+**ausente** na acurácia medida (a mesa não tem esse desfecho; preenchê-lo com o número do `aprovar`
+seria inventar medição). E as flags de liberação seguem desligadas: `age_sozinho` continua `false`.
+
+**Status.** Testes: `tests/avaliacao-calibragem.test.ts`, `tests/avaliacao-gabarito-vivo.test.ts`,
+`tests/avaliacao-sombra-rotulos.test.ts` (canário do percentual). Plano:
+`docs/plans/calibragem-time-avaliacao.md` (fatia c, T10-T13).
+
+---
+
+## 2026-09-08 — A mesa procurava INFLAÇÃO em quatro eixos e nunca perguntava se o ganho era IRRELEVANTE
+
+**Sintoma.** Um projeto de **R$ 18,16/mês** (`LEGADO-057`, "Meta Base - Estoque") voltava
+`veredito: 'ok'` com confiança **0,9**. Em 04/09/2026 o dono do produto reprovou **137 projetos à
+mão** por esse eixo — **todos** com `statusAntes: "Aprovado"`
+(`docs/baselines/rodadas/snapshot-reprovacao-04-09.json`).
+
+**Causa-raiz.** `avaliacao-financeira.ts` tinha **TETO** de materialidade (R$ 5.000/mês → decisão
+humana) e **nenhum PISO**. E não havia desfecho negativo: `VeredictoAgregado` era
+`aprovar | em_validacao | isento` e `SaidaConsenso` era `aprovar | ajuste | humano` — reprovar não
+existia em lugar nenhum do time (só `analyzer.ts`, por `claro_nao`).
+
+**Fix (D4).** O time passa a poder reprovar por **RÉGUA DECLARADA**, com duas portas:
+**(i) piso de impacto** — `src/lib/materialidade-piso.ts` (PURO), `PISO_IMPACTO_MENSAL = 100`,
+mecânica, nenhum agente opina; **(ii) projeto inválido** — o agente tem de **NOMEAR** um dos 2
+motivos de `ROTULO_DESQ` (`fora_de_uso`, `ressubmissao`) **e CITAR** o trecho do material. Sem nome
+ou sem citação, **não reprova**. Nasce também a classe de erro **espelhada**
+`reprovacao_indevida` (o time reprova o que o humano aprovou) com taxa própria, e os **canários**
+(`avaliacao-canarios.ts`): se a mesa aprovaria um caso que ninguém honesto aprova, o relatório é
+marcado **suspeito** em vez de reportar o acerto.
+
+**Onde aterrissou.** `materialidade-piso.ts` (novo) · `avaliacao-canarios.ts` (novo) ·
+`agents/avaliacao-financeira.ts` (campo `abaixoDoPiso`) · `agents/agregador-avaliacao.ts` (enum) ·
+`agents/mesa-especialistas.ts` · `avaliacao-normais.functions.ts` · `deliberacao.ts` (estado
+terminal `reprovado`) · `agents/decisao-final.ts` · `agents/cetico-avaliacao.ts` ·
+`avaliacao/consenso.ts` · `avaliacao/textos.ts` · `avaliacao/time.ts` · `avaliacao/retroativo.ts` ·
+`avaliacao-retroativa.ts` · `avaliacao-sombra-rotulos.ts`.
+
+**⚠️ O que não pode regredir.**
+- **Os outros 5 motivos do `PISO_ZERO`** (`apenas_mensuravel`, `so_o_autor`, `simples_local`,
+  `marginal`, `experimentacao`) **NÃO reprovam** (D4.1): 336 dos 637 projetos da run 9 são 0★, e
+  reprová-los seria reprovar **metade da base**. Nota zero é a caixa «Experimenta».
+- **Ausência de número não é ganho abaixo do piso** (`0`/`null` → `false`): especial não tem
+  memorial financeiro e a v2 tem ganho IMENSURÁVEL declarado.
+- **ESPECIAL nunca é reprovado** pelo piso (o isento vem antes).
+- **Rejeição mecânica sobrepõe a aprovação do LLM**: o piso é repassado também à mesa LLM
+  (`conciliarJulgamentos`), senão as duas mesas teriam réguas diferentes.
+- **`reprovar` NUNCA age sozinho** (RF-246): não existe flag de liberação para ele.
+- **Todo leitor do enum ganhou rótulo próprio** — `rotuloVeredito`, `ROTULO_SAIDA`,
+  `rotuloEstadoDeliberacao`, `rotuloResultadoRetroativo`, `decidirComTime` e a máquina de
+  deliberação (estado terminal `reprovado`). ⚠️ Sem o ramo em `decidirComTime`, `reprovar` caía no
+  `return` final e virava **aprovado**; sem o terminal em `avancarDeliberacao`, moía até
+  `nao_consenso` e a reprovação **desaparecia**. É a mesma família do `Dispensado` que virou
+  `Pré-reprovado` na fila do líder. ⚠️ `avaliacao/retroativo.ts` **redigitava** a lista de saídas
+  em vez de usar o enum, e por isso o TypeScript não acusou nada: passou a tipar por `SaidaConsenso`.
+
+**Status.** Testes: `tests/materialidade-piso.test.ts` (inclui o gabarito dos 137 de 04/09),
+`tests/avaliacao-reprovar.test.ts`, `tests/avaliacao-canarios.test.ts`. Dois testes de
+`tests/consenso-avaliacao.test.ts` foram ATUALIZADOS de propósito (`fora_de_uso`/`ressubmissao`
+saíam `humano` e agora saem `reprovar`). Plano: `docs/plans/calibragem-time-avaliacao.md` (fatia c,
+T14-T17).
+
+---
+
 ## 2026-09-08 — Os 8 agentes de avaliação pediam o NÚMERO antes do raciocínio (score-first), e o especialista da mesa julgava vendo o parecer dos outros
 
 **Sintoma.** A run 9 da calibragem (`docs/baselines/runs/run-9.json`, n=637) parou em **52% de nota

@@ -9,8 +9,21 @@
 import { confiancaDe, type Confianca, type Contestacao } from '@/lib/estrelas-regua';
 import type { SaidaMerito, AuditoriaValor } from '@/lib/avaliacao/cerebro-merito';
 import type { SaidaEstrela } from '@/lib/avaliacao/cerebro-estrela';
+import { abaixoDoPisoDeImpacto, motivoPisoDeImpacto } from '@/lib/materialidade-piso';
 
-export type SaidaConsenso = 'aprovar' | 'ajuste' | 'humano';
+/**
+ * ⚠️ `reprovar` entrou em 08/09/2026 (D4 do plano de calibragem). O time passa a poder reprovar
+ * por **RÉGUA DECLARADA**, com DUAS portas e nada de juízo livre:
+ *   (i)  **piso de impacto** — mecânica, `materialidade-piso.ts`, nenhum agente opina;
+ *   (ii) **projeto inválido** — o agente tem de **NOMEAR** um dos motivos de `ROTULO_DESQ`
+ *        (`fora_de_uso`, `ressubmissao`) **e CITAR** o trecho do material que comprova. Sem nome
+ *        ou sem citação, **não reprova**.
+ * ⚠️ Os outros 5 motivos do `PISO_ZERO` (`apenas_mensuravel`, `so_o_autor`, `simples_local`,
+ * `marginal`, `experimentacao`) significam **nota zero**, NÃO reprovação (D4.1): 336 dos 637
+ * projetos da run 9 são 0★ e reprová-los seria reprovar metade da base.
+ * ⚠️ MODO SOMBRA: `reprovar` NUNCA age sozinho — não existe flag de liberação para ele (RF-246).
+ */
+export type SaidaConsenso = 'aprovar' | 'ajuste' | 'humano' | 'reprovar';
 export type MedicaoVeredito = { acerto: number; erro_grave: number; n: number };
 export type AcuraciaMedida = { aprovar?: MedicaoVeredito; ajuste?: MedicaoVeredito };
 
@@ -83,10 +96,34 @@ export type Consenso = {
   age_sozinho: boolean;
 };
 
-const ROTULO_DESQ: Record<string, string> = {
+/**
+ * Os motivos de INVALIDEZ do projeto — lista **FECHADA** e fonte única da porta (ii) da
+ * reprovação. ⚠️ Não é a lista do `PISO_ZERO`: aqui só entra o que torna o projeto inválido, não o
+ * que o deixa baixo. Ampliar esta lista é ampliar quem o time pode reprovar (D4.1).
+ */
+export const ROTULO_DESQ: Record<string, string> = {
   fora_de_uso: 'fora de uso (parado, descontinuado ou POC)',
   ressubmissao: 'ressubmissão do mesmo escopo já documentado (duplicado)',
 };
+
+/** As chaves de invalidez, derivadas do rótulo — nunca redigitadas. */
+export const MOTIVOS_INVALIDEZ: readonly string[] = Object.keys(ROTULO_DESQ);
+
+/**
+ * A porta (ii) está aberta? PURA. Exige as DUAS coisas de RF-244: motivo NOMEADO da lista fechada
+ * e ao menos uma citação do material. `sem_evidencia` (o agente declarou que não achou nada)
+ * fecha a porta mesmo com o motivo nomeado.
+ */
+export function invalidezComprovada(b: {
+  desqualificador?: string | null;
+  evidencias?: string[] | null;
+  sem_evidencia?: boolean | null;
+}): boolean {
+  const chave = b.desqualificador ?? '';
+  if (!MOTIVOS_INVALIDEZ.includes(chave)) return false;
+  if (b.sem_evidencia === true) return false;
+  return (b.evidencias ?? []).some((e) => typeof e === 'string' && e.trim().length > 0);
+}
 
 function frase(s: string): string {
   const t = s.replace(/—|–/g, ',').replace(/ - /g, ', ').trim();
@@ -108,6 +145,12 @@ export function conciliar(
     ceticoEstrelaRefuta?: boolean;
     /** O que ele disse, para virar divergência legível em vez de um booleano mudo. */
     ceticoEstrelaMotivo?: string | null;
+    /**
+     * Impacto mensal declarado (R$/mês) — a entrada da porta (i). Campo OPCIONAL: ausente/null
+     * significa "não há número declarado", que NÃO é ganho abaixo do piso (ver
+     * `materialidade-piso.ts`), então todo chamador antigo segue com o comportamento de antes.
+     */
+    impactoMensal?: number | null;
   },
 ): Consenso {
   const divergencias: string[] = [];
@@ -135,8 +178,25 @@ export function conciliar(
   });
   const escape = b.escape.indicado && b.escape.valido;
 
+  // ── As DUAS portas da reprovação (D4), ANTES de todo o resto ────────────────────────────────
+  // (i) PISO DE IMPACTO — mecânica. Vem primeiro porque rejeição mecânica sobrepõe a aprovação do
+  // LLM, nunca o contrário: nenhum arranjo de pareceres compensa um ganho de R$ 18/mês.
+  const abaixoDoPiso = abaixoDoPisoDeImpacto(ctx.impactoMensal);
+  // (ii) INVALIDEZ nomeada E citada — régua declarada, lista fechada.
+  const invalido = invalidezComprovada(b);
+
   let saida: SaidaConsenso;
-  if (escape) {
+  if (abaixoDoPiso) {
+    saida = 'reprovar';
+    motivos.push(frase(motivoPisoDeImpacto(ctx.impactoMensal as number)));
+  } else if (invalido) {
+    saida = 'reprovar';
+    motivos.push(
+      frase(
+        `Projeto inválido por ${ROTULO_DESQ[b.desqualificador as string]}, com a evidência citada do material: ${b.evidencias[0]}`,
+      ),
+    );
+  } else if (escape) {
     saida = 'humano';
     motivos.push(frase('Escape 6 a 10 indicado com os dois gatilhos citados: a posição na faixa é do comitê humano'));
   } else if (a.veredito === 'humano') {
@@ -166,9 +226,14 @@ export function conciliar(
     motivos.push(frase(`Confiança ${confianca}: ${a.sinais.temEvidenciaCitada && b.sinais.temEvidenciaCitada ? 'com' : 'sem'} evidência citada nos dois cérebros`));
   }
 
+  // ⚠️ `reprovar` NÃO tem flag de liberação (RF-246): não existe caminho em que o time reprove
+  // sozinho. Quem reprova em produção continua sendo gente.
   const age_sozinho =
     (saida === 'aprovar' && ctx.liberacao.aprovar) || (saida === 'ajuste' && ctx.liberacao.ajuste);
-  if (!age_sozinho && saida !== 'humano') {
+  if (saida === 'reprovar') {
+    motivos.push(frase('A reprovação é recomendação em sombra, quem reprova em produção é a triagem'));
+  }
+  if (!age_sozinho && saida !== 'humano' && saida !== 'reprovar') {
     motivos.push(frase(`Saída ${saida} fica em sombra: a liberação para agir sozinho não está autorizada`));
   }
 

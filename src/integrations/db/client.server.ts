@@ -3568,12 +3568,110 @@ export async function getAvaliacoesRetroativasPorIds(
 }
 
 /** ids já medidos pelo retroativo — para o cron não re-rodar o que já mediu (idempotência). */
-export async function getIdsRetroativos(): Promise<string[]> {
-  const rows = await queryAll<{ projeto_id: string }>(
-    'SELECT projeto_id FROM avaliacao_retroativa',
+/**
+ * As medições retroativas já gravadas, com o veredito HUMANO contra o qual cada uma foi medida.
+ *
+ * ⚠️ Devolvia só os ids (`getIdsRetroativos`), e o retroativo pulava esses projetos **para
+ * sempre** — gabarito CONGELADO (achado A3.3): os 137 projetos que viraram `Aprovado → Reprovado`
+ * em 04/09/2026 seguiam medidos contra a verdade ANTIGA, e um `aprovar` ali é um `erro_grave` que
+ * nunca seria contado. Com o veredito de referência em mãos, quem mudou de Status volta à fila
+ * (`upsertAvaliacaoRetroativa` já é UPSERT — re-medir é reavaliar).
+ */
+export async function getMedicoesRetroativas(): Promise<
+  { projeto_id: string; veredito_humano: string | null }[]
+> {
+  return await queryAll<{ projeto_id: string; veredito_humano: string | null }>(
+    'SELECT projeto_id, veredito_humano FROM avaliacao_retroativa',
     [],
   );
-  return rows.map((r) => r.projeto_id);
+}
+
+/**
+ * O último CONSENSO do time autônomo de agentes num projeto — é de onde sai a **estrela
+ * recomendada** que a ficha exibe.
+ *
+ * ⚠️ A estrela NÃO vem da mesa (`projeto_avaliacao`): a mesa produz veredito e confiança, e nunca
+ * uma nota. Quem raciocina a estrela é o TIME (`avaliacao/time.ts`, cérebro da estrela), que só
+ * roda **sob demanda** (`POST /api/admin/avaliacao/time`) e cujo resultado vive no log em árvore.
+ * Por isso a leitura é daqui, e por isso projeto que nunca teve o time rodado simplesmente não tem
+ * estrela do agente — não é falha de leitura. (Estrela automática em TODO projeto é a T8 do plano
+ * da v2, ainda não implementada.)
+ *
+ * ⚠️ Uma linha só, pelo índice `idx_agente_log_projeto_criado`. O `saida` do nó de consenso é o
+ * `Consenso` inteiro em JSON — quem o interpreta é o chamador.
+ */
+export async function getUltimoConsensoDoTime(
+  projetoId: string,
+): Promise<{ saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null } | null> {
+  const rows = await queryAll<{
+    saida: string | null;
+    confianca: string | null;
+    veredito: string | null;
+    created_at: string | null;
+  }>(
+    `SELECT saida, confianca, veredito, created_at
+       FROM agente_log
+      WHERE projeto_id = ? AND tipo = 'consenso'
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * O último consenso do TIME para VÁRIOS projetos — a versão em lote do leitor acima, para o
+ * `getProjetosDashboardLote`.
+ *
+ * ⚠️ **Uma consulta, nunca uma por projeto**: o `ROW_NUMBER() OVER (PARTITION BY ...)` escolhe a
+ * linha mais recente de cada projeto dentro do próprio SQL — é o mesmo padrão que tirou o
+ * `/investigador` de 600 round-trips. E seleciona só 4 colunas: `agente_log.entrada`/`tools_chamadas`
+ * são textos longos e o teto de 32 MiB de RPC já derrubou 3 consultas nesta vizinhança.
+ */
+export async function getUltimosConsensosDoTimePorIds(
+  ids: string[],
+): Promise<Map<string, { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null }>> {
+  const chaves = [...new Set(ids.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  const out = new Map<string, { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null }>();
+  if (chaves.length === 0) return out;
+  const linhas = await queryEmLotesPorIds<{
+    projeto_id: string;
+    saida: string | null;
+    confianca: string | null;
+    veredito: string | null;
+    created_at: string | null;
+  }>(
+    (ph) => `SELECT projeto_id, saida, confianca, veredito, created_at FROM (
+               SELECT projeto_id, saida, confianca, veredito, created_at,
+                      ROW_NUMBER() OVER (PARTITION BY LOWER(projeto_id) ORDER BY created_at DESC) AS rn
+                 FROM agente_log
+                WHERE tipo = 'consenso' AND LOWER(projeto_id) IN (${ph})
+             ) WHERE rn = 1`,
+    chaves,
+  );
+  for (const l of linhas) {
+    out.set(String(l.projeto_id).trim().toLowerCase(), {
+      saida: l.saida,
+      confianca: l.confianca,
+      veredito: l.veredito,
+      created_at: l.created_at,
+    });
+  }
+  return out;
+}
+
+/**
+ * Contagem das medições por FAIXA de confiança × balde do comparador — a matéria-prima da
+ * calibragem (`avaliacao-calibragem.ts`). ⚠️ Agrega no SQL: a tabela tem uma linha por projeto
+ * medido e não há motivo para trazer 600 linhas para contar 12 números.
+ */
+export async function getCalibragemRetroativa(): Promise<
+  { grau: string | null; resultado: string | null; n: number }[]
+> {
+  return await queryAll<{ grau: string | null; resultado: string | null; n: number }>(
+    'SELECT grau, resultado, COUNT(*) AS n FROM avaliacao_retroativa GROUP BY grau, resultado',
+    [],
+  );
 }
 
 /** Grava (ou substitui) a medição retroativa de um projeto. UPSERT: re-medir é reavaliar. */

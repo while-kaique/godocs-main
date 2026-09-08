@@ -25,7 +25,7 @@ const TEXTO: TextoProjeto = {
 function votosBase(over: Partial<VotosDeterministicos> = {}): VotosDeterministicos {
   return {
     fte: { implausivel: false, fte: 0.5, pessoas: 1, motivo: null },
-    financeiro: { veredito: 'ok', confianca: 0.9, motivo: null, sinais: [] },
+    financeiro: { veredito: 'ok', confianca: 0.9, motivo: null, sinais: [], abaixoDoPiso: false },
     rag: { apoio: true, confianca: 0.85, vizinhos: 3, topSimilaridade: 0.7, motivo: null },
     cetico: { refuta: false, confianca: 0, motivo: null, sinais: [] },
     ...over,
@@ -65,7 +65,7 @@ describe('montarEntradasEspecialistas', () => {
   it('financeiro !== ok → preocupa; rag sem apoio → preocupa; cético refuta → preocupa', () => {
     const entradas = montarEntradasEspecialistas(
       votosBase({
-        financeiro: { veredito: 'atencao', confianca: 0.4, motivo: 'material', sinais: ['s'] },
+        financeiro: { veredito: 'atencao', confianca: 0.4, motivo: 'material', sinais: ['s'], abaixoDoPiso: false },
         rag: { apoio: false, confianca: 0.4, vizinhos: 0, topSimilaridade: 0, motivo: 'sem vizinho' },
         cetico: { refuta: true, confianca: 0.6, motivo: 'projetado', sinais: ['proj'] },
       }),

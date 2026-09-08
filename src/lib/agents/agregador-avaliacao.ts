@@ -6,9 +6,21 @@
  *   • sinal do RAG por corpus de aprovados (`avaliarSinalRag`, aqui).
  *
  * Regra de ouro (o pedido do dono): **confiança baixa OU divergência → `em_validacao`** (fila
- * humana). O agregador **NUNCA decide sozinho** um desfecho negativo — só há dois caminhos,
- * `aprovar` (todos os votos confiantes e concordes) ou `em_validacao` (qualquer dúvida) — e
- * **especial é ISENTO** (liderança NÃO isenta mais — 01/09/2026; ver o gate).
+ * humana). O agregador **nunca decide um desfecho negativo por JUÍZO** — `aprovar` (votos
+ * confiantes e concordes) ou `em_validacao` (qualquer dúvida) — e **especial é ISENTO** (liderança
+ * NÃO isenta mais — 01/09/2026; ver o gate).
+ *
+ * ⚠️ **A única exceção, e ela é MECÂNICA: `reprovar` pelo PISO DE IMPACTO** (D4 do plano de
+ * calibragem, 08/09/2026). Não é opinião de agente nenhum: `avaliarFinanceiro` devolve
+ * `abaixoDoPiso` comparando o impacto mensal declarado com a régua de `materialidade-piso.ts`, e
+ * aqui isso vira desfecho. É o invariante do repo "rejeição MECÂNICA sobrepõe aprovação do LLM,
+ * nunca o contrário" — e por ser mecânica ela vale também sobre a mesa LLM
+ * (`agregarJulgamentos`), que não vota sobre o piso.
+ * ⚠️ Os outros motivos de nota zero (`apenas_mensuravel`, `so_o_autor`, `simples_local`,
+ * `marginal`, `experimentacao`) **NÃO reprovam** (D4.1): eles dizem a ALTURA do projeto, não que
+ * ele seja inválido — 336 dos 637 projetos da run 9 são 0★ e reprová-los seria reprovar metade da
+ * base. Nota zero é a caixa «Experimenta», não reprovação.
+ * ⚠️ MODO SOMBRA continua: `reprovar` é RECOMENDAÇÃO. Nada aqui muda status de projeto.
  *
  * ⚠️ MODO SOMBRA (fatia B): esta função só PRODUZ a recomendação. Nada aqui muda o status do
  * projeto — quem registra é `avaliacao-normais.functions.ts`, na tabela `projeto_avaliacao`.
@@ -97,10 +109,13 @@ export const QUORUM_PREOCUPACAO = 2;
  */
 export const MIN_JULGAMENTOS_PARA_APROVAR = 2;
 
-export type VeredictoAgregado = 'aprovar' | 'em_validacao' | 'isento';
+export type VeredictoAgregado = 'aprovar' | 'em_validacao' | 'reprovar' | 'isento';
 
 export type ResultadoAgregado = {
-  /** 'aprovar' (todos confiantes/concordes), 'em_validacao' (dúvida) ou 'isento' (especial/liderança). */
+  /**
+   * 'aprovar' (todos confiantes/concordes), 'em_validacao' (dúvida), 'reprovar' (só pelo piso de
+   * impacto — régua mecânica, ver o aviso no topo) ou 'isento' (especial).
+   */
   veredito: VeredictoAgregado;
   /** 0..1 — confiança agregada (o elo mais fraco entre os votos). */
   confianca: number;
@@ -117,6 +132,23 @@ export type ResultadoAgregado = {
 function clamp01(n: number): number {
   if (!isFinite(n)) return 0;
   return Math.max(0, Math.min(1, n));
+}
+
+/**
+ * O desfecho MECÂNICO do piso de impacto, montado num lugar só (os dois agregadores o devolvem
+ * igual). Confiança 1: não há dúvida a medir — o número está abaixo da régua ou não está.
+ * `aplicarEmValidacao` fica `false` porque isto NÃO é fila humana: é uma recomendação de reprovar,
+ * e o que segura tudo em sombra é a liberação desligada, não a fila.
+ */
+function reprovadoPeloPiso(motivo: string | null): ResultadoAgregado {
+  return {
+    veredito: 'reprovar',
+    confianca: 1,
+    aplicarEmValidacao: false,
+    divergencia: false,
+    isento: false,
+    motivos: [motivo ?? 'Impacto mensal declarado abaixo do piso.'],
+  };
 }
 
 /**
@@ -151,6 +183,13 @@ export function agregarVotos(input: {
         'Projeto especial. A avaliação automática não se aplica (validação humana).',
       ],
     };
+  }
+
+  // PISO DE IMPACTO (D4) — mecânico e ANTES de qualquer aritmética de confiança: nenhum arranjo de
+  // votos "compensa" um ganho de R$ 18/mês. Vem DEPOIS do isento de especial de propósito (especial
+  // não tem memorial financeiro, então não há impacto declarado a julgar).
+  if (input.financeiro.abaixoDoPiso) {
+    return reprovadoPeloPiso(input.financeiro.motivo);
   }
 
   const limiar =
@@ -230,6 +269,14 @@ export function agregarJulgamentos(input: {
   especial?: boolean | null;
   fluxoDireto?: boolean | null;
   limiarConfianca?: number | null;
+  /**
+   * O piso de impacto MECÂNICO (de `avaliarFinanceiro.abaixoDoPiso`), com o motivo já redigido.
+   * Campo OPCIONAL: ausente é `false`, então todo chamador antigo segue byte-idêntico. ⚠️ Os
+   * especialistas LLM não votam sobre o piso — quem o aplica é a régua, e ela sobrepõe o painel
+   * inteiro (rejeição mecânica sobrepõe aprovação do LLM).
+   */
+  abaixoDoPiso?: boolean | null;
+  motivoPiso?: string | null;
 }): ResultadoAgregado {
   // ⚠️ LIDERANÇA NÃO ISENTA MAIS (decisão do Luis, 01/09/2026). Só o ESPECIAL isenta.
   // Antes, `fluxoDireto` (autor coordenador+) devolvia `isento` e isso silenciava **145 dos 649
@@ -251,6 +298,11 @@ export function agregarJulgamentos(input: {
         'Projeto especial. A avaliação automática não se aplica (validação humana).',
       ],
     };
+  }
+
+  // PISO DE IMPACTO: mecânico, sobrepõe o painel LLM inteiro (ver o aviso no topo).
+  if (input.abaixoDoPiso === true) {
+    return reprovadoPeloPiso(input.motivoPiso ?? null);
   }
 
   const limiar =

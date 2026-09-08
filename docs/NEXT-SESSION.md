@@ -2,27 +2,69 @@
 
 ## Plano ativo
 **→ [docs/plans/calibragem-time-avaliacao.md](plans/calibragem-time-avaliacao.md)** · Status: ✅ aprovado (Luis, 08/09/2026)
-· branch `feat/calibragem-time-avaliacao` · worktree `~/godocs-wt-calibragem-time` (sobre `origin/main`
-`e8d26de`)
+· **fatia (a) T1-T3 e fatia (b) T5-T9 EM PROD** (PR #324) · **fatia (c) T10-T17 CODADA** na branch
+`feat/calibragem-confianca-medida`, worktree `~/godocs-wt-calibragem-c` (sobre `origin/main` `d066851`)
 
-Três entregas independentes e paráveis: **(a)** racional-primeiro nos 8 agentes + independência dos
-especialistas · **(b)** a discordância humana vira lição, estendendo o `correcoes.ts` que já existe ·
-**(c)** confiança MEDIDA em vez de percentual inventado, fechando o circuito
-(`politicaDeLiberacao(null)`, gabarito congelado, piso de materialidade, 5ª saída `reprovar`).
-
-> ⚠️ Os ponteiros das seções abaixo são de OUTRAS branches (`feat/godocs-v2`,
-> `regua-estrelas-e-time-unificado`) e ficam preservados de propósito.
+**Suíte 3862 verde** (entrou em 3787), `tsc` nos **9 erros pré-existentes**, `npm run build` ok,
+`worker.js` rebuildado (regra 1), specs atualizadas (regra 12: 2 entradas em `SPEC_CORRECOES.md`).
 
 ### Próximo passo
-**Medir a fatia (a) — a T4, que é o que falta para ela fechar.** Deploy na **staging (`edf400b4`)** com o
-fluxo do "Deploy rápido" (regra 13: staging antes de prod) e depois a run 10:
-`npx tsx --env-file=.env scripts/v2/classificar-paralelo.mts --staging` — ⚠️ **precisa do `.env` com
-`E2E_COOKIE`, que NÃO existe nesta worktree** (copiar de `~/godocs-main` ou renovar o cookie). Gravar
-`docs/baselines/runs/run-10.json` + `run-10-comparacao.txt` no formato da run 9 e comparar contando **só
-`humana > 0`** (baseline: n=637, idêntica **52%**, ±1 **76%**). O critério do plano **não é "subiu"**, é
-**estar medido**. Feito isso, a fatia **(b) T5-T9** com `/ggsd:code`.
+**Validar na STAGING (`edf400b4`) e só então prod (regra 13), com o merge no `main` no mesmo dia
+(regra 14).** Duas coisas a olhar no navegador, porque são as únicas com superfície visível:
+1. **`/dashboard`** — a coluna "Sombra" e a ficha devem dizer **"ainda sem medição"** enquanto a
+   staging não tiver 20 medições numa faixa (é o estado esperado, não bug), e **nenhum percentual**
+   pode aparecer.
+2. **`POST /api/admin/avaliacao-retroativa`** (`{"dry":true}`) — a resposta agora traz `canarios`;
+   com o `LEGADO-057` na base, `canarios.avaliados` deve ser ≥ 1.
 
-### ✅ O que a sessão de CÓDIGO de 08/09 entregou — fatia (a), T1/T2/T3
+Depois disso, o que **falta do plano inteiro** são as duas MEDIÇÕES, nenhuma delas código:
+- **T4 (fatia a)** — a run 10 contra o baseline da run 9 (`docs/baselines/runs/run-9.json`, n=637,
+  idêntica 52%, ±1 76%): `npx tsx --env-file=.env scripts/v2/classificar-paralelo.mts --staging`.
+  ⚠️ precisa de `.env` com `E2E_COOKIE`.
+- **Critério 9 do plano** — o piso contra o snapshot de 04/09 **já está medido e travado em teste**
+  (`tests/materialidade-piso.test.ts`: os 137 alvos ficam abaixo de R$ 100, o maior é R$ 99,34).
+
+⚠️ **Os 3 revisores de contexto fresco NÃO rodaram** nesta fatia, e os marcadores
+`.claude/.review-status`/`.quality-status` **barram `git push` e `/ggsd:ship`** — commit na branch e
+deploy na staging não são barrados. Destravar: `ggsd:verificador-conformidade` +
+`ggsd:revisor-qualidade` e gravar os vereditos.
+
+### ✅ O que a sessão de CÓDIGO de 08/09 (tarde) entregou — fatia (c), T10-T17
+
+Oito tarefas, **2 módulos puros novos** e a varredura de leitores que o plano exigia.
+
+- **T10** `src/lib/avaliacao-calibragem.ts` (PURO) — acerto por FAIXA (a coluna `grau` era gravada e
+  nunca lida), `MIN_AMOSTRA_FAIXA = 20`, taxa `null` (nunca 0%) sem amostra, e a concordância
+  implícita da D2 (`classificarConcordanciaImplicita`: só conta com **prova de olhada**; o 👎 conta
+  retroativamente).
+- **T11** a tela deixou de exibir percentual: `pctConfianca` **removida** (canário nas 3 telas), a
+  confiança virou "**8**/10 · N casos" ou "ainda sem medição". A calibragem viaja no **payload da
+  listagem** (UM objeto global, fail-safe) em vez de custar uma requisição.
+- **T12** `getIdsRetroativos` → **`getMedicoesRetroativas`**: gabarito VIVO, quem mudou de Status
+  volta à fila.
+- **T13** `politicaDeLiberacao(carregarAcuraciaMedida(), …)` no lugar do `null` literal. `ajuste`
+  fica AUSENTE de propósito; `age_sozinho` segue `false`.
+- **T14** `src/lib/materialidade-piso.ts` (PURO), `PISO_IMPACTO_MENSAL = 100` + `abaixoDoPiso` no
+  financeiro. LEGADO-057 (R$ 18,16/mês) sai de `ok`/0,9 para `atencao`.
+- **T15** desfecho **`reprovar`** nas duas mesas, com as 2 portas (piso mecânico · invalidez nomeada
+  E citada). Os outros 5 motivos do `PISO_ZERO` **não** reprovam.
+- **T16** `src/lib/avaliacao-canarios.ts` — 4 casos REAIS do snapshot de 04/09; a mesa aprovando um
+  deles marca o relatório como **suspeito**.
+- **T17** classe espelhada **`reprovacao_indevida`** com taxa própria, nos DOIS retroativos.
+
+**⚠️ O que mordeu, e vale saber:** `avaliacao/retroativo.ts` **redigitava** o enum de saídas em vez
+de importá-lo, então ampliar `SaidaConsenso` **não gerou erro de compilação nenhum** — o arquivo
+teria seguido cego ao `reprovar`. Foi encontrado na varredura manual de leitores, não pelo `tsc`.
+Idem `decidirComTime` (o `reprovar` cairia no `return` final e viraria **aprovado**) e
+`avancarDeliberacao` (moeria até `nao_consenso`, apagando a reprovação). Os 3 estão em teste.
+
+**2 testes atualizados de propósito:** em `tests/consenso-avaliacao.test.ts`,
+`fora_de_uso`/`ressubmissao` com citação saíam `humano` e agora saem `reprovar` — é exatamente o que
+a D4 expande. O caso SEM citação virou teste novo e continua `humano`.
+
+---
+
+### O que a sessão de CÓDIGO de 08/09 (manhã) entregou — fatia (a), T1/T2/T3
 
 Branch `feat/calibragem-time-avaliacao`, worktree `~/godocs-wt-calibragem-time`. Suíte **3724 verde**
 (entrou em 3708), `tsc` nos **9 erros pré-existentes** (nenhum em arquivo tocado), `worker.js` rebuildado

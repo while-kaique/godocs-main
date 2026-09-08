@@ -6,7 +6,8 @@
 // olhou", e não entra em comparação nenhuma; descontinuado fica fora de tudo (D7). D12: queda em massa
 // para o mesmo nível acusa a régua, não os projetos — o relatório emite o alerta de achatamento.
 import { detectarAchatamento, conferirCalibragem } from '@/lib/estrelas-regua';
-import type { AcuraciaMedida, MedicaoVeredito } from '@/lib/avaliacao/consenso';
+import { conferirCanarios } from '@/lib/avaliacao-canarios';
+import type { AcuraciaMedida, MedicaoVeredito, SaidaConsenso } from '@/lib/avaliacao/consenso';
 
 export type LinhaGabarito = {
   id: string;
@@ -54,7 +55,9 @@ export type ResultadoProjeto = {
   nome: string;
   area: string | null;
   especial: boolean;
-  saida: 'aprovar' | 'ajuste' | 'humano';
+  // ⚠️ Tipado pelo enum, NÃO redigitado: quando `reprovar` entrou (D4), a lista literal que estava
+  // aqui não deu erro de compilação nenhum e este arquivo teria seguido cego ao desfecho novo.
+  saida: SaidaConsenso;
   veredito_merito: 'aprovar' | 'ajuste' | 'humano';
   estrela: number;
   escape: boolean;
@@ -66,7 +69,12 @@ export type ResultadoProjeto = {
   custo_usd: number;
 };
 
-export type Merito = 'acerto' | 'conservador' | 'erro_grave' | 'sem_base';
+/**
+ * ⚠️ `reprovacao_indevida` (RF-247) é o erro ESPELHADO do `erro_grave`: o time reprovaria o que a
+ * triagem aprovou. Sem classe própria ele cairia em `conservador`/`acerto` — ou seja, o pior erro
+ * possível para o AUTOR entraria no relatório como prudência ou como acerto.
+ */
+export type Merito = 'acerto' | 'conservador' | 'erro_grave' | 'reprovacao_indevida' | 'sem_base';
 
 export type ComparacaoProjeto = {
   id: string;
@@ -89,8 +97,18 @@ export function compararProjeto(r: ResultadoProjeto, g: LinhaGabarito): Comparac
   const status = statusAssentado(g.status);
   let merito: Merito = 'sem_base';
   if (confiavel && status) {
-    if (status === 'aprovado') merito = r.saida === 'aprovar' ? 'acerto' : 'conservador';
-    else merito = r.saida === 'aprovar' ? 'erro_grave' : r.saida === 'ajuste' ? 'acerto' : 'conservador';
+    if (status === 'aprovado') {
+      if (r.saida === 'aprovar') merito = 'acerto';
+      else if (r.saida === 'reprovar') merito = 'reprovacao_indevida';
+      else merito = 'conservador';
+    } else if (r.saida === 'aprovar') {
+      merito = 'erro_grave';
+    } else if (r.saida === 'ajuste' || r.saida === 'reprovar') {
+      // Reprovado pelo humano: pedir ajuste e reprovar batem com ele (nenhum auto-aprova).
+      merito = 'acerto';
+    } else {
+      merito = 'conservador';
+    }
   }
   const humana = g.nota_humana;
   const comparavel = confiavel && typeof humana === 'number';
@@ -114,7 +132,14 @@ export function compararProjeto(r: ResultadoProjeto, g: LinhaGabarito): Comparac
 export type RelatorioRetroativo = {
   total: number;
   por_gabarito: Record<ConfiancaGabarito, number>;
-  merito: { acerto: number; conservador: number; erro_grave: number; sem_base: number; acuracia: number | null };
+  merito: {
+    acerto: number;
+    conservador: number;
+    erro_grave: number;
+    reprovacao_indevida: number;
+    sem_base: number;
+    acuracia: number | null;
+  };
   acuracia_por_veredito: AcuraciaMedida;
   estrelas: {
     distribuicao_time: Record<string, number>;
@@ -127,7 +152,7 @@ export type RelatorioRetroativo = {
   };
   achatamento: ReturnType<typeof detectarAchatamento>;
   calibragem: ReturnType<typeof conferirCalibragem>;
-  saidas: Record<'aprovar' | 'ajuste' | 'humano', number>;
+  saidas: Record<SaidaConsenso, number>;
   humano_pct: number | null;
   valor: { absurdos: number; auditados: number };
   contestacoes: { id: string; nome: string; humana: number | null; time: number }[];
@@ -147,8 +172,15 @@ function medicao(cs: ComparacaoProjeto[]): MedicaoVeredito | undefined {
 export function agregarRetroativo(comparacoes: ComparacaoProjeto[]): RelatorioRetroativo {
   const total = comparacoes.length;
   const por_gabarito: Record<ConfiancaGabarito, number> = { nota_humana: 0, status_assentado: 0, nao_auditado: 0, fora: 0 };
-  const merito = { acerto: 0, conservador: 0, erro_grave: 0, sem_base: 0, acuracia: null as number | null };
-  const saidas = { aprovar: 0, ajuste: 0, humano: 0 };
+  const merito = {
+    acerto: 0,
+    conservador: 0,
+    erro_grave: 0,
+    reprovacao_indevida: 0,
+    sem_base: 0,
+    acuracia: null as number | null,
+  };
+  const saidas: Record<SaidaConsenso, number> = { aprovar: 0, ajuste: 0, humano: 0, reprovar: 0 };
   const distribuicao_time: Record<string, number> = { '0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
   const distribuicao_humana: Record<string, number> = {};
   const quedas: number[] = [];
@@ -180,7 +212,8 @@ export function agregarRetroativo(comparacoes: ComparacaoProjeto[]): RelatorioRe
     }
   }
 
-  const julgados = merito.acerto + merito.conservador + merito.erro_grave;
+  const julgados =
+    merito.acerto + merito.conservador + merito.erro_grave + merito.reprovacao_indevida;
   merito.acuracia = julgados ? merito.acerto / julgados : null;
   const n = dists.length;
   const achatamento = detectarAchatamento(quedas);
@@ -201,6 +234,17 @@ export function agregarRetroativo(comparacoes: ComparacaoProjeto[]): RelatorioRe
   }
   if (merito.erro_grave > 0) {
     alertas.push(`${merito.erro_grave} erro grave: o time aprovou projeto que o humano reprovou. Aprovar não pode agir sozinho.`);
+  }
+  // CANÁRIOS (T16): acurácia perfeita é tripwire, não vitória. Se o time aprovaria um caso que
+  // ninguém honesto aprova, o relatório é SUSPEITO e a taxa não deve ser lida como qualidade.
+  const canarios = conferirCanarios(
+    comparacoes.map((c) => ({ projeto_id: c.id, veredito_agregado: c.saida })),
+  );
+  if (canarios.alerta) alertas.push(canarios.alerta);
+  if (merito.reprovacao_indevida > 0) {
+    alertas.push(
+      `${merito.reprovacao_indevida} reprovação indevida: o time reprovaria projeto que o humano aprovou. Revisar o piso e a porta de invalidez antes de qualquer liberação.`,
+    );
   }
 
   return {
@@ -317,6 +361,7 @@ export function relatorioParaMarkdown(
   l.push(`| aprovar | ${r.saidas.aprovar} |`);
   l.push(`| ajuste | ${r.saidas.ajuste} |`);
   l.push(`| humano | ${r.saidas.humano} |`);
+  l.push(`| reprovar | ${r.saidas.reprovar} |`);
   l.push('');
   l.push(`Humano: ${pct(r.humano_pct)} dos projetos.`);
   l.push('');
@@ -326,6 +371,7 @@ export function relatorioParaMarkdown(
   l.push(`| acerto | ${r.merito.acerto} |`);
   l.push(`| conservador | ${r.merito.conservador} |`);
   l.push(`| erro grave | ${r.merito.erro_grave} |`);
+  l.push(`| reprovação indevida | ${r.merito.reprovacao_indevida} |`);
   l.push(`| sem base | ${r.merito.sem_base} |`);
   l.push('');
   l.push(`Acurácia de mérito: ${pct(r.merito.acuracia)}.`);

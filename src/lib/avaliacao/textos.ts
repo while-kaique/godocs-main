@@ -26,6 +26,9 @@ const ROTULO_SAIDA: Record<Consenso['saida'], string> = {
   aprovar: 'Aprovar',
   ajuste: 'Pedir ajuste',
   humano: 'Encaminhar ao humano',
+  // ⚠️ Rótulo PRÓPRIO (D4): sem ele, `reprovar` cairia num `undefined` no meio da justificativa
+  // interna — a família de bug do `Dispensado` que virou `Pré-reprovado` na fila do líder.
+  reprovar: 'Reprovar',
 };
 const ROTULO_CONFIANCA: Record<Consenso['confianca'], string> = { alta: 'alta', media: 'média', baixa: 'baixa' };
 

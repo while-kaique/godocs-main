@@ -15,7 +15,7 @@
  * da MESA NOVA (agentes LLM) contra o veredito humano, o gate de confiança antes de sair da sombra.
  */
 import {
-  getIdsRetroativos,
+  getMedicoesRetroativas,
   upsertAvaliacaoRetroativa,
 } from '@/integrations/db/client.server';
 import { lerResumosEspelho } from '@/lib/sheet-espelho';
@@ -31,6 +31,7 @@ import {
   type ResultadoComparacao,
   type Acuracia,
 } from '@/lib/avaliacao-retroativa';
+import { conferirCanarios, type ResultadoCanarios } from '@/lib/avaliacao-canarios';
 
 /** Carimbo de origem das medições retroativas. */
 export const ORIGEM_RETROATIVO = 'retroativo-normais';
@@ -55,6 +56,11 @@ export type ResultadoRetroativo = {
   medidos: number;
   acuracia: Acuracia;
   itens: ItemRetroativo[];
+  /**
+   * Os casos-canário desta corrida (T16). ⚠️ `suspeito: true` invalida a leitura da acurácia:
+   * acurácia perfeita com canário aprovado é sinal de medição furada, não de qualidade.
+   */
+  canarios: ResultadoCanarios;
   motivo?: string;
 };
 
@@ -64,10 +70,12 @@ function acuraciaVazia(): Acuracia {
     acerto: 0,
     conservador: 0,
     erro_grave: 0,
+    reprovacao_indevida: 0,
     sem_base: 0,
     comparaveis: 0,
     taxa_acerto: 0,
     taxa_erro_grave: 0,
+    taxa_reprovacao_indevida: 0,
   };
 }
 
@@ -88,6 +96,7 @@ export async function avaliarRetroativo(
       medidos: 0,
       acuracia: acuraciaVazia(),
       itens: [],
+      canarios: conferirCanarios([]),
       motivo: 'AVALIACAO_NORMAIS desligado (modo sombra OFF)',
     };
   }
@@ -96,16 +105,29 @@ export async function avaliarRetroativo(
 
   const { linhas } = await lerResumosEspelho();
   const resumos = linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null);
-  const jaMedidos = new Set(await getIdsRetroativos());
+  // GABARITO VIVO (T12/RF-241): guardamos o veredito humano contra o qual cada projeto foi medido.
+  // Quem mudou de Status desde a medição volta à fila — antes o `Set` de ids o excluía para sempre
+  // e a acurácia continuava sendo calculada sobre uma verdade que já tinha mudado.
+  const medidoContra = new Map<string, string | null>();
+  for (const m of await getMedicoesRetroativas()) {
+    medidoContra.set(String(m.projeto_id).toLowerCase(), m.veredito_humano);
+  }
+  const jaMedidoContraOMesmoStatus = (p: ProjetoDashboardResumo): boolean => {
+    const chave = String(p.id).toLowerCase();
+    if (!medidoContra.has(chave)) return false;
+    const antes = String(medidoContra.get(chave) ?? '').trim().toLowerCase();
+    return antes === String(p.statusChave ?? '').trim().toLowerCase();
+  };
 
-  // Candidatos = NÃO especiais, com veredito humano assentado (aprovado/reprovado), ainda não medidos.
+  // Candidatos = NÃO especiais, com veredito humano assentado (aprovado/reprovado), e que ainda
+  // não foram medidos CONTRA O STATUS ATUAL.
   const candidatos = resumos
     .filter(
       (p) =>
         !p.especial &&
         p.statusChave != null &&
         STATUS_ASSENTADOS.has(p.statusChave) &&
-        !jaMedidos.has(p.id),
+        !jaMedidoContraOMesmoStatus(p),
     )
     .slice(0, limite);
 
@@ -118,6 +140,7 @@ export async function avaliarRetroativo(
       medidos: 0,
       acuracia: acuraciaVazia(),
       itens: [],
+      canarios: conferirCanarios([]),
       motivo: 'nenhum projeto com veredito humano pendente de medição',
     };
   }
@@ -163,6 +186,16 @@ export async function avaliarRetroativo(
   }
 
   const acuracia = agregarAcuracia(itens.map((i) => i.resultado));
+  const canarios = conferirCanarios(itens);
 
-  return { ok: true, ligado: true, dry, candidatos: candidatos.length, medidos, acuracia, itens };
+  return {
+    ok: true,
+    ligado: true,
+    dry,
+    candidatos: candidatos.length,
+    medidos,
+    acuracia,
+    itens,
+    canarios,
+  };
 }
