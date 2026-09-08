@@ -8,6 +8,7 @@ import { appendRow, updateRowByProjectId, type SheetColumn } from './sheets';
 // — era a MESMA notificação por submissão com outra roupa. Agora o grupo é avisado na
 // pré-aprovação do líder (`notificacao-chat.ts`). Não reimplementar.
 import { sendChatNotification, buildSubmitMessage, ehProjetoTesteE2E } from './chat';
+import { resumirGanho } from '@/lib/notificacao-ganho';
 // Espelho da planilha: quem escreve no Sheets remenda o espelho na hora, senão o efeito da
 // escrita só apareceria na tela no próximo cron (as telas leem o espelho — `sheet-espelho.ts`).
 import { espelharEscrita } from '@/lib/sheet-espelho';
@@ -17,6 +18,8 @@ import {
   desserializarCategorias,
   desserializarCustoRodar,
   desserializarLinhasHoras,
+  totalCustoRodar,
+  totalHorasLiberadas,
 } from '@/lib/ganhos';
 import { tituloGanho } from '@/lib/ganhos-rotulos';
 import { normalizarTipo, tipoParaSheet } from '@/lib/categoria-projeto';
@@ -351,15 +354,13 @@ function celulasGanhoV2(
 
   // Horas liberadas: o TOTAL das linhas, clampado por linha (par invertido não abate o
   // ganho das outras — mesma régua de `derivarValorHorasCustoEvitado`).
-  const linhas = desserializarLinhasHoras(projeto.custo_evitado_horas_linhas);
-  const horas =
-    Math.round(
-      linhas.reduce((soma, l) => soma + Math.max(0, l.horasAntes - l.horasDepois), 0) * 100,
-    ) / 100;
+  // ⚠️ Os dois totais saem de `ganhos.ts` (puras `totalHorasLiberadas`/`totalCustoRodar`),
+  // não somados aqui: o card do Google Chat mostra os MESMOS números
+  // (`notificacao-ganho.ts`), e uma segunda soma divergiria em silêncio.
+  const horas = totalHorasLiberadas(desserializarLinhasHoras(projeto.custo_evitado_horas_linhas));
 
   const itensCusto = desserializarCustoRodar(projeto.custo_rodar_itens);
-  const custoRodarTotal =
-    Math.round(itensCusto.reduce((soma, i) => soma + Math.max(0, i.valor), 0) * 100) / 100;
+  const custoRodarTotal = totalCustoRodar(itensCusto);
   // Mesmo formato de item da v1 (`• nome — R$ valor (recorrência). o que é`), para a
   // coluna continuar legível por quem já lê a da v1.
   // ⚠️ O detalhamento usa o MESMO valor clampado do total. Listar o item negativo cru
@@ -673,16 +674,26 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         area: p.area,
         ferramenta: ouTraco(p.projeto.ferramenta),
         escopo: ouTraco(p.projeto.escopo),
-        tipos: tiposStr,
+        // Eixo TIPO da categorização. ⚠️ Substituiu a linha "Tipos" (que lia
+        // `tipos_projeto` e saía "—" em todo projeto da v2). Ausente aqui é o caso
+        // NORMAL: quem escreve esta coluna é o analisador, que roda DEPOIS da submissão.
+        tipoProjeto: p.projeto.categoria_projeto as string | null,
         nomeCompleto: ouTraco(p.projeto.responsavel_nome),
         email: ouTraco(p.projeto.responsavel_email),
         participantes,
         descricao: ouTraco(p.projeto.descricao_breve),
-        savingHoras,
-        savingReais,
-        tipoSaving: ouTraco(p.saving?.tipo_saving as string | undefined),
-        receitaValor,
-        tipoReceita: ouTraco(p.receita?.tipo_saving as string | undefined),
+        // ⚠️ O ganho sai de UM lugar (`notificacao-ganho.ts`), que decide a geração pelo
+        // `ganho_categorias` — a MESMA régua de `celulasGanhoV2` acima. Antes o card
+        // recebia `savingHoras`/`savingReais`/`tipoSaving`/`receitaValor` da v1 direto, e
+        // por isso anunciava R$ 0,00 e 0 horas em todo projeto da v2.
+        ganho: resumirGanho(p.projeto, {
+          tiposProjeto: p.tiposProjeto,
+          savingHoras,
+          savingReais,
+          tipoSaving: p.saving?.tipo_saving as string | undefined,
+          receitaValor,
+          tipoReceita: p.receita?.tipo_saving as string | undefined,
+        }),
         dataSubmissao,
         modo: p.modo,
         // Projeto especial → alerta enxuto (sem saving/receita/escopo/tipos) + a

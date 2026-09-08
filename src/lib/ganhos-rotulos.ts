@@ -120,3 +120,16 @@ export const FREQUENCIA_ABAS: { value: Frequencia; label: string }[] = [
 export const FREQUENCIA_ABAS_RECEITA = FREQUENCIA_ABAS.filter(
   (a) => a.value === 'mensal' || a.value === 'pontual',
 )
+
+/**
+ * A frequência de um bloco de ganho como texto curto ("Mensal", "Pontual").
+ *
+ * ⚠️ Deriva de `FREQUENCIA_ABAS` (FILTRA/LÊ, não redigita): os rótulos que a pessoa viu
+ * na aba do formulário são os mesmos que a planilha e o card do Chat mostram depois.
+ * Valor fora da escala (legado, texto digitado à mão) volta como veio — a superfície
+ * mostra o que existe em vez de esconder o que não reconhece.
+ */
+export function rotuloFrequencia(valor: string | null | undefined): string {
+  const chave = String(valor ?? '').trim().toLowerCase()
+  return FREQUENCIA_ABAS.find((a) => a.value === chave)?.label ?? String(valor ?? '')
+}

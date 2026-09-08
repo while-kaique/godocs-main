@@ -1,175 +1,299 @@
+// O CARD do "Alerta de Automações" (`buildSubmitMessage`, `src/lib/google/chat.ts`).
+//
+// ⚠️ O alerta era uma mensagem de TEXTO de ~20 linhas e virou um **card (cardsV2)** em
+// 08/09/2026. Dois defeitos e um pedido moveram isto:
+//
+//  1. **Campos zerados** — o card lia `savingHoras`/`savingReais`/`tipoSaving` e a receita
+//     do blob do chat, que são colunas da **v1**; o formulário determinístico da v2 nunca
+//     as escreve (grava `ganho_categorias` + os 4 blocos + os 3 `impacto_*`). Resultado:
+//     "R$ 0,00" e "0 horas" em projeto com ganho declarado e aprovado. Hoje o número vem
+//     resumido de `notificacao-ganho.ts`, que decide a geração pelo `ganho_categorias`.
+//  2. **"Tipos: —"** — a linha lia `tipos_projeto` (vocabulário da v1). Virou o eixo TIPO
+//     da categorização (`categoria_projeto`), e AUSENTE agora OMITE a linha em vez de
+//     mostrar "—" (o analisador escreve essa coluna DEPOIS da submissão).
+//  3. **Compactar com "exibir mais"** (pedido do Luis) — só a seção `collapsible` do
+//     cardsV2 dá isso; texto plano não tem como esconder nada.
+//
+// Estes testes trancam o CONTRATO do payload (nada de comparar strings inteiras: o card é
+// estrutura) e a régua de cada um dos 3 pontos acima.
 import { describe, it, expect } from 'vitest';
 import { buildSubmitMessage, linkDashboardProjeto } from '@/lib/google/chat';
+import { resumirGanhoV1, type ResumoGanho } from '@/lib/notificacao-ganho';
 
-// Base de parâmetros de um projeto NÃO-especial (com saving/receita) para reuso.
+const GANHO_V1: ResumoGanho = resumirGanhoV1({
+  tiposProjeto: ['saving'],
+  savingHoras: 120,
+  savingReais: 5000,
+  tipoSaving: 'mensal',
+});
+
 const base = {
   projeto: 'Automação X',
   area: 'Operações',
   ferramenta: 'n8n',
   escopo: 'interno',
-  tipos: 'saving',
   nomeCompleto: 'Fulano de Tal',
   email: 'fulano@gocase.com',
   participantes: 'Beltrano',
   descricao: 'Descrição do projeto.',
-  savingHoras: 120,
-  savingReais: 5000,
-  tipoSaving: 'mensal',
-  receitaValor: 0,
-  tipoReceita: '',
   dataSubmissao: '08/07/2026',
   modo: 'novo' as const,
+  ganho: GANHO_V1,
 };
 
-const SEPARADOR = '──────────────────────';
+// ─── Helpers de leitura do payload ───────────────────────────────────────────
 
-describe('buildSubmitMessage — alerta de projeto especial', () => {
-  it('projeto padrão mantém as linhas de saving/escopo/tipos', () => {
-    const msg = buildSubmitMessage(base);
-    expect(msg).toContain('Saving estimado (horas/mês)');
-    expect(msg).toContain('Saving estimado (R$/mês)');
-    expect(msg).toContain('Escopo:');
-    expect(msg).toContain('Tipos:');
+type Card = { cardsV2: unknown[]; fallbackTexto: string };
+
+function card(msg: ReturnType<typeof buildSubmitMessage>): Record<string, any> {
+  if (typeof msg === 'string') throw new Error('esperava CARD, veio texto');
+  return (msg.cardsV2[0] as any).card;
+}
+
+/** Todo o texto do card concatenado (para asserts de "contém"/"não contém"). */
+function textoDoCard(msg: ReturnType<typeof buildSubmitMessage>): string {
+  return JSON.stringify(card(msg));
+}
+
+function secoes(msg: ReturnType<typeof buildSubmitMessage>): Record<string, any>[] {
+  return card(msg).sections as Record<string, any>[];
+}
+
+function secaoPorHeader(msg: ReturnType<typeof buildSubmitMessage>, header: string) {
+  return secoes(msg).find((s) => s.header === header);
+}
+
+/** A 1ª seção — a que fica VISÍVEL sem clicar em nada. */
+function visivel(msg: ReturnType<typeof buildSubmitMessage>): string {
+  return JSON.stringify(secoes(msg)[0]);
+}
+
+// ─── Forma do payload ────────────────────────────────────────────────────────
+
+describe('buildSubmitMessage — é um card, com fallback de texto', () => {
+  it('devolve cardsV2 com UM card e o texto de degradação', () => {
+    const msg = buildSubmitMessage(base) as Card;
+    expect(Array.isArray(msg.cardsV2)).toBe(true);
+    expect(msg.cardsV2).toHaveLength(1);
+    // ⚠️ O fallback não é decoração: o card usa `collapsible`, e se o webhook recusar um
+    // campo do schema o alerta NÃO PODE deixar de sair (`sendChatNotification` degrada).
+    expect(typeof msg.fallbackTexto).toBe('string');
+    expect(msg.fallbackTexto.length).toBeGreaterThan(20);
   });
 
-  it('projeto especial OMITE saving/receita/escopo/tipos e mostra a justificativa', () => {
-    const msg = buildSubmitMessage({
-      ...base,
-      especial: true,
-      contextoEspecial: 'Projeto de pesquisa sem saving mensurável, valor estratégico.',
-    });
-    // Linhas irrelevantes ao caso especial não aparecem.
-    expect(msg).not.toContain('Saving estimado');
-    expect(msg).not.toContain('Tipo de saving');
-    expect(msg).not.toContain('Receita incremental');
-    expect(msg).not.toContain('Escopo:');
-    expect(msg).not.toContain('Tipos:');
-    // Cabeçalho e justificativa próprios do especial.
-    expect(msg).toContain('Projeto especial');
-    expect(msg).toContain('Por que é um projeto especial:');
-    expect(msg).toContain('Projeto de pesquisa sem saving mensurável, valor estratégico.');
-    // Metadados que ainda fazem sentido continuam.
-    expect(msg).toContain('Automação X');
-    expect(msg).toContain('Fulano de Tal');
-    expect(msg).toContain('Descrição do projeto.');
+  it('o nome do projeto é o TÍTULO e o estado é o subtítulo', () => {
+    const c = card(buildSubmitMessage(base));
+    expect(c.header.title).toBe('Automação X');
+    expect(String(c.header.subtitle)).toMatch(/submiss/i);
   });
 
-  it('especial sem contexto cai no traço (nunca célula vazia)', () => {
-    const msg = buildSubmitMessage({ ...base, especial: true, contextoEspecial: '' });
-    expect(msg).toContain('Por que é um projeto especial:');
-    expect(msg).toContain('—');
+  it('markup do card é HTML (<b>), NUNCA *asterisco* — são 2 sintaxes que não se conversam', () => {
+    // Ver D22: o 1º disparo do Gomoon chegou com asterisco literal na tela porque a
+    // superfície era CARD e o texto usava a sintaxe de MENSAGEM.
+    const t = textoDoCard(buildSubmitMessage(base));
+    expect(t).toContain('<b>');
+    expect(t).not.toMatch(/\*[A-ZÁÉÍÓÚÂÊÔÃÕÇa-z]/);
   });
 
-  it('edição de projeto especial usa o cabeçalho de edição', () => {
-    const msg = buildSubmitMessage({
-      ...base,
-      modo: 'edicao',
-      especial: true,
-      contextoEspecial: 'Contexto qualquer.',
-    });
-    expect(msg).toContain('Edição de projeto especial');
+  // ⚠️ O `topLabel` do `decoratedText` tem tamanho FIXO e miúdo no Chat, e card não aceita
+  // CSS. Para o rótulo ficar maior (pedido do Luis, 08/09/2026) ele foi promovido ao corpo
+  // em NEGRITO, e o valor ficou sem negrito — com os dois em negrito não há hierarquia.
+  it('o RÓTULO é o negrito da linha, no corpo; o valor vem sem negrito, e `topLabel` saiu', () => {
+    const t = textoDoCard(buildSubmitMessage(base));
+    expect(t).not.toContain('topLabel');
+    expect(t).toContain('<b>Área</b><br>Operações');
+    expect(t).not.toContain('<b>Operações</b>');
+  });
+
+  it('a quebra da linha é <br> (o \\n do textParagraph não vale no decoratedText)', () => {
+    const t = textoDoCard(buildSubmitMessage(base));
+    expect(t).toContain('</b><br>');
+  });
+
+  it('o link vai em BOTÃO, não em <a href> (tag com atributo sai escapada no card)', () => {
+    const msg = buildSubmitMessage({ ...base, projetoId: 'proj-42' });
+    const t = textoDoCard(msg);
+    expect(t).not.toContain('<a href');
+    expect(t).toContain('openLink');
+    expect(t).toContain('/dashboard?projeto=proj-42');
   });
 });
 
-// ─── Mensagem do ESPECIAL fica ENXUTA ────────────────────────────────────────
-//
-// O especial é o único caso que continua avisando o grupo NA SUBMISSÃO (não há líder
-// para pré-aprovar). Como ele passou a ser a mensagem que o time lê no dia a dia, ela
-// encolhe: fica só o que a triagem precisa para decidir se abre o projeto.
-describe('buildSubmitMessage — o alerta do especial é ENXUTO', () => {
-  const especial = {
-    ...base,
-    especial: true,
-    contextoEspecial: 'Pesquisa exploratória sem ganho mensurável ainda.',
+// ─── Compactação: o "exibir mais" ────────────────────────────────────────────
+
+describe('buildSubmitMessage — compacto, com "exibir mais"', () => {
+  it('a descrição fica atrás de uma seção COLAPSÁVEL, não na área visível', () => {
+    const msg = buildSubmitMessage(base);
+    expect(visivel(msg)).not.toContain('Descrição do projeto.');
+    const contexto = secaoPorHeader(msg, 'Descrição e contexto');
+    expect(contexto?.collapsible).toBe(true);
+    expect(JSON.stringify(contexto)).toContain('Descrição do projeto.');
+  });
+
+  it('seção colapsável não vaza o 1º widget (uncollapsibleWidgetsCount = 0)', () => {
+    // Com 1 aqui, a descrição apareceria aberta e o pedido do Luis estaria desfeito.
+    for (const s of secoes(buildSubmitMessage(base))) {
+      if (s.collapsible) expect(s.uncollapsibleWidgetsCount).toBe(0);
+    }
+  });
+
+  it('a área VISÍVEL leva o essencial: ganho, categorias, área e autor', () => {
+    const v = visivel(buildSubmitMessage(base));
+    expect(v).toContain('R$');
+    expect(v).toContain('Saving');
+    expect(v).toContain('Operações');
+    expect(v).toContain('Fulano de Tal');
+  });
+
+  it('texto muito longo é truncado (protege o tamanho do payload do card)', () => {
+    const descricao = 'x'.repeat(4000);
+    const t = textoDoCard(buildSubmitMessage({ ...base, descricao }));
+    expect(t).not.toContain('x'.repeat(2000));
+    expect(t).toContain('…');
+  });
+
+  it('nome de projeto quilométrico não estoura o título do card', () => {
+    const nome = 'Projeto '.repeat(40);
+    const c = card(buildSubmitMessage({ ...base, projeto: nome }));
+    expect(String(c.header.title).length).toBeLessThanOrEqual(91);
+  });
+});
+
+// ─── O bug #1: números da v2 ──────────────────────────────────────────────────
+
+describe('buildSubmitMessage — o ganho vem do resumo, não das colunas da v1', () => {
+  const GANHO_V2: ResumoGanho = {
+    geracao: 'v2',
+    categorias: 'Saving efetivado · Custo evitado',
+    destaque: { rotulo: 'Impacto líquido mensal', valor: 'R$ 5.900,00', nota: 'bruto R$ 7.000,00' },
+    detalhe: [{ rotulo: 'Saving efetivado (Mensal)', valor: 'R$ 4.000,00' }],
+    textos: [{ rotulo: 'Evidência do saving', texto: 'Contrato encerrado em 07/2026.' }],
+    semNumero: false,
   };
 
-  it('mantém o essencial: cabeçalho, projeto, área, solicitante, e-mail, descrição, motivo e link', () => {
-    const msg = buildSubmitMessage(especial);
-    expect(msg).toContain('Projeto especial');
-    expect(msg).toContain('Automação X');
-    expect(msg).toContain('Operações');
-    expect(msg).toContain('Fulano de Tal');
-    expect(msg).toContain('fulano@gocase.com');
-    expect(msg).toContain('Descrição do projeto.');
-    expect(msg).toContain('Por que é um projeto especial:');
-    expect(msg).toContain('Pesquisa exploratória sem ganho mensurável ainda.');
-    // O link agora é o do DASHBOARD (o grupo é lido só por admin), não mais o da planilha.
-    expect(msg).toContain('/dashboard');
-    expect(msg).not.toContain('docs.google.com/spreadsheets');
+  it('projeto da v2 mostra o impacto declarado, não R$ 0,00', () => {
+    const msg = buildSubmitMessage({ ...base, ganho: GANHO_V2 });
+    expect(visivel(msg)).toContain('R$ 5.900,00');
+    expect(visivel(msg)).toContain('Saving efetivado · Custo evitado');
+    expect(textoDoCard(msg)).not.toContain('R$ 0,00');
   });
 
-  it('NÃO traz mais Ferramenta, Participantes, Data da submissão nem separadores', () => {
-    const msg = buildSubmitMessage(especial);
-    // Pelo VALOR (o rótulo pode mudar de redação; o dado não pode estar lá).
-    expect(msg).not.toContain('n8n');
-    expect(msg).not.toContain('Beltrano');
-    expect(msg).not.toContain('08/07/2026');
-    // E pelos rótulos, que é o que a pessoa lê na tela.
-    expect(msg).not.toMatch(/Ferramenta/i);
-    expect(msg).not.toMatch(/Participantes/i);
-    expect(msg).not.toMatch(/Data da submiss/i);
-    expect(msg).not.toContain(SEPARADOR);
+  it('o detalhe por bloco fica na colapsável "Números do ganho"', () => {
+    const msg = buildSubmitMessage({ ...base, ganho: GANHO_V2 });
+    const numeros = secaoPorHeader(msg, 'Números do ganho');
+    expect(numeros?.collapsible).toBe(true);
+    expect(JSON.stringify(numeros)).toContain('Saving efetivado (Mensal)');
   });
 
-  it('descrição muito longa é truncada (o alerta não vira um paredão)', () => {
-    const descricao =
-      'INICIO-DA-DESCRICAO ' + 'texto de encheção de linguiça. '.repeat(120) + 'FIM-DA-DESCRICAO';
-    const msg = buildSubmitMessage({ ...especial, descricao });
-    expect(msg).toContain('INICIO-DA-DESCRICAO');
-    expect(msg).not.toContain('FIM-DA-DESCRICAO');
-    expect(msg).not.toContain(descricao);
+  it('os textos do ganho (evidência/racional) vão para a colapsável de contexto', () => {
+    const msg = buildSubmitMessage({ ...base, ganho: GANHO_V2 });
+    expect(JSON.stringify(secaoPorHeader(msg, 'Descrição e contexto'))).toContain(
+      'Contrato encerrado em 07/2026.',
+    );
   });
 
-  it('contexto especial muito longo também é truncado', () => {
-    const contextoEspecial =
-      'INICIO-DO-CONTEXTO ' + 'justificativa muito comprida. '.repeat(120) + 'FIM-DO-CONTEXTO';
-    const msg = buildSubmitMessage({ ...especial, contextoEspecial });
-    expect(msg).toContain('INICIO-DO-CONTEXTO');
-    expect(msg).not.toContain('FIM-DO-CONTEXTO');
-    expect(msg).not.toContain(contextoEspecial);
+  it('ganho SEM número declara isso em palavras, nunca como R$ 0,00', () => {
+    // É o caso legítimo do ganho imensurável — "R$ 0,00" ali se lê como bug do sistema.
+    const semNumero: ResumoGanho = {
+      geracao: 'v2',
+      categorias: 'Ganho imensurável',
+      destaque: null,
+      detalhe: [],
+      textos: [],
+      semNumero: true,
+    };
+    const msg = buildSubmitMessage({ ...base, ganho: semNumero });
+    expect(visivel(msg)).toMatch(/[Ss]em número/);
+    expect(textoDoCard(msg)).not.toContain('R$ 0,00');
+    // Sem número não há o que colapsar na seção de números.
+    expect(secaoPorHeader(msg, 'Números do ganho')).toBeUndefined();
   });
 });
 
-// ─── Nota de "por que não há parecer de líder" ───────────────────────────────
+// ─── O bug #2: a linha "Tipos" ────────────────────────────────────────────────
+
+describe('buildSubmitMessage — o TIPO do projeto (era "Tipos: —")', () => {
+  it('slug conhecido vira rótulo legível', () => {
+    const t = textoDoCard(buildSubmitMessage({ ...base, tipoProjeto: 'automacao' }));
+    expect(t).toContain('Automação');
+    expect(t).not.toContain('automacao');
+  });
+
+  it('ausente OMITE a linha — não vira "—" (o analisador escreve isso depois)', () => {
+    const semTipo = textoDoCard(buildSubmitMessage(base));
+    expect(semTipo).not.toContain('Tipo:');
+  });
+
+  it('valor fora da escala aparece como veio (mostra o que existe)', () => {
+    const t = textoDoCard(buildSubmitMessage({ ...base, tipoProjeto: 'coisa-nova' }));
+    expect(t).toContain('coisa-nova');
+  });
+});
+
+// ─── Projeto especial ─────────────────────────────────────────────────────────
+
+describe('buildSubmitMessage — projeto especial', () => {
+  const especial = { ...base, especial: true, contextoEspecial: 'Pesquisa sem número, valor estratégico.' };
+
+  it('OMITE a seção de números e destaca o porquê é especial', () => {
+    const msg = buildSubmitMessage(especial);
+    expect(secaoPorHeader(msg, 'Números do ganho')).toBeUndefined();
+    expect(visivel(msg)).not.toContain('R$');
+    expect(textoDoCard(msg)).toContain('Por que é um projeto especial');
+    expect(textoDoCard(msg)).toContain('Pesquisa sem número, valor estratégico.');
+  });
+
+  it('o subtítulo diz que é especial e que a avaliação é humana', () => {
+    const c = card(buildSubmitMessage(especial));
+    expect(String(c.header.subtitle)).toMatch(/especial/i);
+    expect(String(c.header.subtitle)).toMatch(/humana/i);
+  });
+
+  it('especial sem contexto cai no traço (nunca campo em branco)', () => {
+    const msg = buildSubmitMessage({ ...especial, contextoEspecial: '' });
+    expect(textoDoCard(msg)).toContain('Por que é um projeto especial');
+    expect(textoDoCard(msg)).toContain('—');
+  });
+
+  it('metadados que ainda fazem sentido continuam no card', () => {
+    const t = textoDoCard(buildSubmitMessage(especial));
+    expect(t).toContain('Automação X');
+    expect(t).toContain('Fulano de Tal');
+    expect(t).toContain('Descrição do projeto.');
+  });
+});
+
+// ─── Nota de "não há parecer de líder" ────────────────────────────────────────
 //
-// Quando ninguém vai pré-aprovar (autor é liderança / não tem líder / TeamGuide fora),
-// o aviso sai na submissão MESMO ASSIM — e leva uma linha dizendo por quê, para quem lê
-// o grupo não achar que o parecer está a caminho.
+// Quando ninguém vai pré-aprovar (autor é liderança / não tem líder / TeamGuide fora), o
+// aviso sai na submissão MESMO ASSIM — com uma linha CURTA dizendo por quê (o texto vem
+// de `notificacao-chat.ts`, encurtado a pedido do Luis em 08/09/2026).
 describe('buildSubmitMessage — nota da pré-aprovação', () => {
-  const NOTA = 'Sem pré-aprovação: o autor não tem líder cadastrado na TeamGuide.';
+  const NOTA = 'O autor é líder: pré-aprovado direto.';
 
-  it('sem os parâmetros novos, a mensagem é a mesma de hoje (não regride)', () => {
-    const hoje = buildSubmitMessage(base);
-    const comNulos = buildSubmitMessage({ ...base, notaPreAprovacao: null, preAprovacao: null });
-    expect(comNulos).toBe(hoje);
+  it('a nota aparece no card do fluxo normal, na área VISÍVEL', () => {
+    expect(visivel(buildSubmitMessage({ ...base, notaPreAprovacao: NOTA }))).toContain(NOTA);
   });
 
-  it('a nota aparece na mensagem do fluxo normal', () => {
-    const msg = buildSubmitMessage({ ...base, notaPreAprovacao: NOTA });
-    expect(msg).toContain(NOTA);
-  });
-
-  it('a nota aparece também na mensagem do especial', () => {
+  it('a nota aparece também no card do especial', () => {
     const msg = buildSubmitMessage({
       ...base,
       especial: true,
       contextoEspecial: 'Pesquisa.',
       notaPreAprovacao: NOTA,
     });
-    expect(msg).toContain(NOTA);
+    expect(visivel(msg)).toContain(NOTA);
   });
 
   it('nota vazia/ausente não inventa linha nenhuma', () => {
-    const semNota = buildSubmitMessage(base);
-    expect(buildSubmitMessage({ ...base, notaPreAprovacao: '' })).toBe(semNota);
-    expect(buildSubmitMessage({ ...base, notaPreAprovacao: null })).toBe(semNota);
+    const semNota = JSON.stringify(buildSubmitMessage(base));
+    expect(JSON.stringify(buildSubmitMessage({ ...base, notaPreAprovacao: '' }))).toBe(semNota);
+    expect(JSON.stringify(buildSubmitMessage({ ...base, notaPreAprovacao: null }))).toBe(semNota);
+    expect(semNota).not.toContain('Pré-aprovação do líder');
   });
 });
 
 // ─── Link do dashboard (substitui o link da planilha) ────────────────────────
-//
-// O grupo do Chat é lido só por admin, então o alerta leva à esteira de triagem
-// (/dashboard) e, com o id, abre a ficha do projeto direto (?projeto=<id>).
 describe('link do dashboard nas mensagens do Chat', () => {
   it('linkDashboardProjeto monta /dashboard?projeto=<id> (encodado) e cai na raiz sem id', () => {
     expect(linkDashboardProjeto('abc123')).toMatch(/\/dashboard\?projeto=abc123$/);
@@ -178,56 +302,53 @@ describe('link do dashboard nas mensagens do Chat', () => {
     expect(linkDashboardProjeto(null)).toMatch(/\/dashboard$/);
   });
 
-  it('a mensagem normal usa o link do dashboard com o id e não cita mais a planilha', () => {
-    const msg = buildSubmitMessage({ ...base, projetoId: 'proj-42' });
-    expect(msg).toContain('/dashboard?projeto=proj-42');
-    expect(msg).not.toContain('docs.google.com/spreadsheets');
-    expect(msg).not.toContain('Link da planilha');
+  it('o card não cita mais a planilha', () => {
+    const t = textoDoCard(buildSubmitMessage({ ...base, projetoId: 'proj-42' }));
+    expect(t).not.toContain('docs.google.com/spreadsheets');
+    expect(t).not.toContain('Link da planilha');
   });
 
-  it('a mensagem do especial também usa o link do dashboard com o id', () => {
-    const msg = buildSubmitMessage({
-      ...base,
-      projetoId: 'esp-7',
-      especial: true,
-      contextoEspecial: 'Pesquisa.',
-    });
-    expect(msg).toContain('/dashboard?projeto=esp-7');
-    expect(msg).not.toContain('docs.google.com/spreadsheets');
-  });
-
-  it('a mensagem de pré-aprovação leva o link do dashboard com o id', () => {
-    const msg = buildSubmitMessage({
-      ...base,
-      projetoId: 'pa-9',
-      preAprovacao: { por: 'Alguém', em: '20/08/2026 10:00' },
-    });
-    expect(msg).toContain('/dashboard?projeto=pa-9');
-    expect(msg).not.toContain('docs.google.com/spreadsheets');
+  it('o especial e a pré-aprovação também levam o link com o id', () => {
+    expect(textoDoCard(buildSubmitMessage({ ...base, projetoId: 'esp-7', especial: true }))).toContain(
+      '/dashboard?projeto=esp-7',
+    );
+    expect(
+      textoDoCard(
+        buildSubmitMessage({
+          ...base,
+          projetoId: 'pa-9',
+          preAprovacao: { por: 'Alguém', em: '20/08/2026 10:00' },
+        }),
+      ),
+    ).toContain('/dashboard?projeto=pa-9');
   });
 });
 
-// ─── Mensagem disparada PELA pré-aprovação do líder ──────────────────────────
+// ─── Card disparado PELA pré-aprovação do líder ──────────────────────────────
 describe('buildSubmitMessage — projeto pré-aprovado pelo líder', () => {
   const parecer = { por: 'Lucas Gonçalves Queiroz', em: '11/08/2026 14:32' };
 
-  it('o cabeçalho anuncia a PRÉ-APROVAÇÃO, não o "aguardando análise" de hoje', () => {
-    const semParecer = buildSubmitMessage(base);
-    const comParecer = buildSubmitMessage({ ...base, preAprovacao: parecer });
-    expect(comParecer).not.toBe(semParecer);
-    expect(comParecer).toMatch(/pré-aprova/i);
+  it('o subtítulo anuncia a PRÉ-APROVAÇÃO, não o "aguardando análise" de sempre', () => {
+    const c = card(buildSubmitMessage({ ...base, preAprovacao: parecer }));
+    expect(String(c.header.subtitle)).toMatch(/pré-aprovad/i);
   });
 
-  it('o corpo cita quem pré-aprovou e quando', () => {
-    const msg = buildSubmitMessage({ ...base, preAprovacao: parecer });
-    expect(msg).toContain('Lucas Gonçalves Queiroz');
-    expect(msg).toContain('11/08/2026 14:32');
+  it('cita quem pré-aprovou e quando, na área visível', () => {
+    const v = visivel(buildSubmitMessage({ ...base, preAprovacao: parecer }));
+    expect(v).toContain('Lucas Gonçalves Queiroz');
+    expect(v).toContain('11/08/2026 14:32');
   });
 
-  it('os dados do projeto continuam na mensagem (é ela que a triagem lê)', () => {
+  it('os dados do projeto e o ganho continuam no card (é ele que a triagem lê)', () => {
     const msg = buildSubmitMessage({ ...base, preAprovacao: parecer });
-    expect(msg).toContain('Automação X');
-    expect(msg).toContain('Fulano de Tal');
-    expect(msg).toContain('Saving estimado (horas/mês)');
+    expect(textoDoCard(msg)).toContain('Automação X');
+    expect(textoDoCard(msg)).toContain('Fulano de Tal');
+    expect(visivel(msg)).toContain('R$');
+  });
+
+  it('o fallback de texto também carrega o parecer (é o que sai se o card for recusado)', () => {
+    const msg = buildSubmitMessage({ ...base, preAprovacao: parecer }) as Card;
+    expect(msg.fallbackTexto).toContain('Lucas Gonçalves Queiroz');
+    expect(msg.fallbackTexto).toContain('/dashboard');
   });
 });

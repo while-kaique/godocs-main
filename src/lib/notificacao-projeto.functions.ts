@@ -12,6 +12,7 @@
 
 import { getProjetoById, getDocumentacao, parseJson } from '@/integrations/db/client.server';
 import { buildSubmitMessage, sendChatNotification, ehProjetoTesteE2E } from '@/lib/google/chat';
+import { resumirGanho } from '@/lib/notificacao-ganho';
 import { parseDataFlexivel } from '@/lib/format-date';
 
 const ouTraco = (v: unknown): string =>
@@ -78,16 +79,27 @@ export async function notificarChatPreAprovacao(
       area: ouTraco(projeto.area),
       ferramenta: ouTraco(projeto.ferramenta),
       escopo: ouTraco(projeto.escopo),
-      tipos: tiposProjeto.join(', ') || '—',
+      // Eixo TIPO da categorização (`categoria_projeto`). Aqui ele em geral JÁ existe: o
+      // analisador roda na submissão e a pré-aprovação vem depois. Ausente → linha
+      // omitida. ⚠️ Substituiu a linha "Tipos", que lia `tipos_projeto` e saía "—" em
+      // todo projeto da v2 (aquele campo é vocabulário da v1 e o cliente da v2 não o manda).
+      tipoProjeto: projeto.categoria_projeto,
       nomeCompleto: ouTraco(projeto.responsavel_nome),
       email: ouTraco(projeto.responsavel_email),
       participantes: membros.join(', ') || '—',
       descricao: ouTraco(projeto.descricao_breve),
-      savingHoras: Number(projeto.saving_horas) || 0,
-      savingReais: Number(projeto.saving_reais) || 0,
-      tipoSaving: ouTraco(projeto.tipo_saving),
-      receitaValor: Number(receita?.valor_ganho_mensal) || 0,
-      tipoReceita: ouTraco(receita?.tipo_saving),
+      // ⚠️ O ganho vem de `notificacao-ganho.ts`, que decide a geração pelo
+      // `ganho_categorias` — a MESMA régua de `celulasGanhoV2`. Antes esta chamada
+      // passava só as colunas da v1, que o formulário da v2 nunca escreve: o card
+      // anunciava R$ 0,00 e 0 horas em projeto com ganho declarado e aprovado.
+      ganho: resumirGanho(projeto, {
+        tiposProjeto,
+        savingHoras: Number(projeto.saving_horas) || 0,
+        savingReais: Number(projeto.saving_reais) || 0,
+        tipoSaving: projeto.tipo_saving,
+        receitaValor: Number(receita?.valor_ganho_mensal) || 0,
+        tipoReceita: (receita?.tipo_saving as string | null) ?? null,
+      }),
       dataSubmissao: dataSubmissaoBR(projeto.submitted_at),
       // A mensagem é sempre a do projeto "chegando" ao grupo, mesmo quando a
       // pré-aprovação veio de um reenvio: para quem lê, é a 1ª vez que ele aparece.
