@@ -277,3 +277,180 @@ describe('resumirGanhoV2 — a nota do destaque não repete o mesmo número', ()
     expect(r.destaque?.nota).toContain('1.000,00');
   });
 });
+
+// ─── A PLANILHA como fonte (o caminho preferido, 08/09/2026) ─────────────────
+//
+// ⚠️ Origem: em produção um líder pré-aprovou um projeto e o card anunciou só
+// "Saving R$ X", com a seção "Números do ganho" REPETINDO a mesma linha. O card estava
+// tecnicamente certo (o projeto é v1), e é aí que estava o erro de projeto: eu tratei o
+// caminho v1 como fallback de legado e dei a ele o mínimo, quando a base de produção é
+// **100% v1** (739 projetos) — ou seja, aquele era o caminho de TODOS os cards.
+//
+// A planilha, por outro lado, já está no vocabulário da v2 para a base inteira (a régua D1
+// renomeou as colunas in-place e o retroativo recalculou os 3 `Impacto *`): 667 de 739
+// (90%) têm impacto. Então o número existe — só não em `projetos`, onde `impacto_*` é NULL
+// fora da v2. Ler o espelho resolve v1 e v2 pelo mesmo caminho e, por construção, impede o
+// card de discordar da ficha do /dashboard.
+import { resumirGanhoDaPlanilha, rotularCategoriasGanho } from '@/lib/notificacao-ganho';
+
+// Linha REAL de produção (projeto v1 "Mapeamento de prazo ecomerce", 02/09/2026), reduzida
+// às colunas de ganho. É a linha do card que motivou esta mudança.
+const LINHA_V1_REAL = {
+  'Tipos de Ganho': 'saving, receita_incremental',
+  'Saving Efetivado': '5.000,00',
+  'Freq. Saving Efetivado': 'Mensal',
+  'Evidência Saving Efetivado': '• erros de leilão intelipost com transportadoras mais caras',
+  'Custo Evitado Horas': '30,00',
+  'Custo Evitado Horas Reais': '638,70',
+  'Freq. Custo Evitado': 'mensal',
+  'Racional Custo Evitado': 'Antes × depois por cargo: Analista Júnior 30h→0h.',
+  'Receita Incremental': '5.000,00',
+  'Freq. Receita': 'mensal',
+  'Racional Receita': 'Mapeia prazo e abre oportunidade de frete.',
+  'Custo para Rodar': '0,00',
+  'Impacto Bruto': '10638,7',
+  'Impacto Líquido': '5819,35',
+  'Impacto Líquido Mensal': '5819,35',
+  'Alguém Fazia?': 'sim',
+  'Saving Horas Real': '30',
+  'Saving Horas Escalado': '0',
+};
+
+describe('resumirGanhoDaPlanilha — o defeito que motivou a mudança', () => {
+  it('projeto V1 mostra IMPACTO LÍQUIDO MENSAL, não "Saving"', () => {
+    const r = resumirGanhoDaPlanilha(LINHA_V1_REAL)!;
+    expect(r.geracao).toBe('planilha');
+    expect(r.destaque?.rotulo).toBe('Impacto líquido mensal');
+    expect(r.destaque?.valor).toContain('5.819,35');
+    expect(r.destaque?.nota).toContain('10.638,70'); // o bruto, que difere
+  });
+
+  it('o número bate com o que o /dashboard mostra (mesmo parser, mesma célula)', () => {
+    // `ganhoTotal: 5819.35` na listagem de prod para este mesmo projeto. Card e ficha
+    // discordarem foi o defeito de ORIGEM desta frente.
+    const r = resumirGanhoDaPlanilha(LINHA_V1_REAL)!;
+    expect(r.destaque?.valor.replace(/[^\d,]/g, '')).toBe('5.819,35'.replace(/[^\d,]/g, ''));
+  });
+
+  it('"Números do ganho" NÃO repete o destaque — são parcelas distintas', () => {
+    const r = resumirGanhoDaPlanilha(LINHA_V1_REAL)!;
+    expect(r.detalhe.length).toBeGreaterThanOrEqual(4);
+    // Nenhuma linha do detalhe pode ser o próprio destaque (era literalmente o bug).
+    for (const d of r.detalhe) {
+      expect(d.valor).not.toBe(r.destaque?.valor);
+      expect(d.rotulo).not.toBe(r.destaque?.rotulo);
+    }
+  });
+
+  it('as parcelas trazem informação que o resumo do banco não tinha', () => {
+    const r = resumirGanhoDaPlanilha(LINHA_V1_REAL)!;
+    const rotulos = r.detalhe.map((d) => d.rotulo).join(' | ');
+    expect(rotulos).toContain('Saving efetivado');
+    expect(rotulos).toContain('Custo evitado');
+    expect(rotulos).toContain('Receita incremental');
+    expect(rotulos).toContain('Origem das horas'); // split carga real × escala
+    expect(rotulos).toContain('Alguém já fazia?');
+    // As horas liberadas aparecem, com unidade.
+    expect(JSON.stringify(r.detalhe)).toContain('30 horas liberadas');
+  });
+
+  it('os textos longos (evidência e racionais) vão para o colapsável', () => {
+    const r = resumirGanhoDaPlanilha(LINHA_V1_REAL)!;
+    expect(r.textos.map((t) => t.rotulo)).toEqual([
+      'Evidência do saving',
+      'Racional do custo evitado',
+      'Racional da receita',
+    ]);
+  });
+});
+
+describe('resumirGanhoDaPlanilha — o rótulo SEGUE o campo', () => {
+  it('sem "Impacto Líquido Mensal", o rótulo é "Impacto líquido" (sem prometer cadência)', () => {
+    // ⚠️ Caso real: o `syncSubmitToGoogle` do caminho v1 escreve `Impacto Líquido` e NÃO
+    // `Impacto Líquido Mensal` (esse veio do retroativo); e na v2 o `Impacto Líquido` é o
+    // do PERÍODO, não o mensal. Chamá-lo de "mensal" afirmaria uma cadência que ele não tem.
+    const { 'Impacto Líquido Mensal': _, ...semMensal } = LINHA_V1_REAL;
+    const r = resumirGanhoDaPlanilha(semMensal)!;
+    expect(r.destaque?.rotulo).toBe('Impacto líquido');
+    expect(r.destaque?.valor).toContain('5.819,35');
+  });
+
+  it('bruto igual ao destaque não vira nota (não repete o mesmo número)', () => {
+    const r = resumirGanhoDaPlanilha({
+      'Impacto Bruto': '1.000,00',
+      'Impacto Líquido Mensal': '1.000,00',
+    })!;
+    expect(r.destaque?.nota).toBe('');
+  });
+});
+
+describe('resumirGanhoDaPlanilha — degrada, não mente', () => {
+  it('linha ausente devolve null (o chamador cai no resumo do banco)', () => {
+    expect(resumirGanhoDaPlanilha(null)).toBeNull();
+    expect(resumirGanhoDaPlanilha(undefined)).toBeNull();
+  });
+
+  it('linha SEM nada de ganho devolve null, em vez de um card com tudo zerado', () => {
+    expect(resumirGanhoDaPlanilha({ Projeto: 'X', 'Área': 'Fiscal' })).toBeNull();
+  });
+
+  it('célula "—" e zero contam como ausência, nunca como R$ 0,00', () => {
+    const r = resumirGanhoDaPlanilha({
+      'Impacto Líquido Mensal': '900,00',
+      'Saving Efetivado': '—',
+      'Custo para Rodar': '0,00',
+      'Receita Incremental': '0',
+    })!;
+    expect(r.detalhe).toHaveLength(0);
+    expect(JSON.stringify(r)).not.toContain('R$ 0,00');
+  });
+
+  it('casa o nome da coluna de forma TOLERANTE (o cabeçalho é digitado à mão)', () => {
+    // O cabeçalho real da planilha já tem `Justificativa Aprovação do **Lider**` sem
+    // acento; a mesma disciplina do `resolverColunaLetra` vale aqui.
+    const r = resumirGanhoDaPlanilha({ 'IMPACTO LIQUIDO MENSAL': '2.500,00' })!;
+    expect(r.destaque?.valor).toContain('2.500,00');
+  });
+
+  it('número pt-BR nos 2 formatos que a própria planilha mistura', () => {
+    // "5.000,00" (com milhar) e "5819,35" (sem) convivem na MESMA linha em produção.
+    expect(resumirGanhoDaPlanilha({ 'Impacto Líquido Mensal': '10638,7' })!.destaque?.valor)
+      .toContain('10.638,70');
+    expect(resumirGanhoDaPlanilha({ 'Impacto Líquido Mensal': '1.234,56' })!.destaque?.valor)
+      .toContain('1.234,56');
+  });
+});
+
+describe('rotularCategoriasGanho — a coluna carrega os DOIS vocabulários', () => {
+  it('slugs da v1 viram rótulo', () => {
+    expect(rotularCategoriasGanho('saving, receita_incremental')).toBe('Saving · Receita incremental');
+  });
+
+  it('títulos da v2 atravessam intactos', () => {
+    expect(rotularCategoriasGanho('Saving efetivado · Custo evitado')).toBe(
+      'Saving efetivado · Custo evitado',
+    );
+  });
+
+  it('token desconhecido volta como veio (mostra o que existe)', () => {
+    expect(rotularCategoriasGanho('coisa_nova')).toBe('coisa_nova');
+  });
+
+  it('vazio/"—" devolve null (o card cai no traço)', () => {
+    expect(rotularCategoriasGanho('')).toBeNull();
+    expect(rotularCategoriasGanho('—')).toBeNull();
+    expect(rotularCategoriasGanho(null)).toBeNull();
+  });
+});
+
+describe('resumirGanhoDaPlanilha — "Ganho Imensurável" fica FORA de propósito', () => {
+  it('não vira texto do resumo (na v1 essa célula é o "por que é especial")', () => {
+    // Incluí-la duplicaria o contexto que o card do especial já mostra na seção própria e,
+    // num projeto padrão, rotularia o contexto especial como racional de ganho sem número.
+    const r = resumirGanhoDaPlanilha({
+      'Impacto Líquido Mensal': '500,00',
+      'Ganho Imensurável': 'Projeto de altíssimo impacto estratégico.',
+    })!;
+    expect(JSON.stringify(r)).not.toContain('altíssimo impacto');
+  });
+});

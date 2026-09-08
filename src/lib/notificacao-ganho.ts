@@ -33,7 +33,11 @@ import {
 } from './ganhos'
 import { rotuloFrequencia, tituloGanho } from './ganhos-rotulos'
 import { ROTULO_TIPO, type TipoProjeto } from './categoria-projeto'
-import { fmtTiposProjeto } from './projeto-rotulos'
+import { fmtSimNao, fmtTiposProjeto, TIPOS_PROJETO_LABEL } from './projeto-rotulos'
+import { chaveColuna } from './coluna-chave'
+// ⚠️ O parser numérico é o MESMO da listagem do /dashboard (`dashboard-resumo.ts`), de
+// propósito: o card tem de interpretar a célula exatamente como a tela interpreta.
+import { numero } from './dashboard-resumo'
 
 /** Uma linha "rótulo: valor" do card. `nota` é o rodapé pequeno (opcional). */
 export type LinhaGanho = { rotulo: string; valor: string; nota?: string }
@@ -49,7 +53,7 @@ export type TextoGanho = { rotulo: string; texto: string }
  */
 export type ResumoGanho = {
   /** Geração de onde os números saíram — vira uma linha do card, para a triagem saber. */
-  geracao: 'v1' | 'v2'
+  geracao: 'planilha' | 'v1' | 'v2'
   /** "Saving efetivado · Custo evitado". Nunca vazio: sem categoria vira "—". */
   categorias: string
   /** O número que a triagem olha primeiro. `null` quando o projeto não tem número. */
@@ -311,4 +315,229 @@ export function resumirGanhoV1(g: GanhoV1): ResumoGanho {
  */
 export function resumirGanho(projeto: ProjetoParaResumo, v1: GanhoV1): ResumoGanho {
   return resumirGanhoV2(projeto) ?? resumirGanhoV1(v1)
+}
+
+// ─── a PLANILHA como fonte (o caminho preferido) ────────────────────────────
+//
+// ⚠️ **Por que o card lê o ESPELHO e não as colunas do SQLite (08/09/2026).** A primeira
+// versão deste módulo bifurcava v1/v2 sobre `projetos`, e o resultado em produção foi um
+// card de projeto v1 anunciando só "Saving R$ X" — com a seção "Números do ganho"
+// repetindo a MESMA linha. Duas descobertas explicam e corrigem isso:
+//
+//  1. **A base de produção é 100% v1** (739 projetos; a última submissão é de 02/09, antes
+//     da pausa). Ou seja, o caminho que eu tratei como "fallback de legado" é o caminho de
+//     TODOS os cards de hoje — e era o que estava mais pobre.
+//  2. **A PLANILHA já está no vocabulário da v2 para a base inteira.** A régua D1 renomeou
+//     as colunas *in-place* (o `Custo Evitado` da v1 é o SAVING EFETIVADO da v2; o saving
+//     por HORAS da v1 é o CUSTO EVITADO da v2) e o retroativo de impacto recalculou os 3
+//     `Impacto *`. Medido: **667 de 739 (90%) têm impacto na planilha**; os 71 sem número
+//     são os especiais (por definição) e sobram 5 não-especiais.
+//
+// Então o número que a triagem quer ver JÁ EXISTE para v1 — só não em `projetos`, onde
+// `impacto_*` é `NULL` fora da v2 (só `salvarGanhos` escreve). Ler o espelho resolve três
+// coisas de uma vez: **(a)** v1 e v2 pelo mesmo caminho, sem bifurcação; **(b)** o card
+// não pode discordar da ficha do `/dashboard`, porque é a mesma fonte, e discordar da
+// célula ao lado foi o defeito de origem; **(c)** as parcelas ficam ricas, o que mata a
+// redundância entre destaque e detalhe.
+//
+// ⚠️ O espelho é SQLite local (a ficha já o lê assim) — **nada de `readAllRows`/Sheets em
+// request**, a cota é compartilhada com prod. E é a linha COMPLETA (`lerLinhaEspelho`),
+// não o `linha_resumo`: aqui é UM projeto, não a listagem.
+//
+// ⚠️ Espelho ausente devolve `null` e o chamador cai no resumo derivado do banco. Degrada,
+// não mente.
+
+/** Só as colunas que este resumo lê. Estrutural: o espelho entrega um mapa nome→texto. */
+export type LinhaPlanilha = Record<string, string | undefined>
+
+/**
+ * Casamento de coluna TOLERANTE a acento/caixa/espaço, a mesma disciplina do
+ * `resolverColunaLetra` do Sheets: o cabeçalho real é digitado à mão e já tem
+ * `Justificativa Aprovação do **Lider**` sem acento. Exato primeiro, normalizado depois.
+ */
+function celula(linha: LinhaPlanilha, nome: string): string | undefined {
+  const exato = preenchida(linha[nome])
+  if (exato) return exato
+  const alvo = chaveColuna(nome)
+  for (const [k, v] of Object.entries(linha)) {
+    const val = preenchida(v)
+    if (!val) continue
+    if (chaveColuna(k) === alvo) return val
+  }
+  return undefined
+}
+
+/**
+ * Célula com conteúdo de verdade, ou `undefined`.
+ *
+ * ⚠️ **"—" conta como VAZIA**, e é aqui que isso tem de ser tratado: o `padronizarLinha`
+ * do sync grava o traço em TODA célula de texto em branco (padrão do repo), então sem este
+ * descarte a evidência e os racionais ausentes chegariam como "—" e virariam um parágrafo
+ * inteiro no card dizendo nada. Centralizado na porta de entrada porque os três leitores
+ * (`celula`, `numeroCelula`, `textoCelula`) dependem disso.
+ */
+function preenchida(valor: string | undefined): string | undefined {
+  if (valor == null) return undefined
+  const s = String(valor).trim()
+  if (s === '' || s === '—' || s === '-') return undefined
+  return s
+}
+
+/** O número de uma célula, ou `null` quando vazia/"—"/zero. */
+function numeroCelula(linha: LinhaPlanilha, nome: string): number | null {
+  const n = numero(celula(linha, nome))
+  return n != null && n > 0 ? n : null
+}
+
+/** O texto de uma célula, descartando o "—" que o `padronizarLinha` grava. */
+function textoCelula(linha: LinhaPlanilha, nome: string): string | null {
+  return texto(celula(linha, nome))
+}
+
+/**
+ * Rótulos legíveis para a coluna "Tipos de Ganho", que carrega **os dois vocabulários**:
+ * slugs da v1 (`saving`, `receita_incremental`, `especial`) nas 739 linhas antigas e os
+ * títulos da v2 (`Saving efetivado`…) no que o formulário novo grava. Token desconhecido
+ * volta como veio — mostra o que existe em vez de esconder o que não reconhece.
+ */
+export function rotularCategoriasGanho(bruto: string | null | undefined): string | null {
+  // ⚠️ Descarta o "—" aqui TAMBÉM, e não só no `celula()`: esta função é exportada e é a
+  // fonte única do rótulo, então quem a chamar com a célula crua não pode receber um
+  // traço rotulado como se fosse uma categoria.
+  const t = preenchida(texto(bruto) ?? undefined)
+  if (!t) return null
+  const nomes = t
+    .split(/[,·]/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => TIPOS_PROJETO_LABEL[p] ?? tituloGanho(p))
+  return nomes.length > 0 ? nomes.join(' · ') : null
+}
+
+/**
+ * O ganho de um projeto a partir da LINHA da planilha (espelho). `null` quando não há
+ * linha ou quando ela não tem número nenhum — aí o chamador cai no resumo do banco.
+ *
+ * ⚠️ O destaque aceita **duas** colunas, e o rótulo SEGUE o campo: `Impacto Líquido
+ * Mensal` quando existe, senão `Impacto Líquido`. Não é preciosismo — no caminho v1 o
+ * `syncSubmitToGoogle` escreve `Impacto Líquido` (que ali JÁ é o ganho total mensal) e
+ * **não** escreve `Impacto Líquido Mensal`, que veio do retroativo; na v2 o `Impacto
+ * Líquido` é o líquido do PERÍODO, não o mensal. Chamar o segundo de "mensal" seria
+ * afirmar uma cadência que o número não tem.
+ *
+ * ⚠️ O valor é reformatado a partir do `numero()` de `dashboard-resumo.ts` — o MESMO
+ * parser da listagem, então o card interpreta a célula como o `/dashboard` interpreta. A
+ * reformatação é só apresentação: a própria planilha mistura `"5.000,00"` e `"5819,35"`, e
+ * exibir cru poria os dois formatos lado a lado no mesmo card.
+ */
+export function resumirGanhoDaPlanilha(linha: LinhaPlanilha | null | undefined): ResumoGanho | null {
+  if (!linha) return null
+
+  const detalhe: LinhaGanho[] = []
+  const textos: TextoGanho[] = []
+
+  const freq = (nome: string) => {
+    const f = textoCelula(linha, nome)
+    return f ? rotuloFrequencia(f) : null
+  }
+  const comFreq = (rotulo: string, nomeFreq: string) => {
+    const f = freq(nomeFreq)
+    return f ? `${rotulo} (${f})` : rotulo
+  }
+
+  // Saving efetivado — na v1 esta célula é o CUSTO EVITADO (gasto externo que parou), que
+  // pela régua D1 é exatamente o saving efetivado da v2. Mesma célula, mesmo sentido.
+  const savingEfetivado = numeroCelula(linha, 'Saving Efetivado')
+  if (savingEfetivado) {
+    const agora = numeroCelula(linha, 'Saving Efetivado Agora')
+    detalhe.push({
+      rotulo: comFreq('Saving efetivado', 'Freq. Saving Efetivado'),
+      valor: reais(agora ? Math.max(0, savingEfetivado - agora) : savingEfetivado),
+      nota: agora ? `Saía ${reais(savingEfetivado)} · sai ${reais(agora)}` : undefined,
+    })
+    const evidencia = textoCelula(linha, 'Evidência Saving Efetivado')
+    if (evidencia) textos.push({ rotulo: 'Evidência do saving', texto: evidencia })
+  }
+
+  // Custo evitado — na v1 é o saving por HORAS (as horas que ninguém gasta mais).
+  const horasLiberadas = numeroCelula(linha, 'Custo Evitado Horas')
+  const horasReais = numeroCelula(linha, 'Custo Evitado Horas Reais')
+  const naoContratado = numeroCelula(linha, 'Custo Evitado Não Contratado')
+  if (horasLiberadas || horasReais || naoContratado) {
+    detalhe.push({
+      rotulo: comFreq('Custo evitado', 'Freq. Custo Evitado'),
+      valor: reais((horasReais ?? 0) + (naoContratado ?? 0)),
+      nota: [
+        horasLiberadas ? `${horas(horasLiberadas)} liberadas` : null,
+        naoContratado ? `não contratado ${reais(naoContratado)}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    })
+    const racional = textoCelula(linha, 'Racional Custo Evitado')
+    if (racional) textos.push({ rotulo: 'Racional do custo evitado', texto: racional })
+  }
+
+  const receita = numeroCelula(linha, 'Receita Incremental')
+  if (receita) {
+    detalhe.push({ rotulo: comFreq('Receita incremental', 'Freq. Receita'), valor: reais(receita) })
+    const racional = textoCelula(linha, 'Racional Receita')
+    if (racional) textos.push({ rotulo: 'Racional da receita', texto: racional })
+  }
+
+  const custoRodar = numeroCelula(linha, 'Custo para Rodar')
+  if (custoRodar) {
+    detalhe.push({
+      rotulo: comFreq('Custo para rodar', 'Freq. Custo para Rodar'),
+      valor: `- ${reais(custoRodar)}`,
+      nota: textoCelula(linha, 'Justificativa Custo para Rodar') ?? undefined,
+    })
+  }
+
+  // Split carga real × ganho por escala: transparência, não parcela (o TOTAL não muda).
+  // Entra como UMA linha só quando há algo a dizer — parte do ganho vem de volume que só
+  // a automação cobre, e é o tipo de coisa que o líder pergunta e o card não respondia.
+  const horasReal = numeroCelula(linha, 'Saving Horas Real')
+  const horasEscala = numeroCelula(linha, 'Saving Horas Escalado')
+  if (horasReal || horasEscala) {
+    detalhe.push({
+      rotulo: 'Origem das horas',
+      valor: `${horas(horasReal ?? 0)} de carga real · ${horas(horasEscala ?? 0)} de escala`,
+      nota: 'Carga real = trabalho humano que acontecia. Escala = volume que só a automação cobre.',
+    })
+  }
+
+  const alguemFazia = textoCelula(linha, 'Alguém Fazia?')
+  if (alguemFazia) {
+    detalhe.push({ rotulo: 'Alguém já fazia?', valor: fmtSimNao(alguemFazia) ?? alguemFazia })
+  }
+
+  // ⚠️ "Ganho Imensurável" fica FORA de propósito: na v1 essa célula carrega o
+  // `contexto_especial` ("por que é especial"), que o card do especial já mostra na seção
+  // própria — incluí-la aqui duplicaria o texto e, num projeto padrão, rotularia o
+  // contexto como se fosse racional de ganho sem número.
+
+  const mensal = numeroCelula(linha, 'Impacto Líquido Mensal')
+  const liquido = numeroCelula(linha, 'Impacto Líquido')
+  const bruto = numeroCelula(linha, 'Impacto Bruto')
+  const alvo = mensal ?? liquido
+  const destaque: LinhaGanho | null = alvo
+    ? {
+        rotulo: mensal ? 'Impacto líquido mensal' : 'Impacto líquido',
+        valor: reais(alvo),
+        nota: bruto && bruto !== alvo ? `bruto ${reais(bruto)}` : '',
+      }
+    : null
+
+  // Sem número E sem parcela → não há o que a planilha adicione; o chamador decide.
+  if (!destaque && detalhe.length === 0 && textos.length === 0) return null
+
+  return {
+    geracao: 'planilha',
+    categorias: rotularCategoriasGanho(celula(linha, 'Tipos de Ganho')) ?? '—',
+    destaque,
+    detalhe,
+    textos,
+    semNumero: destaque === null && detalhe.length === 0,
+  }
 }
