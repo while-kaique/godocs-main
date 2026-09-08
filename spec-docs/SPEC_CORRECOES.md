@@ -6,6 +6,62 @@
 
 ---
 
+## 2026-09-08 — O botão "rodar o time" prometia a estrela e o `waitUntil` era cancelado; e o dossiê chamava saving efetivado de "custo evitado"
+
+**Sintoma 1 (a estrela que nunca vinha).** O clique respondia "Time de agentes rodando, a estrela
+aparece em cerca de 1 minuto" e nada aparecia. Nos logs de prod, no POST
+`/api/admin/avaliacao/time`: 4 chamadas de LLM iniciadas, **2 respondidas**, e então
+`waitUntil() tasks did not complete within the allowed time after invocation end and have been
+cancelled`.
+
+**Causa-raiz 1.** O time completo são **~30 chamadas de LLM** e a rota o disparava em
+`runBackground` (`ctx.waitUntil`), cujo orçamento após a resposta a plataforma corta. É o mesmo
+motivo pelo qual o disparo de e-mails deste repo é **dirigido pelo FRONT em lotes**: *"`waitUntil`
+longo morre no Godeploy"*. O `202 agendado` era uma promessa que a plataforma não podia cumprir.
+
+**Fix 1.** O botão passou a rodar o **classificador de 1 agente**
+(`POST /api/admin/especiais/classificar`, `forcar: true`), que é **uma** chamada, cabe num request
+e usa a MESMA régua de estrelas. A ficha lê a recomendação de `especial_avaliacao`
+(`getAvaliacaoEspecialPorId` + a versão em LOTE por `IN`). ⚠️ **O botão do time completo SAIU** —
+ele segue existindo como **ferramenta de auditoria em lote** pela rota de admin, que é o que
+`CLAUDE.md` sempre disse que ele era. Canário de teste proíbe a ficha de chamar aquela rota.
+⚠️ `forcar: true` porque **rerodar é o pedido**: sem ele o classificador recusa projeto com nota
+humana ("vira âncora").
+
+**Sintoma 2 (o agente não distinguia saving efetivado de custo evitado).** A mesa chamou os
+**R$ 324.005,09** de multa de DIFAL — uma despesa que a empresa PAGAVA e parou de pagar — de
+*"custo evitado"*, e cobrou "comprovantes" pela coisa errada.
+
+**Causa-raiz 2, e ela é do dossiê, não do agente.** O campo é alimentado pela coluna `Custo
+Evitado` na v1 e `Saving Efetivado` na v2 (as duas querem dizer o mesmo), mas na **v2 "custo
+evitado" é o OUTRO conceito** — a despesa que **nunca nasceu**, incluindo as horas liberadas de
+quem segue na equipe. Imprimir o número sob o rótulo `Custo evitado:` ensinava ao agente
+**exatamente o contrário** do que o formulário ensina ao autor. E o inverso também: as horas
+saíam como "Saving em horas" quando na v2 elas SÃO o custo evitado.
+
+**Fix 2.** O bloco financeiro passou a **rotular pela substância**, não pelo jargão de uma versão:
+`Horas humanas liberadas: 60h` e `Despesa que a empresa pagava e parou de pagar (saving
+efetivado): 324005.09`. E ganhou duas coisas que faltavam para o time poder **julgar a
+classificação**: o **glossário das 4 categorias vindo de `GANHO_ROTULOS`** — a MESMA copy que o
+autor leu nos cards da Etapa 2, não uma definição escrita à parte — e a linha **"Categorias de
+ganho DECLARADAS pelo autor"**. A régua fecha nomeando a armadilha: *despesa que EXISTIA e parou é
+saving efetivado (tem extrato); despesa que NUNCA NASCEU é custo evitado (não tem extrato, e
+cobrar comprovante dela é cobrar o impossível)*.
+
+**Onde aterrissou.** `src/lib/avaliacao/dossie.ts` (rótulos, glossário) ·
+`src/integrations/db/client.server.ts` (2 leitores de `especial_avaliacao`) ·
+`src/lib/dashboard-admin.functions.ts` (campo `estrela` no payload, individual e em lote) ·
+`src/components/dashboard/projeto-detalhe-dialog.tsx` (bloco da estrela, botão, handler).
+
+**⚠️ O que não pode regredir.** O glossário sai de `GANHO_ROTULOS` (fonte única com o formulário) —
+**não redigitar a definição para o agente**, senão a régua que ele aplica descola da que a pessoa
+leu. E nenhum botão da ficha pode voltar a disparar trabalho longo em `waitUntil`.
+
+**Status.** Testes: `tests/dossie-colunas-v2.test.ts` (a inversão, o glossário, a categoria
+declarada) e `tests/painel-sombra-quatro-agentes.test.ts` (o canário da rota). Suíte 3893 verde.
+
+---
+
 ## 2026-09-08 — O dossiê do time lia a planilha por nomes de coluna da v1, e a aba de PROD já é v2: TODO o financeiro chegava `null` aos agentes
 
 **Sintoma.** No projeto `dba1cc1c23ebb528d6ad4c852ad32b64` (SmartOnline/DIFAL) a planilha tinha

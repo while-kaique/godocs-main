@@ -13,6 +13,8 @@
 // Regra de ouro: JSON podre, célula vazia ou fonte ausente NUNCA lançam. Viram null/[] +
 // lacuna declarada. Um dossiê que mente completude é pior que um dossiê curto.
 import { chaveColuna, nomeV2De } from '@/lib/coluna-chave';
+import { GANHO_CATEGORIAS } from '@/lib/ganhos';
+import { GANHO_ROTULOS } from '@/lib/ganhos-rotulos';
 
 export type FontesDossie = {
   projeto: Record<string, unknown> | null;
@@ -463,8 +465,30 @@ export function dossieParaTexto(d: Dossie, opts: { comReais?: boolean } = {}): s
       : ['(documentação compilada ausente)']),
   );
 
+  // ⚠️ **O GLOSSÁRIO vem das MESMAS palavras que o autor leu no formulário** (`GANHO_ROTULOS`,
+  // fonte única dos cards da Etapa 2) — não de uma definição escrita à parte para o agente.
+  // Motivo: sem ele o time não tinha como julgar se a pessoa classificou o ganho na caixa certa,
+  // e o próprio dossiê o induzia ao erro (ver a inversão de rótulo abaixo). Com o glossário mais
+  // a categoria DECLARADA, "isso é saving efetivado ou custo evitado?" passa a ser pergunta
+  // respondível com o material.
+  const glossario = [
+    'COMO O FORMULÁRIO DEFINE CADA CATEGORIA DE GANHO (é o texto que o autor leu ao escolher):',
+    ...GANHO_CATEGORIAS.map((c) => {
+      const r = GANHO_ROTULOS[c];
+      return `- ${r.titulo}: ${r.descricao} Ex.: ${r.exemplo}`;
+    }),
+    'Confira se o ganho descrito cai na categoria que o autor marcou. Despesa que EXISTIA e parou é saving efetivado, e tem extrato. Despesa que NUNCA NASCEU, inclusive horas liberadas de quem segue na equipe, é custo evitado: não tem extrato, e cobrar comprovante dela é cobrar o impossível.',
+  ].join('\n');
+
   const linhasFin: (string | null)[] = [
-    `Saving em horas: ${fmt(fin.saving_horas, 'h')} (${fin.tipo_saving ?? 'cadência não informada'}) · alguém fazia: ${fin.alguem_fazia ?? '—'}`,
+    glossario,
+    d.classificacao.tipos.length
+      ? `Categorias de ganho DECLARADAS pelo autor: ${d.classificacao.tipos.join(', ')}`
+      : 'Categorias de ganho declaradas pelo autor: nenhuma informada.',
+    // ⚠️ Rótulo pela SUBSTÂNCIA, não pelo jargão de uma versão. A coluna que alimenta este
+    // campo é `Custo Evitado Horas` na v2 e `Saving Horas` na v1: são HORAS HUMANAS LIBERADAS nas
+    // duas. Chamá-las de "saving" fazia o agente trocar os dois conceitos (ver o glossário).
+    `Horas humanas liberadas: ${fmt(fin.saving_horas, 'h')} (${fin.tipo_saving ?? 'cadência não informada'}) · alguém fazia: ${fin.alguem_fazia ?? '—'}`,
     fin.linhas.length
       ? `Linhas de horas:\n${fin.linhas.map((l) => `- ${l.cargo}: ${fmt(l.horas_antes, 'h')} antes → ${fmt(l.horas_depois, 'h')} depois`).join('\n')}`
       : null,
@@ -483,8 +507,20 @@ export function dossieParaTexto(d: Dossie, opts: { comReais?: boolean } = {}): s
     reais && (fin.impacto_bruto !== null || fin.impacto_liquido !== null)
       ? `Impacto bruto: ${fmt(fin.impacto_bruto)} · impacto líquido: ${fmt(fin.impacto_liquido)}`
       : null,
-    fin.custo_evitado_reais !== null ? `Custo evitado: ${fmt(fin.custo_evitado_reais)}` : null,
-    fin.custo_evitado_itens.length ? `Itens de custo evitado: ${t(JSON.stringify(fin.custo_evitado_itens))}` : null,
+    // ⚠️ **A INVERSÃO que este rótulo consertou (08/09/2026).** Este campo é alimentado pela
+    // coluna `Custo Evitado` na v1 e `Saving Efetivado` na v2 — e as duas querem dizer a MESMA
+    // coisa: uma despesa que a empresa PAGAVA e parou de pagar. Mas na v2 "custo evitado" é o
+    // OUTRO conceito (a despesa que nunca nasceu, incluindo as horas liberadas), então imprimir
+    // este número como "Custo evitado" ensinava ao agente exatamente o contrário do que o
+    // formulário ensina ao autor. Foi por isso que a mesa chamou os R$ 324.005,09 de multa de
+    // DIFAL (uma despesa que PAROU, comprovável em extrato) de "custo evitado" e pediu
+    // comprovante da coisa errada.
+    fin.custo_evitado_reais !== null
+      ? `Despesa que a empresa pagava e parou de pagar (saving efetivado): ${fmt(fin.custo_evitado_reais)}`
+      : null,
+    fin.custo_evitado_itens.length
+      ? `Itens da despesa eliminada: ${t(JSON.stringify(fin.custo_evitado_itens))}`
+      : null,
     fin.custo_externo_mensal !== null ? `Custo externo mensal: ${fmt(fin.custo_externo_mensal)}` : null,
     fin.custo_projeto_itens.length ? `Itens de custo do projeto: ${t(JSON.stringify(fin.custo_projeto_itens))}` : null,
     fin.receita_mensal !== null ? `Receita mensal: ${fmt(fin.receita_mensal)} (${fin.tipo_receita ?? '—'})` : null,
