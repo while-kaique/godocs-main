@@ -95,11 +95,14 @@ describe('notificarChatPreAprovacao', () => {
 
     expect(enviou).toBe(true);
     expect(mockChat).toHaveBeenCalledTimes(1);
-    const texto = String(mockChat.mock.calls[0][0]);
+    // ⚠️ O payload é um CARD (cardsV2), não string — `String(obj)` daria
+    // "[object Object]" e o teste passaria a não medir nada.
+    const texto = JSON.stringify(mockChat.mock.calls[0][0]);
     expect(texto).toContain('Automação de Faturamento');
     expect(texto).toContain('Luis Albuquerque');
-    // Remontado do banco: o saving da documentação entra na mensagem.
+    // Remontado do banco: o saving das COLUNAS da v1 entra na mensagem.
     expect(texto).toMatch(/120/);
+    expect(texto).toContain('5.000,00');
   });
 
   it('a mensagem assina quem pré-aprovou e quando', async () => {
@@ -107,10 +110,50 @@ describe('notificarChatPreAprovacao', () => {
 
     await notificarChatPreAprovacao(id, PARECER);
 
-    const texto = String(mockChat.mock.calls[0][0]);
+    const texto = JSON.stringify(mockChat.mock.calls[0][0]);
     expect(texto).toMatch(/pré-aprova/i);
     expect(texto).toContain(PARECER.por);
     expect(texto).toContain(PARECER.em);
+  });
+
+  // ⚠️ REGRESSÃO do defeito de 08/09/2026: o card anunciava **R$ 0,00 e 0 horas** em todo
+  // projeto da v2, porque esta função só passava as colunas da v1 (`saving_horas`/
+  // `saving_reais`/`tipo_saving`), que o formulário determinístico da v2 nunca escreve.
+  // O ganho agora vem de `resumirGanho`, que decide a geração pelo `ganho_categorias`.
+  it('projeto da V2 anuncia o impacto declarado, nunca R$ 0,00', async () => {
+    const id = `v2-${++seq}`;
+    await insertProjetoRaw({
+      id,
+      nome: 'Automação v2',
+      responsavel_nome: 'Luis Albuquerque',
+      responsavel_email: 'luis.albuquerque@gocase.com',
+      ferramenta: 'n8n',
+      escopo: 'interno',
+      descricao_breve: 'Declarou o ganho pelo formulário determinístico.',
+      area: 'RPA',
+      status: 'em_validacao',
+      submitted_at: new Date().toISOString(),
+      categoria_projeto: 'automacao',
+      // Nada de `saving_horas`/`saving_reais`/`tipos_projeto`: é justamente o que a v2
+      // NÃO grava, e o que fazia o card mentir.
+      ganho_categorias: JSON.stringify(['saving_efetivado']),
+      saving_efetivado_valor_antes: 8000,
+      saving_efetivado_valor_agora: 2000,
+      saving_efetivado_frequencia: 'mensal',
+      saving_efetivado_evidencia: 'Contrato encerrado, fatura zerada em 08/2026.',
+      impacto_bruto: 6000,
+      impacto_liquido: 6000,
+      impacto_liquido_mensal: 6000,
+    });
+
+    expect(await notificarChatPreAprovacao(id, PARECER)).toBe(true);
+
+    const texto = JSON.stringify(mockChat.mock.calls[0][0]);
+    expect(texto).toContain('6.000,00');
+    expect(texto).toContain('Saving efetivado');
+    expect(texto).not.toContain('R$ 0,00');
+    // A linha "Tipos" saía "—" na v2; hoje é o eixo TIPO da categorização.
+    expect(texto).toContain('Automação');
   });
 
   it('projeto `[E2E-…]` NÃO envia nada e devolve false', async () => {

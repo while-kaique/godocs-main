@@ -626,6 +626,40 @@ export function paraGanhosProjeto(g: GanhosDeclarados): GanhosProjeto {
 // ─── a ponte com a PERSISTÊNCIA (T6) ────────────────────────────────────────────
 
 /**
+ * O TOTAL de horas liberadas da tabela antes/depois — **clampado por LINHA**.
+ *
+ * Fonte única do número que a planilha grava em `Custo Evitado Horas` e que o card do
+ * Google Chat mostra. A ordem do clamp é a mesma de `derivarValorHorasCustoEvitado`, e
+ * pelo mesmo motivo: par invertido numa linha não pode abater as horas das OUTRAS (a
+ * régua "depois < antes" é do formulário, com mensagem no campo). Clampar só o total
+ * deixaria essa compensação passar.
+ *
+ * ⚠️ Este total é de HORAS, não de R$ — o R$ mora em `custo_evitado_horas_valor`,
+ * derivado por `derivarValorHorasCustoEvitado` com o valor/hora INJETADO.
+ */
+export function totalHorasLiberadas(linhas: CustoEvitadoLinhaHoras[]): number {
+  const total = (linhas ?? []).reduce(
+    (soma, l) => soma + Math.max(0, (Number(l.horasAntes) || 0) - (Number(l.horasDepois) || 0)),
+    0,
+  )
+  return Math.round(total * 100) / 100
+}
+
+/**
+ * O TOTAL do custo para rodar — **clampado por ITEM**, como `impacto.ts` faz.
+ *
+ * ⚠️ O clamp aqui não é cosmético: o custo é a única parcela NEGATIVA da fórmula, então
+ * item com valor negativo AUMENTARIA o impacto. Ver `valorDeCusto` em `impacto.ts`.
+ * ⚠️ Ignora a frequência de propósito: é a SOMA declarada, para exibição ao lado da lista
+ * de itens. Quem mensaliza é a fórmula (`impactoLiquidoMensal`), nunca este total.
+ */
+export function totalCustoRodar(itens: CustoRodar): number {
+  const total = (itens ?? []).reduce((soma, i) => soma + Math.max(0, Number(i.valor) || 0), 0)
+  return Math.round(total * 100) / 100
+}
+
+
+/**
  * O R$ do braço das HORAS do custo evitado, a partir da tabela antes/depois.
  *
  * ⚠️ A conversão hora→R$ entra por **INJEÇÃO** (`valorHoraDe`), nunca por uma segunda

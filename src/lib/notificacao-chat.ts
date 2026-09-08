@@ -33,19 +33,25 @@ export type MomentoNotificacao = {
 // Textos das notas. Cada caso tem o seu: quem lê o grupo precisa distinguir a isenção
 // legítima (o autor é liderança) de uma falha de integração (TeamGuide fora) — foi a
 // mesma razão que separou os rótulos da coluna "Aprovação do Líder" (D12).
+//
+// ⚠️ São FRASES CURTAS por decisão do Luis (08/09/2026: "sem aprovação de líder porque é
+// líder deve ser uma mensagem simples, como 'O autor é líder', pré-aprovado"). A versão
+// anterior gastava uma linha e meia de card explicando a régua de cargo ("o autor tem
+// cargo de liderança (coordenação para cima) e vai direto para a validação da RPA"), e
+// essa é a nota MAIS FREQUENTE do grupo: o alerta é para bater o olho e decidir se abre a
+// ficha, não para ensinar a régua da isenção, que vive na SPEC_APROVACAO_LIDER (D20).
+// ⚠️ As 3 têm de continuar DISTINGUÍVEIS entre si (teste explícito): encurtar não pode
+// virar "sem parecer de líder" nas três, senão a triagem perde a diferença entre isenção
+// legítima e integração caída.
 export const NOTA_SEM_PARECER: Record<'lideranca' | 'sem_lider' | 'teamguide_indisponivel', string> = {
-  lideranca:
-    'Sem pré-aprovação de líder: o autor tem cargo de liderança (coordenação para cima) e vai direto para a validação da RPA.',
-  sem_lider:
-    'Sem pré-aprovação de líder: não foi encontrado líder direto do autor na TeamGuide.',
-  teamguide_indisponivel:
-    'Sem pré-aprovação de líder: a TeamGuide estava indisponível na submissão e a fila não pôde ser aberta.',
+  lideranca: 'O autor é líder: pré-aprovado direto.',
+  sem_lider: 'Sem líder direto na TeamGuide: segue sem parecer.',
+  teamguide_indisponivel: 'TeamGuide indisponível na submissão: fila não aberta.',
 };
 
 // Nota do caminho DESCONHECIDO (motivo `null` ou um motivo futuro ainda não mapeado).
 // Diz o fato — "não entrou na fila" — sem afirmar um porquê que não se sabe.
-export const NOTA_SEM_PARECER_DESCONHECIDO =
-  'Sem pré-aprovação de líder: este projeto não entrou na fila de pré-aprovação.';
+export const NOTA_SEM_PARECER_DESCONHECIDO = 'Não entrou na fila de pré-aprovação.';
 
 /**
  * Decide quando o grupo é avisado, a partir do resultado de `abrirPreAprovacao`.

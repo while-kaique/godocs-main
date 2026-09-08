@@ -6,6 +6,76 @@
 
 ---
 
+## 2026-09-08 — Card do "Alerta de Automações" com ganho ZERADO e "Tipos: —" em todo projeto da v2
+
+**Sintoma.** Com o GoDocs **v2** em validação, o alerta do grupo do Google Chat anunciava
+**"Saving estimado (horas/mês): 0,00 horas"** e **"Saving estimado (R$/mês): R$ 0,00"** em
+projetos que tinham ganho declarado, aprovado pelo líder e **gravado corretamente na planilha**
+(as colunas `Impacto Líquido Mensal`, `Saving Efetivado`, `Custo Evitado Horas` etc. vinham
+preenchidas). A linha **"Tipos"** saía **"—"** nos mesmos projetos. Ou seja: o card contradizia a
+célula ao lado, na mensagem que é o único lugar onde a triagem descobre que existe projeto novo.
+
+**Causa-raiz.** Não era o card, era a **FONTE**. `buildSubmitMessage` (`src/lib/google/chat.ts`)
+nasceu na v1 e recebia os números como parâmetros achatados da v1:
+`savingHoras`/`savingReais`/`tipoSaving` (colunas `projetos.saving_*`) e a receita do blob
+`documentacao.conteudo.receita`. O formulário determinístico da v2 **nunca escreve nenhuma dessas
+colunas** — `montarPatchGanhos` (`src/lib/ganhos.ts`) grava `ganho_categorias` + os 4 blocos +
+os 3 `impacto_*`. Então os dois call sites (`syncSubmitToGoogle` e `notificarChatPreAprovacao`)
+liam `Number(projeto.saving_reais) || 0` num campo que é `NULL` por construção, e o `|| 0` fazia
+a ausência virar **um número**: R$ 0,00 exibido com a mesma autoridade de um valor medido.
+A planilha já estava certa porque a T6 tinha criado `celulasGanhoV2` para ela — mas **só para ela**:
+o card ficou sendo o último leitor da v1 no caminho da submissão.
+A linha "Tipos" tinha a MESMA causa com outro campo: lia `tipos_projeto`, que é vocabulário da v1
+(`saving`/`receita_incremental`/`especial`) e que o cliente da v2 não manda mais.
+
+**Fix.** Módulo PURO novo **`src/lib/notificacao-ganho.ts`** = FONTE ÚNICA do ganho para o alerta.
+`resumirGanho(projeto, v1)` decide a geração pelo **`ganho_categorias`** — a MESMA régua de
+`celulasGanhoV2` — e devolve a mesma forma (`ResumoGanho`) nos dois casos, então o builder do card
+não sabe de geração alguma: só desenha. ⚠️ **Nada é recalculado**: o destaque é
+`impacto_liquido_mensal`, materializado no mesmo `UPDATE` do ganho; os dois totais compostos
+(horas liberadas, custo para rodar) saem das puras `totalHorasLiberadas`/`totalCustoRodar`,
+extraídas para `ganhos.ts` e agora usadas **também** por `celulasGanhoV2` — card e planilha somam
+no mesmo lugar. Os parâmetros `savingHoras`/`savingReais`/`tipoSaving`/`receitaValor`/`tipoReceita`/
+`tipos` **saíram** de `ParamsSubmitMessage`: mantê-los seria deixar a armadilha montada.
+"Tipos" virou o eixo TIPO da categorização (`categoria_projeto` → `ROTULO_TIPO`), e **ausente agora
+OMITE a linha** em vez de escrever "—" (quem preenche essa coluna é o analisador, que roda DEPOIS
+da submissão: na hora do alerta ela legitimamente ainda não existe).
+Ganho sem número (imensurável) passou a **dizer isso em palavras** — "Sem número declarado" —
+porque "R$ 0,00" ali se lê como bug do sistema, não como característica do projeto.
+
+**Onde aterrissou.** `src/lib/notificacao-ganho.ts` (novo, puro) · `src/lib/google/chat.ts`
+(builder do card + `sendChatNotification`) · `src/lib/google/sync.ts` e
+`src/lib/notificacao-projeto.functions.ts` (os 2 call sites) · `src/lib/ganhos.ts`
+(`totalHorasLiberadas`/`totalCustoRodar`) · `src/lib/ganhos-rotulos.ts` (`rotuloFrequencia`) ·
+`src/lib/notificacao-chat.ts` (notas encurtadas). Testes: `tests/notificacao-ganho.test.ts` (novo,
+25 casos) · `tests/chat-message-especial.test.ts` (reescrito para o card) ·
+`tests/notificacao-projeto-pre-aprovacao.test.ts` (caso de regressão v2: "nunca R$ 0,00").
+
+**No mesmo PR (pedidos do Luis, 08/09/2026).**
+1. **O alerta virou CARD (`cardsV2`)**, compacto: o que decide se vale abrir a ficha fica visível
+   (parecer do líder · ganho · categorias · área/tipo · autor) e **descrição, racionais, evidência
+   e metadados vivem em 2 seções `collapsible`** — o "exibir mais" pedido. Texto plano não tem como
+   esconder nada; quem dá o botão de expandir é a seção colapsável do card.
+   ⚠️ **Markup passou a ser `<b>`/`<i>`, nunca `*asterisco*`** — a sintaxe segue a SUPERFÍCIE
+   (mensagem de texto usa asterisco, `textParagraph` de card usa HTML). É a armadilha do D22, que
+   fez o 1º disparo do Gomoon chegar com asterisco literal na tela. `<a href>` também não funciona
+   em card: o link vai em `buttonList`.
+   ⚠️ **`sendChatNotification` degrada para TEXTO** quando o Chat recusa o card (`fallbackTexto`
+   obrigatório no payload). O card usa `collapsible`, e um campo de schema recusado devolveria 400
+   e mataria o alerta INTEIRO, em silêncio, no grupo onde a triagem descobre projeto novo. Perder o
+   layout é aceitável; perder o alerta não.
+2. **As notas de "não há parecer de líder" ficaram CURTAS** (`NOTA_SEM_PARECER`,
+   `src/lib/notificacao-chat.ts`, que segue FONTE ÚNICA). "O autor tem cargo de liderança
+   (coordenação para cima) e vai direto para a validação da RPA" → **"O autor é líder:
+   pré-aprovado direto."** É a nota mais frequente do grupo, e o alerta existe para bater o olho,
+   não para ensinar a régua da isenção (que vive na `SPEC_APROVACAO_LIDER`, D20). ⚠️ As 3 têm de
+   continuar DISTINGUÍVEIS entre si (teste explícito): encurtar não pode virar "sem parecer de
+   líder" nas três, senão a triagem perde a diferença entre isenção legítima e integração caída.
+
+**Status.** Implementado na branch `fix/card-chat-alerta`; suíte verde (3706).
+
+---
+
 ## 2026-09-01 — Mesa de avaliação em SOMBRA nunca aprovava nada (o cético adversarial tinha VETO)
 
 **Sintoma.** Com o time LLM crítico ligado em prod (`AVALIACAO_MESA_LLM=1`, desde 29/08), a mesa de
