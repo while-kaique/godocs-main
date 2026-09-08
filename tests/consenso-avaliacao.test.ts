@@ -323,24 +323,40 @@ describe('conciliar — debate e cético', () => {
 });
 
 describe('conciliar — divergência A×B', () => {
-  it('A aprova e B desqualifica por fora_de_uso → divergência cita fora de uso/parado, saída humano', () => {
+  // ⚠️ MUDOU em 08/09/2026 (D4 do plano de calibragem): estes dois casos saíam `humano`, e a
+  // decisão do dono do produto foi **expandir** o time para poder reprovar por RÉGUA DECLARADA.
+  // `fora_de_uso` e `ressubmissao` são exatamente os 2 motivos de invalidez (D4.1) — com o motivo
+  // nomeado E a citação do material, isto agora é `reprovar`, não uma dúvida para o humano. A
+  // divergência continua registrada; o que mudou é o desfecho. Sem citação segue não reprovando
+  // (ver `tests/avaliacao-reprovar.test.ts`).
+  it('A aprova e B desqualifica por fora_de_uso → divergência cita fora de uso/parado, saída reprovar', () => {
     const c = conciliar(
       merito(),
       estrela({ nota: 0, criterio_aplicado: 'piso_zero', desqualificador: 'fora_de_uso', nivel: null }),
       ctx(),
     );
     expect(contem(c.divergencias, /fora de uso|parad/i)).toBe(true);
-    expect(c.saida).toBe('humano');
+    expect(c.saida).toBe('reprovar');
+    // Reprovar NUNCA age sozinho: não há flag de liberação para ele (RF-246).
     expect(c.age_sozinho).toBe(false);
   });
 
-  it('A aprova e B desqualifica por ressubmissao → divergência cita ressubmissão/duplicado, saída humano', () => {
+  it('A aprova e B desqualifica por ressubmissao → divergência cita ressubmissão/duplicado, saída reprovar', () => {
     const c = conciliar(
       merito(),
       estrela({ nota: 0, criterio_aplicado: 'piso_zero', desqualificador: 'ressubmissao', nivel: null }),
       ctx(),
     );
     expect(contem(c.divergencias, /ressubmiss[ãa]o|duplicad/i)).toBe(true);
+    expect(c.saida).toBe('reprovar');
+  });
+
+  it('o MESMO caso sem citação do material NÃO reprova: volta a ser dúvida do humano', () => {
+    const c = conciliar(
+      merito(),
+      estrela({ nota: 0, criterio_aplicado: 'piso_zero', desqualificador: 'fora_de_uso', evidencias: [], sem_evidencia: true }),
+      ctx(),
+    );
     expect(c.saida).toBe('humano');
   });
 

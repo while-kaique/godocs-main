@@ -38,6 +38,7 @@ import {
   type ResultadoCeticoEstrela,
 } from '@/lib/avaliacao/cetico-estrela';
 import { conciliar, type Consenso, type Liberacao } from '@/lib/avaliacao/consenso';
+import { impactoMensalDeclarado } from '@/lib/materialidade-piso';
 import { textoJustificativaInterna, textoAoAutor, dossieDeComite, ocultarValoresMonetarios } from '@/lib/avaliacao/textos';
 import type { TipoNo } from '@/lib/agentes-log';
 
@@ -448,6 +449,13 @@ export async function avaliarComTime(args: {
     ceticoEstrelaRefuta: ceticoEstrela.refuta,
     ceticoEstrelaMotivo: ceticoEstrela.motivo,
     liberacao: args.liberacao,
+    // Porta (i) da reprovação: o número declarado, escolhido por `impactoMensalDeclarado` (nunca
+    // recalculado aqui). Ausente → `null`, e o piso não dispara.
+    impactoMensal: impactoMensalDeclarado({
+      ganhoTotalMensal: dossie.financeiro.ganho_total_mensal,
+      savingReais: dossie.financeiro.saving_reais,
+      receitaMensal: dossie.financeiro.receita_mensal,
+    }),
   });
   await registrarSeguro(
     { pai_id: raizId, agente: 'consenso', tipo: 'consenso', rodada: rodadas, saida: json(consenso), veredito: consenso.saida, confianca: consenso.confianca, duracao_ms: Date.now() - t0 },

@@ -66,7 +66,7 @@ const correcao = (over: Partial<Correcao> = {}): Correcao => ({
 function votosBase(): VotosDeterministicos {
   return {
     fte: { implausivel: false, fte: 0.5, pessoas: 1, motivo: null },
-    financeiro: { veredito: "ok", confianca: 0.9, motivo: null, sinais: [] },
+    financeiro: { veredito: "ok", confianca: 0.9, motivo: null, sinais: [], abaixoDoPiso: false },
     rag: { apoio: true, confianca: 0.85, vizinhos: 3, topSimilaridade: 0.7, motivo: null },
     cetico: { refuta: false, confianca: 0, motivo: null, sinais: [] },
   };

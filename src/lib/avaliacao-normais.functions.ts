@@ -429,6 +429,9 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
     conciliado = conciliarJulgamentos(julgamentos, {
       especial: projeto.especial === 1,
       fluxoDireto: ehLider,
+      // Piso de impacto: mecânico, a MESMA régua da mesa determinística (D4).
+      abaixoDoPiso: financeiro.abaixoDoPiso,
+      motivoPiso: financeiro.motivo,
     });
     // Cético EFETIVO = o parecer do agente cético (preocupou?); sem ele (não deveria faltar), o
     // determinístico. É o sinal `ceticoRefuta` que a deliberação lê.

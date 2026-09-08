@@ -153,7 +153,19 @@ export function conciliarJulgamentos(
   julgamentos: JulgamentoEspecialista[],
   // ⚠️ `fluxoDireto` continua no contrato (os chamadores o passam e o analisador REAL ainda o usa),
   // mas desde 01/09/2026 ele NÃO isenta na mesa — só `especial` isenta. Ver `agregarJulgamentos`.
-  opts: { especial?: boolean | null; fluxoDireto?: boolean | null; limiarConfianca?: number | null },
+  opts: {
+    especial?: boolean | null;
+    fluxoDireto?: boolean | null;
+    limiarConfianca?: number | null;
+    /**
+     * O piso de impacto MECÂNICO (`avaliarFinanceiro.abaixoDoPiso`), repassado ao agregador. ⚠️ Os
+     * especialistas não votam sobre o piso: ele é régua e sobrepõe o painel inteiro. Sem este
+     * repasse a mesa LLM APROVARIA o que a mesa determinística reprova — as duas passariam a ter
+     * réguas diferentes, que é o que este arquivo existe para evitar.
+     */
+    abaixoDoPiso?: boolean | null;
+    motivoPiso?: string | null;
+  },
 ): ResultadoConciliado {
   const agregado = agregarJulgamentos({ julgamentos, ...opts });
   const cetico = julgamentos.find((j) => j.dimensao === 'cetico');

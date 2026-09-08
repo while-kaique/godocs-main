@@ -10,7 +10,18 @@
  * Irmão de `avaliarPlausibilidadeFTE`/`decidirStatusSubmissao`: pura, testável, sem LLM.
  * A `confianca` aqui é "quão seguro dá para AUTO-DECIDIR sem humano": alta no 'ok', baixa no
  * 'atencao' (há red flag), média no 'inconclusivo' (não há dado financeiro para julgar).
+ *
+ * ⚠️ **Havia TETO e não havia PISO** (achado A2 do plano de calibragem, 08/09/2026): um projeto de
+ * R$ 18,16/mês voltava `ok` com confiança 0,9, e foi por esse eixo que o dono do produto reprovou
+ * 137 projetos à mão em 04/09. O piso entra por `abaixoDoPisoDeImpacto` (régua declarada em
+ * `materialidade-piso.ts`, nunca literal solto aqui) e vira **sinal próprio** + o campo
+ * `abaixoDoPiso`, que é o que o agregador lê para emitir `reprovar` MECANICAMENTE.
  */
+import {
+  abaixoDoPisoDeImpacto,
+  motivoPisoDeImpacto,
+  PISO_IMPACTO_MENSAL,
+} from '@/lib/materialidade-piso';
 
 /** Teto de materialidade (R$/mês) acima do qual a decisão é sempre humana (mesma régua do analyzer). */
 export const TETO_MATERIALIDADE_FINANCEIRO = 5000;
@@ -25,6 +36,14 @@ export type ResultadoFinanceiro = {
   motivo: string | null;
   /** Sinais individuais detectados (auditoria). */
   sinais: string[];
+  /**
+   * O impacto mensal declarado é POSITIVO e menor que o piso (`PISO_IMPACTO_MENSAL`)?
+   *
+   * ⚠️ Campo MECÂNICO, e é o único sinal deste módulo que o agregador transforma em `reprovar`.
+   * ⚠️ Ausência de número (0/null) devolve `false` — projeto especial e ganho imensurável não
+   * prometem valor, e reprovar por ausência reprovaria as duas famílias inteiras.
+   */
+  abaixoDoPiso: boolean;
 };
 
 /** Número finito ou 0 — normaliza null/undefined/NaN. */
@@ -81,11 +100,18 @@ export function avaliarFinanceiro(input: {
       confianca: 0.5,
       motivo: 'Sem dados financeiros para avaliar — nem saving nem receita declarados.',
       sinais: ['sem dados financeiros'],
+      abaixoDoPiso: false,
     };
   }
 
   const sinais: string[] = [];
 
+  // PISO de impacto: a régua mecânica de D4. Fica ANTES do teto porque são os dois extremos da
+  // mesma pergunta ("este número justifica um projeto?") e nenhum projeto pode disparar os dois.
+  const abaixoDoPiso = abaixoDoPisoDeImpacto(materialidade, PISO_IMPACTO_MENSAL);
+  if (abaixoDoPiso) {
+    sinais.push(motivoPisoDeImpacto(materialidade, PISO_IMPACTO_MENSAL));
+  }
   if (materialidade > teto) {
     sinais.push(
       `Materialidade de ${reais(materialidade)}/mês acima do teto de ${reais(teto)}/mês — decisão humana.`,
@@ -112,5 +138,5 @@ export function avaliarFinanceiro(input: {
   const confianca = veredito === 'ok' ? 0.9 : 0.3;
   const motivo = sinais.length > 0 ? sinais.join(' ') : null;
 
-  return { veredito, confianca, motivo, sinais };
+  return { veredito, confianca, motivo, sinais, abaixoDoPiso };
 }

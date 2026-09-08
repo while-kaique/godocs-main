@@ -7,6 +7,12 @@
  * decisão humana. Sem imports de servidor.
  */
 import { grauConfianca } from "@/lib/deliberacao";
+import {
+  descreverFaixaMedida,
+  taxaEmDez,
+  type Calibragem,
+  type FaixaConfianca,
+} from "@/lib/avaliacao-calibragem";
 import type { Confianca } from "@/lib/especiais-regua";
 
 // Reexporta a formalização da confiança em grau — o piso de `alta` (0.8) e `media` (0.6) é
@@ -21,6 +27,10 @@ export function rotuloVeredito(v: string | null | undefined): string {
       return "Aprovar";
     case "em_validacao":
       return "Validar";
+    // ⚠️ Rótulo PRÓPRIO: `reprovar` nasceu do piso de impacto (D4) e sem esta linha cairia no
+    // `default` exibindo a chave crua — a família do `Dispensado` que virou `Pré-reprovado`.
+    case "reprovar":
+      return "Reprovar";
     case "isento":
       return "Isento";
     default:
@@ -37,6 +47,8 @@ export function rotuloEstadoDeliberacao(e: string | null | undefined): string {
       return "Consenso";
     case "nao_consenso":
       return "Sem consenso";
+    case "reprovado":
+      return "Reprovado pelo piso";
     case "isento":
       return "Isento";
     default:
@@ -53,6 +65,8 @@ export function rotuloResultadoRetroativo(r: string | null | undefined): string 
       return "Conservador";
     case "erro_grave":
       return "Erro grave";
+    case "reprovacao_indevida":
+      return "Reprovação indevida";
     case "sem_base":
       return "Sem base";
     default:
@@ -75,12 +89,41 @@ export function rotuloGrau(g: Confianca | null): string {
 }
 
 /**
- * Confiança 0..1 → percentual inteiro exibível ("82%"). `null`/não-finito → "—".
- * Mede a mesma coisa que a barra de confiança, para o número que a coluna destaca.
+ * ⚠️ **`pctConfianca` SAIU em 08/09/2026 (INV-18 / RF-239).** Ela exibia o float interno como
+ * percentual, e esse float é **o placar da votação**, não uma medida: com 4 especialistas a
+ * concordância direcional só vale 0,5 · 0,75 · 1,0 e a confiança média é auto-declaração do LLM
+ * colada em 0,85-0,95 — daí "71%" e "43%" se repetirem para sempre, com 2 dígitos significativos,
+ * como se fossem medição. O que a tela mostra agora é **frequência MEDIDA ou nada**
+ * (`medicaoDaConfianca`). **Não reintroduzir**: o float segue interno, onde a lógica o compara
+ * por limiar, e a UI não o traduz mais em percentual.
  */
-export function pctConfianca(conf: number | null | undefined): string {
-  if (typeof conf !== "number" || !Number.isFinite(conf)) return "—";
-  return `${Math.round(conf * 100)}%`;
+
+/** Faixa de calibragem de uma confiança numérica. `null` quando não há número. */
+export function faixaDeConfianca(conf: number | null | undefined): FaixaConfianca | null {
+  return typeof conf === "number" && Number.isFinite(conf) ? grauConfianca(conf) : null;
+}
+
+/**
+ * O que a tela diz sobre a confiança de UM projeto: o grau (sinal do agente) + a taxa MEDIDA
+ * daquela faixa contra a triagem. FONTE ÚNICA do texto — a coluna e a ficha dividem.
+ *
+ * ⚠️ Sem amostra suficiente na faixa, `medicao` é "ainda sem medição" e `emDez` é `null`:
+ * **nenhum número é exibido**. Faixa sem base não pode virar "0 de 10", que se leria como
+ * "erra sempre".
+ */
+export function medicaoDaConfianca(
+  conf: number | null | undefined,
+  calibragem: Calibragem | null | undefined,
+): { faixa: FaixaConfianca | null; grau: Confianca | null; medicao: string; emDez: number | null } {
+  const faixa = faixaDeConfianca(conf);
+  const grau = faixa === "sem_grau" || faixa == null ? null : faixa;
+  const f = faixa && calibragem ? calibragem[faixa] : null;
+  return {
+    faixa,
+    grau,
+    medicao: descreverFaixaMedida(f),
+    emDez: f?.suficiente && f.taxa_acerto != null ? taxaEmDez(f.taxa_acerto) : null,
+  };
 }
 
 /**

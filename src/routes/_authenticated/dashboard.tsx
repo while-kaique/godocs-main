@@ -35,6 +35,7 @@ import { HistoricoButton } from '@/components/historico/historico-button';
 import { StatusBadge } from '@/components/status-badge';
 import { ChipEstadoParecer } from '@/components/dashboard/parecer-lider';
 import { ChipSombra, type SombraChipDados } from '@/components/dashboard/chip-sombra';
+import type { Calibragem } from '@/lib/avaliacao-calibragem';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
 import { SkeletonLinhas } from '@/components/dashboard/skeleton-linhas';
 import { STATUS_TRIAGEM, corDaRegua, metaStatus } from '@/components/dashboard/status-triagem';
@@ -101,6 +102,8 @@ type Listagem = {
   avaliacoes: Record<string, SombraChipDados>;
   /** Voto 👍/👎 já dado pelo admin, por id. */
   feedbacks: Record<string, 'like' | 'dislike'>;
+  /** Calibragem da confiança por faixa — a taxa MEDIDA que a coluna e a ficha exibem (INV-18). */
+  calibragem?: Calibragem;
   /** ISO da última sincronização com a planilha (a idade do espelho). */
   lidoEm: string;
   /** Passou de 20 min sem sincronizar = 4 corridas de cron perdidas → avisa. */
@@ -728,6 +731,7 @@ function Dashboard() {
                       <ChipSombra
                         dados={dados?.avaliacoes?.[p.id] ?? dados?.avaliacoes?.[p.id.toLowerCase()] ?? null}
                         voto={dados?.feedbacks?.[p.id] ?? dados?.feedbacks?.[p.id.toLowerCase()] ?? null}
+                        calibragem={dados?.calibragem ?? null}
                       />
                     </td>
                     <td className="px-3 py-2.5">
@@ -843,6 +847,7 @@ function Dashboard() {
 
       <ProjetoDetalheDialog
         projeto={aberto}
+        calibragem={dados?.calibragem ?? null}
         onFechar={() => {
           setAberto(null);
           // Se veio por deep-link (?projeto=<id>), tira o param para não reabrir sozinho

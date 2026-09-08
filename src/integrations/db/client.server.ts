@@ -3568,12 +3568,36 @@ export async function getAvaliacoesRetroativasPorIds(
 }
 
 /** ids já medidos pelo retroativo — para o cron não re-rodar o que já mediu (idempotência). */
-export async function getIdsRetroativos(): Promise<string[]> {
-  const rows = await queryAll<{ projeto_id: string }>(
-    'SELECT projeto_id FROM avaliacao_retroativa',
+/**
+ * As medições retroativas já gravadas, com o veredito HUMANO contra o qual cada uma foi medida.
+ *
+ * ⚠️ Devolvia só os ids (`getIdsRetroativos`), e o retroativo pulava esses projetos **para
+ * sempre** — gabarito CONGELADO (achado A3.3): os 137 projetos que viraram `Aprovado → Reprovado`
+ * em 04/09/2026 seguiam medidos contra a verdade ANTIGA, e um `aprovar` ali é um `erro_grave` que
+ * nunca seria contado. Com o veredito de referência em mãos, quem mudou de Status volta à fila
+ * (`upsertAvaliacaoRetroativa` já é UPSERT — re-medir é reavaliar).
+ */
+export async function getMedicoesRetroativas(): Promise<
+  { projeto_id: string; veredito_humano: string | null }[]
+> {
+  return await queryAll<{ projeto_id: string; veredito_humano: string | null }>(
+    'SELECT projeto_id, veredito_humano FROM avaliacao_retroativa',
     [],
   );
-  return rows.map((r) => r.projeto_id);
+}
+
+/**
+ * Contagem das medições por FAIXA de confiança × balde do comparador — a matéria-prima da
+ * calibragem (`avaliacao-calibragem.ts`). ⚠️ Agrega no SQL: a tabela tem uma linha por projeto
+ * medido e não há motivo para trazer 600 linhas para contar 12 números.
+ */
+export async function getCalibragemRetroativa(): Promise<
+  { grau: string | null; resultado: string | null; n: number }[]
+> {
+  return await queryAll<{ grau: string | null; resultado: string | null; n: number }>(
+    'SELECT grau, resultado, COUNT(*) AS n FROM avaliacao_retroativa GROUP BY grau, resultado',
+    [],
+  );
 }
 
 /** Grava (ou substitui) a medição retroativa de um projeto. UPSERT: re-medir é reavaliar. */

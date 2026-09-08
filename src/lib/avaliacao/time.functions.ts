@@ -12,6 +12,7 @@ import { llmChat } from '@/lib/llm';
 import { getCargoDe } from '@/lib/areas/teamguide.server';
 import { lerResumosEspelho } from '@/lib/sheet-espelho';
 import { politicaDeLiberacao } from '@/lib/avaliacao/consenso';
+import { carregarAcuraciaMedida } from '@/lib/avaliacao-calibragem.functions';
 import { buscarDuplicataNaLista, checarPlausibilidadeHoras, calcularImpactoBasico } from '@/lib/avaliacao/ferramentas';
 import { numero, texto, type Dossie } from '@/lib/avaliacao/dossie';
 import type { Mensagem } from '@/lib/avaliacao/ferramentas';
@@ -197,7 +198,11 @@ export async function avaliarProjetoComTime(
     return llmChat(mensagens as never, o as never);
   };
 
-  const liberacao = politicaDeLiberacao(null, opts.liberacao ?? {});
+  // A política recebe a acurácia MEDIDA (T13/RF-242). ⚠️ Era `null` literal: a política existia
+  // para ler medição e nunca recebia nenhuma, então o time ficava em sombra por argumento
+  // hardcoded. Com o número real ela passa a dizer QUAL meta faltou — e as flags de liberação
+  // seguem desligadas, então `age_sozinho` continua `false` (fronteira do plano).
+  const liberacao = politicaDeLiberacao(await carregarAcuraciaMedida(), opts.liberacao ?? {});
   try {
     const resultado = await avaliarComTime({
       dossie,

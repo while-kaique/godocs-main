@@ -293,7 +293,8 @@ describe('agregarRetroativo — relatório sobre 6 comparações fabricadas', ()
   });
 
   it('saídas e humano_pct', () => {
-    expect(r.saidas).toEqual({ aprovar: 2, ajuste: 2, humano: 2 });
+    // `reprovar` entrou como 4ª saída (D4) — nenhuma comparação fabricada aqui a usa.
+    expect(r.saidas).toEqual({ aprovar: 2, ajuste: 2, humano: 2, reprovar: 0 });
     expect(r.humano_pct).toBeCloseTo(2 / 6, 6);
   });
 
@@ -343,13 +344,21 @@ describe('agregarRetroativo — lista vazia', () => {
     const r = agregarRetroativo([]);
     expect(r.total).toBe(0);
     expect(r.por_gabarito).toEqual({ nota_humana: 0, status_assentado: 0, nao_auditado: 0, fora: 0 });
-    expect(r.merito).toEqual({ acerto: 0, conservador: 0, erro_grave: 0, sem_base: 0, acuracia: null });
+    expect(r.merito).toEqual({
+      acerto: 0,
+      conservador: 0,
+      erro_grave: 0,
+      // erro ESPELHADO do erro_grave, nascido com o desfecho `reprovar` (RF-247).
+      reprovacao_indevida: 0,
+      sem_base: 0,
+      acuracia: null,
+    });
     expect(r.estrelas.n_comparaveis).toBe(0);
     expect(r.estrelas.exato).toBeNull();
     expect(r.estrelas.dentro_de_1).toBeNull();
     expect(r.estrelas.vies).toBeNull();
     expect(r.estrelas.escape).toBe(0);
-    expect(r.saidas).toEqual({ aprovar: 0, ajuste: 0, humano: 0 });
+    expect(r.saidas).toEqual({ aprovar: 0, ajuste: 0, humano: 0, reprovar: 0 });
     expect(r.humano_pct).toBeNull();
     expect(r.valor).toEqual({ absurdos: 0, auditados: 0 });
     expect(r.contestacoes).toEqual([]);

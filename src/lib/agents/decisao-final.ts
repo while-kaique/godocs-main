@@ -98,6 +98,18 @@ export function decidirComTime(e: EntradaDecisao): Decisao {
     };
   }
 
+  // 3b. Reprovação MECÂNICA do agregador (piso de impacto, D4): já é régua declarada com o motivo
+  // redigido, então não passa pelo teste do "achado grave" acima — o que a sustenta é o número, não
+  // um especialista. ⚠️ Sem este ramo, `reprovar` caía no `return` final e virava **aprovado**: é
+  // exatamente o fall-through que transformou `Dispensado` em `Pré-reprovado` na fila do líder.
+  if (e.veredito === 'reprovar') {
+    return {
+      status: 'reprovado',
+      racional: 'impacto mensal declarado abaixo do piso (régua mecânica)',
+      sustentacao: graves,
+    };
+  }
+
   // 4. O agregador pediu humano (materialidade alta, divergência…).
   if (e.veredito === 'em_validacao' || e.veredito === 'isento') {
     return { status: 'em_validacao', racional: 'a mesa pediu conferência humana', sustentacao: e.apontamentos };
