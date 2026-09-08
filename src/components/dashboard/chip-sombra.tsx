@@ -17,11 +17,9 @@ import { AlertTriangle, ThumbsUp, ThumbsDown } from "lucide-react";
 import {
   rotuloVeredito,
   rotuloGrau,
-  medicaoDaConfianca,
   grauConfianca,
   aparenciaConfianca,
 } from "@/lib/avaliacao-sombra-rotulos";
-import type { Calibragem } from "@/lib/avaliacao-calibragem";
 
 export type SombraChipDados = {
   veredito: string;
@@ -33,12 +31,9 @@ export type SombraChipDados = {
 export function ChipSombra({
   dados,
   voto,
-  calibragem,
 }: {
   dados: SombraChipDados | null;
   voto?: "like" | "dislike" | null;
-  /** A calibragem por faixa (a mesma da ficha). Ausente → nenhum número é exibido. */
-  calibragem?: Calibragem | null;
 }) {
   // Sem recomendação do agente: "—" quieto (o agente ainda não avaliou este projeto).
   if (!dados) {
@@ -46,32 +41,24 @@ export function ChipSombra({
   }
   const a = aparenciaConfianca(dados.confianca);
   const grau = typeof dados.confianca === "number" ? grauConfianca(dados.confianca) : null;
-  const { medicao, emDez } = medicaoDaConfianca(dados.confianca, calibragem);
   return (
     <span className="inline-flex items-center gap-1.5">
       <span
         className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold"
         style={{ background: a.fundo, border: `1px solid ${a.borda}`, color: a.cor }}
-        title={`${rotuloVeredito(dados.veredito)} · ${rotuloGrau(grau)} · ${medicao}`}
+        title={`${rotuloVeredito(dados.veredito)} · ${rotuloGrau(grau)}`}
       >
         <span>{rotuloVeredito(dados.veredito)}</span>
-        {/* A MEDIÇÃO em destaque, com um ponto de reforço para não depender só da cor. */}
+        {/* O GRAU em palavra, com um ponto de reforço para não depender só da cor. */}
         <span className="inline-flex items-center gap-1">
           <span
             aria-hidden
             className="inline-block h-1.5 w-1.5 rounded-full"
             style={{ background: a.cor }}
           />
-          {emDez == null ? (
-            /* Sem amostra na faixa: o grau em PALAVRA. Nenhum número — "0 de 10" se leria como
-               "erra sempre", e é justamente a mentira que esta mudança desfaz. */
-            <span className="text-[11px] font-semibold">{rotuloGrau(grau).replace("confiança ", "")}</span>
-          ) : (
-            <span className="inline-flex items-baseline gap-[1px] tabular-nums">
-              <span className="text-[12.5px] font-bold">{emDez}</span>
-              <span className="text-[10px] font-medium opacity-70">/10</span>
-            </span>
-          )}
+          <span className="text-[11px] font-semibold">
+            {rotuloGrau(grau).replace("confiança ", "")}
+          </span>
         </span>
       </span>
       {(dados.divergencia || dados.aplicar) && (

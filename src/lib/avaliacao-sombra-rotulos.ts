@@ -7,12 +7,7 @@
  * decisão humana. Sem imports de servidor.
  */
 import { grauConfianca } from "@/lib/deliberacao";
-import {
-  descreverFaixaMedida,
-  taxaEmDez,
-  type Calibragem,
-  type FaixaConfianca,
-} from "@/lib/avaliacao-calibragem";
+import type { FaixaConfianca } from "@/lib/avaliacao-calibragem";
 import type { Confianca } from "@/lib/especiais-regua";
 
 // Reexporta a formalização da confiança em grau — o piso de `alta` (0.8) e `media` (0.6) é
@@ -74,7 +69,7 @@ export function rotuloResultadoRetroativo(r: string | null | undefined): string 
   }
 }
 
-/** Grau da confiança → rótulo por extenso (o número vem sempre junto). */
+/** Grau da confiança → rótulo por extenso. É o ÚNICO jeito de a tela exibir confiança. */
 export function rotuloGrau(g: Confianca | null): string {
   switch (g) {
     case "alta":
@@ -94,8 +89,8 @@ export function rotuloGrau(g: Confianca | null): string {
  * concordância direcional só vale 0,5 · 0,75 · 1,0 e a confiança média é auto-declaração do LLM
  * colada em 0,85-0,95 — daí "71%" e "43%" se repetirem para sempre, com 2 dígitos significativos,
  * como se fossem medição. O que a tela mostra agora é **frequência MEDIDA ou nada**
- * (`medicaoDaConfianca`). **Não reintroduzir**: o float segue interno, onde a lógica o compara
- * por limiar, e a UI não o traduz mais em percentual.
+ * (só o GRAU, ver abaixo). **Não reintroduzir**: o float segue interno, onde a lógica o compara
+ * por limiar, e a UI não o traduz mais em número nenhum.
  */
 
 /** Faixa de calibragem de uma confiança numérica. `null` quando não há número. */
@@ -104,32 +99,22 @@ export function faixaDeConfianca(conf: number | null | undefined): FaixaConfianc
 }
 
 /**
- * O que a tela diz sobre a confiança de UM projeto: o grau (sinal do agente) + a taxa MEDIDA
- * daquela faixa contra a triagem. FONTE ÚNICA do texto — a coluna e a ficha dividem.
+ * ⚠️ **A tela exibe SÓ o grau** (`baixa`/`média`/`alta`) — decisão do Luis, 08/09/2026.
  *
- * ⚠️ Sem amostra suficiente na faixa, `medicao` é "ainda sem medição" e `emDez` é `null`:
- * **nenhum número é exibido**. Faixa sem base não pode virar "0 de 10", que se leria como
- * "erra sempre".
+ * Duas coisas foram tentadas e saíram: o **percentual** (`pctConfianca`, removida acima) porque é
+ * o placar da votação disfarçado de medida, e a **frequência medida** ("8 de 10 · N casos"), que
+ * era honesta mas, nas palavras dele, *"uma boa ideia para contornar a confiança"* — contorno, não
+ * solução. O que ele quer é o agente **avaliando bem**, não um número melhor descrevendo um
+ * julgamento ruim. Então a tela ficou com a palavra, e a MEDIÇÃO continua onde ela decide algo:
+ * `politicaDeLiberacao` (que lê `carregarAcuraciaMedida`) e o relatório do retroativo.
+ *
+ * ⚠️ Não reintroduzir número de confiança na tela sem que essa decisão mude.
  */
-export function medicaoDaConfianca(
-  conf: number | null | undefined,
-  calibragem: Calibragem | null | undefined,
-): { faixa: FaixaConfianca | null; grau: Confianca | null; medicao: string; emDez: number | null } {
-  const faixa = faixaDeConfianca(conf);
-  const grau = faixa === "sem_grau" || faixa == null ? null : faixa;
-  const f = faixa && calibragem ? calibragem[faixa] : null;
-  return {
-    faixa,
-    grau,
-    medicao: descreverFaixaMedida(f),
-    emDez: f?.suficiente && f.taxa_acerto != null ? taxaEmDez(f.taxa_acerto) : null,
-  };
-}
 
 /**
  * Cores por grau de confiança — alta=verde, média=âmbar, baixa=ardósia. Token de aparência
  * consumido pela coluna e pela ficha. ⚠️ A cor NUNCA é o único sinal: quem usa isto sempre
- * mostra também o % em texto e o rótulo do grau.
+ * mostra também o rótulo do grau em TEXTO.
  */
 export const CORES_GRAU: Record<Confianca, { cor: string; fundo: string; borda: string }> = {
   alta: { cor: "#186a3b", fundo: "rgba(24,106,59,0.10)", borda: "rgba(24,106,59,0.35)" },

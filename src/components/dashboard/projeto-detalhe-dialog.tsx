@@ -48,11 +48,9 @@ import {
   rotuloEstadoDeliberacao,
   rotuloResultadoRetroativo,
   rotuloGrau,
-  medicaoDaConfianca,
   grauConfianca,
   aparenciaConfianca,
 } from '@/lib/avaliacao-sombra-rotulos';
-import type { Calibragem } from '@/lib/avaliacao-calibragem';
 import { partirParecerMesa, ROTULO_CURTO_DIMENSAO } from '@/lib/mesa-parecer';
 import {
   DiscordanciaForm,
@@ -377,49 +375,26 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
 }
 
 /**
- * Confiança em destaque: a **frequência MEDIDA** daquela faixa contra a triagem, colorida pelo
- * grau, com o grau em palavra ao lado. `compacta` é a versão da linha colapsada — mesmo
- * componente para a tela não ter duas réguas de cor/arredondamento.
+ * Confiança em destaque: **só o GRAU**, em palavra, colorido por ele. `compacta` é a versão da
+ * linha colapsada — mesmo componente para a tela não ter duas réguas de cor/arredondamento.
  *
- * ⚠️ Até 08/09/2026 o destaque era o **percentual do float interno** (`pctConfianca`, removida),
- * que é o placar da votação: com 4 especialistas ele só podia valer 43%, 71% e alguns vizinhos, e
- * era exibido com 2 dígitos como se fosse medição (INV-18 / RF-239). Faixa sem amostra
- * suficiente NÃO exibe número: exibe o grau e diz "ainda sem medição".
+ * ⚠️ **Nenhum número** (decisão do Luis, 08/09/2026). Saíram, nesta ordem: o **percentual** do
+ * float interno (`pctConfianca`, removida — é o placar da votação, que com 4 especialistas só
+ * podia valer 43%, 71% e alguns vizinhos) e a **frequência medida** ("8 de 10 · N casos"), que era
+ * honesta mas *"uma boa ideia para contornar a confiança"* — contorno, não solução. O que importa
+ * é o agente avaliar bem. A medição segue viva onde decide algo: `politicaDeLiberacao` e o
+ * relatório do retroativo.
  */
-function ConfiancaDestaque({
-  conf,
-  compacta,
-  calibragem,
-}: {
-  conf: number | null;
-  compacta?: boolean;
-  calibragem?: Calibragem | null;
-}) {
+function ConfiancaDestaque({ conf, compacta }: { conf: number | null; compacta?: boolean }) {
   const a = aparenciaConfianca(conf);
   const grau = typeof conf === 'number' ? grauConfianca(conf) : null;
-  const { medicao, emDez } = medicaoDaConfianca(conf, calibragem);
   return (
     <span
       className={`inline-flex items-baseline rounded-lg ${compacta ? 'gap-1 px-2 py-0.5' : 'gap-1.5 px-2.5 py-1'}`}
       style={{ background: a.fundo, border: `1px solid ${a.borda}`, color: a.cor }}
-      title={`${rotuloGrau(grau)} · ${medicao}`}
     >
-      {emDez == null ? (
-        <span className={`font-bold leading-none ${compacta ? 'text-[13px]' : 'text-[15px]'}`}>
-          {rotuloGrau(grau).replace('confiança ', '')}
-        </span>
-      ) : (
-        <span className="inline-flex items-baseline gap-[2px] tabular-nums">
-          <span className={`font-bold leading-none ${compacta ? 'text-[15px]' : 'text-[20px]'}`}>
-            {emDez}
-          </span>
-          <span className={`font-medium opacity-70 ${compacta ? 'text-[10px]' : 'text-[12px]'}`}>
-            de 10
-          </span>
-        </span>
-      )}
-      <span className={`font-semibold ${compacta ? 'text-[10.5px]' : 'text-[11px]'}`}>
-        {emDez == null ? 'ainda sem medição' : rotuloGrau(grau)}
+      <span className={`font-semibold ${compacta ? 'text-[11px]' : 'text-[13px]'}`}>
+        {rotuloGrau(grau)}
       </span>
     </span>
   );
@@ -564,13 +539,10 @@ function AvaliacaoSombraPainel({
   votando,
   onDiscordar,
   onLimparVoto,
-  calibragem,
   onRodar,
   rodando,
 }: {
   sombra: AvaliacaoSombra;
-  /** Calibragem por faixa (vem da listagem, é global). Ausente → nenhuma taxa é exibida. */
-  calibragem?: Calibragem | null;
   /** Dispara a análise: a MESA (rápida) ou o TIME completo (dá a estrela, roda em background). */
   onRodar: (qual: 'mesa' | 'time') => Promise<void> | void;
   rodando: 'mesa' | 'time' | null;
@@ -609,7 +581,7 @@ function AvaliacaoSombraPainel({
         {mesa ? (
           <>
             <span className="text-[13.5px] font-semibold">{rotuloVeredito(mesa.veredito)}</span>
-            <ConfiancaDestaque conf={mesa.confianca} compacta calibragem={calibragem} />
+            <ConfiancaDestaque conf={mesa.confianca} compacta />
             {mesa.divergencia && (
               <span
                 className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
@@ -854,16 +826,10 @@ export function ProjetoDetalheDialog({
   projeto,
   onFechar,
   onStatusSalvo,
-  calibragem,
 }: {
   projeto: ProjetoDashboardResumo | null;
   onFechar: () => void;
   onStatusSalvo: (id: string, status: string) => void;
-  /**
-   * Calibragem da confiança por faixa. É GLOBAL (não do projeto), então vem da listagem em vez
-   * de custar uma requisição própria — cada requisição neste app carrega ~750 ms fixos de edge.
-   */
-  calibragem?: Calibragem | null;
 }) {
   const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -1276,7 +1242,6 @@ export function ProjetoDetalheDialog({
                   votando={votando}
                   onDiscordar={discordarDaSombra}
                   onLimparVoto={limparVotoSombra}
-                  calibragem={calibragem}
                   onRodar={rodarAnalise}
                   rodando={rodandoAnalise}
                 />

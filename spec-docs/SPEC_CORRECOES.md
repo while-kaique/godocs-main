@@ -6,6 +6,49 @@
 
 ---
 
+## 2026-09-08 — O dossiê do time lia a planilha por nomes de coluna da v1, e a aba de PROD já é v2: TODO o financeiro chegava `null` aos agentes
+
+**Sintoma.** No projeto `dba1cc1c23ebb528d6ad4c852ad32b64` (SmartOnline/DIFAL) a planilha tinha
+`Saving Efetivado = 324.005,09` e `Custo Evitado Horas = 60`, e o `dossie.financeiro` veio com
+`saving_horas`, `saving_reais`, `custo_evitado_reais`, `tipo_saving`, `receita_mensal` e
+`ganho_total_mensal` **TODOS `null`**. Os agentes só citaram números porque estavam escritos na
+**prosa** do memorial. Efeito colateral: o **cético acusou "contradição interna"** porque o dossiê
+imprimia "Saving em R$: —" enquanto o memorial dizia que o valor estava no campo estruturado — um
+falso positivo nascido de leitura vazia. E `classificacao.tipos` saía "—" pela mesma causa.
+
+**Causa-raiz.** `src/lib/avaliacao/dossie.ts` pede as colunas pelos nomes da **v1**
+(`Saving Horas`, `Custo Evitado`, `Tipo de Saving`, `Tipos Projeto`, `Receita Mensal`,
+`Ganho Total`), e a aba `GoDocs` de produção já está **100% em v2** — nenhum nome v1 sobrou. O
+`leitorPlanilha` tinha 2 passos (exato e normalizado) e nenhum deles alcança um nome diferente.
+
+**Fix, num ponto só.** `leitorPlanilha` ganhou um 3º passo: o **nome v2 equivalente**, via
+`nomeV2De` (`src/lib/coluna-chave.ts`), que é o **INVERSO** do `NOME_LEGADO` que já existia.
+Resolve todos os campos de uma vez e a aba v1 segue lendo pelo passo 1, intocada.
+
+**⚠️ A exceção, e ela é a parte que importa.** Duas traduções **não** entram no alias
+(`SEM_ALIAS_DE_LEITURA`), porque ali o significado mudou de verdade:
+- **`Saving Reais`** (v1: só saving) ↔ **`Impacto Bruto`** (v2: saving + custo evitado +
+  **receita**). Herdar esse alias faria o especialista financeiro auditar **receita dentro do
+  saving** — a dupla contagem do caso Sucesso.AI, de volta pela porta do leitor. Em linha v2 o
+  campo fica `null` de propósito.
+- **`Ganho Total`** (v1: saving + receita ÷ 10) ↔ **`Impacto Líquido`** (v2: 1,0·S + 0,5·CE +
+  0,1·R − C). Mesmo papel, fórmulas diferentes: a escolha é declarada no bloco `financeiro`, na
+  ordem banco → v1 → `Impacto Líquido Mensal` → `Impacto Líquido`.
+
+**Junto.** O dossiê passou a expor `impacto_bruto` e `impacto_liquido` (os compostos que a v2 tem
+de verdade), e a linha de texto **deixou de ser incondicional**: ela só nomeia o que existe, em vez
+de imprimir "Saving em R$: — · ganho total mensal: —" em toda linha v2 — que era exatamente o que o
+cético leu como contradição.
+
+**Onde aterrissou.** `src/lib/coluna-chave.ts` (`SEM_ALIAS_DE_LEITURA`, `nomeV2De`) ·
+`src/lib/avaliacao/dossie.ts` (`leitorPlanilha`, bloco `financeiro`, o texto).
+
+**Status.** Testes: `tests/dossie-colunas-v2.test.ts` — a linha real do caso (60 h e R$ 324.005,09
+chegando), a linha v1 lendo igual, o `saving_reais` **não** herdando o Impacto Bruto, e o texto sem
+o "—". Suíte 3888 verde.
+
+---
+
 ## 2026-09-08 — O painel de sombra mostrava só quem OBJETOU (e mudava de tamanho entre duas aberturas), com o texto cortado em reticências
 
 **Sintoma.** Três coisas, todas relatadas pelo Luis olhando a ficha do `/dashboard`: *"eu tinha
@@ -103,6 +146,14 @@ um campo por projeto) · `client.server.ts` · `avaliacao-retroativa.functions.t
 limiar) — a mudança é de EXIBIÇÃO e MEDIÇÃO. Faixa sem amostra **não exibe número**. `ajuste` fica
 **ausente** na acurácia medida (a mesa não tem esse desfecho; preenchê-lo com o número do `aprovar`
 seria inventar medição). E as flags de liberação seguem desligadas: `age_sozinho` continua `false`.
+
+**⚠️ Revisado no mesmo dia (08/09/2026), pelo dono do produto.** A frequência medida **saiu da
+tela**: *"tire o '0 de 10' confiança baixa. Só deixe 'baixa', 'media', 'alta'. Foi uma boa ideia
+para contornar a confiança. Mas quero que realmente funcione esse sistema no sentido de que ele tá
+avaliando bem."* Então a tela ficou com o **GRAU em palavra** e mais nada — a medição continua
+existindo onde ela decide algo (`politicaDeLiberacao`, relatório do retroativo), e a `calibragem`
+saiu do payload da listagem junto (campo que a tela não desenha não viaja). O canário do teste
+passou a proibir percentual, `medicaoDaConfianca` **e** a fração nas 3 telas.
 
 **Status.** Testes: `tests/avaliacao-calibragem.test.ts`, `tests/avaliacao-gabarito-vivo.test.ts`,
 `tests/avaliacao-sombra-rotulos.test.ts` (canário do percentual). Plano:

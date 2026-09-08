@@ -78,12 +78,10 @@ import {
   statusEspelho,
 } from "@/lib/sheet-espelho";
 import { syncSheetsToSqlite } from "@/lib/google/sync-reverse";
-import { carregarCalibragem } from "@/lib/avaliacao-calibragem.functions";
 import {
   getUltimoConsensoDoTime,
   getUltimosConsensosDoTimePorIds,
 } from "@/integrations/db/client.server";
-import type { Calibragem } from "@/lib/avaliacao-calibragem";
 import {
   montarContribuicoesPorProjeto,
   type ContribuicaoParticipante,
@@ -160,15 +158,6 @@ export type ListagemDashboard = {
   avaliacoes: Record<string, AvaliacaoSombraResumo>;
   /** Voto 👍/👎 já dado pelo admin, por id (indicador na coluna; o voto acontece na ficha). */
   feedbacks: Record<string, "like" | "dislike">;
-  /**
-   * Calibragem da confiança por FAIXA (INV-18): a taxa MEDIDA de concordância com a triagem, que
-   * substituiu o percentual do float interno na coluna e na ficha.
-   *
-   * ⚠️ Vem AQUI, no payload da listagem, e não numa requisição própria: é UM objeto global (não
-   * um campo por projeto, então não multiplica por ~600 — o gotcha 4 do dashboard segue honrado) e
-   * cada requisição neste app custa ~750 ms fixos de edge.
-   */
-  calibragem: Calibragem;
   /** ISO — quando a planilha foi lida pela última vez (a idade do ESPELHO, não do request). */
   lidoEm: string;
   /** O espelho passou de `ESPELHO_VELHO_MS` sem sincronizar → a tela avisa. */
@@ -570,8 +559,6 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
   // (não do espelho), num mapa lateral chaveado por id — mesmo padrão da `/especiais`. Falha
   // aqui NÃO derruba a listagem (o teste sombra é acessório): a coluna só mostra "—".
   const { avaliacoes, feedbacks } = await carregarSombraDaListagem(projetos.map((p) => p.id));
-  // Fail-safe como a sombra: sem calibragem a tela diz "ainda sem medição" e segue inteira.
-  const calibragem = await carregarCalibragem();
 
   // A idade é do dado: preferimos o carimbo da última corrida OK e caímos no `lido_em` das
   // linhas (o espelho pode ter linhas de antes de `sync_runs` existir).
@@ -582,7 +569,6 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     total: projetos.length,
     avaliacoes,
     feedbacks,
-    calibragem,
     lidoEm: new Date(idadeRef ?? Date.now()).toISOString(),
     espelhoVelho: idadeRef != null && Date.now() - idadeRef > ESPELHO_VELHO_MS,
     syncFalhou: saude.ultimaFalhou,

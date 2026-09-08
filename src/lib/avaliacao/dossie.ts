@@ -12,7 +12,7 @@
 //
 // Regra de ouro: JSON podre, célula vazia ou fonte ausente NUNCA lançam. Viram null/[] +
 // lacuna declarada. Um dossiê que mente completude é pior que um dossiê curto.
-import { chaveColuna } from '@/lib/coluna-chave';
+import { chaveColuna, nomeV2De } from '@/lib/coluna-chave';
 
 export type FontesDossie = {
   projeto: Record<string, unknown> | null;
@@ -56,6 +56,10 @@ export type Dossie = {
     receita_mensal: number | null;
     tipo_receita: string | null;
     ganho_total_mensal: number | null;
+    /** v2 `Impacto Bruto` (saving + custo evitado + receita, SEM pesos). `null` em linha v1. */
+    impacto_bruto: number | null;
+    /** v2 `Impacto Líquido Mensal` (ou `Impacto Líquido`). `null` em linha v1. */
+    impacto_liquido: number | null;
     memorial_saving: string | null;
     memorial_receita: string | null;
     observacoes_analisador: string | null;
@@ -159,7 +163,24 @@ function separarLinks(s: string | null): string[] {
     .filter(Boolean);
 }
 
-/** Leitor por NOME de coluna, exato primeiro e normalizado depois (a régua de `chaveColuna`). */
+/**
+ * Leitor por NOME de coluna: exato primeiro, normalizado depois (a régua de `chaveColuna`) e, por
+ * último, o **nome v2 equivalente** (`nomeV2De`).
+ *
+ * ⚠️ **O 3º passo é o fix de 08/09/2026.** Este dossiê pede as colunas pelos nomes da **v1**
+ * (`Saving Horas`, `Custo Evitado`, `Tipo de Saving`, `Tipos Projeto`…) e a aba `GoDocs` de PROD
+ * já está 100% em **v2** — nenhum nome v1 sobrou. Resultado medido no projeto
+ * `dba1cc1c23ebb528d6ad4c852ad32b64` (SmartOnline/DIFAL): a planilha tinha
+ * `Saving Efetivado = 324.005,09` e `Custo Evitado Horas = 60`, e o dossiê entregou
+ * `saving_horas`, `saving_reais`, `custo_evitado_reais`, `tipo_saving`, `receita_mensal` e
+ * `ganho_total_mensal` **TODOS null**. Os agentes só citaram números porque estavam escritos na
+ * PROSA do memorial — e o cético acusou "contradição interna" porque o dossiê dizia
+ * "Saving em R$: —" enquanto o memorial trazia o valor. Falso positivo nascido de leitura vazia.
+ *
+ * ⚠️ O alias resolve POSIÇÃO, não SIGNIFICADO: `Saving Reais` e `Ganho Total` estão em
+ * `SEM_ALIAS_DE_LEITURA` e **não** caem aqui — quem os quer numa aba v2 escolhe a coluna v2
+ * explicitamente (ver o bloco `financeiro`). Aba v1 segue lendo pelo passo 1, intocada.
+ */
 function leitorPlanilha(row: Record<string, string> | null): (nome: string) => string | null {
   if (!row) return () => null;
   const porChave = new Map<string, string>();
@@ -167,9 +188,15 @@ function leitorPlanilha(row: Record<string, string> | null): (nome: string) => s
     const ch = chaveColuna(k);
     if (!porChave.has(ch)) porChave.set(ch, v);
   }
-  return (nome: string) => {
+  const ler = (nome: string): string | null => {
     if (nome in row) return texto(row[nome]);
     return texto(porChave.get(chaveColuna(nome)));
+  };
+  return (nome: string) => {
+    const direto = ler(nome);
+    if (direto !== null) return direto;
+    const v2 = nomeV2De(nome);
+    return v2 ? ler(v2) : null;
   };
 }
 
@@ -288,6 +315,10 @@ function construir(f: FontesDossie, opts: { lacunaProjeto: boolean }): Dossie | 
     },
     financeiro: {
       saving_horas: numero(p?.saving_horas) ?? numero(g('Saving Horas')),
+      // ⚠️ EXPLÍCITO, sem alias: a v2 não tem "saving em R$". `Impacto Bruto` inclui a RECEITA
+      // dentro, e herdá-lo aqui faria o especialista financeiro auditar receita como se fosse
+      // saving. Em linha v2 este campo fica `null` de propósito, e o que os agentes leem é o
+      // `impacto_bruto`/`impacto_liquido` abaixo (que a v2 tem de verdade).
       saving_reais: numero(p?.saving_reais) ?? numero(g('Saving Reais')),
       tipo_saving: texto(p?.tipo_saving) ?? g('Tipo de Saving'),
       alguem_fazia: texto(p?.alguem_fazia) ?? g('Alguém Fazia?'),
@@ -298,7 +329,18 @@ function construir(f: FontesDossie, opts: { lacunaProjeto: boolean }): Dossie | 
       custo_externo_mensal: numero(p?.custo_externo_mensal) ?? numero(g('Custo Externo Mensal')),
       receita_mensal: numero(g('Receita Mensal')) ?? numero(p?.receita_mensal),
       tipo_receita: g('Tipo de Receita') ?? texto(p?.tipo_receita),
-      ganho_total_mensal: numero(p?.ganho_total_mensal) ?? numero(g('Ganho Total')),
+      // ⚠️ EXPLÍCITO, sem alias (`Ganho Total` está em `SEM_ALIAS_DE_LEITURA`): v1 `Ganho Total`
+      // é saving + receita ÷ 10 e v2 `Impacto Líquido Mensal` é 1,0·S + 0,5·CE + 0,1·R − C
+      // normalizado no tempo. São fórmulas diferentes com o MESMO papel — "o ganho mensal do
+      // projeto" —, então a escolha é declarada aqui, na ordem: banco, v1, v2 mensal, v2.
+      ganho_total_mensal:
+        numero(p?.ganho_total_mensal) ??
+        numero(g('Ganho Total')) ??
+        numero(g('Impacto Líquido Mensal')) ??
+        numero(g('Impacto Líquido')),
+      // Os dois compostos da v2, como eles são (nunca traduzidos para nome v1).
+      impacto_bruto: numero(g('Impacto Bruto')),
+      impacto_liquido: numero(g('Impacto Líquido Mensal')) ?? numero(g('Impacto Líquido')),
       memorial_saving: g('Memorial de Saving') ?? texto(p?.memorial_calculo),
       memorial_receita: g('Receita Memorial'),
       observacoes_analisador: g('Observações'),
@@ -430,7 +472,17 @@ export function dossieParaTexto(d: Dossie, opts: { comReais?: boolean } = {}): s
       ? `Carga real ${fmt(fin.horas_carga_real, 'h')} · escala ${fmt(fin.horas_escala, 'h')}${fin.justificativa_carga_escala ? ` — ${t(fin.justificativa_carga_escala)}` : ''}`
       : null,
     fin.alocacao_ganhos ? `Alocação dos ganhos: ${t(fin.alocacao_ganhos)}` : null,
-    reais ? `Saving em R$: ${fmt(fin.saving_reais)} · ganho total mensal: ${fmt(fin.ganho_total_mensal)}` : null,
+    // ⚠️ Só nomeia o que EXISTE. A linha antiga era incondicional e imprimia
+    // "Saving em R$: — · ganho total mensal: —" em toda linha v2, e foi lendo isso que o cético
+    // acusou "contradição interna" contra um memorial que trazia o valor: o dossiê afirmava
+    // ausência onde havia dado, só com outro nome de coluna.
+    reais && fin.saving_reais !== null ? `Saving em R$: ${fmt(fin.saving_reais)}` : null,
+    reais && fin.ganho_total_mensal !== null
+      ? `Ganho mensal do projeto: ${fmt(fin.ganho_total_mensal)}`
+      : null,
+    reais && (fin.impacto_bruto !== null || fin.impacto_liquido !== null)
+      ? `Impacto bruto: ${fmt(fin.impacto_bruto)} · impacto líquido: ${fmt(fin.impacto_liquido)}`
+      : null,
     fin.custo_evitado_reais !== null ? `Custo evitado: ${fmt(fin.custo_evitado_reais)}` : null,
     fin.custo_evitado_itens.length ? `Itens de custo evitado: ${t(JSON.stringify(fin.custo_evitado_itens))}` : null,
     fin.custo_externo_mensal !== null ? `Custo externo mensal: ${fmt(fin.custo_externo_mensal)}` : null,
