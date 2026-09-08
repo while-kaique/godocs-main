@@ -3094,6 +3094,40 @@ export async function getAvaliacoesEspeciais(): Promise<EspecialAvaliacaoRow[]> 
 }
 
 /**
+ * A recomendação de ESTRELA de UM projeto (o classificador de 1 agente).
+ *
+ * ⚠️ É daqui que sai a estrela que a ficha do `/dashboard` mostra. **Não é do time de 30
+ * chamadas**: aquele morre no `waitUntil` do Godeploy (medido em prod 08/09/2026 — *"waitUntil()
+ * tasks did not complete within the allowed time and have been cancelled"*, com 2 de 4 chamadas
+ * respondidas). O classificador é UMA chamada, cabe num request e por isso é o que o botão roda.
+ * ⚠️ Match por chave canônica: o id vem da planilha em MAIÚSCULA e do app em hex minúsculo.
+ */
+export async function getAvaliacaoEspecialPorId(
+  projetoId: string,
+): Promise<EspecialAvaliacaoRow | null> {
+  const rows = await queryAll<EspecialAvaliacaoRow>(
+    'SELECT * FROM especial_avaliacao WHERE LOWER(projeto_id) = LOWER(?)',
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/** A mesma leitura em LOTE (uma consulta por `IN`) — para o lote da listagem. */
+export async function getAvaliacoesEspeciaisPorIds(
+  ids: string[],
+): Promise<Map<string, EspecialAvaliacaoRow>> {
+  const chaves = [...new Set(ids.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  const out = new Map<string, EspecialAvaliacaoRow>();
+  if (chaves.length === 0) return out;
+  const linhas = await queryEmLotesPorIds<EspecialAvaliacaoRow>(
+    (ph) => `SELECT * FROM especial_avaliacao WHERE LOWER(projeto_id) IN (${ph})`,
+    chaves,
+  );
+  for (const l of linhas) out.set(String(l.projeto_id).trim().toLowerCase(), l);
+  return out;
+}
+
+/**
  * Grava (ou substitui) a recomendação de um projeto. UPSERT porque reavaliar é o caso normal:
  * o agente roda de novo a cada reenvio, e uma recomendação nova sobre a mesma linha vale mais
  * que a anterior. O histórico não é objetivo desta tabela — quem guarda decisão é a planilha.

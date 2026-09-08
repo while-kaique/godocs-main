@@ -12,6 +12,8 @@
 import { describe, it, expect } from 'vitest';
 import { dossieDaLinhaPlanilha, dossieParaTexto } from '@/lib/avaliacao/dossie';
 import { NOME_LEGADO, SEM_ALIAS_DE_LEITURA, nomeV2De } from '@/lib/coluna-chave';
+import { GANHO_CATEGORIAS } from '@/lib/ganhos';
+import { GANHO_ROTULOS } from '@/lib/ganhos-rotulos';
 
 /** A linha do caso real, com os nomes de coluna da aba v2 (é o que PROD tem hoje). */
 function linhaV2(extra: Record<string, string> = {}): Record<string, string> {
@@ -134,5 +136,40 @@ describe('nomeV2De — o alias de leitura, e o que fica DE FORA dele', () => {
       if (SEM_ALIAS_DE_LEITURA.has(legado)) continue;
       expect(nomeV2De(legado), legado).toBe(v2);
     }
+  });
+});
+
+describe('a INVERSÃO de vocabulário que confundia os agentes (08/09/2026)', () => {
+  const txt = dossieParaTexto(dossieDaLinhaPlanilha(linhaV2())!, { comReais: true });
+
+  it('o R$ que a empresa PAGAVA e parou não é mais chamado de "custo evitado"', () => {
+    // Na v2 "custo evitado" é a despesa que NUNCA NASCEU. A multa de DIFAL que parou de ser paga
+    // é saving efetivado, e o dossiê a rotulava com a palavra do outro conceito — foi por isso que
+    // a mesa pediu comprovante da coisa errada.
+    expect(txt).toMatch(/parou de pagar \(saving efetivado\): 324005\.09/);
+    expect(txt).not.toMatch(/Custo evitado: 324005\.09/);
+  });
+
+  it('as horas liberadas são nomeadas pelo que são, não como "saving"', () => {
+    expect(txt).toMatch(/Horas humanas liberadas: 60h/);
+    expect(txt).not.toMatch(/Saving em horas/);
+  });
+
+  it('o glossário vem das MESMAS palavras do formulário (fonte única `GANHO_ROTULOS`)', () => {
+    for (const c of GANHO_CATEGORIAS) {
+      expect(txt, c).toContain(GANHO_ROTULOS[c].titulo);
+      expect(txt, c).toContain(GANHO_ROTULOS[c].descricao.slice(0, 40));
+    }
+  });
+
+  it('a categoria DECLARADA pelo autor entra, para o time poder conferir a distinção', () => {
+    expect(txt).toMatch(/Categorias de ganho DECLARADAS pelo autor: .*Custo evitado/);
+  });
+
+  it('e a régua da distinção está escrita, com o que cada uma exige de prova', () => {
+    expect(txt).toMatch(/EXISTIA e parou é saving efetivado/i);
+    expect(txt).toMatch(/NUNCA NASCEU.*é custo evitado/is);
+    // a armadilha nomeada: cobrar extrato de custo evitado é cobrar o impossível
+    expect(txt).toMatch(/cobrar o impossível/i);
   });
 });

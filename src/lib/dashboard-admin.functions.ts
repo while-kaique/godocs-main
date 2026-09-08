@@ -60,6 +60,7 @@ import {
   type ProjetoAvaliacaoRow,
   type DeliberacaoResumoRow,
   type AvaliacaoRetroativaRow,
+  type EspecialAvaliacaoRow,
   type AvaliacaoFeedbackRow,
   type AprovacaoRow,
 } from "@/integrations/db/client.server";
@@ -81,6 +82,8 @@ import { syncSheetsToSqlite } from "@/lib/google/sync-reverse";
 import {
   getUltimoConsensoDoTime,
   getUltimosConsensosDoTimePorIds,
+  getAvaliacaoEspecialPorId,
+  getAvaliacoesEspeciaisPorIds,
 } from "@/integrations/db/client.server";
 import {
   montarContribuicoesPorProjeto,
@@ -234,8 +237,23 @@ export type DetalheDashboard = {
       confianca: number | null;
     }[];
     /**
-     * O último veredito do TIME de agentes (o que raciocina a ESTRELA). `null` quando o time nunca
-     * rodou neste projeto — o que é o normal, porque ele só roda sob demanda (botão da ficha).
+     * A **estrela sugerida** pelo classificador de 1 agente (`especial_avaliacao`).
+     *
+     * ⚠️ É esta que o botão da ficha roda, e é UMA chamada de LLM. O time completo (30 chamadas)
+     * **não cabe num clique**: em prod, 08/09/2026, o `waitUntil` do Godeploy foi cancelado no
+     * meio dele ("tasks did not complete within the allowed time"), com 2 de 4 chamadas
+     * respondidas — o botão dizia "rodando" e nunca chegava estrela nenhuma.
+     */
+    estrela: {
+      estrelas: number;
+      confianca: string | null;
+      leitura: string | null;
+      contestada: boolean;
+      quando: string | null;
+    } | null;
+    /**
+     * O último veredito do TIME de agentes (30 chamadas, ferramenta de auditoria em LOTE).
+     * `null` quando o time nunca rodou neste projeto — o normal.
      */
     time: {
       estrela: number | null;
@@ -493,8 +511,16 @@ export function montarAvaliacaoSombra(
   } | null,
   /** O último consenso do TIME (nó `tipo='consenso'` do log em árvore), quando houver. */
   time?: { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null } | null,
+  /** A recomendação de estrela do classificador de 1 agente (`especial_avaliacao`). */
+  estrela?: {
+    estrelas_recomendada: number;
+    confianca: string | null;
+    leitura: string | null;
+    contestada: number;
+    criado_em: string | null;
+  } | null,
 ): DetalheDashboard["avaliacaoSombra"] {
-  if (!mesa && !delib && !retro && !time) return null;
+  if (!mesa && !delib && !retro && !time && !estrela) return null;
   return {
     mesa: mesa
       ? {
@@ -506,6 +532,15 @@ export function montarAvaliacaoSombra(
         }
       : null,
     especialistas: pareceresDosVotos(mesa?.votos),
+    estrela: estrela
+      ? {
+          estrelas: estrela.estrelas_recomendada,
+          confianca: estrela.confianca,
+          leitura: estrela.leitura,
+          contestada: estrela.contestada === 1,
+          quando: estrela.criado_em,
+        }
+      : null,
     time: interpretarConsensoDoTime(time),
     deliberacao: delib
       ? {
@@ -649,8 +684,13 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
       Promise.resolve()
         .then(() => getUltimoConsensoDoTime(id))
         .catch(() => null),
+      Promise.resolve()
+        .then(() => getAvaliacaoEspecialPorId(id))
+        .catch(() => null),
     ])
-      .then(([mesa, delib, retro, time]) => montarAvaliacaoSombra(mesa, delib, retro, time))
+      .then(([mesa, delib, retro, time, estrela]) =>
+        montarAvaliacaoSombra(mesa, delib, retro, time, estrela),
+      )
       .catch((e): DetalheDashboard["avaliacaoSombra"] => {
         console.error("[dashboard-admin] falha ao ler avaliação em sombra:", e);
         return null;
@@ -729,6 +769,7 @@ export async function getProjetosDashboardLote(
     delibs,
     retros,
     consensosTime,
+    estrelasAgente,
     votos,
     aprovacoesPai,
   ] = await Promise.all([
@@ -779,6 +820,13 @@ export async function getProjetosDashboardLote(
       .catch((e) => {
         console.error("[dashboard-admin] falha ao ler consenso do time em lote:", e);
         return new Map<string, { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null }>();
+      }),
+    // A estrela sugerida (classificador de 1 agente) — uma consulta por `IN`. Acessório.
+    Promise.resolve()
+      .then(() => getAvaliacoesEspeciaisPorIds(alvos))
+      .catch((e) => {
+        console.error("[dashboard-admin] falha ao ler estrela sugerida em lote:", e);
+        return new Map<string, EspecialAvaliacaoRow>();
       }),
     getFeedbacksPorIds(alvos).catch((e) => {
       console.error("[dashboard-admin] falha ao ler feedback (sombra) em lote:", e);
@@ -831,6 +879,7 @@ export async function getProjetosDashboardLote(
         // ⚠️ Precisa vir no LOTE: sem isto a estrela do time apareceria só nas fichas abertas fora
         // do lote (o clique numa linha semeada mostraria "o time não rodou" mentindo).
         consensosTime.get(chave) ?? null,
+        estrelasAgente.get(chave) ?? null,
       ),
       feedback: normalizarVoto(votos.get(chave)?.voto),
       preAprovacaoPai: parecerEstagio2ParaFicha(aprovacoesPai.get(chave) ?? []),

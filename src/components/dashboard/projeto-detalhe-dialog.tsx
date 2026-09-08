@@ -21,7 +21,6 @@ import {
   ChevronDown,
   AlertTriangle,
   Check,
-  Play,
 } from 'lucide-react';
 import {
   Dialog,
@@ -101,7 +100,19 @@ type AvaliacaoSombra = {
    * `[]` em avaliação antiga (gravada antes de o argumento ser persistido) → cai no `motivo`.
    */
   especialistas?: { dimensao: string; preocupa: boolean; argumento: string; confianca: number | null }[];
-  /** Último veredito do TIME (quem raciocina a ESTRELA). `null` = o time nunca rodou aqui. */
+  /**
+   * A ESTRELA sugerida pelo classificador de 1 agente. `null` = ninguém rodou aqui ainda.
+   * ⚠️ É esta que o botão roda: o time completo (30 chamadas) não cabe num clique — em prod o
+   * `waitUntil` foi cancelado no meio dele e a estrela nunca chegava.
+   */
+  estrela?: {
+    estrelas: number;
+    confianca: string | null;
+    leitura: string | null;
+    contestada: boolean;
+    quando: string | null;
+  } | null;
+  /** Último veredito do TIME completo (auditoria em lote). `null` = nunca rodou aqui. */
   time?: {
     estrela: number | null;
     saida: string | null;
@@ -460,7 +471,48 @@ function ParecerDosAgentes({
   );
 }
 
-/** A estrela recomendada pelo TIME (não pela mesa) + a saída dele. */
+/**
+ * A ESTRELA sugerida pelo agente classificador + a leitura dele.
+ *
+ * ⚠️ Sem botão de aplicar: quem grava a coluna "Estrelas" é a triagem, no campo do topo da ficha.
+ */
+function EstrelaSugerida({ estrela }: { estrela: NonNullable<AvaliacaoSombra['estrela']> }) {
+  return (
+    <div
+      className="rounded-lg border px-3 py-2"
+      style={{ borderColor: 'rgba(0,89,169,0.22)', background: 'rgba(0,89,169,0.05)' }}
+    >
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="text-[11px] font-bold uppercase tracking-[0.06em]" style={{ color: '#0059A9' }}>
+          Estrela sugerida
+        </span>
+        <span className="inline-flex items-baseline gap-1 text-[15px] font-bold" style={{ color: '#0059A9' }}>
+          {estrela.estrelas}
+          <Star className="h-3.5 w-3.5 self-center" aria-hidden />
+        </span>
+        {estrela.confianca && (
+          <span className="text-[11.5px] text-muted-foreground">confiança {estrela.confianca}</span>
+        )}
+        {estrela.contestada && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-1.5 py-[1px] text-[10.5px] font-semibold"
+            style={{ background: 'rgba(138,90,0,0.12)', border: '1px solid rgba(138,90,0,0.4)', color: '#8a5a00' }}
+          >
+            <AlertTriangle className="h-3 w-3" aria-hidden /> Contestada
+          </span>
+        )}
+      </span>
+      {estrela.leitura && (
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">{estrela.leitura}</p>
+      )}
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        Sugestão do agente. Quem grava a nota é a triagem, no campo acima.
+      </p>
+    </div>
+  );
+}
+
+/** A estrela recomendada pelo TIME completo (só aparece quando ele rodou em lote). */
 function EstrelaDoTime({ time }: { time: NonNullable<AvaliacaoSombra['time']> }) {
   return (
     <div
@@ -544,8 +596,8 @@ function AvaliacaoSombraPainel({
 }: {
   sombra: AvaliacaoSombra;
   /** Dispara a análise: a MESA (rápida) ou o TIME completo (dá a estrela, roda em background). */
-  onRodar: (qual: 'mesa' | 'time') => Promise<void> | void;
-  rodando: 'mesa' | 'time' | null;
+  onRodar: (qual: 'mesa' | 'estrela') => Promise<void> | void;
+  rodando: 'mesa' | 'estrela' | null;
   feedback: 'like' | 'dislike' | null;
   votando: boolean;
   /** Registra a discordância COM motivo (o que vira lição). */
@@ -556,6 +608,7 @@ function AvaliacaoSombraPainel({
   const [formAberto, setFormAberto] = useState(false);
   const { mesa, deliberacao, retroativo } = sombra;
   const time = sombra.time ?? null;
+  const estrela = sombra.estrela ?? null;
   const especialistas = sombra.especialistas ?? [];
   const [aberto, setAberto] = useState(false);
   const [rodadasAbertas, setRodadasAbertas] = useState(false);
@@ -594,13 +647,14 @@ function AvaliacaoSombraPainel({
                 Divergiram
               </span>
             )}
-            {/* A estrela sugerida pelo TIME vale no cabeçalho: é o número que a triagem procura. */}
-            {time?.estrela != null && (
+            {/* A estrela vale no cabeçalho: é o número que a triagem procura. Prefere a do
+                classificador (o que o botão roda); o time completo é o fallback. */}
+            {(estrela?.estrelas ?? time?.estrela) != null && (
               <span
                 className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
                 style={{ background: 'rgba(0,89,169,0.09)', border: '1px solid rgba(0,89,169,0.3)', color: '#0059A9' }}
               >
-                {time.estrela}
+                {estrela?.estrelas ?? time?.estrela}
                 <Star className="h-3 w-3" aria-hidden />
                 <span className="font-semibold">sugeridas</span>
               </span>
@@ -658,6 +712,7 @@ function AvaliacaoSombraPainel({
             )
           )}
 
+          {estrela && <EstrelaSugerida estrela={estrela} />}
           {time && <EstrelaDoTime time={time} />}
 
           {deliberacao && (
@@ -721,10 +776,15 @@ function AvaliacaoSombraPainel({
             </LinhaSombra>
           )}
 
-          {/* Rodar / rerodar a análise NESTE projeto. Duas ações porque são duas coisas: a MESA é
-              o que preenche este painel (rápida) e o TIME é quem raciocina a ESTRELA (~30 chamadas
-              de LLM, roda em background). ⚠️ Nenhuma delas muda status nem escreve a coluna
-              "Estrelas". */}
+          {/* Rodar / rerodar a análise NESTE projeto. Duas ações porque são duas coisas: a MESA
+              (veredito + o parecer dos 4) e a ESTRELA (o classificador, 1 chamada de LLM).
+              ⚠️ Nenhuma muda status nem escreve a coluna "Estrelas".
+              ⚠️ **O botão do TIME COMPLETO saiu** (08/09/2026): ele são ~30 chamadas de LLM e o
+              `waitUntil` do Godeploy o cancela no meio — medido em prod, com 2 de 4 chamadas
+              respondidas e a mensagem "tasks did not complete within the allowed time". O botão
+              dizia "rodando, a estrela aparece em ~1 min" e nunca aparecia. O time completo segue
+              existindo como ferramenta de auditoria em LOTE (a rota de admin), que é o que ele
+              sempre foi; num clique, quem responde é o classificador. */}
           <div className="flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'rgba(71,85,105,0.18)' }}>
             <Button
               type="button"
@@ -746,18 +806,18 @@ function AvaliacaoSombraPainel({
               variant="outline"
               size="sm"
               disabled={rodando !== null}
-              onClick={() => void onRodar('time')}
+              onClick={() => void onRodar('estrela')}
               className="h-8 text-[12px]"
             >
-              {rodando === 'time' ? (
+              {rodando === 'estrela' ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
               ) : (
-                <Play className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                <Star className="mr-1.5 h-3.5 w-3.5" aria-hidden />
               )}
-              {time ? 'Rerodar o time (estrela)' : 'Rodar o time (estrela)'}
+              {estrela ? 'Rerodar a estrela' : 'Rodar a estrela'}
             </Button>
             <span className="text-[11px] text-muted-foreground">
-              A mesa responde na hora. O time leva ~1 min e roda em segundo plano.
+              As duas respondem na hora, e nenhuma escreve na planilha.
             </span>
           </div>
 
@@ -851,7 +911,7 @@ export function ProjetoDetalheDialog({
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
   const [votando, setVotando] = useState(false);
   /** Qual análise está rodando agora (`null` = nenhuma) — desabilita os dois botões. */
-  const [rodandoAnalise, setRodandoAnalise] = useState<'mesa' | 'time' | null>(null);
+  const [rodandoAnalise, setRodandoAnalise] = useState<'mesa' | 'estrela' | null>(null);
   // Guarda o texto original da coluna "Observações": só mandamos a coluna quando o
   // validador realmente mexeu nela (evitar reescrever a célula com o mesmo conteúdo).
   const obsOriginal = useRef('');
@@ -1006,14 +1066,16 @@ export function ProjetoDetalheDialog({
   /**
    * Roda (ou reroda) a análise dos agentes NESTE projeto.
    *
-   * ⚠️ Reusa as duas rotas de admin que já existem (`avaliar-normais` e `avaliacao/time`) — nenhuma
-   * rota nova. A MESA é sincrona e preenche este painel; o TIME devolve **202 agendado** (são ~30
-   * chamadas de LLM, uma request morreria no meio e deixaria o ciclo aberto), então aqui só
-   * avisamos e recarregamos quando a pessoa reabrir a ficha.
+   * ⚠️ Reusa as duas rotas de admin que já existem (`avaliar-normais` e `especiais/classificar`)
+   * — nenhuma rota nova. **As duas são SÍNCRONAS**, e é isso que faz o botão valer: a rota do time
+   * completo devolvia 202 e o `waitUntil` do Godeploy a cancelava no meio (medido em prod
+   * 08/09/2026, 2 de 4 chamadas respondidas), então o clique prometia uma estrela que nunca vinha.
+   * ⚠️ `forcar: true` na estrela porque RERODAR é o pedido: sem ele o classificador recusa projeto
+   * que já tem nota humana ("vira âncora") e recusaria a re-execução.
    * ⚠️ `invalidarDetalhe` antes de recarregar: a ficha tem cache de 30 s e sem isso o painel
    * voltaria com o parecer velho, exatamente como se nada tivesse rodado.
    */
-  async function rodarAnalise(qual: 'mesa' | 'time') {
+  async function rodarAnalise(qual: 'mesa' | 'estrela') {
     if (!projeto || rodandoAnalise) return;
     setRodandoAnalise(qual);
     try {
@@ -1033,9 +1095,21 @@ export function ProjetoDetalheDialog({
         }
         await recarregarDetalhe();
       } else {
-        await apiFetch('/api/admin/avaliacao/time', { projetoId: projeto.id });
+        const r = (await apiFetch('/api/admin/especiais/classificar', {
+          projetoId: projeto.id,
+          dry: false,
+          forcar: true,
+        })) as { ok?: boolean; motivo?: string; recomendacao?: { estrelas_recomendada?: number } };
         invalidarDetalhe(projeto.id);
-        toast.success('Time de agentes rodando. A estrela aparece aqui em cerca de 1 minuto.');
+        if (r?.ok === false) {
+          toast.error(r.motivo ?? 'O agente não conseguiu sugerir uma estrela.');
+        } else {
+          const n = r?.recomendacao?.estrelas_recomendada;
+          toast.success(
+            typeof n === 'number' ? `Estrela sugerida: ${n}.` : 'Estrela sugerida atualizada.',
+          );
+        }
+        await recarregarDetalhe();
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Não foi possível rodar a análise.');
