@@ -95,6 +95,21 @@ describe('buildSubmitMessage — é um card, com fallback de texto', () => {
     expect(t).not.toMatch(/\*[A-ZÁÉÍÓÚÂÊÔÃÕÇa-z]/);
   });
 
+  // ⚠️ O `topLabel` do `decoratedText` tem tamanho FIXO e miúdo no Chat, e card não aceita
+  // CSS. Para o rótulo ficar maior (pedido do Luis, 08/09/2026) ele foi promovido ao corpo
+  // em NEGRITO, e o valor ficou sem negrito — com os dois em negrito não há hierarquia.
+  it('o RÓTULO é o negrito da linha, no corpo; o valor vem sem negrito, e `topLabel` saiu', () => {
+    const t = textoDoCard(buildSubmitMessage(base));
+    expect(t).not.toContain('topLabel');
+    expect(t).toContain('<b>Área</b><br>Operações');
+    expect(t).not.toContain('<b>Operações</b>');
+  });
+
+  it('a quebra da linha é <br> (o \\n do textParagraph não vale no decoratedText)', () => {
+    const t = textoDoCard(buildSubmitMessage(base));
+    expect(t).toContain('</b><br>');
+  });
+
   it('o link vai em BOTÃO, não em <a href> (tag com atributo sai escapada no card)', () => {
     const msg = buildSubmitMessage({ ...base, projetoId: 'proj-42' });
     const t = textoDoCard(msg);

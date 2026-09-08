@@ -134,8 +134,29 @@ const LIMITE_TITULO = 90;
 /** Uma linha "rótulo · valor" do card. Vira um `decoratedText`. */
 type WidgetCard = Record<string, unknown>;
 
+/**
+ * Uma linha do card: **rótulo em cima, em negrito; valor embaixo**.
+ *
+ * ⚠️ O rótulo vai no campo `text`, não no `topLabel` — e isso é a correção de 08/09/2026
+ * (pedido do Luis: "deixa um pouco maior os subtítulos, para diferenciar dos textos
+ * informativos"). O `topLabel` do `decoratedText` tem **tamanho FIXO e miúdo** no Chat, e
+ * card não aceita CSS: não existe como aumentá-lo. O que existe é promover o rótulo para o
+ * corpo (que é o tamanho normal do card) e diferenciá-lo do valor pelo **peso**. Por isso
+ * o `<b>` está no rótulo e NÃO no valor — inclusive na linha de destaque, onde o negrito
+ * antes estava no número: com os dois em negrito não haveria hierarquia nenhuma.
+ *
+ * ⚠️ A quebra é **`<br>`**, não `\n`: em card, `\n` é honrado no `textParagraph`, e o
+ * `decoratedText` é outro widget. `<br>` está na allowlist de tags do Chat (ver a nota de
+ * markup acima) — qualquer tag fora dela sai ESCAPADA na tela.
+ *
+ * ⚠️ `bottomLabel` (a nota) segue no campo pequeno de propósito: ele é o 3º nível da
+ * hierarquia (rótulo > valor > nota) e é o que mantém a linha com uma altura só.
+ */
 function linha(rotulo: string, valor: string, nota?: string | null): WidgetCard {
-  const w: Record<string, unknown> = { topLabel: rotulo, text: valor, wrapText: true };
+  const w: Record<string, unknown> = {
+    text: `<b>${rotulo}</b><br>${valor}`,
+    wrapText: true,
+  };
   // ⚠️ `bottomLabel` só quando há texto: string vazia desenha uma faixa em branco sob a
   // linha e afrouxa justamente a compactação que este card existe para ganhar.
   const n = (nota ?? '').trim();
@@ -240,22 +261,14 @@ export function buildSubmitMessage(p: ParamsSubmitMessage): MensagemChat {
   // ser analisado. ⚠️ Ausente nos dois campos → nenhuma linha (o projeto está em fila, e
   // nesse caso este alerta nem é disparado).
   if (p.preAprovacao) {
-    resumo.push(
-      linha('Pré-aprovação do líder', `<b>${p.preAprovacao.por}</b>`, `em ${p.preAprovacao.em}`),
-    );
+    resumo.push(linha('Pré-aprovação do líder', p.preAprovacao.por, `em ${p.preAprovacao.em}`));
   } else if ((p.notaPreAprovacao ?? '').trim()) {
     resumo.push(linha('Pré-aprovação do líder', (p.notaPreAprovacao ?? '').trim()));
   }
 
   if (!p.especial) {
     if (p.ganho.destaque) {
-      resumo.push(
-        linha(
-          p.ganho.destaque.rotulo,
-          `<b>${p.ganho.destaque.valor}</b>`,
-          p.ganho.destaque.nota,
-        ),
-      );
+      resumo.push(linha(p.ganho.destaque.rotulo, p.ganho.destaque.valor, p.ganho.destaque.nota));
     } else if (p.ganho.semNumero) {
       // ⚠️ Diz "sem número declarado" em vez de mostrar R$ 0,00 — que é o que o card fazia
       // e que se lê como bug do sistema, não como característica do projeto (é o caso

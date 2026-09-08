@@ -64,7 +64,15 @@ porque "R$ 0,00" ali se lê como bug do sistema, não como característica do pr
    obrigatório no payload). O card usa `collapsible`, e um campo de schema recusado devolveria 400
    e mataria o alerta INTEIRO, em silêncio, no grupo onde a triagem descobre projeto novo. Perder o
    layout é aceitável; perder o alerta não.
-2. **As notas de "não há parecer de líder" ficaram CURTAS** (`NOTA_SEM_PARECER`,
+2. **O RÓTULO de cada linha é o negrito, no CORPO do card** (validado com o Luis por 2
+   disparos reais no grupo, 08/09/2026). O `topLabel` do `decoratedText` tem tamanho FIXO e
+   miúdo e card não aceita CSS: não existe como aumentá-lo. O que existe é promover o rótulo
+   ao corpo (tamanho normal) e diferenciá-lo do valor pelo **peso** — então o `<b>` saiu do
+   valor e foi para o rótulo, inclusive na linha de destaque (com os dois em negrito não
+   haveria hierarquia). A nota fica no `bottomLabel`, o 3º nível. ⚠️ A quebra é **`<br>`**:
+   `\n` é honrado no `textParagraph`, e `decoratedText` é outro widget. Ambas funcionam
+   (medido), mas o teste trava o `<br>` para a linha não virar rótulo e valor colados.
+3. **As notas de "não há parecer de líder" ficaram CURTAS** (`NOTA_SEM_PARECER`,
    `src/lib/notificacao-chat.ts`, que segue FONTE ÚNICA). "O autor tem cargo de liderança
    (coordenação para cima) e vai direto para a validação da RPA" → **"O autor é líder:
    pré-aprovado direto."** É a nota mais frequente do grupo, e o alerta existe para bater o olho,
@@ -72,7 +80,9 @@ porque "R$ 0,00" ali se lê como bug do sistema, não como característica do pr
    continuar DISTINGUÍVEIS entre si (teste explícito): encurtar não pode virar "sem parecer de
    líder" nas três, senão a triagem perde a diferença entre isenção legítima e integração caída.
 
-**Status.** Implementado na branch `fix/card-chat-alerta`; suíte verde (3706).
+**Status.** Implementado na branch `fix/card-chat-alerta`; suíte verde (3708). Layout do card
+validado por 2 disparos reais no grupo (o Chat aceita `cardsV2` com `collapsible` — o
+"Mostrar mais" aparece nas 2 seções) e **aprovado pelo Luis**.
 
 ---
 
