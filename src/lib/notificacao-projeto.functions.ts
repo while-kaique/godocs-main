@@ -90,9 +90,6 @@ export async function notificarChatPreAprovacao(
       // Eixo TIPO da categorização (`categoria_projeto`). Aqui ele em geral JÁ existe: o
       // analisador roda na submissão e a pré-aprovação vem depois. Ausente → linha
       // omitida. ⚠️ Substituiu a linha "Tipos", que lia `tipos_projeto` e saía "—" em
-      // todo projeto da v2 (aquele campo é vocabulário da v1 e o cliente da v2 não o manda).
-      // Preferir a planilha (é onde a triagem corrige) e cair no banco.
-      tipoProjeto: (linhaPlanilha?.['Tipo de Projeto'] as string | undefined) ?? projeto.categoria_projeto,
       nomeCompleto: ouTraco(projeto.responsavel_nome),
       email: ouTraco(projeto.responsavel_email),
       participantes: membros.join(', ') || '—',

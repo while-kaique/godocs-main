@@ -119,8 +119,20 @@ function positivo(valor: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
+/**
+ * Texto limpo — e **o travessão conta como vazio**, como em todo o resto do repo (`ouTraco`,
+ * `texto` do dossiê, o `vazio()` do cron da complexidade).
+ *
+ * ⚠️ Sem isso, a linha "Tipo: —" aparecia no card do Chat: a coluna `Tipo de Projeto` da planilha
+ * nunca está AUSENTE (o analisador grava `—`), então o "ausente omite a linha" nunca disparava e
+ * o `—` seguia como se fosse valor. A linha em si foi removida, mas a régua vale para os outros
+ * campos que passam por aqui (evidência do saving efetivado, racionais) — um `—` gravado ali
+ * viraria texto no card do mesmo jeito.
+ */
 function texto(valor: unknown): string | null {
-  return typeof valor === 'string' && valor.trim() !== '' ? valor.trim() : null
+  if (typeof valor !== 'string') return null
+  const t = valor.trim()
+  return t === '' || t === '—' || t === '-' ? null : t
 }
 
 /**
