@@ -147,6 +147,14 @@ limiar) — a mudança é de EXIBIÇÃO e MEDIÇÃO. Faixa sem amostra **não ex
 **ausente** na acurácia medida (a mesa não tem esse desfecho; preenchê-lo com o número do `aprovar`
 seria inventar medição). E as flags de liberação seguem desligadas: `age_sozinho` continua `false`.
 
+**⚠️ Revisado no mesmo dia (08/09/2026), pelo dono do produto.** A frequência medida **saiu da
+tela**: *"tire o '0 de 10' confiança baixa. Só deixe 'baixa', 'media', 'alta'. Foi uma boa ideia
+para contornar a confiança. Mas quero que realmente funcione esse sistema no sentido de que ele tá
+avaliando bem."* Então a tela ficou com o **GRAU em palavra** e mais nada — a medição continua
+existindo onde ela decide algo (`politicaDeLiberacao`, relatório do retroativo), e a `calibragem`
+saiu do payload da listagem junto (campo que a tela não desenha não viaja). O canário do teste
+passou a proibir percentual, `medicaoDaConfianca` **e** a fração nas 3 telas.
+
 **Status.** Testes: `tests/avaliacao-calibragem.test.ts`, `tests/avaliacao-gabarito-vivo.test.ts`,
 `tests/avaliacao-sombra-rotulos.test.ts` (canário do percentual). Plano:
 `docs/plans/calibragem-time-avaliacao.md` (fatia c, T10-T13).

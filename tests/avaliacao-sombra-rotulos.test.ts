@@ -4,14 +4,12 @@ import {
   rotuloEstadoDeliberacao,
   rotuloResultadoRetroativo,
   rotuloGrau,
-  medicaoDaConfianca,
   faixaDeConfianca,
   grauConfianca,
   aparenciaConfianca,
   CORES_GRAU,
   CORES_GRAU_NEUTRO,
 } from "@/lib/avaliacao-sombra-rotulos";
-import { agruparCalibragem } from "@/lib/avaliacao-calibragem";
 import { readFileSync } from "node:fs";
 
 describe("rotuloVeredito", () => {
@@ -68,52 +66,39 @@ describe("grauConfianca (limiares 0.8 / 0.6)", () => {
   });
 });
 
-describe("medicaoDaConfianca (INV-18 — frequência medida ou nada)", () => {
-  const cheia = agruparCalibragem([
-    ...Array.from({ length: 24 }, () => ({ grau: "alta", resultado: "acerto" })),
-    ...Array.from({ length: 6 }, () => ({ grau: "alta", resultado: "conservador" })),
-    ...Array.from({ length: 3 }, () => ({ grau: "baixa", resultado: "acerto" })),
-  ]);
-
-  it("faixa COM amostra: devolve a taxa em 10 e a frase com o n", () => {
-    const r = medicaoDaConfianca(0.9, cheia);
-    expect(r.faixa).toBe("alta");
-    expect(r.emDez).toBe(8); // 24 de 30
-    expect(r.medicao).toContain("8 de 10");
-    expect(r.medicao).toContain("30 casos");
+describe("a tela exibe SÓ o grau (decisão do Luis, 08/09/2026)", () => {
+  it("rotuloGrau é o único tradutor de confiança para a tela", () => {
+    expect(rotuloGrau("alta")).toBe("confiança alta");
+    expect(rotuloGrau(null)).toBe("sem confiança");
   });
 
-  it("faixa SEM amostra suficiente: nenhum número, e a frase diz que não há medição", () => {
-    const r = medicaoDaConfianca(0.2, cheia);
-    expect(r.faixa).toBe("baixa");
-    expect(r.emDez).toBeNull();
-    expect(r.medicao).toBe("ainda sem medição");
-  });
-
-  it("sem calibragem nenhuma (ou sem número de confiança) não inventa percentual", () => {
-    expect(medicaoDaConfianca(0.9, null).emDez).toBeNull();
-    expect(medicaoDaConfianca(0.9, null).medicao).toBe("ainda sem medição");
-    expect(medicaoDaConfianca(null, cheia).emDez).toBeNull();
+  it("faixaDeConfianca segue existindo (a MEDIÇÃO continua, fora da tela)", () => {
+    expect(faixaDeConfianca(0.9)).toBe("alta");
+    expect(faixaDeConfianca(0.2)).toBe("baixa");
     expect(faixaDeConfianca(null)).toBeNull();
     expect(faixaDeConfianca(NaN)).toBeNull();
   });
 });
 
-describe("canário: nenhuma tela traduz a confiança em percentual (INV-18)", () => {
+describe("canário: nenhuma tela traduz a confiança em NÚMERO", () => {
   const telas = [
     "src/components/dashboard/chip-sombra.tsx",
     "src/components/dashboard/projeto-detalhe-dialog.tsx",
     "src/routes/_authenticated/dashboard.tsx",
   ];
-  it("pctConfianca não existe mais e nenhum componente calcula % de confiança", () => {
+  it("nem percentual, nem fração medida: a tela só tem a palavra", () => {
     const rotulos = readFileSync("src/lib/avaliacao-sombra-rotulos.ts", "utf8");
     expect(rotulos).not.toMatch(/export function pctConfianca/);
+    expect(rotulos).not.toMatch(/export function medicaoDaConfianca/);
     for (const t of telas) {
       const src = readFileSync(t, "utf8");
-      // A CHAMADA, não a palavra: os comentários que registram a remoção podem (e devem) citá-la.
+      // A CHAMADA, não a palavra: os comentários que registram as remoções podem citá-las.
       expect(src, t).not.toMatch(/pctConfianca\s*\(/);
+      expect(src, t).not.toMatch(/medicaoDaConfianca\s*\(/);
       // `conf * 100` era a outra forma de dizer a mesma mentira.
       expect(src, t).not.toMatch(/confianca[^\n]{0,20}\*\s*100/);
+      // "de 10" / "/10": a fração medida, que saiu da tela por decisão do dono do produto.
+      expect(src, t).not.toMatch(/(?:de 10|\/10)</);
     }
   });
 });
