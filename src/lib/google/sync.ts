@@ -8,7 +8,7 @@ import { appendRow, updateRowByProjectId, type SheetColumn } from './sheets';
 // — era a MESMA notificação por submissão com outra roupa. Agora o grupo é avisado na
 // pré-aprovação do líder (`notificacao-chat.ts`). Não reimplementar.
 import { sendChatNotification, buildSubmitMessage, ehProjetoTesteE2E } from './chat';
-import { resumirGanho } from '@/lib/notificacao-ganho';
+import { resumirGanho, resumirGanhoDaPlanilha } from '@/lib/notificacao-ganho';
 // Espelho da planilha: quem escreve no Sheets remenda o espelho na hora, senão o efeito da
 // escrita só apareceria na tela no próximo cron (as telas leem o espelho — `sheet-espelho.ts`).
 import { espelharEscrita } from '@/lib/sheet-espelho';
@@ -686,7 +686,14 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         // `ganho_categorias` — a MESMA régua de `celulasGanhoV2` acima. Antes o card
         // recebia `savingHoras`/`savingReais`/`tipoSaving`/`receitaValor` da v1 direto, e
         // por isso anunciava R$ 0,00 e 0 horas em todo projeto da v2.
-        ganho: resumirGanho(p.projeto, {
+        // ⚠️ A linha que ACABOU de ser escrita na planilha é a fonte preferida (é a mesma
+        // que a ficha do /dashboard lê — ver a nota em `notificacao-ganho.ts`). Aqui ela
+        // vem da `rowPadronizada` em memória, e não de uma releitura do espelho: o
+        // `espelharEscrita` já rodou acima, então o conteúdo é idêntico, e ler de volta
+        // seria um round-trip para buscar o que está na mão. Sem impacto na linha (o
+        // caminho v1 não escreve `Impacto Líquido Mensal`) → cai no resumo do banco.
+        ganho: resumirGanhoDaPlanilha(rowPadronizada as Record<string, string | undefined>) ??
+        resumirGanho(p.projeto, {
           tiposProjeto: p.tiposProjeto,
           savingHoras,
           savingReais,

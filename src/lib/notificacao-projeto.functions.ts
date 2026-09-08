@@ -12,7 +12,8 @@
 
 import { getProjetoById, getDocumentacao, parseJson } from '@/integrations/db/client.server';
 import { buildSubmitMessage, sendChatNotification, ehProjetoTesteE2E } from '@/lib/google/chat';
-import { resumirGanho } from '@/lib/notificacao-ganho';
+import { resumirGanho, resumirGanhoDaPlanilha } from '@/lib/notificacao-ganho';
+import { lerLinhaEspelho } from '@/lib/sheet-espelho';
 import { parseDataFlexivel } from '@/lib/format-date';
 
 const ouTraco = (v: unknown): string =>
@@ -66,6 +67,13 @@ export async function notificarChatPreAprovacao(
     // anunciar R$ 0,00 num projeto de custo evitado que entrou na planilha com o valor
     // certo (classe de bug já conhecida: Portal de Reembolsos / SmartOnline, CLAUDE.md).
     // A RECEITA não tem coluna própria em `projetos` — essa vem do doc mesmo.
+    // A linha da planilha (espelho, SQLite local — NUNCA o Sheets em request). Falha
+    // aqui não derruba o alerta: o resumo cai no banco, como fazia antes.
+    const linhaPlanilha = await lerLinhaEspelho(projetoId).catch((e) => {
+      console.warn('[notificacao-projeto] espelho indisponível, usando o banco:', e);
+      return null;
+    });
+
     const docRow = await getDocumentacao(projetoId);
     const conteudo = parseJson<Record<string, unknown>>(docRow?.conteudo) ?? {};
     const receita = (conteudo.receita ?? null) as Record<string, unknown> | null;
@@ -83,7 +91,8 @@ export async function notificarChatPreAprovacao(
       // analisador roda na submissão e a pré-aprovação vem depois. Ausente → linha
       // omitida. ⚠️ Substituiu a linha "Tipos", que lia `tipos_projeto` e saía "—" em
       // todo projeto da v2 (aquele campo é vocabulário da v1 e o cliente da v2 não o manda).
-      tipoProjeto: projeto.categoria_projeto,
+      // Preferir a planilha (é onde a triagem corrige) e cair no banco.
+      tipoProjeto: (linhaPlanilha?.['Tipo de Projeto'] as string | undefined) ?? projeto.categoria_projeto,
       nomeCompleto: ouTraco(projeto.responsavel_nome),
       email: ouTraco(projeto.responsavel_email),
       participantes: membros.join(', ') || '—',
@@ -92,14 +101,20 @@ export async function notificarChatPreAprovacao(
       // `ganho_categorias` — a MESMA régua de `celulasGanhoV2`. Antes esta chamada
       // passava só as colunas da v1, que o formulário da v2 nunca escreve: o card
       // anunciava R$ 0,00 e 0 horas em projeto com ganho declarado e aprovado.
-      ganho: resumirGanho(projeto, {
-        tiposProjeto,
-        savingHoras: Number(projeto.saving_horas) || 0,
-        savingReais: Number(projeto.saving_reais) || 0,
-        tipoSaving: projeto.tipo_saving,
-        receitaValor: Number(receita?.valor_ganho_mensal) || 0,
-        tipoReceita: (receita?.tipo_saving as string | null) ?? null,
-      }),
+      ganho:
+        // ⚠️ A PLANILHA (via espelho) é a fonte PREFERIDA — ver a nota grande em
+        // `notificacao-ganho.ts`. Ela tem o impacto de v1 E v2, é a mesma fonte da ficha
+        // do /dashboard (então o card não pode discordar da célula ao lado) e traz as
+        // parcelas que o resumo do banco não tinha. Espelho ausente → cai no banco.
+        resumirGanhoDaPlanilha(linhaPlanilha) ??
+        resumirGanho(projeto, {
+          tiposProjeto,
+          savingHoras: Number(projeto.saving_horas) || 0,
+          savingReais: Number(projeto.saving_reais) || 0,
+          tipoSaving: projeto.tipo_saving,
+          receitaValor: Number(receita?.valor_ganho_mensal) || 0,
+          tipoReceita: (receita?.tipo_saving as string | null) ?? null,
+        }),
       dataSubmissao: dataSubmissaoBR(projeto.submitted_at),
       // A mensagem é sempre a do projeto "chegando" ao grupo, mesmo quando a
       // pré-aprovação veio de um reenvio: para quem lê, é a 1ª vez que ele aparece.
