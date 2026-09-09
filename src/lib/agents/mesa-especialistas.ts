@@ -158,12 +158,13 @@ export function conciliarJulgamentos(
     fluxoDireto?: boolean | null;
     limiarConfianca?: number | null;
     /**
-     * O piso de impacto MECÂNICO (`avaliarFinanceiro.abaixoDoPiso`), repassado ao agregador. ⚠️ Os
+     * A reprovação MECÂNICA por impacto (`avaliarFinanceiro.reprovavel` — a régua composta
+     * impacto+nota), repassada ao agregador. ⚠️ Os
      * especialistas não votam sobre o piso: ele é régua e sobrepõe o painel inteiro. Sem este
      * repasse a mesa LLM APROVARIA o que a mesa determinística reprova — as duas passariam a ter
      * réguas diferentes, que é o que este arquivo existe para evitar.
      */
-    abaixoDoPiso?: boolean | null;
+    reprovavel?: boolean | null;
     motivoPiso?: string | null;
   },
 ): ResultadoConciliado {

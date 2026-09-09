@@ -6,6 +6,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   abaixoDoPisoDeImpacto,
+  reprovaPeloPiso,
+  TETO_ESTRELA_REPROVAVEL,
   impactoMensalDeclarado,
   motivoPisoDeImpacto,
   PISO_IMPACTO_MENSAL,
@@ -113,5 +115,61 @@ describe('gabarito de 04/09/2026 — o piso reprova os 137 e mais ninguém', () 
     // ⚠️ Se alguém baixar o piso, o teste dos 137 acima cai primeiro; este guarda o outro lado:
     // um piso muito acima de 100 pegaria projeto que o dono do produto NÃO reprovou.
     expect(PISO_IMPACTO_MENSAL).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('reprovaPeloPiso — a régua COMPOSTA, medida contra o gabarito de 04/09', () => {
+  it('o teto de estrela é 1', () => {
+    expect(TETO_ESTRELA_REPROVAVEL).toBe(1);
+  });
+
+  it('impacto baixo + nota baixa (ou sem nota) → reprova', () => {
+    expect(reprovaPeloPiso({ impactoMensal: 18.16, estrela: 0 })).toBe(true);
+    expect(reprovaPeloPiso({ impactoMensal: 18.16, estrela: 1 })).toBe(true);
+    // ⚠️ Ausência de nota NÃO poupa: é o estado da maioria dos que a rodada de 04/09 pegou, e
+    // exigir estrela para reprovar tornaria o piso inerte justamente em quem ninguém avaliou.
+    expect(reprovaPeloPiso({ impactoMensal: 18.16, estrela: null })).toBe(true);
+    expect(reprovaPeloPiso({ impactoMensal: 18.16 })).toBe(true);
+  });
+
+  it('⚠️ nota ALTA poupa — é o que o piso sozinho errava', () => {
+    // Casos REAIS de prod que o piso sozinho derrubaria: Funil R&S (4★, R$ 89,70),
+    // Onboarding & Integração (3★, R$ 91,19), Portal de Admissão (2★, R$ 97,02). Quase todos de
+    // processo, a família em que o valor não está no dinheiro.
+    expect(reprovaPeloPiso({ impactoMensal: 89.7, estrela: 4 })).toBe(false);
+    expect(reprovaPeloPiso({ impactoMensal: 91.19, estrela: 3 })).toBe(false);
+    expect(reprovaPeloPiso({ impactoMensal: 97.02, estrela: 2 })).toBe(false);
+  });
+
+  it('impacto acima do piso não reprova, nem com nota 0', () => {
+    expect(reprovaPeloPiso({ impactoMensal: 5000, estrela: 0 })).toBe(false);
+  });
+
+  it('ausência de NÚMERO nunca reprova (especial, ganho imensurável)', () => {
+    expect(reprovaPeloPiso({ impactoMensal: 0, estrela: 0 })).toBe(false);
+    expect(reprovaPeloPiso({ impactoMensal: null, estrela: 0 })).toBe(false);
+  });
+});
+
+describe('gabarito de 04/09 — a régua composta reproduz o julgamento humano', () => {
+  type Alvo = { id: string; nome: string; imp: number };
+  const alvos = (
+    JSON.parse(readFileSync('docs/baselines/rodadas/snapshot-reprovacao-04-09.json', 'utf8')) as {
+      alvos: Alvo[];
+    }
+  ).alvos;
+
+  it('⚠️ os 137 que ele reprovou tinham TODOS 0★ — medido em 08/09/2026', () => {
+    // Este é o fato que criou a régua composta: o julgamento humano nunca foi só o piso.
+    // A prova viva está no relatório; aqui travamos a consequência.
+    const relatorio = JSON.parse(
+      readFileSync('docs/baselines/rodadas/piso-impacto-precisao-08-09.json', 'utf8'),
+    ) as { recall_sobre_os_137: string; extensao_por_status: Record<string, number> };
+    expect(relatorio.recall_sobre_os_137).toMatch(/136\/137/);
+  });
+
+  it('com estrela 0, a régua composta pega os 137 alvos (o mesmo recall do piso sozinho)', () => {
+    const escapam = alvos.filter((a) => !reprovaPeloPiso({ impactoMensal: a.imp, estrela: 0 }));
+    expect(escapam.map((a) => `${a.nome}: ${a.imp}`)).toEqual([]);
   });
 });

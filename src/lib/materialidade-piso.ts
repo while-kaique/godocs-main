@@ -84,3 +84,56 @@ export function impactoMensalDeclarado(input: {
   if (saving == null && receita == null) return null;
   return (saving ?? 0) + (receita ?? 0) / 10;
 }
+
+/**
+ * Teto de estrela para o piso poder reprovar.
+ *
+ * ⚠️ **Medido contra o gabarito do dono do produto (08/09/2026):** dos **137** projetos que ele
+ * reprovou à mão em 04/09 pela régua de impacto, **137 tinham 0★. Sem exceção.** Ou seja, a régua
+ * que ele aplicou nunca foi só o piso — era piso **E** nota baixa, e o piso sozinho é mais largo
+ * que o julgamento que ele exerceu.
+ *
+ * O que a estrela poupa, medido na base de prod: **10 projetos APROVADOS** que o piso sozinho
+ * reprovaria e que têm 2★ a 4★ — `Funil R&S` (4★), `Onboarding & Integração` (3★), `Portal de
+ * Admissão` (2★), `Agente de Waitlists` (3★)… quase todos de Gente & Gestão e processo, que é
+ * exatamente a família em que **o valor não está no dinheiro** (o ganho imensurável da régua).
+ * Reprovar um 4★ porque ele move R$ 89,70/mês seria aplicar o eixo errado.
+ *
+ * Relatório: `docs/baselines/rodadas/piso-impacto-precisao-08-09.json`.
+ */
+export const TETO_ESTRELA_REPROVAVEL = 1;
+
+/**
+ * A régua COMPOSTA da reprovação por impacto: o número é irrelevante **e** o projeto é baixo.
+ * PURA.
+ *
+ * ⚠️ **Sem estrela declarada, a régua VALE** (`estrela` ausente/`null` → reprovável): é o estado
+ * da maioria dos projetos que a rodada de 04/09 pegou, e exigir estrela para reprovar tornaria o
+ * piso inerte justamente em quem ninguém avaliou. Quem poupa é a nota ALTA, não a ausência dela.
+ * ⚠️ A ordem importa: sem número não há reprovação por impacto (ver `abaixoDoPisoDeImpacto`).
+ */
+export function reprovaPeloPiso(input: {
+  impactoMensal: number | null | undefined;
+  /** Nota humana (coluna "Estrelas"); na falta dela, a recomendada pelo agente. */
+  estrela?: number | null;
+  piso?: number;
+  tetoEstrela?: number;
+}): boolean {
+  if (!abaixoDoPisoDeImpacto(input.impactoMensal, input.piso ?? PISO_IMPACTO_MENSAL)) return false;
+  const teto = input.tetoEstrela ?? TETO_ESTRELA_REPROVAVEL;
+  const e = input.estrela;
+  if (typeof e !== 'number' || !Number.isFinite(e)) return true;
+  return e <= teto;
+}
+
+/** A frase da reprovação composta — nomeia os DOIS eixos, porque são dois. */
+export function motivoPisoComEstrela(
+  impactoMensal: number,
+  estrela: number | null | undefined,
+  piso: number = PISO_IMPACTO_MENSAL,
+): string {
+  const base = motivoPisoDeImpacto(impactoMensal, piso);
+  return typeof estrela === 'number' && Number.isFinite(estrela)
+    ? `${base} E a nota do projeto é ${estrela}, ou seja, o ganho pequeno não vem acompanhado de altura em nenhum outro eixo.`
+    : `${base} E o projeto não tem nota que aponte valor em outro eixo.`;
+}

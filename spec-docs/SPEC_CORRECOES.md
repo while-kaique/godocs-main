@@ -6,6 +6,48 @@
 
 ---
 
+## 2026-09-08 — O piso de impacto reprovava sozinho, e a régua que o dono do produto aplicou tinha DOIS eixos
+
+**Como apareceu.** Ao ser questionado sobre o que falta para tirar o time da sombra, eu disse que o
+piso de R$ 100 "nunca reprovou nada em produção". **Errado, e a correção é dele:** *"o piso de 100
+já reprovou mais de 100 projetos (100 e com 0 estrelas)."* A ressalva entre parênteses é o achado.
+
+**A medição (base de prod, 743 linhas).** A rodada de 04/09 usou **exatamente** a coluna
+`Impacto Líquido Mensal` — 136 dos 137 alvos batem ao centavo com o snapshot. Com a mesma régua:
+
+| | |
+|---|---|
+| o piso dispara em | **208** projetos |
+| dos 137 que ele reprovou à mão, o piso pega | **136** (o único fora é o HireFlow, cujo impacto virou 0 depois) |
+| projetos que o piso reprovaria por conta | **72** (45 `Aprovado` · 19 `Pendente` · 7 `Descontinuado` · 1 `Reenvio`) |
+| **estrela dos 137 reprovados à mão** | **0★ em 137 de 137. Sem exceção.** |
+
+**A causa.** A régua aplicada nunca foi só o piso: era piso **E** nota zero. O piso sozinho é mais
+largo que o julgamento que ele exerceu — dos 45 aprovados que derrubaria, **10 têm 2★ a 4★**:
+`Funil R&S` (4★, R$ 89,70), `Onboarding & Integração` (3★, R$ 91,19), `Portal de Admissão` (2★,
+R$ 97,02), `Agente de Waitlists` (3★)… quase todos de Gente & Gestão e processo, que é exatamente a
+família em que **o valor não está no dinheiro** (o ganho imensurável da própria régua). Reprovar um
+4★ porque ele move R$ 89,70/mês é aplicar o eixo errado.
+
+**Fix.** `reprovaPeloPiso` (`materialidade-piso.ts`) passa a exigir os dois eixos, e o financeiro
+distingue **`abaixoDoPiso`** (o sinal do dinheiro, que segue aparecendo no parecer) de
+**`reprovavel`** (a régua composta, que é o que o agregador transforma em `reprovar`). A nota entra
+pelo `resumoPorId` do contexto: humana primeiro, senão a recomendada pelo agente.
+
+**⚠️ O que não pode regredir.**
+- **Ausência de nota NÃO poupa** — era o estado da maioria dos 137, e exigir estrela para reprovar
+  tornaria o piso inerte justamente em quem ninguém avaliou. Quem poupa é nota ALTA.
+- **`"6-10"` é traduzido para 6** antes de comparar: `Number("6-10")` é `NaN`, e `NaN` cairia em
+  "sem nota", que **reprova** — no caso que mais precisa ser poupado.
+- O agregador lê **`financeiro.reprovavel`**, nunca `abaixoDoPiso` (canário de fiação em
+  `tests/avaliacao-reprovar.test.ts`).
+- Recall travado em teste: com estrela 0, a régua composta pega os 137 alvos do snapshot.
+
+**Status.** Relatório: `docs/baselines/rodadas/piso-impacto-precisao-08-09.json`. Testes:
+`tests/materialidade-piso.test.ts` (o teto, os 3 casos reais poupados, o gabarito). Suíte 3902.
+
+---
+
 ## 2026-09-08 — O card do Chat dizia "Tipo: —" na pré-aprovação
 
 **Sintoma.** O alerta de pré-aprovação chegou no Google Chat com a linha **`Tipo: —`** ao lado da
