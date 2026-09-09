@@ -2094,3 +2094,57 @@ entra no prompt das 4 dimensões) · `components/dashboard/discordancia-form.tsx
 `projeto-detalhe-dialog.tsx` · `components/historico/historico-drawer.tsx` (rótulo da ação).
 Testes: `tests/correcoes.test.ts` (31 casos), `tests/feedback-sombra.test.ts` (11 — o ESCRITOR,
 com o round-trip pelo `correcoesDoLog` real), `tests/mesa-licoes.test.ts` (7).
+
+
+## Feature adicional — A recomendação do agente em coluna PRÓPRIA (`Estrela Agente`) · 08/09/2026
+
+**Pergunta que a criou (Luis).** *"Em qual coluna você colocou a recomendação do agente? Para a
+gente diferenciar a flag 6-10? Pois a coluna de estrelas só pode ter 0 a 10 (6 a 10 aqui o humano
+valida nos casos que escaparam)."*
+
+**A resposta era: em nenhuma.** A recomendação vivia só em `especial_avaliacao` (SQLite interno) e
+na ficha do `/dashboard`. Na planilha não havia coluna nenhuma, e a **faixa de escape não tinha
+lugar algum** — por um motivo bom: `Estrelas` é NUMÉRICA, `"6-10"` como texto quebraria soma e
+ordenação, e gravar `6` afirmaria uma posição que a régua se recusa a afirmar (quem crava 6, 7, 8,
+9 ou 10 é o comitê humano, comparando com quem já está na faixa).
+
+O efeito colateral disso já tinha acontecido: em 05/09 as 129 estrelas da run 9 foram escritas
+**dentro de `Estrelas`**, e desde então não se distingue, olhando a coluna, um `3` do agente de um
+`3` de gente.
+
+**O que entrou.** Duas colunas no FIM das 3 abas (`GoDocs`, `STAGING`, `STAGING-V2`):
+
+| coluna | conteúdo |
+|---|---|
+| `Estrela Agente` | `0`..`5` ou **`6-10`** (texto, de `rotuloNotaAgente`) |
+| `Confiança Agente` | `alta` / `media` / `baixa` — o GRAU, nunca percentual |
+
+E uma coluna **Agente** na tabela do `/dashboard`, ao lado de Estrelas, para a divergência
+(agente `6-10` × humano `2`) ser visível sem abrir ficha por ficha.
+
+**Decisão do Luis sobre a divergência.** O agente marcar `6-10` num projeto que não é da faixa
+**é aceitável**: *"pode deixar aí, se eu achar absurdo eu vou lá, corrijo e o agente aprende com o
+porquê. Simples assim."* Isso já é circuito fechado — o 👎 da ficha grava eixo + motivo e volta
+como lição no prompt de outros projetos.
+
+**Invariantes.**
+- **`Estrelas` volta a ser 100% humana.** Adotar a sugestão é ato de pessoa, no campo da ficha —
+  nunca efeito colateral de uma rodada do classificador.
+- **As 129 células da run 9 FICAM em `Estrelas`.** Quando o Luis validou a run e disse *"se dentro
+  dos critérios o time definiu 0, então é 0"*, aqueles números **viraram a nota**: foi adoção
+  humana, não invasão do agente.
+- O rótulo sai de **`rotuloNotaAgente`** (fonte única com a tela) — não redigitar `6-10`.
+- Quem escreve é o classificador, junto do upsert, com **`espelharEscrita` no mesmo passo** e
+  **best-effort** (falhar não desfaz a recomendação já no SQLite).
+- Colunas no **FIM**: inserir no meio empurraria `Diff Horas / Antes` e `Diff Saving / Antes`
+  (MANUAIS da gestão) para outra letra.
+- Entraram em `COLUNAS_RESUMO` ⇒ **`VERSAO_RECORTE_RESUMO` = 7** (re-espelhamento único no próximo
+  cron; sem o bump a coluna nasceria vazia para sempre na tela).
+
+**Backfill aplicado (run 9).** 637 linhas com recomendação — **7 na faixa 6-10** — e 108 `—` (os
+projetos que entraram depois da run). Nenhuma célula vazia.
+
+**Nota de deriva encontrada.** O fixture `CABECALHO_STAGING_V2` dos testes listava **60** nomes
+quando a aba real tinha **58** — ou seja, a cobertura que aquele canário garante é contra o
+SNAPSHOT, não contra a planilha. Quem confere a aba real é o aviso do `appendRow` em runtime.
+Fechar a deriva é trabalho da branch da v2, que é quem escreve nessa aba.

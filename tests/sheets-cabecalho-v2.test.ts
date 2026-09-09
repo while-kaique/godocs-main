@@ -85,12 +85,24 @@ const CABECALHO_STAGING_V2 = [
   'Custo Evitado Não Contratado', // BF ⚠️ NOVA — a vaga/consultoria não contratada
   'Impacto Líquido Mensal', // BG ⚠️ NOVA — a normalização no tempo
   'Tipo de Projeto', // BH ⚠️ NOVA (03/09/2026) — eixo TIPO da categorização (item 5.4)
+  // As 2 do AGENTE, escritas no FIM em 08/09/2026 (BD, BE nesta aba): a recomendação do
+  // classificador, separada da nota humana de `Estrelas` porque a faixa `6-10` não é número.
+  'Estrela Agente',
+  'Confiança Agente',
 ];
 
 describe('cabeçalho real da aba STAGING-V2 (fixture)', () => {
-  it('tem 60 colunas, de A a BH', () => {
-    expect(CABECALHO_STAGING_V2).toHaveLength(60);
-    expect(colLetter(CABECALHO_STAGING_V2.length - 1)).toBe('BH');
+  it('tem 62 colunas, de A a BJ', () => {
+    // 60 → 62 em 08/09/2026: entraram `Estrela Agente` e `Confiança Agente`, escritas no FIM
+    // das 3 abas que o código conhece (`GoDocs`, `STAGING`, `STAGING-V2`).
+    //
+    // ⚠️ Este fixture DERIVOU do cabeçalho real: quando as 2 colunas foram escritas, a aba
+    // `STAGING-V2` tinha **58** nomes e este snapshot já listava 60. A cobertura que o canário
+    // abaixo garante é contra o SNAPSHOT, não contra a planilha — quem confere a aba real é o
+    // aviso do `appendRow` em runtime. Fechar essa deriva é trabalho da branch da v2, que é
+    // quem escreve nessa aba.
+    expect(CABECALHO_STAGING_V2).toHaveLength(62);
+    expect(colLetter(CABECALHO_STAGING_V2.length - 1)).toBe('BJ');
   });
 
   it('não tem nome repetido (nome ambíguo não recebe valor pelo índice tolerante)', () => {
