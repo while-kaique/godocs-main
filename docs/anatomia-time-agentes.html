@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Anatomia do Time de Agentes · GoDocs</title>
+<meta name="description" content="Mapa navegável da arquitetura do time de agentes de avaliação do GoDocs, em duas vistas: o fluxo de produção e a auditoria em lote.">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--paper:#FBF4EE;--ink:#1C2733;--ink-2:#5B6572;--line:#E6DCD3;--card:#FFFFFF;--blue:#0059A9;--blue-ink:#004B8E;--blue-bg:#E4EEF9;--lime:#D7DB00;--lime-ink:#5F6200;--lime-bg:#F4F5D4;--code-bg:#EFE9E3;--ok:#1F7A4D;--warn:#8A5A00;--bad:#A3322A;--sel:#0059A9;--novo:#7A3E9D;--novo-bg:#F0E6F7}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#131A21;--ink:#EEF1F4;--ink-2:#A6B0BC;--line:#2A343F;--card:#1B242E;--blue:#6FB0F0;--blue-ink:#9CCBFA;--blue-bg:#1D2E42;--lime:#D7DB00;--lime-ink:#E4E76A;--lime-bg:#33361A;--code-bg:#252F3A;--ok:#7CD3A0;--warn:#F0C168;--bad:#F19A92;--sel:#6FB0F0;--novo:#C9A0E8;--novo-bg:#2C2038}}
+:root[data-theme="dark"]{--paper:#131A21;--ink:#EEF1F4;--ink-2:#A6B0BC;--line:#2A343F;--card:#1B242E;--blue:#6FB0F0;--blue-ink:#9CCBFA;--blue-bg:#1D2E42;--lime:#D7DB00;--lime-ink:#E4E76A;--lime-bg:#33361A;--code-bg:#252F3A;--ok:#7CD3A0;--warn:#F0C168;--bad:#F19A92;--sel:#6FB0F0;--novo:#C9A0E8;--novo-bg:#2C2038}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font:14px/1.5 "IBM Plex Sans",system-ui,sans-serif;height:100vh;display:grid;grid-template-rows:auto 1fr}
+img{max-width:100%}
+header{padding:15px 22px 10px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+h1{font:600 21px/1.15 Poppins,system-ui,sans-serif;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--ink-2);margin:4px 0 0;font-size:12.5px;max-width:78ch}
+.ctrl{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.vistas{display:flex;gap:0;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--card)}
+.vistas button{font:600 12.5px Poppins,system-ui,sans-serif;border:0;background:transparent;color:var(--ink-2);padding:7px 15px;cursor:pointer}
+.vistas button[aria-pressed=true]{background:var(--blue);color:#fff}
+.zoom{display:flex;gap:5px}
+.zoom button{font:500 13px Poppins,system-ui,sans-serif;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:5px 10px;border-radius:999px;cursor:pointer}
+button:focus-visible,.no:focus-visible{outline:3px solid var(--lime);outline-offset:2px}
+.legenda{display:flex;gap:13px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2)}
+.legenda i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:5px;border:1px solid transparent}
+.app{display:grid;grid-template-columns:1fr minmax(300px,392px);min-height:0;border-top:1px solid var(--line)}
+#mapa{position:relative;overflow:hidden;background:var(--card);cursor:grab;touch-action:none}
+#mapa.arrastando{cursor:grabbing}
+#mapa svg{width:100%;height:100%;display:block;font-family:"IBM Plex Sans",system-ui,sans-serif}
+.no{cursor:pointer}
+.no rect{stroke-width:1.3}
+.no.sel rect.corpo{stroke:var(--sel);stroke-width:2.6}
+.no text{fill:var(--ink);pointer-events:none}
+.no .subt{fill:var(--ink-2);font-size:10.5px}
+.aresta{stroke:var(--ink-2);stroke-width:1.3;fill:none;stroke-linejoin:round}
+.aresta.sel{stroke:var(--sel);stroke-width:2.4}
+.aresta.fina{stroke-dasharray:4 4;opacity:.8}
+.rot text{fill:var(--ink-2);font-size:10.5px}
+.rot rect{fill:var(--card)}
+aside{border-left:1px solid var(--line);background:var(--paper);overflow:auto;padding:16px 18px 28px}
+aside h2{font:600 16px/1.2 Poppins,system-ui,sans-serif;margin:0 0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+aside h3{font:600 11.5px/1.2 Poppins,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--blue-ink);margin:14px 0 4px}
+aside p,aside li{margin:0;font-size:13px;color:var(--ink)}
+aside ul{margin:0;padding-left:18px;display:grid;gap:3px}
+aside .dica{color:var(--ink-2);font-size:12.5px}
+.tag{font:500 11px/1 "IBM Plex Mono",monospace;padding:3px 7px;border-radius:999px;white-space:nowrap}
+.t-luna{background:var(--lime-bg);color:var(--lime-ink)}.t-sol{background:var(--blue-bg);color:var(--blue-ink)}.t-code{background:var(--code-bg);color:var(--ink-2)}.t-tool{background:var(--card);color:var(--ink-2);border:1px dashed var(--ink-2)}
+.est{font:500 10.5px/1 "IBM Plex Mono",monospace;padding:3px 7px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.e-prod{color:var(--ok)}.e-staging{color:var(--warn)}.e-codigo{color:var(--novo)}
+code{font:500 12px "IBM Plex Mono",monospace;background:var(--code-bg);padding:1px 5px;border-radius:3px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:500 12px "IBM Plex Mono",monospace;border:1px dashed var(--ink-2);background:var(--card);color:var(--ink);padding:3px 8px;border-radius:999px;cursor:pointer}
+@media (max-width:860px){.app{grid-template-columns:1fr;grid-template-rows:1fr auto}aside{border-left:0;border-top:1px solid var(--line);max-height:46vh}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+<div><h1>Anatomia do Time de Agentes</h1><p class="sub"><b>Um orquestrador, dois times.</b> O de cima julga se o projeto <b>se sustenta</b>, o de baixo julga <b>quanto ele vale</b>, e a <b>junta</b> transforma as duas análises em uma só: todo projeto passa pelo time completo. ⚠️ Este é o desenho-<b>alvo</b>: o selo no painel de cada nó diz se ele já está em produção. Clique num nó para ver.</p></div>
+<div class="ctrl">
+<div class="vistas" role="group" aria-label="Focar">
+<button id="v-prod" aria-pressed="true">Ver tudo</button><button id="v-aud" aria-pressed="false">Time do impacto</button><button id="v-est" aria-pressed="false">Time da estrela</button>
+</div>
+<div class="zoom" role="group" aria-label="Zoom"><button id="z-menos" aria-label="Diminuir zoom">−</button><button id="z-mais" aria-label="Aumentar zoom">+</button><button id="z-reset">Ver tudo</button></div>
+<span class="legenda"><span><i style="background:var(--lime-bg);border-color:var(--lime-ink)"></i>luna</span><span><i style="background:var(--blue-bg);border-color:var(--blue)"></i>sol</span><span><i style="background:var(--code-bg)"></i>código</span><span><i style="background:var(--card);border:1px dashed var(--ink-2)"></i>ferramenta</span></span>
+</div>
+</header>
+<div class="app">
+<div id="mapa" aria-label="Mapa navegável do time de agentes"></div>
+<aside id="painel" aria-live="polite"></aside>
+</div>
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// DUAS VISTAS. Um grafo só, com dois subgrafos que não se falam, era o que fazia
+// as setas passarem por cima das caixas e os rótulos empilharem. Cada nó declara
+// a vista a que pertence, e só a vista ativa é desenhada.
+//
+// ROTA ORTOGONAL POR CORREDOR: toda aresta sai pela direita, anda até o corredor
+// vertical ENTRE as duas colunas, sobe ou desce ali, e entra pela esquerda do
+// destino. Os corredores são vazios por construção (o layout é em colunas), então
+// nenhuma aresta corta uma caixa. Aresta que volta (loop) desce por baixo.
+// ─────────────────────────────────────────────────────────────────────────────
+const TOOLS={
+ consultar_vizinhos:{devolve:'Projetos parecidos já decididos por humanos: nome, nota humana, status, similaridade, resumo.',le:'Pinecone (3072 dims, cosseno) com o SQLite como fonte da verdade e fallback. Só projetos com nota humana ou status assentado.',params:'k (1 a 6), so_com_nota_humana'},
+ consultar_cargo:{devolve:'Cargo da pessoa, ou null.',le:'Espelho da TeamGuide no SQLite, fail-safe.',params:'email'},
+ historico_versoes:{devolve:'Versões do projeto e o que mudou entre as duas mais recentes.',le:'projeto_versions sem blobs de snapshot (teto de 32 MiB).',params:'nenhum'},
+ buscar_duplicata:{devolve:'Outro projeto com o mesmo nome normalizado que já tenha ganho medido.',le:'Espelho da planilha: id, nome, saving, receita, status.',params:'nome'},
+ checar_plausibilidade_horas:{devolve:'Total antes e depois, economia, linhas acima de 220 h por pessoa, economia alta (44 h ou mais), alerta e mensagem.',le:'Cálculo puro sobre as linhas do dossiê.',params:'linhas, tipo_saving'},
+ calcular_impacto:{devolve:'Ganho total mensal e a composição: saving + custo evitado + receita dividida por 10, menos custo externo e custo do projeto.',le:'Cálculo puro sobre os números do dossiê.',params:'saving_reais, custo_evitado_reais, custo_externo_mensal, custo_projeto_mensal, receita_mensal'},
+ ler_evidencia:{devolve:'O link do anexo e, quando já houver texto extraído, o texto dele.',le:'Link em projetos.arquivos_links. O TEXTO passa a vir da tabela anexo_texto.',params:'link'},
+};
+const N={}; const E=[];
+const no=(id,o)=>{N[id]=Object.assign({id,vista:'prod'},o)};
+const rot=(de,para,txt,o)=>E.push(Object.assign({de,para,txt},o||{}));
+
+/* ── VISTA: PRODUÇÃO ─────────────────────────────────────────────────────────
+   Colunas (x): 30 entrada · 290 orquestrador · 560 agentes ·
+   800 ferramentas · 1060 régua/consolidação · 1320 cético · 1580 consenso ·
+   1840 saídas.  Corredores: 260-300, 460-500, 740-800, 1020-1060, 1280-1320,
+   1540-1580, 1800-1840. */
+no('dossie',{titulo:'Dossiê',tipo:'code',sub:'tudo que o time lê',estado:'prod',x:30,y:420,w:200,h:56,
+ config:{'O que é':'Objeto único montado por código com tudo que existe sobre o projeto. É o texto que TODOS os agentes recebem, igual.','Fontes':['Linha da planilha (espelho): status, estrelas, memoriais, observações, parecer do líder','Documentação compilada: o que faz, execução, fluxo, dependências, atenção','Linha de projetos: financeiro, itens de custo, membros, afetados','Versões e o que mudou no último reenvio','Cargo do autor na TeamGuide, fail-safe','Categorias de ganho declaradas pelo autor'],'Rótulo pela SUBSTÂNCIA':'O financeiro é nomeado pelo que a coisa É, não pela coluna de onde veio: "Horas humanas liberadas" e "Despesa que a empresa pagava e parou de pagar". Antes o campo herdava o nome da v1, e a mesa chamou R$ 324.005,09 de multa de DIFAL de "custo evitado" — que na v2 é o conceito OPOSTO.','Glossário embutido':'O bloco financeiro carrega a definição das 4 categorias vinda dos MESMOS cards que o autor leu ao preencher. É o que torna "isso é saving efetivado ou custo evitado?" uma pergunta respondível.','Memorial degenerado':'Quando o memorial é só a conta (mediana de 57 caracteres nos legados importados à mão), o dossiê completa com a coluna Memorial anterior.','Nunca lê':['chat_messages','coluna Observações: guarda o parecer da triagem, e dar ao agente a opinião do humano contra quem ele é medido contamina a medição'],'Lacunas declaradas':'Fonte ausente vira lacuna nomeada, nunca exceção.'}});
+no('anexos',{titulo:'Leitura de anexo',tipo:'code',sub:'texto + visão',estado:'codigo',x:30,y:300,w:200,h:60,
+ config:{'O que é':'O texto dos anexos, guardado por projeto, para o agente poder LER a evidência em vez de só saber que existe um link.','Por que faltava':'O texto SEMPRE foi extraído na submissão (PDF pelo OCR Worker, DOCX pelo mammoth, txt e json como utf-8) e DESCARTADO depois de alimentar o extrator.','O tamanho do buraco':'746 dos 750 projetos de prod têm anexo no Drive. Nunca foi caso de borda: é o material principal que o agente não estava lendo.','Imagem':'png, jpg, webp, gif e bmp caíam no ramo "extensão desconhecida" e voltavam lixo. Agora vão à visão do ai-proxy, que transcreve o tipo de documento, todos os números e o que ele comprova.','Marca obrigatória':'O que a visão devolve vem com o cabeçalho "leitura automática de imagem, não é o texto literal do arquivo". Sem isso o agente citaria uma transcrição como se fosse o documento.','Falha não é silêncio':'Visão que falha deixa "[IMAGEM ANEXADA x.png, não foi possível ler: motivo]". É a diferença entre concluir "não há evidência" e "há evidência que eu não consigo abrir".','Estado':'Codado, com a visão já provada contra o ai-proxy. Falta a gravação na submissão, o dossiê ler e o backfill dos 746.'}});
+no('licoes',{titulo:'Lições da triagem',tipo:'code',sub:'o 👎 vira material',estado:'prod',x:30,y:540,w:200,h:60,
+ config:{'O que é':'Quando a triagem discorda do agente, o 👎 abre um formulário (eixo, desfecho certo e motivo) e a correção entra no prompt das dimensões.','O 👍 saiu':'Ausência de 👎 já é concordância. Botão de concordar só produzia ruído.','O servidor não promete lição':'Ele monta a correção, roda a régua e devolve se virou lição e por quê. A tela repete o que o servidor disse, em vez de afirmar que ensinou.','Armadilha fechada':'A comparação de id é por chave CANÔNICA: com comparação crua, a correção do PRÓPRIO projeto vazava como lição em todo LEGADO.','Leitura em LOTE':'Uma consulta por lote, nunca por projeto.'}});
+no('orq',{titulo:'Orquestrador',tipo:'code',sub:'raiz do log',estado:'prod',x:290,y:590,w:170,h:60,
+ config:{'O que faz':'Registra a raiz do ciclo, dispara os 5 especialistas em paralelo e o cérebro da estrela, consolida, chama o cético, abre a réplica quando cabe, fecha o consenso e monta os textos.','Regras':['Nunca lança: modelo caído vira fallback declarado e erro listado','Sem raiz no log, nenhum filho é gravado','Teto de 2 rodadas de debate'],'Custo medido':'Uma passada completa leva ~3 min 46 s e são ~8 chamadas de LLM. Cabe num request (o edge corta em ~7 min), e é por isso que o lote é de 1 projeto por requisição.','Código':'src/lib/avaliacao/time.ts'}});
+const ESP=[
+ ['plaus','Plausibilidade de horas','Julga se as horas cabem nas pessoas: teto CLT de 220 h por pessoa, economia alta a partir de 44 h por mês. Conta como DADO DURO na consolidação.',['checar_plausibilidade_horas','consultar_cargo'],'Quando algo não fecha, formula a pergunta que o autor conseguiria responder.'],
+ ['fin','Financeiro e valor','Audita o valor E PROPÕE O NÚMERO: de quanto para quanto, com a conta que chega nele. A sugestão só DESCE ou CONFIRMA; subir é descartado no código.',['calcular_impacto','consultar_vizinhos'],'Duas travas novas, medidas no caso Smartonline: hora liberada de quem CONTINUA na equipe é ganho (ele exigia redução de equipe), e ganho sem número NÃO é ganho zero (o veredito é "existe e não está quantificado").'],
+ ['prec','Precedente','Compara com vizinhos já decididos por humanos e procura duplicata de escopo já documentado.',['consultar_vizinhos','buscar_duplicata'],'Sozinho não segura o projeto: vira ressalva.'],
+ ['evid','Evidência','Confere coerência interna: descrição, memorial, horas e colunas contam a mesma história? O memorial nomeia o processo, quem fazia e onde o número se confere?',['ler_evidencia','historico_versoes'],'A régua diz que ausência de anexo não é sinal, porque a base legada era só a planilha. ⚠️ A premissa está ERRADA: 746 dos 750 têm anexo. Enquanto o texto não chegar, o certo é dizer "existe anexo que não consigo ler".'],
+ ['categ','Categoria do ganho','A dimensão mais nova: o ganho DESCRITO cai na categoria que o autor MARCOU? Saving efetivado (a despesa existia e parou) · custo evitado (nunca nasceu, inclusive horas liberadas de quem fica) · receita incremental (dinheiro novo) · imensurável (o valor está no risco).',['consultar_vizinhos'],'Só PREOCUPA quando consegue NOMEAR a categoria certa E CITAR o dossiê. E vocabulário legado não é erro do autor: 647 das 750 linhas ainda dizem "saving" por herança da migração.'],
+];
+ESP.forEach(([id,t,julga,tools,nota],i)=>no(id,{titulo:t,tipo:'luna',sub:'especialista',estado:'prod',x:560,y:60+i*112,w:200,h:56,tools,
+ config:{'Modelo':'gpt-5.6-luna, reasoning_effort low opcional. Sem env cai no modelo padrão.','Julga':julga,'Entrada':'O MESMO dossiê que os outros, com R$, mais os vizinhos, as lições da triagem e, na réplica, os argumentos dos outros e o motivo do cético.','Formato racional-primeiro':'Raciocínio e evidência ANTES do número, confiança por último. E o 1º parecer é CEGO ao dos outros: os outros votos ficam no contrato e FORA do prompt.','Saída':['preocupa','argumento (até 600 chars)','evidências citadas','pergunta ao autor (uma, sem R$ por hora)','valor (só o financeiro)'],'Regra de preocupação':'Só sinal concreto: número implausível, contradição interna, dupla contagem, duplicata, ganho projetado.','Nota':nota,'Código':'src/lib/avaliacao/cerebro-merito.ts'}}));
+no('estrela',{titulo:'Cérebro da estrela',tipo:'sol',sub:'a nota',estado:'prod',x:290,y:1000,w:170,h:60,toolAbaixo:true,tools:['consultar_vizinhos','buscar_duplicata'],
+ config:{'Papel':'Duas coisas. É o GERENTE do time da estrela (recebe o dossiê do orquestrador e distribui para as 4 lentes) e é quem dá a NOTA BASE de 0 a 5 pela régua, além de responder a pergunta do escape 6 a 10 exigindo DUAS citações literais da documentação.','Por que ele gerencia, e não o orquestrador':'Porque as lentes só fazem sentido em relação à nota dele: elas movem a base em um degrau, não decidem sozinhas. Pendurar as 4 no orquestrador espalhava 10 setas saindo de um nó só e escondia essa dependência.','Quem produz a nota em PROD':'O TIME INTEIRO, desde 09/09. Antes era um classificador de UM agente, e o veto foi: "a avaliação de estrelas não pode ser feita considerando só o cérebro de estrelas, tem que ser o time todo".','Onde a nota é gravada':'Em especial_avaliacao (de onde a ficha lê) E nas 2 colunas da planilha, Estrela Agente e Confiança Agente (de onde a régua do piso lê). Sem a segunda, o time avaliaria e o piso continuaria cego.','NUNCA a coluna Estrelas':'Ela é 100% humana. Adotar a sugestão é ato de pessoa, nunca efeito colateral de uma rodada.','Modelo':'gpt-5.6-sol, sem reasoning_effort.','Aplica':'A régua 0 a 5 exatamente como escrita, concatenada no prompt. Nenhum critério é redigitado. A distribuição esperada não entra no prompt.','Normalização fail-closed':['Critério recalculado da nota','Sem evidência: cai um nível','Desqualificador só no zero','Escape só com os 2 gatilhos e a partir de 5','Nota humana 6 ou mais: âncora congelada'],'Código':'src/lib/avaliacao/cerebro-estrela.ts'}});
+no('vizinhos',{titulo:'Vizinhos (RAG)',tipo:'code',sub:'Pinecone · 3072 dims',estado:'prod',x:30,y:1002,w:200,h:56,
+ config:{'O que é':'Índice vetorial no Pinecone, cosseno. O SQLite é a fonte da verdade e o fallback: índice fora degrada para cosseno em JS e nunca quebra a submissão.','Hidratado da base INTEIRA':'459 projetos normais com nota humana mais os especiais. Antes só os especiais entravam, e um projeto normal recebia ZERO vizinho.','Rótulo preferido':'A nota HUMANA, nunca a recomendada pelo próprio agente. É o anti feedback loop.','⚠️ O loop que sobrou':'O rótulo humano inclui o 0 DEFAULT da coluna manual. Medido em prod: o agente justificou um 0 escrevendo "como os painéis vizinhos avaliados em 0", e os quatro vizinhos que ele citou nunca foram avaliados.','Sem vizinho a nota ACHATA':'Média 3,6★ sem vizinho contra 4,9★ com vizinho, a MESMA régua e o mesmo projeto. Por isso "julgou sem nenhum vizinho" é falha de alerta, não aviso.'}});
+no('piso',{titulo:'Piso de impacto',tipo:'code',sub:'régua COMPOSTA',estado:'prod',x:1620,y:730,w:210,h:64,destaque:true,
+ config:{'A régua':'Impacto mensal entre R$ 0 e R$ 100 E nota abaixo de 1. Os dois eixos, nunca um só.','Por que composta':'Dos 137 projetos que o dono do produto reprovou à mão, 137 tinham 0★. Sem exceção. O piso sozinho derrubaria 45 aprovados; com a nota, 29 — e os poupados têm 2★ a 4★, quase todos de processo, a família em que o valor não está no dinheiro.','É < 1, não <= 1':'A primeira versão usava <= 1 e derrubava 6 aprovados de 1★ sem nenhuma evidência no gabarito.','SEM nota avaliada NÃO reprova':'Invertido em 09/09. A coluna Estrelas tem 463 de 750 linhas em 0, e esse 0 é o estado INICIAL de uma coluna manual (~426 já existiam antes de qualquer agente). A perna "nota < 1" valia em 466 de 750: o piso decidia sem filtro de nota.','Efeito medido':'Dos 511 aprovados, os reprováveis caíram de 30 para 1 — e dos 137 reprovados à mão, a régua ainda pega 134.','Mecânica':'Sobrepõe o painel de LLM inteiro.','Código':'materialidade-piso.ts'}});
+no('consolida',{titulo:'Consolidação',tipo:'code',sub:'quórum 2 + dado duro',estado:'prod',x:1090,y:338,w:200,h:60,
+ config:{'Regra do quórum':['0 preocupação: aprovar','1 preocupação: só plausibilidade ou financeiro com valor absurdo seguram; precedente, evidência ou categoria sozinhos viram RESSALVA','2 preocupações: só segura com pelo menos um dado duro','3 ou mais: segura','Só fallbacks (modelo caído): vai ao humano'],'O que "segurar" virou':'Antes isso produzia uma 4ª saída, o AJUSTE AO AUTOR. Ela saiu do desenho por decisão: pedir correção só faz sentido no fluxo de EDIÇÃO. Hoje o projeto segurado vai ao HUMANO.','⚠️ Pendência real':'No CÓDIGO a saída ajuste ainda existe. Colapsá-la em humano é mudança pendente — este mapa mostra a intenção, não o runtime.','Dedupe':'Perguntas repetidas entre dimensões ficam uma só. Elas continuam sendo produzidas: viram o material que o humano lê.','Código':'consolidarMerito em cerebro-merito.ts'}});
+no('cetico',{titulo:'Cético',tipo:'sol',sub:'tenta derrubar',estado:'prod',x:1350,y:286,w:190,h:56,
+ config:{'Modelo':'gpt-5.6-sol.','Papel':'Adversarial: tenta derrubar a aprovação com sinal concreto do dossiê. Lê o dossiê, os julgamentos e a nota da estrela. Sem ferramentas.','Saída':['refuta','motivo com evidência','sinais','pergunta que resolveria a refutação'],'Travas':['Refutação que só reclama de anexo ou "não auditável" sem citar número é ignorada','Refutação sustentada após a réplica segura o projeto: o desfecho é o humano'],'Medido na base':'Refutou 560 dos 648 aprovados pela triagem: 121 contradições, 113 ganhos projetados, 98 erros de conta, 36 duplas contagens.'}});
+no('replica',{titulo:'Réplica',tipo:'code',sub:'rodada 2, teto',estado:'prod',x:1350,y:176,w:190,h:52,
+ config:{'Quando':'O cético refuta E o mérito consolidado era aprovar E ainda não houve rodada 2.','O que roda':'Os 5 especialistas DE NOVO, com os argumentos da rodada 1 e o motivo do cético no prompt; depois o cético outra vez. E é o ORQUESTRADOR que redispara: por isso a seta de retorno aponta para ele, não para a consolidação.','Teto':'2 rodadas. Nunca há terceira — sem teto, dois modelos discordando não convergem, alternam.','Fecha':'Cético aceita: segue. Insiste: humano.'}});
+no('revisor',{titulo:'Revisor da nota',tipo:'sol',sub:'ataca a ALTURA',estado:'prod',x:1350,y:1022,w:190,h:56,
+ config:{'Modelo':'gpt-5.6-sol.','Alvo':'A ALTURA da nota, não o mérito. O outro cético pergunta "esta aprovação se sustenta?"; este pergunta "esta NOTA se sustenta?". São falhas diferentes: o mérito erra deixando passar ganho inflado, a estrela erra na altura.','Trava antes do LLM':'Escape indicado sem as DUAS citações da doc já é refutação por régua. Pedir opinião ao modelo sobre o que a régua decide gastaria uma chamada para às vezes discordar dela.','Só REBAIXA':'A nota sugerida é cortada no teto da proposta, no código. Um falso 8 vira âncora congelada e contamina todo mundo depois.','Não vale como motivo':'"não é auditável", "não há anexo", "falta evidência independente".','Piso estrutural':'Prova NOMEADA no eixo estrutural é piso do revisor: refutar a ALTURA não apaga a recorrência provada. Sem esse piso, um projeto de 8★ humano fechou em 0★ com uma volta.'}});
+no('volta',{titulo:'Convergência',tipo:'code',sub:'1 volta, com piso',estado:'prod',x:1350,y:1132,w:190,h:52,
+ config:{'Quando':'O revisor refuta E nomeia o motivo.','O que roda':'O cérebro da estrela de novo, com a objeção no prompt como algo a RESPONDER, não uma ordem: ele pode MANTER a nota se citar a evidência que derruba a objeção. Concordar sem evidência é pior que discordar com ela.','Teto':'1 volta.','Depois':'Se o revisor insistir, a objeção vira DIVERGÊNCIA no consenso. Não vira pergunta ao autor: a altura da estrela não é coisa que o autor responda.'}});
+no('junta',{titulo:'Junta as duas análises',tipo:'code',sub:'uma análise só',estado:'codigo',x:1620,y:600,w:210,h:64,destaque:true,
+ config:{'A peça central do desenho':'O orquestrador gerencia DOIS times e esta peça funde o que eles concluíram em UMA análise. Todo projeto é avaliado pelo time COMPLETO: não existe projeto que passe só pelo impacto ou só pela estrela.','Por que é um nó e não uma seta':'Porque juntar tem regra. A análise do impacto responde "se sustenta?" e a da estrela responde "quanto vale?" — e há combinações que só a junta enxerga: impacto que se sustenta com nota zero, nota alta com impacto irrelevante, os dois times discordando sobre o mesmo número.','O que ela produz':'Uma análise única com o veredito, a nota, a confiança e as divergências entre os dois times nomeadas. É o que o consenso lê para escolher a saída.','⚠️ Estado':'É desenho-ALVO. Hoje o código concilia mérito e estrela dentro do consenso, sem uma peça própria, e as 4 lentes nem entram no fluxo (rodam só na auditoria em lote). Mudar isso é a tarefa que este mapa existe para especificar.'}});
+no('consenso',{titulo:'Consenso',tipo:'code',sub:'fecho medido',estado:'prod',x:1900,y:600,w:200,h:56,
+ config:{'Concilia':'O mérito e a estrela em uma saída.','Ordem das regras':['Piso de impacto: reprovar (mecânico, antes de tudo)','Invalidez NOMEADA e CITADA: reprovar','Escape válido: humano com dossiê de comitê','Mérito segurado por preocupação: humano','Debate não fechou: humano','Mérito aprova mas estrela desqualifica: humano','Confiança baixa: humano','Senão: aprovar'],'Três saídas, não quatro':'O ajuste ao autor saiu como desfecho: pedir correção só cabe no fluxo de EDIÇÃO. O que antes virava ajuste vai ao HUMANO, com as perguntas anexadas para ele ler. ⚠️ No código a saída ajuste ainda existe — é pendência, não estado atual.','Confiança':'3 sinais declarados: os dois cérebros concordam, há evidência citada nos dois, há vizinhos. NUNCA auto-declarada pelo modelo (medido: ele se declarou de confiança alta em 456 de 484 casos).','TETO novo':'Alta exige MÉRITO SEM RESSALVA. Com o projeto segurado, ou com auditoria de valor "absurdo", o teto é média. Os 3 sinais falam do PROCESSO, não da força da conclusão: no Smartonline deram 3 de 3 num projeto em que os especialistas escreveram "não é reconciliável" e "valor declarado ABSURDO".','Liberação':'Lê acurácia MEDIDA por veredito: aprovar exige 90% de acerto, 0 erro grave, 300 casos. Sem medição, tudo em sombra — e reprovar não tem flag de liberação nenhuma.','Código':'src/lib/avaliacao/consenso.ts'}});
+no('aprovar',{titulo:'Aprovar',tipo:'ok',estado:'prod',x:2170,y:530,w:170,h:42,config:{'Texto':'Justificativa interna auditável, com R$.','Age sozinho':'Só quando a liberação medida autorizar. Hoje, não.'}});
+no('reprovar',{titulo:'Reprovar',tipo:'bad',estado:'prod',x:2170,y:596,w:170,h:42,
+ config:{'A saída mais nova':'Duas portas, nenhuma de juízo livre: o piso de impacto (mecânico) e a invalidez NOMEADA e CITADA.','Os outros motivos de nota zero NÃO reprovam':'336 dos 637 são 0★ — seria metade da base. Nota zero é a caixa "Experimenta", não invalidez.','Nunca age sozinho':'Não existe flag de liberação para reprovar.','Canários':'Casos REAIS com id marcam o relatório como SUSPEITO quando a mesa aprovaria um deles. Acurácia perfeita é tripwire, não vitória.'}});
+no('humano',{titulo:'Humano + comitê',tipo:'warn',estado:'prod',x:2170,y:662,w:170,h:42,
+ config:{'Texto':'Dossiê de comitê: resumo, nota do time, gatilhos de escape com evidência, pares da faixa 6 a 10 e a frase "o time lê o projeto acima ou abaixo de X porque".','Também recebe':'O que antes virava ajuste ao autor, com as perguntas dos especialistas anexadas.','Medido':'0,7% dos projetos da base caíam aqui antes de o ajuste sair.'}});
+no('textos',{titulo:'Textos',tipo:'code',sub:'2 públicos',estado:'staging',x:1900,y:700,w:200,h:52,
+ config:{'Interno':'Pode ter R$. Auditável.','Comitê':'Só no humano. Pode ter R$.','Ao autor':'Existe e continua sem R$ por hora, mas ficou SEM GATILHO: com o ajuste fora das saídas, nada o dispara sozinho.','Legibilidade':'O texto interno SEMPRE teve estrutura (um rótulo por seção e quebras de linha), mas a ficha o desenhava num span só e o HTML colapsa as quebras: virava um muro de ~3.500 caracteres numa linha. Agora ele é partido em BLOCOS, com "Saída do time", "Racional da estrela", "Auditoria de valor" e "Perguntas ao autor" abertos e o rastro atrás do exibir mais. Nada foi reescrito.'}});
+no('chat',{titulo:'Aviso no grupo',tipo:'code',sub:'gatilho do agente',estado:'staging',x:2170,y:740,w:200,h:60,destaque:true,
+ config:{'A troca':'O alerta do grupo do Chat deixou de sair na PRÉ-APROVAÇÃO DO LÍDER e passa a sair no PARECER DO AGENTE. A pré-aprovação diz que ALGUÉM OLHOU; o parecer diz se o projeto SE SUSTENTA, e chega antes.','Quem dispara':'aprovar e reprovar sempre. O humano só na faixa 6 a 10 — é a única forma dele que carrega informação acionável (o grupo precisa saber quais projetos exigem estrela humana).','Por que o resto cala':'Medido em prod: 311 baixa, 224 média e 106 alta em 641 avaliados. O desfecho "manda para conferência humana" é o DOMINANTE, e se disparasse o card deixaria de ser sinal.','Uma vez por PROJETO':'UPDATE condicional atômico. Sem ele, um backfill nos 641 que já têm nota viraria 641 cards.','Adaptador cego':'Banco que não reporta linhas escritas → AVISA (silêncio permanente é pior que card repetido) e a indeterminação vira falha no watchdog.','A régua antiga fica desarmada, não apagada':'A maquinaria segue no código e coberta por 18 testes. Rearmar é trocar um false — e nesse caso o gatilho do agente sai no MESMO deploy.'}});
+no('log',{titulo:'Log em árvore',tipo:'code',sub:'todo passo grava aqui',estado:'prod',x:30,y:680,w:200,h:52,
+ config:{'Tabelas':['avaliacao_ciclos: uma linha por rodada','agente_log: um nó por passo, com pai, caminho materializado, profundidade, entrada, saída íntegra, ferramentas chamadas, veredito, modelo, tokens, custo e duração'],'Regra':'Só o orquestrador pode ser raiz; todo outro nó aponta para um pai do mesmo ciclo. A subárvore inteira sai com um LIKE no caminho.','Por que ele também não tem seta':'Todo nó do time grava uma linha aqui, não só o orquestrador. A única regra de hierarquia é que apenas o orquestrador pode ser RAIZ: qualquer outro nó tem de apontar para um pai do mesmo ciclo, e a subárvore inteira sai com um LIKE no caminho materializado.','Nunca lança':'Auditoria não derruba a avaliação.'}});
+no('falhas',{titulo:'Catálogo de falhas',tipo:'code',sub:'qualquer peça reporta aqui',estado:'prod',x:30,y:770,w:200,h:60,
+ config:{'Por que ele não tem seta':'Porque ele não é um PASSO do fluxo. Quem reporta nele é qualquer peça do pipeline: a geração de embedding, o índice vetorial, o classificador, a mesa, o gravador do aviso no Chat. Desenhar uma seta saindo de um nó só diria "apenas este reporta", que é falso — e desenhar uma seta de cada peça viraria um novelo por cima do grafo. Ele fica ao lado, como o log: presente em toda a execução, não em um ponto dela.','A régua':'Degradação silenciosa é FALHA. Um agente que responde com menos material não erra visivelmente: erra com APARÊNCIA de resultado, e é isso que envenena a calibragem.','O caso que motivou':'O harness lia a chave de embeddings errada, tomou 401 em série, gerou 0 vetores e o time julgou 12 projetos SEM UM ÚNICO VIZINHO — dando 0★ a projetos de 4★ e 2★. E o relatório saiu COMPLETO, acusando "achatamento suspeito, revisar a régua": uma integração caída se apresentando como defeito de régua.','As classes':['embedding_indisponivel','rag_sem_vizinho','indice_indisponivel','formato_invalido','teto_ferramentas','dossie_sem_financeiro','sem_nota_avaliada','idempotencia_indeterminada','tarefa_cancelada'],'Cada uma tem SINTOMA escrito':'O que se veria se ela passasse calada. É o campo que evita rediagnosticar do zero em plantão.','Onde chega':'Grava em falha_agente e alerta no Chat do watchdog, com cooldown por CLASSE (nunca por projeto: um backfill de 750 mandaria 750 mensagens idênticas).','Painel':'GET /api/admin/agentes-saude responde "falharam, e de que jeito?" sem depender do log da plataforma, que ninguém lê e que expira.'}});
+
+rot('anexos','dossie','',{fina:true});
+rot('licoes','dossie','',{fina:true});
+rot('dossie','orq','o dossiê');
+ESP.forEach((e,i)=>rot('orq',e[0], i===0?'time do IMPACTO':''));
+rot('vizinhos','estrela','vizinhos');
+// ⚠️ faixa por aresta DENTRO do vão vazio (760-815), nunca no vão inteiro: a coluna de
+// ferramentas ocupa 820-1035 e as verticais passavam por dentro dela.
+ESP.forEach((e,i)=>rot(e[0],'consolida','',{faixa:i,faixas:ESP.length,faixaAte:815}));
+rot('junta','consenso','');
+rot('junta','piso','materialidade + nota');
+rot('piso','consenso','reprova?',{cor:'bad'});
+rot('consolida','cetico','mérito');
+rot('cetico','replica','refuta',{cor:'warn'});
+rot('replica','orq','o orquestrador redispara os 5',{cor:'warn',volta:true,saidaX:1330,voltaY:680,corredor:262});
+rot('cetico','junta','análise do impacto');
+rot('revisor','volta','refuta',{cor:'warn'});
+rot('volta','estrela','responder',{cor:'warn',volta:true,voltaY:1262,corredor:250});
+rot('revisor','junta','análise da nota');
+rot('consenso','aprovar','');rot('consenso','reprovar','');rot('consenso','humano','');
+rot('consenso','textos','',{fina:true});
+rot('consenso','chat','',{fina:true});
+
+/* ── VISTA: AUDITORIA EM LOTE ────────────────────────────────────────────── */
+const av=(id,o)=>{no(id,Object.assign({vista:'prod'},o))};
+const LENTES=[
+ ['lFun','Função na cadeia','Quanto da cadeia informação → ação → consequência o projeto assume: Experimenta, Informa, Executa, Garante, Decide, Assume.','apenas_mensuravel, simples_local'],
+ ['lRec','Recorrência e rastro','Acontece de novo, deixa rastro conferível e existe contrafactual. Um dependente NOMEADO é o lugar de conferir.','fora_de_uso, experimentacao, ressubmissao'],
+ ['lAlc','Alcance e reuso','Quantos usam de fato, de fora do autor. Uso declarado não conta, uso nomeado conta.','so_o_autor, marginal'],
+ ['lCom','Complexidade e autonomia','A escada automação, inteligência, autonomia. Quem inicia, quem decide, quem responde pelo erro.','nenhum próprio'],
+];
+LENTES.forEach(([id,t,ve,piso],i)=>av(id,{titulo:t,tipo:'luna',sub:'lente '+(i+1)+' de 4',estado:'codigo',x:560,y:900+i*94,w:200,h:56,
+ config:{'Modelo':'gpt-5.6-luna, esforço baixo opcional.','Responde':'SÓ o eixo dela, com nota de 0 a 5. '+ve,'Saída':['nota 0 a 5','evidência: nomeada, vaga ou ausente','sustentação citada do dossiê','piso, quando for o caso'],'Piso que ESTA lente pode nomear':piso,'Regra que não pode regredir':'Cada lente só nomeia os itens de piso do PRÓPRIO eixo. Com a lista inteira, "apenas_mensuravel" disparou em 4 de 5 num relatório diário comum.','Âncoras':'Recebe as âncoras DO EIXO dela, nunca a régua global. A régua global é conjuntiva e descreve o projeto inteiro: com ela, NENHUMA lente passava de 2 (0% de 3★ ou mais em 48 especiais, contra 41,7% da triagem).','A 5ª lente foi CORTADA':'"Risco evitado" saiu em 04/09 e não deve voltar sem medição: foi a maior em 12 de 177 casos, deu 0 em 104 de 177, e simular o painel sem ela mudaria UMA nota na base inteira. O eixo continua na régua.','⚠️ Estado':'Hoje esta lente roda SÓ na auditoria em lote, não no fluxo de um projeto que chega. Neste desenho ela é parte do time da estrela, que é onde deveria estar.','Código':'src/lib/avaliacao/especiais-lentes.ts'}}));
+av('audConsolida',{titulo:'Consolidação da nota',tipo:'code',sub:'sem média, 1 degrau',estado:'codigo',x:1090,y:1020,w:200,h:64,
+ config:{'Regra':['A lente estrutural (recorrência e rastro) é TETO das outras','Um piso nomeado por qualquer lente zera o conjunto','O resto é disjuntivo: a nota vem de UM eixo que se sustenta'],'Por que não é média':'Média comprime tudo para o meio. Quatro notas medianas viram uma nota mediana, e o projeto que se destaca em um eixo só desaparece junto com o que não se destaca em nenhum.','Como a nota sai daqui':'A nota da BASE (o cérebro) ajustada em no MÁXIMO UM DEGRAU, na direção que as lentes apontam.','Por que ajustar e não decidir':'Com o painel decidindo sozinho, um mesmo projeto saiu 2, 5, 3, 7, 8 e 3 em SEIS chamadas idênticas. Cinco chamadas de LLM não são cinco medidas do mesmo número, e consolidar por mínimo e máximo AMPLIFICA a variação. Com base mais ajuste de um degrau: 8, 8, 8.','As lentes SÓ SOBEM':'Para baixo existe só o piso, que exige citação do dossiê. A base lê o dossiê INTEIRO e diz em que CAIXA o projeto está; a lente lê UM eixo, e a régua é disjuntiva, então lente baixa não desmente a caixa.'}});
+rot('orq','estrela','time da ESTRELA');
+LENTES.forEach((l,i)=>rot('estrela',l[0], i===0?'gerencia as 4':''));
+LENTES.forEach(l=>rot(l[0],'audConsolida',''));
+rot('estrela','audConsolida','a nota base',{porBaixo:{laneOut:530,y:1069,laneIn:1062}});
+rot('audConsolida','revisor','a nota');
+
+// ─── ferramentas: folhas à direita do agente ────────────────────────────────
+Object.keys(N).slice().forEach(id=>{const a=N[id]; (a.tools||[]).forEach((tn,k)=>{
+ const tid=id+'/'+tn; const ab=a.toolAbaixo===true;
+ N[tid]={id:tid,vista:a.vista,titulo:tn,tipo:'tool',x:ab?a.x+4:a.x+260,y:ab?a.y+a.h+16+k*32:a.y-2+k*32,w:215,h:28,pai:id,
+  config:{'Devolve':TOOLS[tn].devolve,'De onde lê':TOOLS[tn].le,'Parâmetros':TOOLS[tn].params,'Protocolo':'O agente pede a ferramenta em JSON, o servidor executa e devolve o resultado no turno seguinte. Erro vira {"erro":...} e o loop segue. Teto de 2 chamadas por agente.'}};
+ E.push({de:id,para:tid,fina:true,curta:true,...(ab?{espinha:a.x-14}:{})});});});
+
+// ─── render ─────────────────────────────────────────────────────────────────
+const NS='http://www.w3.org/2000/svg';
+const mapa=document.getElementById('mapa'), painel=document.getElementById('painel');
+const svg=document.createElementNS(NS,'svg');svg.setAttribute('role','img');
+svg.innerHTML='<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ink-2)"/></marker></defs>';
+const g=document.createElementNS(NS,'g');svg.appendChild(g);mapa.appendChild(svg);
+const FILL={luna:'var(--lime-bg)',sol:'var(--blue-bg)',code:'var(--code-bg)',tool:'var(--card)',ok:'var(--card)',warn:'var(--card)',bad:'var(--card)'};
+const STROKE={luna:'var(--lime-ink)',sol:'var(--blue)',code:'var(--line)',tool:'var(--ink-2)',ok:'var(--ok)',warn:'var(--warn)',bad:'var(--bad)'};
+const cy=n=>n.y+n.h/2;
+let vista='prod', vb, els={}, arestas=[];
+
+/** Rota ORTOGONAL pelo corredor entre as colunas. Nunca corta caixa. */
+function rota(a,b,e){
+  const ay=cy(a), by=cy(b);
+  if(e.espinha!=null){
+    // FOLHA EMPILHADA ABAIXO do agente: desce por uma espinha à ESQUERDA das folhas e
+    // entra pela lateral de cada uma. ⚠️ Descer pelo centro do agente ATRAVESSAVA a folha
+    // de cima para chegar na de baixo (medido: estrela → buscar_duplicata).
+    return {d:`M${a.x} ${ay}L${e.espinha} ${ay}L${e.espinha} ${by}L${b.x} ${by}`,
+            lx:e.espinha, ly:(ay+by)/2};
+  }
+  if(e.porBaixo){
+    // Destino à direita com CAIXAS NO CAMINHO: sai pela direita, anda até uma faixa livre
+    // (laneOut), procura um corredor HORIZONTAL vazio (y), atravessa e sobe/desce na faixa
+    // de entrada (laneIn). É o que tira a seta de cima do bloco em vez de escondê-la.
+    const {laneOut:lo,y:yc,laneIn:li}=e.porBaixo;
+    return {d:`M${a.x+a.w} ${ay}L${lo} ${ay}L${lo} ${yc}L${li} ${yc}L${li} ${by}L${b.x} ${by}`,
+            lx:lo+(li-lo)*0.7, ly:yc-6};
+  }
+  if(e.volta){
+    // Aresta de RETORNO: desce até um corredor livre, volta pela ESQUERDA do destino e entra
+    // pela lateral dele. ⚠️ Não pode atravessar por baixo em linha reta: no time da estrela isso
+    // cortava as lentes ao meio, que foi a queixa do "seta por cima da outra".
+    const yb=(e.voltaY!=null?e.voltaY:Math.max(a.y+a.h,b.y+b.h)+34);
+    const cx2=(e.corredor!=null?e.corredor:b.x-22);
+    if(e.saidaX!=null){
+      // ⚠️ Descer pelo CENTRO do nó só serve quando não há ninguém embaixo dele. A réplica
+      // tem o cético logo abaixo, e a volta passava por dentro dele: aqui ela sai pela
+      // LATERAL, desce por fora da coluna e só então corta para a esquerda.
+      return {d:`M${a.x} ${ay}L${e.saidaX} ${ay}L${e.saidaX} ${yb}L${cx2} ${yb}L${cx2} ${cy(b)}L${b.x} ${cy(b)}`,
+              lx:(e.saidaX+cx2)/2, ly:yb};
+    }
+    return {d:`M${a.x+a.w/2} ${a.y+a.h}L${a.x+a.w/2} ${yb}L${cx2} ${yb}L${cx2} ${cy(b)}L${b.x} ${cy(b)}`,
+            lx:(a.x+a.w/2+cx2)/2, ly:yb};
+  }
+  if(b.x>=a.x+a.w){
+    // Destino à direita: a aresta anda até um CORREDOR VERTICAL no vão entre as duas colunas.
+    // ⚠️ Cada aresta que sai do MESMO nó ganha uma faixa própria dentro desse vão (e.faixa de
+    // e.faixas). Sem isso, as 5 arestas do orquestrador empilhavam na mesma vertical e viravam um
+    // traço grosso só — era o que a barra cinza escondia, e a barra poluía mais que resolvia.
+    // ⚠️ A faixa pode ter de terminar ANTES do destino: entre os especialistas e a
+    // consolidação mora a coluna de FERRAMENTAS, e faixa espalhada pelo vão inteiro
+    // subia dentro delas. Com `faixaAte`, as 5 verticais ficam no vão vazio de 760-815
+    // e só o trecho horizontal final cruza a coluna, na altura livre da consolidação.
+    const limite=(e.faixaAte!=null?e.faixaAte:b.x);
+    const vao=limite-(a.x+a.w);
+    const k=(e.faixa??0)+1, tot=(e.faixas??1)+1;
+    const cor=a.x+a.w+vao*(k/tot);
+    if(Math.abs(ay-by)<3) return {d:`M${a.x+a.w} ${ay}L${b.x} ${by}`, lx:cor, ly:ay};
+    return {d:`M${a.x+a.w} ${ay}L${cor} ${ay}L${cor} ${by}L${b.x} ${by}`, lx:cor, ly:(ay+by)/2};
+  }
+  // mesma coluna: liga verticalmente pelo centro
+  const dir=by>ay?1:-1;
+  return {d:`M${a.x+a.w/2} ${dir>0?a.y+a.h:a.y}L${b.x+b.w/2} ${dir>0?b.y:b.y+b.h}`, lx:a.x+a.w/2, ly:(ay+by)/2};
+}
+/** As duas caixas de TIME, desenhadas ATRÁS de tudo. É o que faz "dois times" ser visível. */
+const TIMES=[
+ {id:'tImpacto',titulo:'TIME DO IMPACTO',sub:'este projeto se sustenta?',x:520,y:16,w:1040,h:596,cor:'var(--lime-ink)'},
+ {id:'tEstrela',titulo:'TIME DA ESTRELA',sub:'o cérebro gerencia as 4 lentes · quanto ele vale?',x:262,y:868,w:1298,h:420,cor:'var(--blue)'},
+];
+function desenhar(){
+  g.innerHTML=''; els={}; arestas=[];
+  const vis=id=>N[id]&&N[id].vista===vista;
+  for(const t of TIMES){
+    const r=document.createElementNS(NS,'rect');r.setAttribute('x',t.x);r.setAttribute('y',t.y);r.setAttribute('width',t.w);r.setAttribute('height',t.h);
+    r.setAttribute('rx',14);r.setAttribute('fill','none');r.setAttribute('stroke',t.cor);r.setAttribute('stroke-width','1.4');r.setAttribute('stroke-dasharray','7 6');r.setAttribute('opacity','.55');g.appendChild(r);
+    const l=document.createElementNS(NS,'text');l.setAttribute('x',t.x+16);l.setAttribute('y',t.y+22);l.setAttribute('font-size','12');l.setAttribute('font-weight','600');
+    l.setAttribute('letter-spacing','.08em');l.style.fill=t.cor;l.textContent=t.titulo;g.appendChild(l);
+    const l2=document.createElementNS(NS,'text');l2.setAttribute('x',t.x+16+t.titulo.length*7.6+12);l2.setAttribute('y',t.y+22);l2.setAttribute('font-size','11.5');l2.style.fill='var(--ink-2)';l2.textContent=t.sub;g.appendChild(l2);
+  }
+  // Faixas: agrupa por nó de origem as arestas que vão para a direita, e ordena por y do destino
+  // para as linhas saírem em leque, sem se cruzarem entre si.
+  const porOrigem={};
+  for(const e of E){ if(!vis(e.de)||!vis(e.para)) continue; if(e.volta) continue;
+    const a=N[e.de],b=N[e.para]; if(b.x<a.x+a.w) continue;
+    (porOrigem[e.de]=porOrigem[e.de]||[]).push(e); }
+  for(const lista of Object.values(porOrigem)){
+    lista.sort((p,q)=>cy(N[p.para])-cy(N[q.para]));
+    lista.forEach((e,i)=>{e.faixa=i;e.faixas=lista.length;}); }
+  const postos=[]; // retângulos de rótulo já colocados (guarda de colisão)
+  for(const e of E){ if(!vis(e.de)||!vis(e.para)) continue; const a=N[e.de],b=N[e.para];
+    const r=rota(a,b,e);
+    const p=document.createElementNS(NS,'path');p.setAttribute('d',r.d);
+    p.setAttribute('class','aresta'+(e.fina?' fina':''));p.setAttribute('marker-end','url(#ar)');
+    if(e.cor)p.style.stroke='var(--'+e.cor+')';
+    p.dataset.de=e.de;p.dataset.para=e.para;g.appendChild(p);arestas.push(p);
+    if(e.txt){
+      // ⚠️ GUARDA DE COLISÃO. Duas arestas que saem do mesmo nó para destinos de y parecido
+      // colocavam o rótulo praticamente no mesmo ponto, e um tapava o outro: foi assim que
+      // "nota + racional" apareceu como "…onal" atrás de "a nota base". Aqui o rótulo desce (ou
+      // sobe) em passos de 17px até achar espaço livre.
+      const w=e.txt.length*5.6+10; let ly=r.ly;
+      for(let t=0;t<8;t++){ const cand={x:r.lx-w/2,y:ly-8,w,h:17};
+        if(!postos.some(q=>cand.x<q.x+q.w&&q.x<cand.x+cand.w&&cand.y<q.y+q.h&&q.y<cand.y+cand.h)) break;
+        ly+= (t%2===0? 1: -1) * 17 * Math.ceil((t+1)/2); }
+      postos.push({x:r.lx-w/2,y:ly-8,w,h:17});
+      const gr=document.createElementNS(NS,'g');gr.setAttribute('class','rot');
+      const bg=document.createElementNS(NS,'rect');
+      bg.setAttribute('x',r.lx-w/2);bg.setAttribute('y',ly-8);bg.setAttribute('width',w);bg.setAttribute('height',17);bg.setAttribute('rx',4);
+      const t=document.createElementNS(NS,'text');t.setAttribute('x',r.lx);t.setAttribute('y',ly+3.5);t.setAttribute('text-anchor','middle');t.textContent=e.txt;if(e.cor)t.style.fill='var(--'+e.cor+')';
+      gr.appendChild(bg);gr.appendChild(t);g.appendChild(gr);} }
+  for(const n of Object.values(N)){ if(n.vista!==vista) continue;
+    
+    const gn=document.createElementNS(NS,'g');gn.setAttribute('class','no');gn.setAttribute('tabindex','0');gn.setAttribute('role','button');
+    gn.setAttribute('aria-label',n.titulo);
+    // ⚠️ A cor do nó é a do MODELO que roda nele (luna, sol ou código), nunca o estado de deploy.
+    // O estado vive no SELO do painel: pintar o nó por ele fazia uma lente luna aparecer roxa e
+    // sumia com a informação que importa no desenho, que é quem pensa ali.
+    const r=document.createElementNS(NS,'rect');r.setAttribute('class','corpo');r.setAttribute('x',n.x);r.setAttribute('y',n.y);r.setAttribute('width',n.w);r.setAttribute('height',n.h);
+    r.setAttribute('rx',['ok','warn','bad'].includes(n.tipo)?21:6);r.setAttribute('fill',FILL[n.tipo]);r.setAttribute('stroke',STROKE[n.tipo]);
+    if(n.tipo==='tool')r.setAttribute('stroke-dasharray','3 3');if(n.destaque)r.setAttribute('stroke-width','2.2');gn.appendChild(r);
+    if(n.destaque){const b=document.createElementNS(NS,'rect');b.setAttribute('x',n.x);b.setAttribute('y',n.y);b.setAttribute('width',6);b.setAttribute('height',n.h);b.setAttribute('rx',3);b.setAttribute('fill','var(--lime)');gn.appendChild(b);}
+    const t=document.createElementNS(NS,'text');t.setAttribute('x',n.x+n.w/2);t.setAttribute('y',n.sub?n.y+22:cy(n)+4);t.setAttribute('text-anchor','middle');
+    t.setAttribute('font-size',n.tipo==='tool'?'11':'13');t.setAttribute('font-weight',n.tipo==='tool'?'400':'600');
+    if(n.tipo==='tool')t.setAttribute('font-family','IBM Plex Mono, monospace');
+    if(['ok','warn','bad'].includes(n.tipo))t.style.fill='var(--'+n.tipo+')';t.textContent=n.titulo;gn.appendChild(t);
+    if(n.sub){const s=document.createElementNS(NS,'text');s.setAttribute('class','subt');s.setAttribute('x',n.x+n.w/2);s.setAttribute('y',n.y+39);s.setAttribute('text-anchor','middle');s.textContent=n.sub;gn.appendChild(s);}
+    gn.dataset.id=n.id;gn.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selecionar(n.id);}});
+    g.appendChild(gn);els[n.id]=gn; }
+}
+function caixa(){ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for(const n of Object.values(N)){ if(n.vista!==vista) continue; x0=Math.min(x0,n.x);y0=Math.min(y0,n.y);x1=Math.max(x1,n.x+n.w);y1=Math.max(y1,n.y+n.h); }
+  return {x:x0-50,y:y0-50,w:x1-x0+100,h:y1-y0+110}; }
+function aplicar(){svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);}
+function ajustar(){const c=caixa();const r=svg.getBoundingClientRect();const ratio=(r.height||600)/(r.width||1000);
+  let w=c.w,h=w*ratio;if(h<c.h){h=c.h;w=h/ratio;} vb={x:c.x-(w-c.w)/2,y:c.y-(h-c.h)/2,w,h};aplicar();}
+function zoom(f,px,py){const r=svg.getBoundingClientRect();const mx=vb.x+(px??r.width/2)/r.width*vb.w,my=vb.y+(py??r.height/2)/r.height*vb.h;
+  const nw=Math.min(9000,Math.max(300,vb.w*f)),nh=nw*(vb.h/vb.w);vb={x:mx-(mx-vb.x)*(nw/vb.w),y:my-(my-vb.y)*(nh/vb.h),w:nw,h:nh};aplicar();}
+mapa.addEventListener('wheel',ev=>{ev.preventDefault();const r=svg.getBoundingClientRect();zoom(ev.deltaY>0?1.12:0.89,ev.clientX-r.left,ev.clientY-r.top);},{passive:false});
+let drag=null;
+mapa.addEventListener('pointerdown',ev=>{const alvo=ev.target.closest?ev.target.closest('.no'):null;drag={x:ev.clientX,y:ev.clientY,vx:vb.x,vy:vb.y,moveu:false,alvo:alvo?alvo.dataset.id:null};mapa.setPointerCapture(ev.pointerId);});
+mapa.addEventListener('pointermove',ev=>{if(!drag)return;if(Math.abs(ev.clientX-drag.x)+Math.abs(ev.clientY-drag.y)>4){drag.moveu=true;mapa.classList.add('arrastando');}if(!drag.moveu)return;
+  const r=svg.getBoundingClientRect();vb.x=drag.vx-(ev.clientX-drag.x)*vb.w/r.width;vb.y=drag.vy-(ev.clientY-drag.y)*vb.h/r.height;aplicar();});
+mapa.addEventListener('pointerup',()=>{if(!drag)return;const d=drag;drag=null;mapa.classList.remove('arrastando');if(d.moveu)return;d.alvo?selecionar(d.alvo):limpar();});
+mapa.addEventListener('pointercancel',()=>{drag=null;mapa.classList.remove('arrastando');});
+document.getElementById('z-mais').onclick=()=>zoom(.8);
+document.getElementById('z-menos').onclick=()=>zoom(1.25);
+document.getElementById('z-reset').onclick=ajustar;
+window.addEventListener('resize',ajustar);
+const FOCO={
+  tudo:null,
+  impacto:{x:480,y:0,w:1120,h:640},
+  estrela:{x:232,y:850,w:1370,h:456},
+};
+function focar(r){ if(!r){ajustar();return;} const el=svg.getBoundingClientRect();const ratio=(el.height||600)/(el.width||1000);
+  let w=r.w,h=w*ratio; if(h<r.h){h=r.h;w=h/ratio;} vb={x:r.x-(w-r.w)/2,y:r.y-(h-r.h)/2,w,h}; aplicar(); }
+function marcar(id){ for(const [b,k] of [['v-prod','tudo'],['v-aud','impacto'],['v-est','estrela']])
+  document.getElementById(b).setAttribute('aria-pressed',String(k===id)); }
+document.getElementById('v-prod').onclick=()=>{marcar('tudo');focar(FOCO.tudo);};
+document.getElementById('v-aud').onclick=()=>{marcar('impacto');focar(FOCO.impacto);};
+document.getElementById('v-est').onclick=()=>{marcar('estrela');focar(FOCO.estrela);};
+function trocar(v){vista=v;
+  svg.setAttribute('aria-label','Um orquestrador e dois times. Time do impacto: 5 especialistas em paralelo, com ferramentas, consolidação por quórum e um cético que pode abrir uma réplica. Time da estrela: cérebro da estrela e 4 lentes, consolidação sem média, ajuste de um degrau e um revisor que ataca a altura da nota. As duas análises entram na junta, que produz uma análise só, e o consenso escolhe entre aprovar, reprovar e humano.');
+  desenhar();ajustar();limpar();}
+
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[c]);
+const ROT={luna:'gpt-5.6-luna',sol:'gpt-5.6-sol',code:'código',tool:'ferramenta',ok:'saída',warn:'saída',bad:'saída'};
+const EST={prod:'em prod',staging:'em staging',codigo:'só no código'};
+function selecionar(id){const n=N[id];if(!n)return;
+  Object.values(els).forEach(el=>el.classList.remove('sel'));els[id]&&els[id].classList.add('sel');
+  arestas.forEach(p=>p.classList.toggle('sel',p.dataset.de===id||p.dataset.para===id));
+  const tt=['ok','warn','bad'].includes(n.tipo)?'code':n.tipo;
+  let h=`<h2><span>${esc(n.titulo)}</span> <span style="display:flex;gap:5px">${n.tipo!=='tool'?`<span class="tag t-${tt}">${ROT[n.tipo]}</span>`:'<span class="tag t-tool">ferramenta</span>'}${n.estado?`<span class="est e-${n.estado}">${EST[n.estado]}</span>`:''}</span></h2>`;
+  if(n.pai)h+=`<p class="dica">Ferramenta usada por ${esc(N[n.pai].titulo)}. <button class="chips" style="display:inline" onclick="selecionar('${n.pai}')">voltar ao agente</button></p>`;
+  for(const [k,v] of Object.entries(n.config||{})){h+=`<h3>${esc(k)}</h3>`;h+=Array.isArray(v)?`<ul>${v.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<p>${esc(v)}</p>`;}
+  if(n.tools)h+=`<h3>Ferramentas mais usadas</h3><div class="chips">${n.tools.map(t=>`<button onclick="selecionar('${n.id}/${t}')">${t}</button>`).join('')}</div><p class="dica" style="margin-top:6px">Todas as 7 do catálogo estão permitidas; estas são as que este papel aciona na prática.</p>`;
+  painel.innerHTML=h;}
+window.selecionar=selecionar;
+const INTRO_PROD=`<h2><span>Um orquestrador, dois times</span> <span class="est e-codigo">desenho-alvo</span></h2>
+<p>O projeto entra como <b>dossiê</b>, e o orquestrador o manda <b>inteiro e igual</b> para os dois times. Eles respondem perguntas diferentes, e nenhuma das duas é dispensável: <b>todo projeto passa pelo time completo</b>.</p>
+<ul>
+<li><b>Time do impacto</b> — 5 especialistas: horas, financeiro, precedente, evidência e categoria do ganho. Pergunta: <i>este projeto se sustenta?</i></li>
+<li><b>Time da estrela</b> — o orquestrador manda para o <b>cérebro da estrela</b>, e é ELE que gerencia as 4 lentes. Pergunta: <i>quanto ele vale?</i></li>
+</ul>
+<p>A <b>junta</b> funde as duas conclusões em uma análise só, e o <b>consenso</b> escolhe entre três saídas.</p>
+<h3>Por que o cérebro gerencia as lentes</h3><p>Porque as lentes só fazem sentido <b>em relação à nota dele</b>: elas movem a base em um degrau, não decidem sozinhas. Penduradas no orquestrador, eram 10 setas saindo de um nó só — e a hierarquia real ficava invisível. Agora o orquestrador tem 6 saídas e cada uma tem <b>faixa própria</b> no vão entre as colunas.</p>
+
+<h3>⚠️ O que ainda não é assim</h3>
+<ul>
+<li>As <b>4 lentes rodam só na auditoria em lote</b>, não no fluxo de um projeto que chega. Neste desenho elas são o time da estrela, como deveriam ser.</li>
+<li>A <b>junta não existe como peça</b>: hoje o consenso concilia os dois por dentro, sem um lugar próprio onde a fusão tenha regra.</li>
+<li>O <b>ajuste ao autor</b> saiu das saídas por decisão, mas o código ainda o produz.</li>
+</ul>
+<p class="dica">Clicar no nó mostra o selo: <b>em prod</b>, <b>em staging</b> ou <b>só no código</b>. A cor da caixa diz outra coisa — qual modelo pensa ali.</p>
+
+<h3>As duas idas e voltas, e só existem duas</h3>
+<ul>
+<li><b>Réplica do impacto</b> — o cético refuta uma aprovação e os <b>5 especialistas rodam de novo</b>, com os argumentos da rodada 1 e o motivo dele no prompt. A seta volta para a <b>barra</b> porque quem repete são os agentes, não a consolidação. Teto de 2 rodadas.</li>
+<li><b>Convergência da estrela</b> — o revisor refuta a ALTURA da nota e o cérebro roda de novo, uma volta só, podendo <b>manter</b> a nota se citar a evidência que derruba a objeção.</li>
+</ul>
+<p class="dica">As voltas descem até um corredor livre e retornam pela esquerda, e nenhuma aresta corta uma caixa. O <b>catálogo de falhas</b> e o <b>log</b> ficam ao lado, sem seta: não são passos do fluxo, são presentes em toda a execução.</p>
+
+<h3>O piso de impacto é a exceção</h3><p>Ele não é agente e não pertence a nenhum dos times: é <b>régua mecânica</b> pendurada na junta, porque precisa dos DOIS lados (a materialidade, que vem do impacto, e a nota, que vem da estrela). Quando dispara, <b>sobrepõe o painel de LLM inteiro</b>.</p>
+
+<h3>As três coisas que este pipeline aprendeu do jeito difícil</h3>
+<ul>
+<li><b>Prompt não segura.</b> As calibrações que valeram foram estruturais, não redações melhores.</li>
+<li><b>Cinco chamadas de LLM não são cinco medidas do mesmo número.</b> Um mesmo projeto saiu 2, 5, 3, 7, 8 e 3 em seis chamadas idênticas.</li>
+<li><b>Degradação silenciosa é o erro mais caro.</b> Uma chave de embedding errada fez o time julgar 12 projetos sem nenhum vizinho, e o relatório saiu inteiro culpando a régua.</li>
+</ul>
+
+<h3>A régua de estrelas</h3><p>Princípio ordenador: quanto da cadeia <b>informação → ação → consequência</b> o projeto assume. Não é tamanho, não é sofisticação, não é quanto dinheiro move.</p>
+<ul><li><b>0 · Experimenta</b> — só o autor usa, é simples e local, ou está parado.</li><li><b>1 · Informa</b> — produz o insumo, não a ação.</li><li><b>2 · Executa</b> — assume a ação recorrente sem ninguém iniciar. Não escolhe, faz.</li><li><b>3 · Garante</b> — impede o erro de passar; a consequência evitada é de outra área.</li><li><b>4 · Decide</b> — assume escolha que compromete recurso.</li><li><b>5 · Assume</b> — está no caminho até o cliente, o fornecedor ou o fisco, sem humano entre a falha e o prejuízo.</li></ul>
+<p class="dica">Promoção de +1 (teto 5): outro processo depende dele como fonte, com o dependente <b>nomeado</b>. De 6 a 10 o agente declara a <b>faixa</b>, sem número: quem crava é o comitê.</p>
+
+<h3>Custo e escala, medidos</h3><p>Uma passada leva <b>~3 min 46 s</b> e são ~8 chamadas de LLM. Com as 4 lentes entrando no fluxo, sobe para ~12. Cabe num request (o edge corta em ~7 min), e por isso o lote é de <b>1 projeto por requisição</b>.</p>`;
+function limpar(){Object.values(els).forEach(el=>el.classList.remove('sel'));arestas.forEach(p=>p.classList.remove('sel'));painel.innerHTML=INTRO_PROD;}
+trocar('prod');
+</script>
+</body>
+</html>
