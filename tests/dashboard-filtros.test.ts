@@ -20,6 +20,7 @@ import {
   rotuloFaixaEstrelas,
   totalSemStatus,
   type FiltrosDashboard,
+  casaAgente,
 } from '@/lib/dashboard-filtros';
 import { ROTULO_ESTADO_PARECER, chaveDoEstado } from '@/lib/aprovacoes-parecer';
 import {
@@ -573,3 +574,38 @@ describe('descontinuados fora da fila (só na pílula própria)', () => {
     expect(contarPorPilula(base, FILTROS_VAZIOS).descontinuado).toBe(1);
   });
 })
+
+describe('filtro "o agente já rodou?" (08/09/2026) — a dimensão que faz o LOTE valer', () => {
+  it('separa quem tem nota do agente de quem não tem', () => {
+    const com = proj({ id: 'A', estrelaAgente: '3' });
+    const faixa = proj({ id: 'B', estrelaAgente: '6-10' });
+    const sem = proj({ id: 'C', estrelaAgente: null });
+    const traco = proj({ id: 'D', estrelaAgente: '—' });
+    expect(casaAgente(com, 'com')).toBe(true);
+    expect(casaAgente(faixa, 'com')).toBe(true);
+    // ⚠️ O travessão é o placeholder de "nunca rodou" (nunca célula vazia) — conta como SEM.
+    expect(casaAgente(traco, 'com')).toBe(false);
+    expect(casaAgente(sem, 'sem')).toBe(true);
+    expect(casaAgente(traco, 'sem')).toBe(true);
+    expect(casaAgente(com, 'sem')).toBe(false);
+    // 'todos' não recorta nada
+    for (const p of [com, faixa, sem, traco]) expect(casaAgente(p, 'todos')).toBe(true);
+  });
+
+  it('SOMA (AND) com as outras dimensões e entra na conta de "Limpar filtros"', () => {
+    const base = [
+      proj({ id: 'A', estrelaAgente: null, statusChave: 'reprovado' }),
+      proj({ id: 'B', estrelaAgente: '2', statusChave: 'reprovado' }),
+      proj({ id: 'C', estrelaAgente: null, statusChave: 'aprovado' }),
+    ];
+    const f = { ...FILTROS_VAZIOS, agente: 'sem' as const, status: 'reprovado' };
+    expect(aplicarFiltros(base, f).map((p) => p.id)).toEqual(['A']);
+    expect(contarFiltrosAtivos(f)).toBe(1);
+  });
+
+  it('entra em casaFiltrosExceto — a contagem do próprio campo ignora a própria dimensão', () => {
+    const p = proj({ id: 'A', estrelaAgente: '3' });
+    expect(casaFiltrosExceto(p, { ...FILTROS_VAZIOS, agente: 'sem' }, 'agente')).toBe(true);
+    expect(casaFiltrosExceto(p, { ...FILTROS_VAZIOS, agente: 'sem' }, 'status')).toBe(false);
+  });
+});

@@ -28,6 +28,19 @@ export type FiltroEspecial = "todos" | "apenas" | "sem";
  */
 export type FiltroGanho = "todos" | "saving" | "receita";
 
+/**
+ * Recorte por "o agente já passou aqui?" — a dimensão que faltava para rodar o time em LOTE
+ * sobre quem precisa (pedido do Luis, 08/09/2026: *"tem muitos projetos sem análise do agente e
+ * com campos em branco, gostaria de rodar só pros que eu selecionasse, pros que não rodaram
+ * agente…"*).
+ *
+ * ⚠️ A régua é a **nota do agente na planilha** (`estrelaAgente`), não o veredito da mesa: ela é
+ * a única das duas metades que vive no resumo do espelho, então filtrar por ela **não custa
+ * leitura nova** (a régua do gotcha 9: filtro que exigisse coluna fora de `COLUNAS_RESUMO` não
+ * entra). E ela responde a pergunta certa: se há nota, o time rodou ali.
+ */
+export type FiltroAgente = "todos" | "sem" | "com";
+
 export const TODAS_AS_AREAS = "todas";
 export const TODOS_OS_PARECERES = "todos";
 
@@ -68,12 +81,15 @@ export type FiltrosDashboard = {
    * (`apenasAutoresComMultiplos`), fora de `aplicarFiltros`. Some (AND) com os demais.
    */
   soMultiplos: boolean;
+  /** "O agente já rodou neste projeto?" — ver `FiltroAgente`. */
+  agente: FiltroAgente;
 };
 
 export const FILTROS_VAZIOS: FiltrosDashboard = {
   status: "todos",
   especial: "todos",
   ganho: "todos",
+  agente: "todos",
   area: TODAS_AS_AREAS,
   parecer: TODOS_OS_PARECERES,
   periodo: null,
@@ -181,6 +197,13 @@ export function casaStatus(p: ProjetoDashboardResumo, status: string): boolean {
 /**
  * Dimensões do recorte — o vocabulário que `casaFiltrosExceto` entende.
  */
+/** O agente rodou neste projeto? A prova é a nota dele na planilha. PURA. */
+export function casaAgente(p: ProjetoDashboardResumo, f: FiltroAgente): boolean {
+  if (f === "todos") return true;
+  const rodou = (p.estrelaAgente ?? "").trim() !== "" && (p.estrelaAgente ?? "").trim() !== "—";
+  return f === "com" ? rodou : !rodou;
+}
+
 export type DimensaoFiltro =
   | "status"
   | "especial"
@@ -188,7 +211,8 @@ export type DimensaoFiltro =
   | "area"
   | "parecer"
   | "periodo"
-  | "estrelas";
+  | "estrelas"
+  | "agente";
 
 /**
  * O projeto passa por TODAS as dimensões, menos uma.
@@ -210,7 +234,8 @@ export function casaFiltrosExceto(
     (exceto === "area" || casaArea(p, f.area)) &&
     (exceto === "parecer" || casaParecer(p, f.parecer)) &&
     (exceto === "periodo" || casaPeriodo(p, f.periodo)) &&
-    (exceto === "estrelas" || casaEstrelas(p, f.estrelasMin, f.estrelasMax))
+    (exceto === "estrelas" || casaEstrelas(p, f.estrelasMin, f.estrelasMax)) &&
+    (exceto === "agente" || casaAgente(p, f.agente))
   );
 }
 
@@ -227,7 +252,8 @@ export function aplicarFiltros(
       casaArea(p, f.area) &&
       casaParecer(p, f.parecer) &&
       casaPeriodo(p, f.periodo) &&
-      casaEstrelas(p, f.estrelasMin, f.estrelasMax),
+      casaEstrelas(p, f.estrelasMin, f.estrelasMax) &&
+      casaAgente(p, f.agente),
   );
 }
 
@@ -244,7 +270,8 @@ export function contarFiltrosAtivos(f: FiltrosDashboard): number {
     (f.periodo ? 1 : 0) +
     // A faixa de estrelas é UMA dimensão, mesmo com as duas pontas preenchidas.
     (f.estrelasMin != null || f.estrelasMax != null ? 1 : 0) +
-    (f.soMultiplos ? 1 : 0)
+    (f.soMultiplos ? 1 : 0) +
+    (f.agente !== "todos" ? 1 : 0)
   );
 }
 

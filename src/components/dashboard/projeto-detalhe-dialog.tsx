@@ -596,8 +596,8 @@ function AvaliacaoSombraPainel({
 }: {
   sombra: AvaliacaoSombra;
   /** Dispara a análise: a MESA (rápida) ou o TIME completo (dá a estrela, roda em background). */
-  onRodar: (qual: 'mesa' | 'estrela') => Promise<void> | void;
-  rodando: 'mesa' | 'estrela' | null;
+  onRodar: (qual: 'time' | 'mesa' | 'estrela') => Promise<void> | void;
+  rodando: 'time' | 'mesa' | 'estrela' | null;
   feedback: 'like' | 'dislike' | null;
   votando: boolean;
   /** Registra a discordância COM motivo (o que vira lição). */
@@ -786,6 +786,23 @@ function AvaliacaoSombraPainel({
               existindo como ferramenta de auditoria em LOTE (a rota de admin), que é o que ele
               sempre foi; num clique, quem responde é o classificador. */}
           <div className="flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'rgba(71,85,105,0.18)' }}>
+            {/* O TIME agindo JUNTO é o botão PRINCIPAL: o veredito de impacto e a nota saem da
+                mesma passada, e é isso que a submissão dispara. Os dois abaixo ficam para rodar
+                uma metade só, quando é isso que se quer (pedido do Luis, 08/09/2026). */}
+            <Button
+              type="button"
+              size="sm"
+              disabled={rodando !== null}
+              onClick={() => void onRodar('time')}
+              className="h-8 text-[12px]"
+            >
+              {rodando === 'time' ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <Bot className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+              )}
+              Rodar o time
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -799,7 +816,7 @@ function AvaliacaoSombraPainel({
               ) : (
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden />
               )}
-              {mesa ? 'Rerodar a mesa' : 'Rodar a mesa'}
+              {mesa ? 'Só o parecer' : 'Só o parecer'}
             </Button>
             <Button
               type="button"
@@ -814,10 +831,10 @@ function AvaliacaoSombraPainel({
               ) : (
                 <Star className="mr-1.5 h-3.5 w-3.5" aria-hidden />
               )}
-              {estrela ? 'Rerodar a estrela' : 'Rodar a estrela'}
+              Só a nota
             </Button>
             <span className="text-[11px] text-muted-foreground">
-              As duas respondem na hora, e nenhuma escreve na planilha.
+              Respondem na hora. A nota vai para a coluna do agente, nunca para "Estrelas".
             </span>
           </div>
 
@@ -911,7 +928,7 @@ export function ProjetoDetalheDialog({
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
   const [votando, setVotando] = useState(false);
   /** Qual análise está rodando agora (`null` = nenhuma) — desabilita os dois botões. */
-  const [rodandoAnalise, setRodandoAnalise] = useState<'mesa' | 'estrela' | null>(null);
+  const [rodandoAnalise, setRodandoAnalise] = useState<'time' | 'mesa' | 'estrela' | null>(null);
   // Guarda o texto original da coluna "Observações": só mandamos a coluna quando o
   // validador realmente mexeu nela (evitar reescrever a célula com o mesmo conteúdo).
   const obsOriginal = useRef('');
@@ -1075,11 +1092,30 @@ export function ProjetoDetalheDialog({
    * ⚠️ `invalidarDetalhe` antes de recarregar: a ficha tem cache de 30 s e sem isso o painel
    * voltaria com o parecer velho, exatamente como se nada tivesse rodado.
    */
-  async function rodarAnalise(qual: 'mesa' | 'estrela') {
+  async function rodarAnalise(qual: 'time' | 'mesa' | 'estrela') {
     if (!projeto || rodandoAnalise) return;
     setRodandoAnalise(qual);
     try {
-      if (qual === 'mesa') {
+      if (qual === 'time') {
+        // O time JUNTO: veredito de impacto + nota, numa passada (é o caminho normal).
+        const r = (await apiFetch('/api/admin/avaliacao/time-completo', {
+          projetoId: projeto.id,
+          dry: false,
+          forcar: true,
+        })) as {
+          ok?: boolean;
+          mesa?: { ok?: boolean; veredito?: string | null; motivo?: string };
+          estrela?: { ok?: boolean; estrelas?: number | null; motivo?: string };
+        };
+        invalidarDetalhe(projeto.id);
+        const partes = [
+          r?.mesa?.ok ? 'parecer atualizado' : null,
+          r?.estrela?.ok && typeof r.estrela.estrelas === 'number' ? `nota ${r.estrela.estrelas}` : null,
+        ].filter(Boolean);
+        if (partes.length) toast.success(`Time rodou: ${partes.join(' · ')}.`);
+        else toast.info(r?.estrela?.motivo ?? r?.mesa?.motivo ?? 'O time não teve o que concluir aqui.');
+        await recarregarDetalhe();
+      } else if (qual === 'mesa') {
         const r = (await apiFetch('/api/admin/avaliar-normais', {
           projetoId: projeto.id,
           dry: false,

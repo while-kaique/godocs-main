@@ -82,7 +82,7 @@ describe("a tela exibe SÓ o grau (decisão do Luis, 08/09/2026)", () => {
 
 describe("canário: nenhuma tela traduz a confiança em NÚMERO", () => {
   const telas = [
-    "src/components/dashboard/chip-sombra.tsx",
+    "src/components/dashboard/chip-agente.tsx",
     "src/components/dashboard/projeto-detalhe-dialog.tsx",
     "src/routes/_authenticated/dashboard.tsx",
   ];

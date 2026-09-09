@@ -35,7 +35,8 @@ import { Button } from '@/components/ui/button';
 import { HistoricoButton } from '@/components/historico/historico-button';
 import { StatusBadge } from '@/components/status-badge';
 import { ChipEstadoParecer } from '@/components/dashboard/parecer-lider';
-import { ChipSombra, type SombraChipDados } from '@/components/dashboard/chip-sombra';
+import { ChipAgente, type AgenteChipDados } from '@/components/dashboard/chip-agente';
+import { BarraLoteAgente } from '@/components/dashboard/barra-lote-agente';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
 import { SkeletonLinhas } from '@/components/dashboard/skeleton-linhas';
 import { STATUS_TRIAGEM, corDaRegua, metaStatus } from '@/components/dashboard/status-triagem';
@@ -63,6 +64,9 @@ import {
   type FiltroEspecial,
   type FiltroGanho,
   type FiltroParecer,
+  type FiltroAgente,
+  casaAgente,
+  casaFiltrosExceto,
   type FiltrosDashboard,
 } from '@/lib/dashboard-filtros';
 import { ROTULO_ESTADO_PARECER } from '@/lib/aprovacoes-parecer';
@@ -98,8 +102,8 @@ type Listagem = {
   projetos: ProjetoDashboardResumo[];
   contagem: Record<string, number>;
   total: number;
-  /** Recomendação em SOMBRA do agente por id (coluna "Sombra" do teste sombra). */
-  avaliacoes: Record<string, SombraChipDados>;
+  /** O que o time de agentes concluiu, por id (a coluna "Agente"). */
+  avaliacoes: Record<string, AgenteChipDados>;
   /** Voto 👍/👎 já dado pelo admin, por id. */
   feedbacks: Record<string, 'like' | 'dislike'>;
   /** ISO da última sincronização com a planilha (a idade do espelho). */
@@ -258,6 +262,15 @@ function Dashboard() {
   // "Pré-pendente (26)" e abria uma lista de 3 com outro filtro ligado.
   const pareceres = useMemo(() => pareceresDisponiveis(projetos, filtros), [projetos, filtros]);
   const ativos = contarFiltrosAtivos(filtros);
+  /** Ids marcados para a ação em lote. Vive na tela (nada persiste). */
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  // ⚠️ Contagem do RECORTE, ignorando a PRÓPRIA dimensão (`casaFiltrosExceto`): campo que diz
+  // "26" e abre uma lista de 3 é o defeito que as pílulas já não têm.
+  const { semAgente, comAgente } = useMemo(() => {
+    const base = projetos.filter((p) => casaFiltrosExceto(p, filtros, 'agente'));
+    const com = base.filter((p) => casaAgente(p, 'com')).length;
+    return { semAgente: base.length - com, comAgente: com };
+  }, [projetos, filtros]);
 
   const filtrados = useMemo(() => {
     let buscados = filtrarPorTermo(aplicarFiltros(projetos, filtros), buscaAplicada);
@@ -520,6 +533,28 @@ function Dashboard() {
             </option>
           ))}
         </select>
+        {/* "O agente já rodou?" — a dimensão que torna o lote útil: filtra quem falta e
+            seleciona tudo de uma vez. A régua é a nota do agente na planilha, que já vem no
+            resumo (nenhuma leitura nova). */}
+        <label className="sr-only" htmlFor="filtro-agente">
+          Filtrar por análise do agente
+        </label>
+        <select
+          id="filtro-agente"
+          value={filtros.agente}
+          onChange={(e) => setFiltros((f) => ({ ...f, agente: e.target.value as FiltroAgente }))}
+          className="h-9 max-w-[220px] rounded-full border border-input bg-card px-3 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+          style={{
+            ['--tw-ring-color' as string]: 'var(--go-blue)',
+            borderColor: filtros.agente !== 'todos' ? 'var(--go-blue)' : undefined,
+            color: filtros.agente !== 'todos' ? 'var(--go-blue)' : undefined,
+            fontWeight: filtros.agente !== 'todos' ? 600 : 400,
+          }}
+        >
+          <option value="todos">Agente: qualquer</option>
+          <option value="sem">Sem análise do agente ({semAgente})</option>
+          <option value="com">Com análise do agente ({comAgente})</option>
+        </select>
         {ativos > 0 && (
           <button
             type="button"
@@ -531,6 +566,19 @@ function Dashboard() {
           </button>
         )}
       </div>
+
+      <BarraLoteAgente
+        ids={visiveis.filter((p) => selecionados.has(p.id)).map((p) => p.id)}
+        onLimpar={() => setSelecionados(new Set())}
+        onConcluir={() => {
+          setSelecionados(new Set());
+          // Invalida as fichas em cache (a nota mudou) e refaz a listagem, para as colunas do
+          // agente aparecerem sem F5. ⚠️ O espelho é remendado pela própria escrita do
+          // classificador, então a listagem já volta com a coluna preenchida.
+          limparDetalhes();
+          void queryClient.invalidateQueries({ queryKey: ['dashboard-projetos'] });
+        }}
+      />
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <div className="relative min-w-[260px] flex-1">
@@ -595,6 +643,27 @@ function Dashboard() {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-border bg-muted/40">
+                {/* Seleção para a ação em LOTE. O checkbox do cabeçalho marca/desmarca o que
+                    está VISÍVEL (o recorte dos filtros), que é o que torna "filtra e roda em
+                    todos" um gesto de dois cliques. */}
+                <th className="w-9 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label="Selecionar todos os projetos filtrados"
+                    checked={visiveis.length > 0 && visiveis.every((p) => selecionados.has(p.id))}
+                    onChange={(e) =>
+                      setSelecionados((atual) => {
+                        const novo = new Set(atual);
+                        for (const p of visiveis) {
+                          if (e.target.checked) novo.add(p.id);
+                          else novo.delete(p.id);
+                        }
+                        return novo;
+                      })
+                    }
+                    className="h-3.5 w-3.5 cursor-pointer accent-[#0059A9]"
+                  />
+                </th>
                 <Th onClick={() => alternarOrdem('nome')} ativa={ordem === 'nome'} direcao={direcao}>
                   Projeto
                 </Th>
@@ -606,10 +675,13 @@ function Dashboard() {
                   Autor
                 </Th>
                 <Th className="hidden lg:table-cell">Área</Th>
-                {/* Teste sombra: a recomendação do AGENTE ao lado da decisão humana. A ordem
-                    de leitura é Sombra · Status · Pré-status — os 3 vereditos lado a lado.
-                    Sempre visível (é o ponto desta tela). */}
-                <Th title="Recomendação do agente em modo sombra (não muda o status)">Sombra</Th>
+                {/* O veredito do AGENTE ao lado da decisão humana. A ordem de leitura é
+                    Agente · Status · Pré-status — os 3 vereditos lado a lado.
+                    ⚠️ Esta coluna se chamava "Sombra" e carregava só o veredito; a nota do agente
+                    vivia numa SEGUNDA coluna. Virou UMA (decisão do Luis, 08/09/2026): o time age
+                    junto — avalia se há impacto E dá a nota —, então mostrar as duas metades em
+                    colunas separadas descrevia uma divisão que não existe. */}
+                <Th title="O que o time de agentes concluiu: veredito e nota">Agente</Th>
                 <Th>Status</Th>
                 {/* Pré-aprovação do líder ao lado do Status, para a triagem já chegar
                     ciente do parecer sem abrir a ficha (pedido do Luis, 05/08/2026). */}
@@ -622,25 +694,28 @@ function Dashboard() {
                   ativa={ordem === 'estrelas'}
                   direcao={direcao}
                 >
+                  {/* A nota da TRIAGEM (coluna manual da planilha) — a do agente vai na
+                      coluna "Agente". */}
                   Estrelas
                 </Th>
-                {/* A recomendação do AGENTE ao lado da nota humana: é o que torna a divergência
-                    (agente "6-10" × humano 2) visível sem abrir ficha por ficha. ⚠️ Coluna
-                    PRÓPRIA porque `Estrelas` é numérica e não carrega a faixa de escape — e
-                    porque misturar as duas foi o que deixou indistinguível, nas 129 células da
-                    run 9, um `3` do agente de um `3` de gente. */}
-                <Th className="hidden lg:table-cell">Agente</Th>
                 {/* Os DOIS eixos da categorização (item 5.4) na mesma célula: o TIPO é o
                     que o projeto é, o NÍVEL é como o trabalho acontece. Coluna nova
                     alargaria uma tabela que já é densa — e a régua desta tela é escanear. */}
                 <Th className="hidden xl:table-cell">Tipo · Nível</Th>
+                {/* As CATEGORIAS de ganho da v2 (saving efetivado · custo evitado · receita ·
+                    imensurável). Estavam no resumo e não eram desenhadas em lugar nenhum, então
+                    a tela não dizia DE ONDE vinha o impacto — só o número. */}
+                <Th className="hidden xl:table-cell">Ganhos</Th>
                 <Th
                   className="text-right"
                   onClick={() => alternarOrdem('ganho')}
                   ativa={ordem === 'ganho'}
                   direcao={direcao}
                 >
-                  Ganho total
+                  {/* ⚠️ O campo é `Impacto Líquido` da v2 desde a migração; o rótulo
+                      continuava dizendo "Ganho total", que é o nome da coluna da v1 e não
+                      existe mais na planilha. */}
+                  Impacto líquido
                 </Th>
                 <Th
                   className="hidden sm:table-cell"
@@ -658,7 +733,7 @@ function Dashboard() {
                 <SkeletonLinhas />
               ) : visiveis.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="p-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={13} className="p-10 text-center text-sm text-muted-foreground">
                     {projetos.length === 0
                       ? 'A planilha não devolveu nenhum projeto.'
                       : 'Nenhum projeto casa com esse filtro. Limpe a busca ou escolha outra fila.'}
@@ -695,6 +770,24 @@ function Dashboard() {
                     className="group cursor-pointer border-b border-border/70 outline-none transition-colors last:border-0 hover:bg-muted/40 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset motion-reduce:transition-none"
                     style={{ ['--tw-ring-color' as string]: 'var(--go-blue)' }}
                   >
+                    {/* ⚠️ `stopPropagation`: a LINHA inteira abre a ficha, então sem isso marcar
+                        o checkbox abriria o overlay por cima da seleção. */}
+                    <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Selecionar ${p.nome ?? p.id}`}
+                        checked={selecionados.has(p.id)}
+                        onChange={(e) =>
+                          setSelecionados((atual) => {
+                            const novo = new Set(atual);
+                            if (e.target.checked) novo.add(p.id);
+                            else novo.delete(p.id);
+                            return novo;
+                          })
+                        }
+                        className="h-3.5 w-3.5 cursor-pointer accent-[#0059A9]"
+                      />
+                    </td>
                     {/* Régua de triagem: a cor do status na borda esquerda deixa a
                         composição da fila legível sem ler texto. */}
                     <td className="relative py-2.5 pl-5 pr-3">
@@ -732,9 +825,11 @@ function Dashboard() {
                       <span className="block max-w-[160px] truncate">{p.area ?? '—'}</span>
                     </td>
                     <td className="px-3 py-2.5">
-                      <ChipSombra
+                      <ChipAgente
                         dados={dados?.avaliacoes?.[p.id] ?? dados?.avaliacoes?.[p.id.toLowerCase()] ?? null}
                         voto={dados?.feedbacks?.[p.id] ?? dados?.feedbacks?.[p.id.toLowerCase()] ?? null}
+                        estrela={p.estrelaAgente}
+                        confianca={p.confiancaAgente}
                       />
                     </td>
                     <td className="px-3 py-2.5">
@@ -780,6 +875,17 @@ function Dashboard() {
                         <span className="text-muted-foreground">{rotuloNivel(p.complexidade)}</span>
                       ) : null}
                       {!p.complexidade && (!p.tipoProjeto || p.tipoProjeto === '—') ? '—' : null}
+                    </td>
+                    {/* As CATEGORIAS de ganho da v2: dizem DE ONDE vem o impacto, que o
+                        número sozinho não conta. */}
+                    <td className="hidden px-3 py-2.5 text-[12px] xl:table-cell">
+                      {p.tipos ? (
+                        <span className="block max-w-[150px] truncate text-muted-foreground" title={p.tipos}>
+                          {p.tipos}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-right text-[13px] font-medium tabular-nums">
                       {fmtGanho(p.ganhoTotal)}

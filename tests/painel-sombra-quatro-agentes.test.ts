@@ -150,6 +150,7 @@ describe('canários da TELA (as duas queixas viraram teste)', () => {
   it('as duas ações reusam as rotas de admin que já existem (nenhuma rota nova)', () => {
     expect(ficha).toContain('/api/admin/avaliar-normais');
     expect(ficha).toContain('/api/admin/especiais/classificar');
+    expect(ficha).toContain('/api/admin/avaliacao/time-completo');
   });
 
   it('⚠️ o botão NÃO chama o time de 30 chamadas: o waitUntil do Godeploy o cancela no meio', () => {
@@ -157,7 +158,9 @@ describe('canários da TELA (as duas queixas viraram teste)', () => {
     // after invocation end and have been cancelled", com 2 de 4 chamadas respondidas. O clique
     // prometia "a estrela aparece em ~1 min" e nunca aparecia. A rota segue existindo para
     // auditoria em LOTE — o que ela sempre foi.
-    expect(ficha).not.toContain('/api/admin/avaliacao/time');
+    // ⚠️ A rota EXATA, com o fecha-aspas: `/time-completo` (a que roda as duas metades numa
+    // passada síncrona) começa com o mesmo prefixo e é justamente a que o botão usa.
+    expect(ficha).not.toMatch(/['"]\/api\/admin\/avaliacao\/time['"]/);
   });
 
   it('rodar a análise invalida o cache de 30 s da ficha antes de recarregar', () => {
