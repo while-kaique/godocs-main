@@ -171,11 +171,31 @@ export function conciliar(
     divergencias.push(frase(`O mérito aprova, mas a estrela desqualifica o projeto por ${ROTULO_DESQ[b.desqualificador]}`));
   }
 
-  const confianca = confiancaDe({
+  const confiancaBruta = confiancaDe({
     cerebrosConcordam: divergencias.length === 0,
     temEvidenciaCitada: a.sinais.temEvidenciaCitada && b.sinais.temEvidenciaCitada,
     temVizinhos: a.sinais.temVizinhos || b.sinais.temVizinhos,
   });
+  // ⚠️ **TETO da confiança quando o próprio mérito tem ressalva aberta** (09/09/2026).
+  //
+  // Os 3 sinais de `confiancaDe` falam do PROCESSO — os dois cérebros concordaram, houve evidência
+  // citada, havia vizinhos — e não da força da conclusão. Resultado medido no caso real
+  // «Plataforma Smartonline / DIFAL»: 3 de 3 sinais → **alta**, num projeto em que o mérito pediu
+  // AJUSTE e os especialistas escreveram "não é reconciliável", "contradição material" e
+  // "valor declarado ABSURDO". O Luis leu o card e disse o obvio: *"Bem... nao ta tao alta assim a
+  // confiança."* Ele está certo: `cerebrosConcordam` só olha divergência ENTRE mérito e estrela e
+  // não vê que o mérito, sozinho, está contestando os números.
+  //
+  // A régua: **confiança ALTA exige mérito sem ressalva pendente.** Com `ajuste`/`humano`, ou com a
+  // auditoria de valor dizendo absurdo, o teto é `media`. Não é rebaixar por desconfiança genérica
+  // — é parar de afirmar certeza sobre material que o próprio time contestou.
+  // ⚠️ É o MESMO padrão que o classificador já usa ("nota >= 3 força confiança <= média +
+  // contestada"), e por isso a mudança é um TETO, nunca um piso: nada aqui sobe confiança.
+  // ⚠️ Só o teto muda; `confiancaDe` fica intacta (ela é compartilhada com o classificador de 1
+  // agente, que não tem mérito para consultar).
+  const meritoComRessalva = a.veredito !== 'aprovar' || a.valor?.absurdo === true;
+  const confianca: Confianca =
+    meritoComRessalva && confiancaBruta === 'alta' ? 'media' : confiancaBruta;
   const escape = b.escape.indicado && b.escape.valido;
 
   // ── As DUAS portas da reprovação (D4), ANTES de todo o resto ────────────────────────────────

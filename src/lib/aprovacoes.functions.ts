@@ -46,6 +46,26 @@ import { updateRowByProjectId } from '@/lib/google/sheets';
 import { notificarChatPreAprovacao } from '@/lib/notificacao-projeto.functions';
 import { notificarLiderDoProjetoPai } from '@/lib/gomoon-lideres.functions';
 import { deveNotificarDecisao } from '@/lib/notificacao-chat';
+
+/**
+ * A D30 (pré-aprovação do líder como gatilho do alerta no grupo) está LIGADA?
+ *
+ * ⚠️ **`false` desde 09/09/2026.** Ver o comentário grande em `decidirAprovacao`. A maquinaria
+ * fica INTEIRA e testada — é o que permite rearmar sem reescrever nada —, e este é o interruptor.
+ */
+let d30 = false;
+export function d30Ligada(): boolean {
+  return d30;
+}
+/**
+ * ⚠️ **SÓ PARA TESTE.** Existe para os 18 casos de `aprovacoes-notifica-chat.test.ts` continuarem
+ * cobrindo a serialização do aviso (duplo clique, 2 líderes da mesma fila, adaptador que não
+ * reporta linhas) com a D30 DESARMADA em produção. Sem isto, desligar a D30 apagaria essa
+ * cobertura junto — e ela é o que torna o rearme seguro.
+ */
+export function __setD30ParaTeste(ligada: boolean): void {
+  d30 = ligada;
+}
 import { espelharEscrita } from '@/lib/sheet-espelho';
 import { runBackground } from '@/lib/background';
 import {
@@ -1107,7 +1127,21 @@ export async function decidirAprovacao(
   // ⚠️ O alerta do grupo (D30) é do ESTÁGIO 1: sai UMA vez por projeto, quando o líder do
   // autor pré-aprova. Uma aprovação do estágio 2 (líder do dono do pai) NÃO reavisa o
   // grupo — seria uma 2ª mensagem para o mesmo projeto.
-  const avisaGrupo = veredito === 'aprovado' && estagioDecisor === 1;
+  // ⚠️ **A D30 ESTÁ DESLIGADA desde 09/09/2026** e este `false` é o interruptor.
+  // O gatilho do alerta do grupo passou a ser o PARECER DO TIME DE AGENTES
+  // (`avaliacao-completa.functions.ts` → `avisarGrupoDoParecer`), por decisão do Luis: *"ao inves
+  // de ter disparo a cada pre-aprovação de lider, faz sentido ter disparo a cada aprovação do
+  // agente, com sua justificativa"* — a pré-aprovação diz que ALGUÉM OLHOU, o parecer do agente diz
+  // se o projeto SE SUSTENTA, e chega antes.
+  //
+  // ⚠️ **A maquinaria fica INTEIRA aqui, desarmada**, como a pausa de submissão e o congelamento da
+  // pré-aprovação: `deveNotificarDecisao`, a assinatura do parecer e o rastro do adaptador que não
+  // reporta linhas continuam válidos e testados. Rearmar é trocar este `false` de volta pela
+  // condição — e, se isso acontecer, DESLIGAR o gatilho do agente no mesmo deploy, senão o grupo
+  // recebe dois cards pelo mesmo projeto.
+  // ⚠️ Consequência aceita: projeto cujo desfecho do agente não dispara (o `em_validacao` que não é
+  // faixa 6-10) NUNCA é anunciado no grupo — ele vive na fila do `/dashboard`.
+  const avisaGrupo = d30Ligada() && veredito === 'aprovado' && estagioDecisor === 1;
   if (avisaGrupo && !deveNotificarDecisao(linhasGravadas)) {
     console.warn(
       '[aprovacoes] UPDATE gravou 0 linhas — outro parecer chegou antes; grupo NÃO avisado',

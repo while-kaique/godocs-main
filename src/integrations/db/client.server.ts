@@ -2623,6 +2623,74 @@ export function upsertAlertaEstado(v: { chave: string; ultimo_em: number | null;
   );
 }
 
+/**
+ * RESERVA o direito de avisar o grupo sobre este projeto. Devolve as linhas escritas:
+ * `> 0` = quem chamou ganhou a corrida e deve avisar · `0` = já avisado · `null` = o adaptador
+ * não reportou.
+ *
+ * ⚠️ **É check-and-act ATÔMICO** (`WHERE ... AND avisado_em IS NULL`), não um SELECT seguido de
+ * UPDATE: dois disparos concorrentes (o fan-out da submissão e o cron, ou dois cliques no lote)
+ * passariam os dois num check-then-act e o grupo receberia 2 cards do mesmo projeto. É a MESMA
+ * mecânica que serializa a decisão do líder.
+ * ⚠️ `null` (adaptador silencioso) é tratado por `deveAvisarDoAgente`, não aqui.
+ */
+export function reservarAvisoDoAgente(projetoId: string) {
+  return execContando(
+    "UPDATE projeto_avaliacao SET avisado_em = datetime('now') WHERE projeto_id = ? AND avisado_em IS NULL",
+    [projetoId],
+  );
+}
+
+export type AnexoTextoRow = {
+  projeto_id: string;
+  arquivo: string;
+  texto: string;
+  origem: string;
+  chars: number | null;
+  created_em: string | null;
+};
+
+/**
+ * Grava (ou substitui) o texto de UM anexo. Idempotente por (projeto, arquivo) — reenvio do mesmo
+ * arquivo atualiza em vez de duplicar.
+ */
+export function upsertAnexoTexto(v: {
+  projeto_id: string;
+  arquivo: string;
+  texto: string;
+  origem: string;
+}) {
+  return exec(
+    "INSERT OR REPLACE INTO anexo_texto (projeto_id, arquivo, texto, origem, chars) VALUES (?, ?, ?, ?, ?)",
+    [v.projeto_id, v.arquivo, v.texto, v.origem, v.texto.length],
+  );
+}
+
+/** O texto dos anexos de UM projeto. É o que o dossiê do time passa a incluir. */
+export function getAnexosTexto(projetoId: string) {
+  return queryAll<AnexoTextoRow>(
+    "SELECT * FROM anexo_texto WHERE projeto_id = ? ORDER BY arquivo",
+    [projetoId],
+  );
+}
+
+/**
+ * Projetos que TÊM link de anexo e ainda NÃO têm texto — a fila do backfill (item 3).
+ * ⚠️ Bounded por `limite`: baixar do Drive é I/O por projeto e não cabe numa passada só.
+ */
+export function getProjetosSemTextoDeAnexo(limite: number) {
+  return queryAll<{ id: string; arquivos_links: string | null; nome: string | null }>(
+    `SELECT p.id, p.arquivos_links, p.nome
+       FROM projetos p
+      WHERE p.arquivos_links IS NOT NULL
+        AND trim(p.arquivos_links) NOT IN ('', '[]')
+        AND NOT EXISTS (SELECT 1 FROM anexo_texto a WHERE a.projeto_id = p.id)
+      ORDER BY p.submitted_at DESC
+      LIMIT ?`,
+    [Math.max(1, Math.min(200, Math.floor(limite)))],
+  );
+}
+
 export type FalhaAgenteRow = {
   id: string;
   classe: string;

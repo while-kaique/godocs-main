@@ -1,5 +1,7 @@
 // Extração de texto de arquivos enviados pelo usuário
-// Suporta: TXT, MD, PDF, DOCX, DOC, JSON e arquivos de código (TS, JS, PY, etc.)
+// Suporta: TXT, MD, PDF, DOCX, DOC, JSON, arquivos de código (TS, JS, PY, etc.) e, desde
+// 09/09/2026, IMAGEM (png/jpg/webp/gif/bmp) pela visão do ai-proxy — ver `visao-anexo.server.ts`.
+import { EXTENSOES_IMAGEM, lerImagemComVisao } from '@/lib/visao-anexo.server';
 
 const MAX_CHARS_PER_FILE = 150_000;
 const MAX_CHARS_TOTAL = 800_000; // ~200k tokens — orçamento da codebase inteira
@@ -79,6 +81,22 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
       log(`DOCX extraído: ${result.value.length} chars`);
       text = result.value;
 
+    } else if (EXTENSOES_IMAGEM.has(ext)) {
+      // ⚠️ Imagem CAÍA no `else` abaixo e voltava lixo binário decodificado como utf-8 — ou seja,
+      // print de comprovante (o anexo típico de memorial financeiro) chegava ao agente como nada.
+      // 746 dos 750 projetos de prod têm anexo, então isto nunca foi caso de borda.
+      log(`Modo: IMAGEM — enviando ao ai-proxy (visão)...`);
+      const r = await lerImagemComVisao(base64, fileName);
+      if (r.ok) {
+        text = r.texto;
+        log(`Imagem lida por visão: ${text.length} chars`);
+      } else {
+        // ⚠️ Falha aqui NÃO é silêncio: o texto que sobra DIZ que existe imagem e não deu para
+        // ler. É a diferença entre o agente concluir "não há evidência" e "há evidência que eu não
+        // consigo abrir" — e foi exatamente essa confusão que produziu o parecer do Smartonline.
+        text = `[IMAGEM ANEXADA "${fileName}" — não foi possível ler automaticamente: ${r.motivo ?? 'motivo não informado'}]`;
+        err(`Imagem "${fileName}" não lida: ${r.motivo}`);
+      }
     } else {
       log(`Extensão desconhecida "${ext}" — tentando utf-8`);
       text = decodeUtf8(bytes);

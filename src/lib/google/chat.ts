@@ -1,6 +1,11 @@
 // Notificação via webhook do Google Chat (não precisa de auth Google — URL contém key+token).
 
 import type { ResumoGanho } from '@/lib/notificacao-ganho';
+import {
+  NOTA_LIDER_PENDENTE,
+  rotuloDesfechoAgente,
+  subtituloDoAgente,
+} from '@/lib/notificacao-agente';
 
 // Projetos de teste E2E (nome com prefixo "[E2E-") NÃO notificam o Google Chat —
 // o harness de validação roda contra produção e gravaria N pings no espaço do time.
@@ -218,10 +223,31 @@ export type ParamsSubmitMessage = {
   // Parecer do líder que DISPAROU esta mensagem. Presente → o alerta deixa de ser
   // "aguardando análise" e passa a anunciar a pré-aprovação, assinada.
   preAprovacao?: { por: string; em: string } | null;
+  /**
+   * O parecer do TIME DE AGENTES, que desde 09/09/2026 é o GATILHO deste alerta (no lugar da
+   * pré-aprovação do líder, a D30). Quando presente, ele manda no subtítulo e ganha a 1ª linha
+   * visível + uma seção colapsável com o consenso resumido.
+   *
+   * ⚠️ Quem decide SE dispara é `deveAvisarPorAgente` (`notificacao-agente.ts`), nunca este
+   * builder: aqui só se desenha.
+   */
+  agente?: {
+    veredito: string;
+    /** Faixa de escape 6-10: o projeto precisa de estrela HUMANA. */
+    escape?: boolean | null;
+    /** O consenso do time, já compactado por `resumirConsenso`. */
+    consenso?: string | null;
+    /** O grau da confiança (alta/media/baixa), como o time o entrega. */
+    confianca?: string | null;
+  } | null;
 };
 
 /** O estado do projeto, em uma linha, para o subtítulo do card. */
 function subtituloDe(p: ParamsSubmitMessage): string {
+  // ⚠️ O parecer do agente VENCE tudo no subtítulo: ele é o gatilho, e é o desfecho que a
+  // triagem precisa ler antes de decidir se abre a ficha. Fonte única do texto em
+  // `notificacao-agente.ts`.
+  if (p.agente) return subtituloDoAgente(p.agente);
   if (p.especial) {
     return p.modo === 'edicao'
       ? '⭐ Projeto especial reenviado · avaliação humana'
@@ -249,10 +275,27 @@ export function buildSubmitMessage(p: ParamsSubmitMessage): MensagemChat {
   // O parecer (ou a razão de não haver um) vem PRIMEIRO: é o que diz se o projeto já pode
   // ser analisado. ⚠️ Ausente nos dois campos → nenhuma linha (o projeto está em fila, e
   // nesse caso este alerta nem é disparado).
+  // O parecer do AGENTE vem primeiro quando ele é o gatilho: é o desfecho, com a confiança ao
+  // lado. ⚠️ O grau vai como NOTA da linha (3º nível), não no valor: o que decide é o veredito.
+  if (p.agente) {
+    const conf = (p.agente.confianca ?? '').trim();
+    resumo.push(
+      linha(
+        'Parecer do time de agentes',
+        rotuloDesfechoAgente(p.agente),
+        conf ? `confiança ${conf}` : null,
+      ),
+    );
+  }
+
   if (p.preAprovacao) {
     resumo.push(linha('Pré-aprovação do líder', p.preAprovacao.por, `em ${p.preAprovacao.em}`));
   } else if ((p.notaPreAprovacao ?? '').trim()) {
     resumo.push(linha('Pré-aprovação do líder', (p.notaPreAprovacao ?? '').trim()));
+  } else if (p.agente) {
+    // ⚠️ Com o gatilho do agente, esta linha está vazia quase sempre (o líder ainda não decidiu).
+    // "—" ali sugeriria que ninguém vai opinar. Ver `NOTA_LIDER_PENDENTE`.
+    resumo.push(linha('Pré-aprovação do líder', NOTA_LIDER_PENDENTE));
   }
 
   if (!p.especial) {
@@ -297,6 +340,19 @@ export function buildSubmitMessage(p: ParamsSubmitMessage): MensagemChat {
   contexto.push(linha('Data da submissão', p.dataSubmissao));
 
   const secoes: Record<string, unknown>[] = [{ widgets: resumo }];
+
+  // ── colapsável 0: COMO o time chegou nisso (pedido do Luis, 09/09/2026) ──
+  // ⚠️ Vem ANTES dos números e da descrição: é o que explica o desfecho anunciado no subtítulo.
+  // O texto é o consenso do PRÓPRIO time, recortado por `resumirConsenso` — não reescrito aqui,
+  // senão o card teria uma segunda voz dizendo por que o projeto foi aprovado.
+  const consenso = (p.agente?.consenso ?? '').trim();
+  if (consenso) {
+    const secaoConsenso = secaoColapsavel('Como o time chegou nisso', [
+      { textParagraph: { text: truncar(consenso) } },
+    ]);
+    if (secaoConsenso) secoes.push(secaoConsenso);
+  }
+
   const secaoNumeros = secaoColapsavel('Números do ganho', numeros);
   if (secaoNumeros) secoes.push(secaoNumeros);
   const secaoContexto = secaoColapsavel('Descrição e contexto', contexto);

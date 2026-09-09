@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { partirParecerMesa, ROTULO_CURTO_DIMENSAO, semTravessao } from '@/lib/mesa-parecer';
+import { readFileSync } from 'node:fs';
+import {
+  partirParecerMesa,
+  ROTULO_CURTO_DIMENSAO,
+  semTravessao,
+  partirJustificativaDoTime,
+  BLOCOS_JUSTIFICATIVA,
+  BLOCOS_ABERTOS,
+} from '@/lib/mesa-parecer';
 
 describe('partirParecerMesa — parecer da mesa em linhas atribuídas', () => {
   it('parte uma linha por especialista, com o autor separado do texto', () => {
@@ -95,5 +103,70 @@ describe('semTravessao — o parecer do agente não usa traços', () => {
   it('vazio/nulo → string vazia (o normalizador cai no fallback)', () => {
     expect(semTravessao(null)).toBe('');
     expect(semTravessao('   —   ')).toBe('');
+  });
+});
+
+// ─── A justificativa do time em BLOCOS (09/09/2026) ──────────────────────────────────────────
+describe('partirJustificativaDoTime — o muro de texto vira blocos', () => {
+  // Recorte REAL do caso «Plataforma Smartonline / DIFAL», que o Luis chamou de "praticamente
+  // ilegivel". O texto sempre teve `\n`; a ficha é que os colapsava.
+  const real = [
+    'Justificativa interna: Plataforma Smartonline (id 589938ae)',
+    'Saída do time: Pedir ajuste. Mérito: ajuste. Estrela: 5 estrelas. Confiança alta.',
+    'Critério aplicado: assume.',
+    'Evidências da estrela:',
+    '- A guia é emitida e paga automaticamente em até 1h após o faturamento.',
+    '- Em agosto/2026 foram recolhidos R$ 1.689.582,89 em 6 empresas.',
+    'Racional da estrela: Fica em 5 porque entrega ao fisco sem uma pessoa entre a execução e a multa.',
+    'Julgamentos do mérito:',
+    '- financeiro (preocupa): R$117.475,25 não é reconciliável.',
+    'Auditoria de valor: valor declarado ABSURDO.',
+    'Perguntas ao autor:',
+    '- Qual memória reconcilia o ganho declarado?',
+  ].join('\n');
+
+  it('reconhece cada rótulo e agrupa as linhas dele', () => {
+    const b = partirJustificativaDoTime(real);
+    const titulos = b.map((x) => x.titulo);
+    expect(titulos).toContain('Saída do time');
+    expect(titulos).toContain('Evidências da estrela');
+    expect(titulos).toContain('Perguntas ao autor');
+    const ev = b.find((x) => x.titulo === 'Evidências da estrela');
+    expect(ev?.linhas).toHaveLength(2);
+    // O bullet sai: quem desenha a lista é a tela.
+    expect(ev?.linhas[0].startsWith('-')).toBe(false);
+  });
+
+  it('o rótulo com texto na MESMA linha não perde o conteúdo', () => {
+    const b = partirJustificativaDoTime(real);
+    expect(b.find((x) => x.titulo === 'Saída do time')?.linhas[0]).toMatch(/Pedir ajuste/);
+  });
+
+  it('não reescreve nada — o rastro de auditoria fica íntegro', () => {
+    const b = partirJustificativaDoTime(real);
+    const junto = b.flatMap((x) => x.linhas).join(' ');
+    expect(junto).toContain('1.689.582,89');
+    expect(junto).toContain('não é reconciliável');
+  });
+
+  it('vazio e nulo não lançam', () => {
+    expect(partirJustificativaDoTime(null)).toEqual([]);
+    expect(partirJustificativaDoTime('   ')).toEqual([]);
+  });
+
+  it('⚠️ os rótulos do parser são os MESMOS que o time escreve', () => {
+    // Rótulo novo no `textos.ts` sem entrar em `BLOCOS_JUSTIFICATIVA` cai no bloco anterior, sem
+    // erro nenhum — é a armadilha do parser por prefixo.
+    const fonte = readFileSync('src/lib/avaliacao/textos.ts', 'utf8');
+    for (const t of BLOCOS_JUSTIFICATIVA) {
+      expect(fonte, `"${t}" não aparece em textos.ts`).toContain(`${t}:`);
+    }
+  });
+
+  it('os blocos abertos são os que respondem "por que este desfecho?"', () => {
+    for (const t of BLOCOS_ABERTOS) expect(BLOCOS_JUSTIFICATIVA).toContain(t as never);
+    // As evidências e os 5 julgamentos são rastro, não leitura primeira.
+    expect(BLOCOS_ABERTOS).not.toContain('Julgamentos do mérito');
+    expect(BLOCOS_ABERTOS).not.toContain('Evidências da estrela');
   });
 });

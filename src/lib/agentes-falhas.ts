@@ -26,6 +26,7 @@ export type ClasseFalha =
   | 'teto_ferramentas'
   | 'dossie_sem_financeiro'
   | 'sem_nota_avaliada'
+  | 'idempotencia_indeterminada'
   | 'tarefa_cancelada';
 
 export type Severidade = 'alerta' | 'registro';
@@ -106,6 +107,15 @@ export const FALHAS_AGENTE: readonly DescricaoFalha[] = [
       'A régua composta poupa o projeto (é o certo — reprovar exige veredito de nota em mãos), mas ' +
       '"não reprovou" e "ninguém avaliou" ficariam indistinguíveis. É exatamente esta fila que o ' +
       'time de agentes precisa alcançar: 463 das 750 linhas de prod têm 0★ default na coluna manual.',
+  },
+  {
+    classe: 'idempotencia_indeterminada',
+    rotulo: 'A trava de "um aviso por projeto" não pôde ser confirmada',
+    severidade: 'alerta',
+    sintoma:
+      'O banco não reportou quantas linhas o UPDATE escreveu, então a reserva do aviso ao grupo ' +
+      'virou um palpite. O default é AVISAR (silêncio permanente é pior que card repetido), mas se ' +
+      'isso vier de um backfill o grupo leva um card por projeto: 641 avaliados hoje.',
   },
   {
     classe: 'tarefa_cancelada',

@@ -452,3 +452,50 @@ describe('conciliar — motivos nunca vazios, sem travessão, com ponto final', 
     });
   }
 });
+
+// ─── TETO da confiança quando o mérito tem ressalva aberta (09/09/2026) ───────────────────────
+//
+// Caso REAL que motivou: «Plataforma Smartonline / DIFAL». Os 3 sinais de `confiancaDe` deram 3 de
+// 3 → **alta**, num projeto em que o mérito pediu AJUSTE e os especialistas escreveram "não é
+// reconciliável", "contradição material" e "valor declarado ABSURDO". O Luis leu o card:
+// *"Bem... nao ta tao alta assim a confiança."*
+describe('confiança: alta exige mérito sem ressalva pendente', () => {
+  it('mérito APROVA + 3 sinais → alta (nada mudou no caminho limpo)', () => {
+    const r = conciliar(merito({ veredito: 'aprovar' }), estrela(), ctx());
+    expect(r.confianca).toBe('alta');
+  });
+
+  it('⚠️ mérito pede AJUSTE → teto media, mesmo com os 3 sinais', () => {
+    // Os 3 sinais falam do PROCESSO (cérebros concordaram, citaram evidência, havia vizinhos), não
+    // da força da conclusão. Com o mérito contestando os números, "alta" afirma certeza demais.
+    const r = conciliar(merito({ veredito: 'ajuste' }), estrela(), ctx());
+    expect(r.confianca).toBe('media');
+  });
+
+  it('⚠️ mérito manda para HUMANO → teto media', () => {
+    const r = conciliar(merito({ veredito: 'humano' }), estrela(), ctx());
+    expect(r.confianca).toBe('media');
+  });
+
+  it('⚠️ auditoria de valor ABSURDA → teto media, mesmo com o mérito aprovando', () => {
+    const r = conciliar(
+      merito({
+        veredito: 'aprovar',
+        valor: { absurdo: true, valor_sugerido: null, justificativa: 'não reconcilia' },
+      }),
+      estrela(),
+      ctx(),
+    );
+    expect(r.confianca).toBe('media');
+  });
+
+  it('⚠️ é TETO, nunca piso: o que já era baixa não sobe', () => {
+    // Nada nesta régua pode aumentar confiança — é a mesma disciplina do guard do classificador.
+    const r = conciliar(
+      merito({ veredito: 'ajuste', sinais: { temEvidenciaCitada: false, temVizinhos: false } }),
+      estrela({ sinais: { temEvidenciaCitada: false, temVizinhos: false } }),
+      ctx(),
+    );
+    expect(r.confianca).toBe('baixa');
+  });
+});

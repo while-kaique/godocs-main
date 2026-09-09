@@ -413,6 +413,28 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_falha_agente_classe ON falha_agente(classe, created_at);
   CREATE INDEX IF NOT EXISTS idx_falha_agente_data ON falha_agente(created_at);
 
+  -- TEXTO dos ANEXOS, por projeto. Append/replace por (projeto_id, arquivo).
+  -- ⚠️ Existe porque o texto SEMPRE foi extraído na submissão (PDF pelo OCR Worker, DOCX pelo
+  -- mammoth, txt/md/json como utf-8) e DESCARTADO depois de alimentar o extrator. O dossiê do
+  -- time declarava a lacuna "texto dos anexos não é persistido, só os links", e o agente julgava
+  -- evidência sem ter visto o que o autor mandou. 746 dos 750 projetos de prod têm anexo.
+  -- ⚠️ origem diz COMO o texto nasceu: extracao (utf-8/OCR/mammoth), visao (leitura de IA da
+  -- imagem) ou backfill (baixado do Drive depois). A distinção importa: leitura de IA não é o
+  -- texto literal do arquivo e o agente não pode citá-la como se fosse.
+  -- ⚠️ Tabela INTERNA e DERIVADA: fora do Sheets e de SAFE_UPDATE_FIELDS, apagá-la só perde o
+  -- texto até o próximo backfill.
+  CREATE TABLE IF NOT EXISTS anexo_texto (
+    projeto_id TEXT NOT NULL,
+    arquivo    TEXT NOT NULL,
+    texto      TEXT NOT NULL,
+    origem     TEXT NOT NULL,
+    chars      INTEGER,
+    created_em TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (projeto_id, arquivo)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_anexo_texto_projeto ON anexo_texto(projeto_id);
+
   -- FAQ. Todo mundo LÊ em /faq, admin edita inline. Cada categoria é UM documento
   -- (coluna corpo, markdown leve) -- a lista de cards existe só no índice /faq.
   -- O conteúdo inicial nasce do FAQ_SEED (src/lib/faq/conteudo.ts) por seed IDEMPOTENTE
@@ -581,7 +603,16 @@ const SCHEMA_SQL = `
     votos       TEXT,
     origem      TEXT,
     modelo      TEXT,
-    criado_em   TEXT DEFAULT (datetime('now'))
+    criado_em   TEXT DEFAULT (datetime('now')),
+    -- Carimbo do aviso ao GRUPO do Chat (09/09/2026, quando o parecer do agente virou o
+    -- gatilho, no lugar da pré-aprovação do líder). NULL = ainda não avisou.
+    -- ⚠️ É a TRAVA DE IDEMPOTÊNCIA, e ela é uma COLUNA em vez de tabela nova de propósito: o
+    -- ponto de serialização já existe aqui (a linha por projeto), e a régua deste repo é
+    -- "nada de tabela de idempotência quando o ponto de serialização já está lá" -- a mesma
+    -- do UPDATE condicional que impede 2 avisos na decisão do líder.
+    -- ⚠️ Sem isto, um backfill do time nos 641 projetos que já têm nota viraria 641 cards no
+    -- grupo, que é o defeito pelo qual o buildUpdateMessage foi removido deste repo.
+    avisado_em  TEXT
   );
 
   -- Estado da DELIBERAÇÃO multi-turno do time autônomo de avaliação (fatia C, MODO SOMBRA):

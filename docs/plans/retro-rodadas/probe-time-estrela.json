@@ -1,0 +1,247 @@
+{
+ "meta": {
+  "ciclo": "probe-time-estrela",
+  "amostra": 3,
+  "modelo": "gpt-5.6-luna (especialistas) + gpt-5.6-sol (estrela, cético)",
+  "variante": "probe: tempo/custo por projeto do TIME inteiro"
+ },
+ "relatorio": {
+  "total": 3,
+  "por_gabarito": {
+   "nota_humana": 2,
+   "status_assentado": 1,
+   "nao_auditado": 0,
+   "fora": 0
+  },
+  "merito": {
+   "acerto": 1,
+   "conservador": 2,
+   "erro_grave": 0,
+   "reprovacao_indevida": 0,
+   "sem_base": 0,
+   "acuracia": 0.3333333333333333
+  },
+  "acuracia_por_veredito": {},
+  "estrelas": {
+   "distribuicao_time": {
+    "0": 3,
+    "1": 0,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0
+   },
+   "distribuicao_humana": {
+    "0": 1,
+    "2": 1,
+    "4": 1
+   },
+   "escape": 0,
+   "exato": 0.3333333333333333,
+   "dentro_de_1": 0.3333333333333333,
+   "vies": -2,
+   "n_comparaveis": 3
+  },
+  "achatamento": {
+   "suspeito": true,
+   "destino": 0,
+   "proporcao": 1,
+   "total": 2
+  },
+  "calibragem": {
+   "ok": false,
+   "desvio": "achatado",
+   "proporcaoAte3": 1,
+   "proporcaoAcimaDe3": 0,
+   "total": 3
+  },
+  "saidas": {
+   "aprovar": 0,
+   "ajuste": 0,
+   "humano": 2,
+   "reprovar": 1
+  },
+  "humano_pct": 0.6666666666666666,
+  "valor": {
+   "absurdos": 0,
+   "auditados": 0
+  },
+  "contestacoes": [],
+  "alertas": [
+   "Achatamento suspeito: 100% das quedas caem no mesmo nível 0. Revisar a régua antes de aceitar qualquer queda (D12).",
+   "Lote achatado: 100% até 3 estrelas e 0% acima.",
+   "Saída humano em 67% dos projetos: acima do teto de 10%, humano tem de ser exceção."
+  ]
+ },
+ "custoUsd": 0,
+ "tokens": {},
+ "resultados": [
+  {
+   "id": "legado-060",
+   "nome": "[R&S]DASH ACOMPANHAMENTO DIÁRIO",
+   "area": "Gente e Gestão",
+   "especial": false,
+   "gabarito": "status_assentado",
+   "merito": "acerto",
+   "estrela": {
+    "humana": 0,
+    "time": 0,
+    "distancia": 0,
+    "dentro_de_1": true
+   },
+   "escape": false,
+   "saida": "reprovar",
+   "confianca": "baixa",
+   "valor_absurdo": null,
+   "contestou": false,
+   "statusHumano": "Reprovado",
+   "veredito_merito": "humano",
+   "criterio": "experimenta",
+   "desqualificador": null,
+   "evidencias": [],
+   "racional_estrela": "Fallback: o agente da estrela não devolveu uma saída utilizável (estrela: erro_llm). Nota não avaliada; conferir na triagem.",
+   "preocupacoes": [],
+   "perguntas": [],
+   "motivos": [
+    "Impacto declarado de R$ 16,55/mês, abaixo do piso de R$ 100,00/mês. Um ganho desta ordem não sustenta o projeto como projeto documentado.",
+    "Confiança baixa: sem evidência citada nos dois cérebros.",
+    "A reprovação é recomendação em sombra, quem reprova em produção é a triagem."
+   ],
+   "divergencias": [],
+   "cetico": {
+    "refuta": false,
+    "motivo": null,
+    "sinais": [],
+    "fallback": true
+   },
+   "rodadas": 1,
+   "chamadas_llm": 7,
+   "erros": [
+    "especialista plausibilidade_horas: erro_llm",
+    "especialista precedente: erro_llm",
+    "especialista financeiro: erro_llm",
+    "especialista evidencia: erro_llm",
+    "estrela: erro_llm",
+    "cético da estrela: OpenAI gpt-5.6-sol: 401 {\n  \"error\": {\n    \"message\": \"Incorrect API key provided: sk-proj-*************************************************************************************************************************************",
+    "cético: OpenAI gpt-5.6-sol: 401 {\n  \"error\": {\n    \"message\": \"Incorrect API key provided: sk-proj-*************************************************************************************************************************************"
+   ],
+   "textos": {
+    "interno": "Justificativa interna: [R&S]DASH ACOMPANHAMENTO DIÁRIO (id legado-060)\nSaída do time: Reprovar. Mérito: humano. Estrela: sem estrela. Confiança baixa.\nCritério aplicado: experimenta.\nEvidências da estrela: nenhuma citada.\nRacional da estrela: Fallback: o agente da estrela não devolveu uma saída utilizável (estrela: erro_llm). Nota não avaliada; conferir na triagem.\nJulgamentos do mérito:\n- plausibilidade_horas: sem resposta do agente.\n- financeiro: sem resposta do agente.\n- precedente: sem resposta do agente.\n- evidencia: sem resposta do agente.\nRessalvas:\n- Nenhum julgamento válido (todos em fallback): sem julgamento não se aprova, encaminhar ao humano.\nDivergências: nenhuma.\nMotivos:\n- Impacto declarado de R$ 16,55/mês, abaixo do piso de R$ 100,00/mês. Um ganho desta ordem não sustenta o projeto como projeto documentado.\n- Confiança baixa: sem evidência citada nos dois cérebros.\n- A reprovação é recomendação em sombra, quem reprova em produção é a triagem.\nAuditoria de valor: não realizada.",
+    "ao_autor": null,
+    "comite": null
+   },
+   "duracao_ms": 39157,
+   "vizinhos": []
+  },
+  {
+   "id": "legado-178",
+   "nome": "Prazo Otimizado",
+   "area": "TRANSPORTES",
+   "especial": true,
+   "gabarito": "nota_humana",
+   "merito": "conservador",
+   "estrela": {
+    "humana": 4,
+    "time": 0,
+    "distancia": 4,
+    "dentro_de_1": false
+   },
+   "escape": false,
+   "saida": "humano",
+   "confianca": "baixa",
+   "valor_absurdo": null,
+   "contestou": false,
+   "statusHumano": "Aprovado",
+   "veredito_merito": "humano",
+   "criterio": "experimenta",
+   "desqualificador": null,
+   "evidencias": [],
+   "racional_estrela": "Fallback: o agente da estrela não devolveu uma saída utilizável (estrela: erro_llm). Nota não avaliada; conferir na triagem.",
+   "preocupacoes": [],
+   "perguntas": [],
+   "motivos": [
+    "O mérito não conseguiu fechar e pede olhar humano."
+   ],
+   "divergencias": [],
+   "cetico": {
+    "refuta": false,
+    "motivo": null,
+    "sinais": [],
+    "fallback": true
+   },
+   "rodadas": 1,
+   "chamadas_llm": 7,
+   "erros": [
+    "especialista plausibilidade_horas: erro_llm",
+    "especialista precedente: erro_llm",
+    "especialista financeiro: erro_llm",
+    "especialista evidencia: erro_llm",
+    "estrela: erro_llm",
+    "cético da estrela: OpenAI gpt-5.6-sol: 401 {\n  \"error\": {\n    \"message\": \"Incorrect API key provided: sk-proj-*************************************************************************************************************************************",
+    "cético: OpenAI gpt-5.6-sol: 401 {\n  \"error\": {\n    \"message\": \"Incorrect API key provided: sk-proj-*************************************************************************************************************************************"
+   ],
+   "textos": {
+    "interno": "Justificativa interna: Prazo Otimizado (id legado-178)\nSaída do time: Encaminhar ao humano. Mérito: humano. Estrela: sem estrela. Confiança baixa.\nCritério aplicado: experimenta.\nEvidências da estrela: nenhuma citada.\nRacional da estrela: Fallback: o agente da estrela não devolveu uma saída utilizável (estrela: erro_llm). Nota não avaliada; conferir na triagem.\nJulgamentos do mérito:\n- plausibilidade_horas: sem resposta do agente.\n- financeiro: sem resposta do agente.\n- precedente: sem resposta do agente.\n- evidencia: sem resposta do agente.\nRessalvas:\n- Nenhum julgamento válido (todos em fallback): sem julgamento não se aprova, encaminhar ao humano.\nDivergências: nenhuma.\nMotivos:\n- O mérito não conseguiu fechar e pede olhar humano.\nAuditoria de valor: não realizada.",
+    "ao_autor": null,
+    "comite": "Dossiê de comitê: Prazo Otimizado (id legado-178)\nResumo: Otimização de prazos de entrega para aumento de conversão.\nNota do time: sem estrela (experimenta). Mérito: humano. Confiança baixa.\nPares já notados (referência):\n- PIAPP (10 estrelas): Desenvolvemos uma plataforma completa de geração de conteúdo com IA para a empresa toda, utilizada por +10 times, que permite gerar conteúdo em alto volume, fotos, vídeos curtos e longos. Inclui MCP, API para ser chamado\n- [VERSTA] Robo orçamento, {Marca} (8 estrelas): Robô que muda orçamentos de Facebook Ads automaticamente seguindo regras de negócio de cada marca. Controla 100% do orçamento do grupo.\n- Ferramenta de testes de novos produtos ctr com agente autonomo (CTR machine) (7 estrelas): Funcionalidade: testar de forma mais fácil produtos novos em ctr para serem lançados posteriormente nas marcas de forma mais assertiva e rápida\nAntes: time tinha que procurar os produtos hit na mao, mandar para designs c\n- GoBrands (7 estrelas): O GoBrands é o registro central de marcas e integrações do grupo: uma nova marca ou conta externa (Meta Ads, Shopify, Mercado Livre, TikTok Shop, Shopee) entra no ecossistema de dados por cadastro na tela, não por altera\nO time lê o projeto abaixo de Ferramenta de testes de novos produtos ctr com agente autonomo (CTR machine) (7 estrelas) porque Fallback: o agente da estrela não devolveu uma saída utilizável (estrela: erro_llm). Nota não avaliada; conferir na triagem.\nDivergências: nenhuma.\nMotivo do encaminhamento:\n- O mérito não conseguiu fechar e pede olhar humano."
+   },
+   "duracao_ms": 39380,
+   "vizinhos": []
+  },
+  {
+   "id": "3ab58cbbea1557ff111d5de3a73c1a15",
+   "nome": "Report Semanal CX",
+   "area": "CX",
+   "especial": false,
+   "gabarito": "nota_humana",
+   "merito": "conservador",
+   "estrela": {
+    "humana": 2,
+    "time": 0,
+    "distancia": 2,
+    "dentro_de_1": false
+   },
+   "escape": false,
+   "saida": "humano",
+   "confianca": "baixa",
+   "valor_absurdo": null,
+   "contestou": false,
+   "statusHumano": "Aprovado",
+   "veredito_merito": "humano",
+   "criterio": "experimenta",
+   "desqualificador": null,
+   "evidencias": [],
+   "racional_estrela": "Fallback: o agente da estrela não devolveu uma saída utilizável (estrela: erro_llm). Nota não avaliada; conferir na triagem.",
+   "preocupacoes": [],
+   "perguntas": [],
+   "motivos": [
+    "O mérito não conseguiu fechar e pede olhar humano."
+   ],
+   "divergencias": [],
+   "cetico": {
+    "refuta": false,
+    "motivo": null,
+    "sinais": [],
+    "fallback": true
+   },
+   "rodadas": 1,
+   "chamadas_llm": 7,
+   "erros": [
+    "especialista plausibilidade_horas: erro_llm",
+    "especialista precedente: erro_llm",
+    "especialista evidencia: erro_llm",
+    "especialista financeiro: erro_llm",
+    "estrela: erro_llm",
+    "cético da estrela: OpenAI gpt-5.6-sol: 401 {\n  \"error\": {\n    \"message\": \"Incorrect API key provided: sk-proj-*************************************************************************************************************************************",
+    "cético: OpenAI gpt-5.6-sol: 401 {\n  \"error\": {\n    \"message\": \"Incorrect API key provided: sk-proj-*************************************************************************************************************************************"
+   ],
+   "textos": {
+    "interno": "Justificativa interna: Report Semanal CX (id 3ab58cbbea1557ff111d5de3a73c1a15)\nSaída do time: Encaminhar ao humano. Mérito: humano. Estrela: sem estrela. Confiança baixa.\nCritério aplicado: experimenta.\nEvidências da estrela: nenhuma citada.\nRacional da estrela: Fallback: o agente da estrela não devolveu uma saída utilizável (estrela: erro_llm). Nota não avaliada; conferir na triagem.\nJulgamentos do mérito:\n- plausibilidade_horas: sem resposta do agente.\n- financeiro: sem resposta do agente.\n- precedente: sem resposta do agente.\n- evidencia: sem resposta do agente.\nRessalvas:\n- Nenhum julgamento válido (todos em fallback): sem julgamento não se aprova, encaminhar ao humano.\nDivergências: nenhuma.\nMotivos:\n- O mérito não conseguiu fechar e pede olhar humano.\nAuditoria de valor: não realizada.",
+    "ao_autor": null,
+    "comite": "Dossiê de comitê: Report Semanal CX (id 3ab58cbbea1557ff111d5de3a73c1a15)\nResumo: O Report Semanal CX consolida o fechamento semanal de indicadores das nove marcas da Gocase e do grupo Gobeaute em uma plataforma única, substituindo o ciclo anterior de análise manual, preenchimento colaborativo em Google Docs e montagem de apresentação para a diretoria. A coordenação sobe o print do painel de indicadores, a IA lê a tabela e, a partir dos números, o sistema identifica sozinho quais indicadores ficaram fora da meta, cria os tópicos correspondentes e monta a mensagem de cobrança do time, que é enviada ao Google Chat com um clique. O time escreve contexto e ações diretamente nos cards, e a IA gera o resumo executivo em linguagem simples a partir do que já foi escrito, sem reescrita. É usado pela coordenação e pelo time de CX, com a diretoria como leitora final; o resultado é o fechamento de sexta-feira caindo de cerca de 2h25 para 1h.\nNota do time: sem estrela (experimenta). Mérito: humano. Confiança baixa.\nPares já notados (referência):\n- PIAPP (10 estrelas): Desenvolvemos uma plataforma completa de geração de conteúdo com IA para a empresa toda, utilizada por +10 times, que permite gerar conteúdo em alto volume, fotos, vídeos curtos e longos. Inclui MCP, API para ser chamado\n- [VERSTA] Robo orçamento, {Marca} (8 estrelas): Robô que muda orçamentos de Facebook Ads automaticamente seguindo regras de negócio de cada marca. Controla 100% do orçamento do grupo.\n- Ferramenta de testes de novos produtos ctr com agente autonomo (CTR machine) (7 estrelas): Funcionalidade: testar de forma mais fácil produtos novos em ctr para serem lançados posteriormente nas marcas de forma mais assertiva e rápida\nAntes: time tinha que procurar os produtos hit na mao, mandar para designs c\n- GoBrands (7 estrelas): O GoBrands é o registro central de marcas e integrações do grupo: uma nova marca ou conta externa (Meta Ads, Shopify, Mercado Livre, TikTok Shop, Shopee) entra no ecossistema de dados por cadastro na tela, não por altera\nO time lê o projeto abaixo de Ferramenta de testes de novos produtos ctr com agente autonomo (CTR machine) (7 estrelas) porque Fallback: o agente da estrela não devolveu uma saída utilizável (estrela: erro_llm). Nota não avaliada; conferir na triagem.\nDivergências: nenhuma.\nMotivo do encaminhamento:\n- O mérito não conseguiu fechar e pede olhar humano."
+   },
+   "duracao_ms": 39422,
+   "vizinhos": []
+  }
+ ]
+}

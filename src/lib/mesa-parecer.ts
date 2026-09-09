@@ -121,3 +121,80 @@ export function semTravessao(texto: string | null | undefined): string {
   t = t.replace(/\s+-+\s+/g, (_m, off: number) => junta(t, off));
   return t.replace(/\s+([,.;:!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
 }
+
+// ─── A JUSTIFICATIVA do time, em blocos legíveis (09/09/2026) ────────────────────────────────
+
+/**
+ * Os rótulos que o `textos.ts` do time escreve, na ordem em que ele os monta. FONTE ÚNICA.
+ *
+ * ⚠️ Mexer no `montarJustificativaInterna` sem mexer aqui faz o bloco novo cair no anterior sem
+ * erro nenhum — é a armadilha do parser por prefixo. O teste de ida e volta cobra os dois lados.
+ */
+export const BLOCOS_JUSTIFICATIVA = [
+  'Justificativa interna',
+  'Saída do time',
+  'Critério aplicado',
+  'Evidências da estrela',
+  'Racional da estrela',
+  'Julgamentos do mérito',
+  'Divergências',
+  'Motivos',
+  'Auditoria de valor',
+  'Perguntas ao autor',
+] as const;
+
+export type BlocoJustificativa = {
+  /** O rótulo do bloco (sem os dois pontos), ou `null` para o texto que vem antes do 1º rótulo. */
+  titulo: string | null;
+  /** As linhas do bloco, já sem bullet e sem linha vazia. */
+  linhas: string[];
+};
+
+/**
+ * Parte a justificativa interna do time em BLOCOS. PURA.
+ *
+ * ⚠️ **Por que existe.** O texto sempre teve estrutura — o `textos.ts` o monta com um rótulo por
+ * seção e `\n` entre elas —, mas a ficha o desenhava num `<span>` só, e HTML colapsa `\n`. Efeito:
+ * um muro de ~3.500 caracteres numa linha, com a régua, as evidências, os 5 julgamentos, a auditoria
+ * de valor e as perguntas ao autor tudo emendado. Palavras do Luis: *"a justificativa está
+ * praticamente ilegivel. É esse texto enorme e dificil de ler"*.
+ *
+ * ⚠️ **Não reescreve nada** — só reconhece os rótulos e agrupa. O texto é o rastro de AUDITORIA do
+ * time e precisa continuar íntegro; o que estava errado era a apresentação.
+ */
+export function partirJustificativaDoTime(texto: string | null | undefined): BlocoJustificativa[] {
+  const bruto = (texto ?? '').trim();
+  if (!bruto) return [];
+  const blocos: BlocoJustificativa[] = [];
+  let atual: BlocoJustificativa | null = null;
+  for (const cru of bruto.split('\n')) {
+    const linha = cru.trim().replace(/^-\s*/, '');
+    if (!linha) continue;
+    const titulo = BLOCOS_JUSTIFICATIVA.find((t) => linha.startsWith(`${t}:`)) ?? null;
+    if (titulo) {
+      const resto = linha.slice(titulo.length + 1).trim();
+      atual = { titulo, linhas: resto ? [resto] : [] };
+      blocos.push(atual);
+      continue;
+    }
+    if (!atual) {
+      atual = { titulo: null, linhas: [] };
+      blocos.push(atual);
+    }
+    atual.linhas.push(linha);
+  }
+  return blocos.filter((b) => b.linhas.length > 0 || b.titulo != null);
+}
+
+/**
+ * Quais blocos ficam ABERTOS na ficha. Os outros vão para o "exibir mais".
+ *
+ * ⚠️ A régua é "o que responde *por que este desfecho?*". Fora ficam as evidências citadas e os 5
+ * julgamentos por dimensão, que são o rastro para quem quiser conferir, não o que se lê primeiro.
+ */
+export const BLOCOS_ABERTOS: readonly string[] = [
+  'Saída do time',
+  'Racional da estrela',
+  'Auditoria de valor',
+  'Perguntas ao autor',
+];

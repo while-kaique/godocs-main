@@ -25,6 +25,14 @@ import { rotuloNotaAgente } from '@/lib/estrelas-regua';
 import { chaveProjeto } from '@/lib/projeto-chave';
 import { numero } from '@/lib/dashboard-resumo';
 import { ESTRELA_LIMITE_REPROVAVEL } from '@/lib/materialidade-piso';
+import { reservarAvisoDoAgente } from '@/integrations/db/client.server';
+import { notificarChatDoAgente } from '@/lib/notificacao-projeto.functions';
+import { reportarFalhaDeAgente } from '@/lib/agentes-falhas';
+import {
+  deveAvisarDoAgente,
+  deveAvisarPorAgente,
+  resumirConsenso,
+} from '@/lib/notificacao-agente';
 
 /**
  * Origem da nota quando quem a produziu foi o TIME INTEIRO (≠ `agente-classificador`, o de 1
@@ -54,7 +62,16 @@ export const ORIGEM_TIME_COMPLETO = 'time-completo';
 async function estrelaPeloTimeInteiro(
   projetoIdBruto: string,
   opts: { dry?: boolean; forcar?: boolean },
-): Promise<{ ok: boolean; motivo?: string; estrelas?: number | null }> {
+): Promise<{
+  ok: boolean;
+  motivo?: string;
+  estrelas?: number | null;
+  /** Faixa 6-10: o projeto precisa de estrela HUMANA (é o único `em_validacao` que avisa o grupo). */
+  escape?: boolean;
+  /** O consenso do time, uma frase por voz — vira o "exibir mais" do card. */
+  motivos?: string[];
+  confianca?: string | null;
+}> {
   const projetoId = chaveProjeto(projetoIdBruto);
   if (!opts.forcar) {
     try {
@@ -72,7 +89,9 @@ async function estrelaPeloTimeInteiro(
   if (!r.ok) return { ok: false, motivo: r.motivo };
   const c = r.resultado.consenso;
 
-  if (opts.dry) return { ok: true, estrelas: c.estrela };
+  if (opts.dry) {
+    return { ok: true, estrelas: c.estrela, escape: c.escape, motivos: c.motivos, confianca: c.confianca };
+  }
 
   // Persistência em DOIS lugares, e os dois são necessários:
   //  - `especial_avaliacao` é de onde a FICHA lê a recomendação;
@@ -104,7 +123,7 @@ async function estrelaPeloTimeInteiro(
   } catch (e) {
     console.error('[time-completo] falha ao escrever as colunas do agente:', e);
   }
-  return { ok: true, estrelas: c.estrela };
+  return { ok: true, estrelas: c.estrela, escape: c.escape, motivos: c.motivos, confianca: c.confianca };
 }
 
 export type ResultadoTimeCompleto = {
@@ -114,6 +133,8 @@ export type ResultadoTimeCompleto = {
   mesa: { ok: boolean; motivo?: string; veredito?: string | null };
   /** A nota: `{ok, estrelas}` ou o motivo (já tem nota humana, sem vizinhos…). */
   estrela: { ok: boolean; motivo?: string; estrelas?: number | null };
+  /** O grupo do Chat foi avisado nesta passada? (só a 1ª conclusão de cada projeto avisa) */
+  avisou_grupo?: boolean;
 };
 
 function resumoMesa(r: unknown): ResultadoTimeCompleto['mesa'] {
@@ -154,7 +175,62 @@ export async function avaliarProjetoComTimeCompleto(
       : { ok: false, motivo: String(estrela.reason) };
   // `ok` é OU, não E: uma metade que funcionou já é resultado — e o caso mais comum de "falha" da
   // nota é legítimo (o projeto tem nota humana e é âncora), não erro.
-  return { ok: m.ok || e.ok, projeto_id: projetoId, mesa: m, estrela: e };
+
+  // ── o aviso ao GRUPO do Chat, que desde 09/09/2026 nasce AQUI (no lugar da D30) ──
+  const bruto = estrela.status === 'fulfilled' ? estrela.value : null;
+  const avisado = dry
+    ? false
+    : await avisarGrupoDoParecer(projetoId, {
+        veredito: m.veredito ?? '',
+        escape: bruto?.escape ?? false,
+        motivos: bruto?.motivos ?? [],
+        confianca: bruto?.confianca ?? null,
+      });
+
+  return { ok: m.ok || e.ok, projeto_id: projetoId, mesa: m, estrela: e, avisou_grupo: avisado };
+}
+
+/**
+ * Avisa o grupo do Chat do parecer do time — UMA VEZ por projeto. **Nunca lança.**
+ *
+ * ⚠️ **Três travas, e cada uma fecha um jeito conhecido de errar:**
+ *  1. `deveAvisarPorAgente` — só `aprovar`, `reprovar` e a faixa 6-10 disparam. O `em_validacao`
+ *     comum é o desfecho DOMINANTE em prod (311 de 641 em confiança baixa) e inundaria o grupo.
+ *  2. `reservarAvisoDoAgente` — UPDATE condicional atômico. Sem ele, um backfill do time nos 641
+ *     projetos que já têm nota viraria 641 cards, que é o defeito pelo qual o `buildUpdateMessage`
+ *     foi removido deste repo.
+ *  3. `dry` nunca avisa (o chamador já filtra, mas a régua mora aqui também).
+ *
+ * ⚠️ Adaptador que não reporta linhas escritas → **avisa** (`deveAvisarDoAgente`) e a
+ * indeterminação é REPORTADA: silêncio permanente é pior que card repetido, mas nenhum dos dois
+ * pode acontecer sem sinal.
+ */
+async function avisarGrupoDoParecer(
+  projetoId: string,
+  sinal: { veredito: string; escape: boolean; motivos: string[]; confianca: string | null },
+): Promise<boolean> {
+  try {
+    if (!deveAvisarPorAgente({ veredito: sinal.veredito, escape: sinal.escape })) return false;
+    const linhas = await reservarAvisoDoAgente(projetoId);
+    if (linhas == null) {
+      reportarFalhaDeAgente({
+        classe: 'idempotencia_indeterminada',
+        onde: 'avaliacao-completa.avisarGrupoDoParecer',
+        projetoId,
+        detalhe: 'o UPDATE da reserva não reportou linhas escritas — avisando por default',
+      });
+    }
+    if (!deveAvisarDoAgente(linhas)) return false;
+    return await notificarChatDoAgente(projetoId, {
+      veredito: sinal.veredito,
+      escape: sinal.escape,
+      consenso: resumirConsenso(sinal.motivos),
+      confianca: sinal.confianca,
+    });
+  } catch (e) {
+    console.error('[time-completo] falha ao avisar o grupo (não-fatal):', e);
+    return false;
+  }
 }
 
 /**

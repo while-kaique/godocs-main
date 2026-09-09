@@ -5,7 +5,7 @@
 // não está liberado e avisar seria ruído para a triagem.
 //
 // ⚠️ O aviso é acessório: ele nunca pode derrubar a decisão do líder (mesma régua do D3).
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import BetterSqlite3 from 'better-sqlite3';
 import type { GoDeployDB } from '@/integrations/db/db-adapter';
 
@@ -31,7 +31,12 @@ import {
   getAprovacoesDoProjeto,
   decidirAprovacoesDoProjeto,
 } from '@/integrations/db/client.server';
-import { abrirPreAprovacao, decidirAprovacao } from '@/lib/aprovacoes.functions';
+import {
+  abrirPreAprovacao,
+  decidirAprovacao,
+  d30Ligada,
+  __setD30ParaTeste,
+} from '@/lib/aprovacoes.functions';
 import { notificarChatPreAprovacao } from '@/lib/notificacao-projeto.functions';
 // ⚠️ Namespace import de propósito: `deveNotificarDecisao` ainda não existe. Com
 // `import { ... }` o arquivo INTEIRO morre no carregamento e leva junto os casos que
@@ -42,6 +47,19 @@ const mockLideranca = ehLideranca as unknown as ReturnType<typeof vi.fn>;
 const mockLideres = getLideresDe as unknown as ReturnType<typeof vi.fn>;
 const mockLiderados = getLideradosDe as unknown as ReturnType<typeof vi.fn>;
 const mockNotifica = notificarChatPreAprovacao as unknown as ReturnType<typeof vi.fn>;
+
+// ⚠️ **A D30 está DESARMADA em produção desde 09/09/2026** — o gatilho do grupo passou a ser o
+// parecer do time de agentes (`avaliacao-completa.functions.ts`). Os casos abaixo ARMAM a flag de
+// propósito: eles cobrem a SERIALIZAÇÃO do aviso (duplo clique, 2 líderes da mesma fila, adaptador
+// que não reporta linhas), e essa cobertura é o que torna o rearme seguro. Apagá-los junto com o
+// desligamento deixaria a maquinaria sem rede.
+describe('a D30 nasce DESARMADA', () => {
+  it('o default é não avisar pela pré-aprovação', () => {
+    // O gatilho hoje é o do agente. Se este teste virar vermelho, alguém rearmou a D30 — e nesse
+    // caso o gatilho do agente tem de sair no MESMO deploy, senão o grupo recebe 2 cards.
+    expect(d30Ligada()).toBe(false);
+  });
+});
 
 function asyncAdapter(db: BetterSqlite3.Database): GoDeployDB {
   return {
@@ -122,11 +140,14 @@ describe('decidirAprovacao — gatilho do aviso no grupo do Chat', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // ARMA a D30: estes casos cobrem a maquinaria, que segue válida e desarmada em produção.
+    __setD30ParaTeste(true);
     mockLideranca.mockResolvedValue(false);
     mockLideres.mockResolvedValue([LUCAS]);
     mockLiderados.mockResolvedValue([]);
     mockNotifica.mockResolvedValue(true);
   });
+  afterEach(() => __setD30ParaTeste(false));
 
   it('PRÉ-APROVADO dispara o aviso, com o projeto e a assinatura de quem decidiu', async () => {
     const id = await criarProjetoEmFila();
@@ -237,11 +258,14 @@ describe('decidirAprovacao — corrida: o grupo recebe UMA mensagem, não duas',
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // ARMA a D30: estes casos cobrem a maquinaria, que segue válida e desarmada em produção.
+    __setD30ParaTeste(true);
     mockLideranca.mockResolvedValue(false);
     mockLideres.mockResolvedValue([LUCAS]);
     mockLiderados.mockResolvedValue([]);
     mockNotifica.mockResolvedValue(true);
   });
+  afterEach(() => __setD30ParaTeste(false));
 
   it('DOIS líderes da mesma fila (D4) pré-aprovando em paralelo → 1 aviso', async () => {
     mockLideres.mockResolvedValue([LUCAS, MARIA]);
@@ -329,6 +353,7 @@ describe('decidirAprovacao — corrida: o grupo recebe UMA mensagem, não duas',
 // que o `env.DB` do Godeploy devolve é DESCONHECIDO. Diante do desconhecido, avisa —
 // trocar 2 mensagens por NENHUMA é estritamente pior e invisível.
 describe('adaptador que NÃO reporta quantas linhas escreveu → notifica assim mesmo', () => {
+  afterEach(() => __setD30ParaTeste(false));
   const variantes: Array<{ nome: string; retorno: unknown }> = [
     { nome: 'exec devolve undefined', retorno: undefined },
     { nome: 'exec devolve objeto sem rowsWritten', retorno: {} },
@@ -349,6 +374,7 @@ describe('adaptador que NÃO reporta quantas linhas escreveu → notifica assim 
       await setDb(cego);
 
       vi.clearAllMocks();
+      __setD30ParaTeste(true); // ARMA a D30: este bloco cobre a maquinaria (ver o aviso no topo).
       mockLideranca.mockResolvedValue(false);
       mockLideres.mockResolvedValue([LUCAS]);
       mockLiderados.mockResolvedValue([]);

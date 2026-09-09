@@ -45,6 +45,33 @@ export async function notificarChatPreAprovacao(
   projetoId: string,
   parecer: { por: string; em: string },
 ): Promise<boolean> {
+  return notificarProjeto(projetoId, { preAprovacao: parecer });
+}
+
+/**
+ * Notifica o grupo do Chat do PARECER DO TIME DE AGENTES — o gatilho desde 09/09/2026, no lugar
+ * da pré-aprovação do líder (a D30).
+ *
+ * ⚠️ Quem decide SE dispara é `deveAvisarPorAgente` + a reserva de idempotência
+ * (`reservarAvisoDoAgente`), no chamador. Esta função só monta e envia: chamá-la já é a decisão
+ * tomada.
+ * ⚠️ **Nunca lança** e projeto `[E2E-…]` segue mudo, como em todos os caminhos.
+ */
+export async function notificarChatDoAgente(
+  projetoId: string,
+  sinal: { veredito: string; escape?: boolean | null; consenso?: string | null; confianca?: string | null },
+): Promise<boolean> {
+  return notificarProjeto(projetoId, { agente: sinal });
+}
+
+/** O corpo comum: remonta o payload do banco e envia. O que DISPAROU vem em `extra`. */
+async function notificarProjeto(
+  projetoId: string,
+  extra: {
+    preAprovacao?: { por: string; em: string } | null;
+    agente?: { veredito: string; escape?: boolean | null; consenso?: string | null; confianca?: string | null } | null;
+  },
+): Promise<boolean> {
   try {
     const projeto = await getProjetoById(projetoId);
     if (!projeto) {
@@ -120,12 +147,13 @@ export async function notificarChatPreAprovacao(
       // mantém o builder coerente caso a régua da isenção mude um dia.
       especial: projeto.especial === 1,
       contextoEspecial: (projeto.contexto_especial as string | null) ?? undefined,
-      preAprovacao: parecer,
+      preAprovacao: extra.preAprovacao ?? null,
+      agente: extra.agente ?? null,
     });
 
     return await sendChatNotification(message);
   } catch (e) {
-    console.error('[notificacao-projeto] Falha ao notificar a pré-aprovação (não-fatal):', e);
+    console.error('[notificacao-projeto] Falha ao notificar o projeto (não-fatal):', e);
     return false;
   }
 }
