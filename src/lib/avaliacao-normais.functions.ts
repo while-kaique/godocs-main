@@ -729,9 +729,20 @@ async function avaliarComContexto(
  * roda os especialistas + juiz. `dry` não grava. Respeita a flag (OFF → NO-OP).
  */
 export async function avaliarProjetoNormal(
-  projetoId: string,
+  projetoIdBruto: string,
   opts: { dry?: boolean } = {},
 ): Promise<ResultadoAvaliacaoNormal> {
+  // ⚠️ **Chave CANÔNICA na entrada (09/09/2026).** A planilha guarda legado em MAIÚSCULA
+  // (`LEGADO-057`) e o sync reverso cria a linha do `projetos` em minúscula — e o `=` do SQLite é
+  // sensível a caixa. Sem normalizar, `getProjetoById('LEGADO-057')` devolve nada e a mesa
+  // responde **"projeto não encontrado"**.
+  //
+  // Medido em prod: `legado-057` reprovava pelo piso corretamente e `LEGADO-057` dava "não
+  // encontrado" — o mesmo projeto. E o id que a TELA manda vem do espelho, ou seja **como está na
+  // planilha**: o lote da triagem falharia calado em TODO legado. O classificador da estrela já
+  // normalizava (`classificarEspecialProjeto`); a mesa era o leitor que ficou de fora da régua de
+  // `projeto-chave.ts`.
+  const projetoId = chaveProjeto(projetoIdBruto);
   if (!avaliacaoNormaisLigada()) {
     return { ok: false, projeto_id: projetoId, motivo: 'AVALIACAO_NORMAIS desligado (modo sombra OFF)' };
   }

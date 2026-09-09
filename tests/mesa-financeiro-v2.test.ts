@@ -11,6 +11,7 @@
  * aqui a mesa que roda em produção a cada submissão.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { financeiroDoProjeto, mapaDeLinhas } from '@/lib/avaliacao-normais.functions';
 import { avaliarFinanceiro } from '@/lib/agents/avaliacao-financeira';
 import { agregarVotos } from '@/lib/agents/agregador-avaliacao';
@@ -131,5 +132,17 @@ describe('mapaDeLinhas — o índice por id', () => {
 
   it('linha sem ID não entra (separador, rodapé, lixo)', () => {
     expect(mapaDeLinhas([{ Projeto: 'sem id' } as SheetRow]).size).toBe(0);
+  });
+});
+
+describe('chave canônica na entrada da mesa (09/09/2026)', () => {
+  it('a mesa normaliza o id, como os outros leitores da avaliação', () => {
+    // ⚠️ Medido em prod: `legado-057` reprovava pelo piso e `LEGADO-057` dava "projeto não
+    // encontrado" — o MESMO projeto. A planilha guarda legado em MAIÚSCULA, o sync cria a linha em
+    // minúscula, e o `=` do SQLite é sensível a caixa. O id que a TELA manda vem do espelho, ou
+    // seja como está na planilha: sem isto o lote da triagem falharia calado em todo legado.
+    const src = readFileSync('src/lib/avaliacao-normais.functions.ts', 'utf8');
+    const fn = src.slice(src.indexOf('export async function avaliarProjetoNormal('));
+    expect(fn.slice(0, 1400)).toMatch(/const projetoId = chaveProjeto\(projetoIdBruto\)/);
   });
 });
