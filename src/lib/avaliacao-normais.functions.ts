@@ -85,6 +85,7 @@ import {
   type VotosDeterministicos,
 } from '@/lib/agents/mesa-especialistas';
 import { carregarCorrecoesDaTriagem, licoesParaPrompt } from '@/lib/correcoes.functions';
+import { FAIXA_ESCAPE } from '@/lib/estrelas-regua';
 import type { Correcao } from '@/lib/correcoes';
 import type {
   JulgamentoEspecialista,
@@ -354,6 +355,23 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
       ? (receita.valor_ganho_mensal as number)
       : null;
   const materialidade = materialidadeMesa(economiaReaisMes, valorReceita);
+  // A NOTA entra no financeiro porque a reprovação por impacto é COMPOSTA: só reprova ganho
+  // irrelevante quando o projeto também é baixo. Preferimos a nota HUMANA; sem ela, a recomendada
+  // pelo agente.
+  //
+  // ⚠️ `"6-10"` NÃO é número: `Number("6-10")` é NaN, e NaN cairia em "sem nota", que **reprova**.
+  // Então a faixa de escape é traduzida para o piso dela (6) — ela é justamente o caso que mais
+  // precisa ser poupado.
+  const resumoDoProjeto = ctx.resumoPorId.get(projetoId) ?? ctx.resumoPorId.get(projetoId.toLowerCase());
+  const estrelaProjeto = ((): number | null => {
+    const humana = resumoDoProjeto?.estrelas;
+    if (typeof humana === 'number' && Number.isFinite(humana)) return humana;
+    const bruta = (resumoDoProjeto?.estrelaAgente ?? '').trim();
+    if (!bruta) return null;
+    if (bruta.includes('-')) return FAIXA_ESCAPE.min;
+    const n = Number(bruta);
+    return Number.isFinite(n) ? n : null;
+  })();
   const financeiro = avaliarFinanceiro({
     temSaving: !!saving,
     temReceita: !!receita,
@@ -362,6 +380,7 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
     custoEvitadoReais: custoEvitado,
     valorReceitaMensal: valorReceita,
     materialidade,
+    estrela: estrelaProjeto,
   });
 
   // ── Voto RAG (vizinhos aprovados) — corpus JÁ montado no contexto (fora do laço) ──
@@ -430,8 +449,8 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
     conciliado = conciliarJulgamentos(julgamentos, {
       especial: projeto.especial === 1,
       fluxoDireto: ehLider,
-      // Piso de impacto: mecânico, a MESMA régua da mesa determinística (D4).
-      abaixoDoPiso: financeiro.abaixoDoPiso,
+      // Piso de impacto: mecânico, a MESMA régua da mesa determinística (D4) — a COMPOSTA.
+      reprovavel: financeiro.reprovavel,
       motivoPiso: financeiro.motivo,
     });
     // Cético EFETIVO = o parecer do agente cético (preocupou?); sem ele (não deveria faltar), o

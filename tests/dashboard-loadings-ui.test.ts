@@ -95,3 +95,29 @@ describe('T2/T3 — o layout admin liga cache de auth e prefetch', () => {
     expect(dashboard).toContain('consumirPrefetchDashboard');
   });
 });
+
+describe('a tabela do /dashboard não desalinha (bug de 08/09/2026)', () => {
+  const src = readFileSync('src/routes/_authenticated/dashboard.tsx', 'utf8');
+
+  it('há exatamente uma célula por cabeçalho', () => {
+    // ⚠️ O bug: a coluna "Agente" ganhou `<Th>` e o `<td>` não entrou (um replace que não casou).
+    // Resultado: 11 cabeçalhos × 10 células, e TODO o conteúdo deslocou uma coluna à esquerda —
+    // o "Tipo · Nível" apareceu embaixo do cabeçalho "Agente", o impacto embaixo de Tipo, e
+    // assim por diante. Nada quebra, nada avisa: a tabela só passa a mentir.
+    const cabecalho = src.slice(src.indexOf('<thead>'), src.indexOf('</thead>'));
+    const ths = (cabecalho.match(/<Th\b/g) ?? []).length + (cabecalho.match(/<th\b/g) ?? []).length;
+    const linha = src.match(/<tr\s+key=\{p\.id\}([\s\S]*?)<\/tr>/);
+    expect(linha, 'a linha de dado não foi encontrada').toBeTruthy();
+    const tds = (linha![1].match(/<td\b/g) ?? []).length;
+    expect(tds).toBe(ths);
+  });
+
+  it('a palavra "Sombra" não aparece mais na tela (é o AGENTE que valida agora)', () => {
+    const semComentarios = src
+      .split('\n')
+      .filter((l) => !/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(l))
+      .join('\n');
+    expect(semComentarios).not.toMatch(/>Sombra</);
+    expect(semComentarios).not.toMatch(/ChipSombra/);
+  });
+});

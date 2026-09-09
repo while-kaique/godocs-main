@@ -28,13 +28,14 @@ import { motivoPisoDeImpacto } from '@/lib/materialidade-piso';
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
 const fteOk: ResultadoPlausibilidadeFTE = { implausivel: false, fte: 1, pessoas: 2, motivo: null } as ResultadoPlausibilidadeFTE;
-const finOk: ResultadoFinanceiro = { veredito: 'ok', confianca: 0.9, motivo: null, sinais: [], abaixoDoPiso: false };
+const finOk: ResultadoFinanceiro = { veredito: 'ok', confianca: 0.9, motivo: null, sinais: [], abaixoDoPiso: false, reprovavel: false };
 const finPiso: ResultadoFinanceiro = {
   veredito: 'atencao',
   confianca: 0.3,
   motivo: motivoPisoDeImpacto(18.16),
   sinais: [motivoPisoDeImpacto(18.16)],
   abaixoDoPiso: true,
+  reprovavel: true,
 };
 const ragApoio = { apoio: true, confianca: 0.85, vizinhos: 3, topSimilaridade: 0.8, motivo: null };
 
@@ -95,7 +96,7 @@ describe('porta (i) — piso de impacto (RF-243)', () => {
 
     const comPiso = agregarJulgamentos({
       julgamentos: tranquilos,
-      abaixoDoPiso: true,
+      reprovavel: true,
       motivoPiso: motivoPisoDeImpacto(0.88),
     });
     expect(comPiso.veredito).toBe('reprovar');
@@ -105,7 +106,7 @@ describe('porta (i) — piso de impacto (RF-243)', () => {
   it('ESPECIAL nunca é reprovado pelo piso — o isento vem antes', () => {
     const r = agregarVotos({ fte: fteOk, financeiro: finPiso, rag: ragApoio, especial: true });
     expect(r.veredito).toBe('isento');
-    expect(agregarJulgamentos({ julgamentos: [], especial: true, abaixoDoPiso: true }).veredito).toBe('isento');
+    expect(agregarJulgamentos({ julgamentos: [], especial: true, reprovavel: true }).veredito).toBe('isento');
   });
 
   it('no time (consenso): impacto abaixo do piso → reprovar, mesmo com mérito aprovando', () => {
@@ -325,7 +326,7 @@ describe('as duas mesas têm a MESMA régua de piso (não dá para aprovar por u
     ] as never;
     expect(conciliarJulgamentos(tranquilos, {}).veredito).toBe('aprovar');
     const comPiso = conciliarJulgamentos(tranquilos, {
-      abaixoDoPiso: true,
+      reprovavel: true,
       motivoPiso: motivoPisoDeImpacto(18.16),
     });
     expect(comPiso.veredito).toBe('reprovar');
@@ -334,6 +335,7 @@ describe('as duas mesas têm a MESMA régua de piso (não dá para aprovar por u
 
   it('o call site da mesa LLM realmente passa o piso (canário de fiação)', () => {
     const src = readFileSync('src/lib/avaliacao-normais.functions.ts', 'utf8');
-    expect(src).toMatch(/abaixoDoPiso: financeiro\.abaixoDoPiso/);
+    // ⚠️ `reprovavel`, não `abaixoDoPiso`: a régua é COMPOSTA (impacto **e** nota baixa).
+    expect(src).toMatch(/reprovavel: financeiro\.reprovavel/);
   });
 });

@@ -188,7 +188,10 @@ export function agregarVotos(input: {
   // PISO DE IMPACTO (D4) — mecânico e ANTES de qualquer aritmética de confiança: nenhum arranjo de
   // votos "compensa" um ganho de R$ 18/mês. Vem DEPOIS do isento de especial de propósito (especial
   // não tem memorial financeiro, então não há impacto declarado a julgar).
-  if (input.financeiro.abaixoDoPiso) {
+  // ⚠️ `reprovavel`, não `abaixoDoPiso`: a régua é COMPOSTA (impacto irrelevante **E** nota
+  // baixa). Medido em 08/09/2026 — os 137 reprovados à mão tinham todos 0★, e o piso sozinho
+  // derrubaria 10 projetos APROVADOS com 2★–4★, quase todos de processo.
+  if (input.financeiro.reprovavel) {
     return reprovadoPeloPiso(input.financeiro.motivo);
   }
 
@@ -270,12 +273,13 @@ export function agregarJulgamentos(input: {
   fluxoDireto?: boolean | null;
   limiarConfianca?: number | null;
   /**
-   * O piso de impacto MECÂNICO (de `avaliarFinanceiro.abaixoDoPiso`), com o motivo já redigido.
+   * A reprovação MECÂNICA por impacto (de `avaliarFinanceiro.reprovavel` — a régua composta
+   * impacto+nota), com o motivo já redigido.
    * Campo OPCIONAL: ausente é `false`, então todo chamador antigo segue byte-idêntico. ⚠️ Os
    * especialistas LLM não votam sobre o piso — quem o aplica é a régua, e ela sobrepõe o painel
    * inteiro (rejeição mecânica sobrepõe aprovação do LLM).
    */
-  abaixoDoPiso?: boolean | null;
+  reprovavel?: boolean | null;
   motivoPiso?: string | null;
 }): ResultadoAgregado {
   // ⚠️ LIDERANÇA NÃO ISENTA MAIS (decisão do Luis, 01/09/2026). Só o ESPECIAL isenta.
@@ -301,7 +305,7 @@ export function agregarJulgamentos(input: {
   }
 
   // PISO DE IMPACTO: mecânico, sobrepõe o painel LLM inteiro (ver o aviso no topo).
-  if (input.abaixoDoPiso === true) {
+  if (input.reprovavel === true) {
     return reprovadoPeloPiso(input.motivoPiso ?? null);
   }
 

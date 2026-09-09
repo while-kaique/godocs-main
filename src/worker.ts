@@ -71,10 +71,14 @@ import {
   avaliarAglutinacaoDaSubmissao,
 } from "@/lib/aglutinacao.functions";
 import {
+  avaliarComTimeCompletoEmBackground,
+  avaliarLoteComTime,
+  avaliarProjetoComTimeCompleto,
+} from "@/lib/avaliacao-completa.functions";
+import {
   classificarEspecialProjeto,
   julgarProjetoComPainel,
   classificarEspeciaisPendentes,
-  classificarEspecialEmBackground,
   prepararIndicePinecone,
   sincronizarPineconeEspeciais,
   reauditarEspeciais,
@@ -231,16 +235,18 @@ function analisarEmBackground(projetoId: string): Promise<unknown> {
   );
 }
 
-// Análise + classificação de especiais + time autônomo de avaliação de normais, TODAS em
-// paralelo (Promise.allSettled). O classificador de especiais é NO-OP se o projeto não for
-// especial; a avaliação de normais (3ª promise) é NO-OP se a flag AVALIACAO_NORMAIS está OFF
-// (default) ou se o projeto é especial — e em MODO SOMBRA só grava a recomendação, nunca muda o
-// status. Nenhuma das três lança (cada uma engole os próprios erros).
+// Análise do analisador + o TIME DE AGENTES completo, em paralelo (`Promise.allSettled`).
+//
+// ⚠️ O time entra como UMA promise (`avaliarComTimeCompletoEmBackground`), não duas: até
+// 08/09/2026 eram `classificarEspecialEmBackground` (a nota, com gate `especial !== 1`) e
+// `avaliarProjetoNormalEmBackground` (a mesa, NO-OP em especial) — dois disparos, e projeto padrão
+// **nunca ganhava nota**. Decisão do Luis: *"é um TIME agindo JUNTO e classificando JUNTO"*, e
+// *"todo projeto pode ter nota ou não agora"*. Cada submissão roda as duas metades.
+// Nenhuma promise daqui lança (cada uma engole os próprios erros).
 function processarPosSubmissao(projetoId: string): Promise<unknown> {
   return Promise.allSettled([
     analisarEmBackground(projetoId),
-    classificarEspecialEmBackground(projetoId),
-    avaliarProjetoNormalEmBackground(projetoId),
+    avaliarComTimeCompletoEmBackground(projetoId),
     // "Este projeto é, na verdade, uma feature de um que já existe?" — 1 chamada de LLM,
     // ao lado do analisador. ⚠️ Só SUGERE: o vínculo na planilha continua nascendo do
     // aceite humano no painel. Quem já declarou o pai na Etapa 1 fica de fora.
@@ -1112,6 +1118,31 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const body = (await readBody(request)) as { projetoId?: string; dry?: boolean };
       if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
       return json(await avaliarProjetoNormal(body.projetoId, { dry: body.dry }));
+    }
+    // ── O TIME agindo JUNTO: uma passada = veredito de impacto + nota ────────────
+    //
+    // ⚠️ É esta a rota do botão da ficha e do lote da tela. Ela existe porque as duas metades
+    // eram dois cliques e dois caminhos (decisão do Luis, 08/09/2026: "é um TIME agindo JUNTO e
+    // classificando JUNTO"). SÍNCRONA: são ~5 chamadas de LLM, cabem num request — e o caminho
+    // em background morreu no `waitUntil` do Godeploy, prometendo estrela que nunca chegava.
+    if (pathname === "/api/admin/avaliacao/time-completo" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { projetoId?: string; dry?: boolean; forcar?: boolean };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
+      return json(
+        await avaliarProjetoComTimeCompleto(body.projetoId, { dry: body.dry, forcar: body.forcar }),
+        200,
+        { "Cache-Control": "no-store" },
+      );
+    }
+    // LOTE dos projetos que a triagem selecionou na tela. Bounded por `LOTE_MAX_PROJETOS` e
+    // iterado pelo FRONT (padrão do repo para trabalho longo — o disparo de e-mails faz igual).
+    if (pathname === "/api/admin/avaliacao/lote" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { projetoIds?: string[]; dry?: boolean; forcar?: boolean };
+      return json(await avaliarLoteComTime(body.projetoIds ?? [], { dry: body.dry, forcar: body.forcar }), 200, {
+        "Cache-Control": "no-store",
+      });
     }
     // Backfill: avalia os normais SEM recomendação + mantém os embeddings do corpus. `dry` é o
     // DEFAULT (gravar exige {"dry":false}); `limite` limita a corrida.

@@ -682,13 +682,21 @@ export async function classificarEspecialProjeto(
 // ─── Disparo pós-submissão (worker) ────────────────────────────────────────────
 
 /**
- * Chamado no worker logo após `submeter-validacao`, junto da análise. NO-OP silencioso se o
- * projeto não for especial. Nunca lança.
+ * Classifica a nota em background. Nunca lança.
+ *
+ * ⚠️ **O gate `especial !== 1` SAIU (decisão do Luis, 08/09/2026):** *"todo projeto pode ter nota
+ * ou não agora"*. Era ele que fazia a nota do agente existir só para especiais — projeto padrão
+ * passava pelo fan-out da submissão e nunca ganhava estrela, o que fazia parecer que o
+ * classificador estava quebrado quando ele só estava sendo barrado na porta.
+ * ⚠️ O que **sobra** de gate é o que a régua já dizia e continua valendo: projeto com **nota
+ * humana** não é reclassificado (é âncora — `prepararAlvo`), e `forcar` reabre.
+ * ⚠️ Hoje o caminho da submissão passa por `avaliarComTimeCompletoEmBackground`, que roda esta
+ * metade junto da mesa. Esta função fica para quem quer só a nota.
  */
-export async function classificarEspecialEmBackground(projetoId: string): Promise<void> {
+export async function classificarEstrelaEmBackground(projetoId: string): Promise<void> {
   try {
     const p = await getProjetoById(projetoId);
-    if (!p || p.especial !== 1) return; // só especiais
+    if (!p) return;
     await classificarEspecialProjeto(projetoId);
   } catch (e) {
     console.error("[especial-classificador] falha em background:", e);

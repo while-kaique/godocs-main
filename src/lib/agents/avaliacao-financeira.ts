@@ -19,7 +19,9 @@
  */
 import {
   abaixoDoPisoDeImpacto,
+  motivoPisoComEstrela,
   motivoPisoDeImpacto,
+  reprovaPeloPiso,
   PISO_IMPACTO_MENSAL,
 } from '@/lib/materialidade-piso';
 
@@ -44,6 +46,15 @@ export type ResultadoFinanceiro = {
    * prometem valor, e reprovar por ausência reprovaria as duas famílias inteiras.
    */
   abaixoDoPiso: boolean;
+  /**
+   * A régua COMPOSTA: impacto abaixo do piso **E** nota baixa (`reprovaPeloPiso`). É ESTE campo
+   * que o agregador transforma em `reprovar` — não o `abaixoDoPiso`, que é só o sinal do dinheiro.
+   *
+   * ⚠️ Medido: os 137 que o dono do produto reprovou à mão tinham **todos 0★**. O piso sozinho
+   * derrubaria 10 projetos APROVADOS com 2★–4★, quase todos de processo, onde o valor não está no
+   * dinheiro. `false` quando não veio estrela alta — ver `reprovaPeloPiso`.
+   */
+  reprovavel: boolean;
 };
 
 /** Número finito ou 0 — normaliza null/undefined/NaN. */
@@ -73,6 +84,12 @@ export function avaliarFinanceiro(input: {
   valorReceitaMensal?: number | null;
   materialidade?: number | null;
   teto?: number | null;
+  /**
+   * Nota do projeto (humana, ou a recomendada pelo agente na falta dela). Só a nota ALTA poupa a
+   * reprovação por impacto; ausência NÃO poupa. Campo OPCIONAL: sem ele o comportamento é o de
+   * antes do gate composto.
+   */
+  estrela?: number | null;
 }): ResultadoFinanceiro {
   const teto =
     typeof input.teto === 'number' && isFinite(input.teto) && input.teto > 0
@@ -101,6 +118,7 @@ export function avaliarFinanceiro(input: {
       motivo: 'Sem dados financeiros para avaliar — nem saving nem receita declarados.',
       sinais: ['sem dados financeiros'],
       abaixoDoPiso: false,
+      reprovavel: false,
     };
   }
 
@@ -109,8 +127,15 @@ export function avaliarFinanceiro(input: {
   // PISO de impacto: a régua mecânica de D4. Fica ANTES do teto porque são os dois extremos da
   // mesma pergunta ("este número justifica um projeto?") e nenhum projeto pode disparar os dois.
   const abaixoDoPiso = abaixoDoPisoDeImpacto(materialidade, PISO_IMPACTO_MENSAL);
+  const reprovavel = reprovaPeloPiso({ impactoMensal: materialidade, estrela: input.estrela });
   if (abaixoDoPiso) {
-    sinais.push(motivoPisoDeImpacto(materialidade, PISO_IMPACTO_MENSAL));
+    // O sinal do dinheiro aparece sempre que o número é irrelevante; o texto da REPROVAÇÃO só
+    // quando a nota também é baixa (senão o parecer afirmaria um desfecho que não vai acontecer).
+    sinais.push(
+      reprovavel
+        ? motivoPisoComEstrela(materialidade, input.estrela, PISO_IMPACTO_MENSAL)
+        : motivoPisoDeImpacto(materialidade, PISO_IMPACTO_MENSAL),
+    );
   }
   if (materialidade > teto) {
     sinais.push(
@@ -138,5 +163,5 @@ export function avaliarFinanceiro(input: {
   const confianca = veredito === 'ok' ? 0.9 : 0.3;
   const motivo = sinais.length > 0 ? sinais.join(' ') : null;
 
-  return { veredito, confianca, motivo, sinais, abaixoDoPiso };
+  return { veredito, confianca, motivo, sinais, abaixoDoPiso, reprovavel };
 }
