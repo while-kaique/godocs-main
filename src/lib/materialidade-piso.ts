@@ -115,14 +115,26 @@ export const ESTRELA_LIMITE_REPROVAVEL = 1;
  * A régua COMPOSTA da reprovação por impacto: o número é irrelevante **e** o projeto é baixo.
  * PURA.
  *
- * ⚠️ **Sem estrela declarada, a régua VALE** (`estrela` ausente/`null` → reprovável): é o estado
- * da maioria dos projetos que a rodada de 04/09 pegou, e exigir estrela para reprovar tornaria o
- * piso inerte justamente em quem ninguém avaliou. Quem poupa é a nota ALTA, não a ausência dela.
+ * ⚠️ **SEM NOTA AVALIADA, NÃO REPROVA (invertido em 09/09/2026 — decisão do Luis).** Este ponto
+ * dizia o contrário, e o contrário estava errado por uma razão de DADO, não de régua: a coluna
+ * "Estrelas" tem **463 de 750 linhas em `0`**, e esse `0` é o **estado inicial de uma coluna
+ * manual** — ela já tinha ~426 zeros em 17/08/2026, antes de qualquer agente existir. Então a
+ * perna "nota < 1" era verdadeira em **466 de 750** projetos e o piso decidia praticamente sem
+ * filtro de nota. Palavras dele: *"tem mts projetos que sao 0 estrelas pq nao passaram pela
+ * avaliação"*. E o próprio repo já discordava de si mesmo: o harness do retroativo só aceita
+ * gabarito com `nota humana >= 1`, ou seja **trata 0 como "sem nota"** desde sempre.
+ *
+ * A régua nova, então: reprovar exige **veredito de nota em mãos**. Quem não foi avaliado vai para
+ * conferência humana — nunca para reprovado.
+ *
+ * ⚠️ Corolário que NÃO pode ser desfeito por engano: `estrela` ausente/`null` → **`false`**. Quem
+ * decide de onde vem essa nota é `notaParaOPiso` (abaixo), e é lá que o `0` humano é tratado como
+ * default, não como julgamento.
  * ⚠️ A ordem importa: sem número não há reprovação por impacto (ver `abaixoDoPisoDeImpacto`).
  */
 export function reprovaPeloPiso(input: {
   impactoMensal: number | null | undefined;
-  /** Nota humana (coluna "Estrelas"); na falta dela, a recomendada pelo agente. */
+  /** A nota AVALIADA (ver `notaParaOPiso`) — nunca o `0` default da coluna manual. */
   estrela?: number | null;
   piso?: number;
   limiteEstrela?: number;
@@ -130,9 +142,42 @@ export function reprovaPeloPiso(input: {
   if (!abaixoDoPisoDeImpacto(input.impactoMensal, input.piso ?? PISO_IMPACTO_MENSAL)) return false;
   const limite = input.limiteEstrela ?? ESTRELA_LIMITE_REPROVAVEL;
   const e = input.estrela;
-  if (typeof e !== 'number' || !Number.isFinite(e)) return true;
+  // Sem nota avaliada não há o 2º eixo da régua composta → não reprova (ver o aviso acima).
+  if (typeof e !== 'number' || !Number.isFinite(e)) return false;
   // ⚠️ `<`, não `<=`: nota 1 NÃO reprova. Ver o aviso da constante.
   return e < limite;
+}
+
+/** De onde a nota do piso saiu — entra no parecer, para a reprovação ser defensável. */
+export type FonteDaNota = 'humana' | 'agente' | 'ausente';
+
+/**
+ * A nota que o piso pode usar, e de onde ela veio. PURA.
+ *
+ * ⚠️ **O `0` da coluna HUMANA não é veredito, é default** (463 de 750 linhas; ~426 já em 17/08,
+ * antes de existir agente). Por isso ele NÃO entra como nota: cai para a do agente, e se não
+ * houver nenhuma o resultado é `'ausente'` — que não reprova.
+ * ⚠️ **Nota humana `>= 1` VENCE sempre** (é âncora, e a régua nunca reclassifica quem gente já
+ * julgou).
+ * ⚠️ **A faixa de escape `"6-10"` vira o piso dela (6)**: `Number("6-10")` é `NaN`, e NaN cairia
+ * em "sem nota" justamente no caso que mais precisa ser poupado.
+ */
+export function notaParaOPiso(input: {
+  humana?: number | null;
+  /** A recomendação do agente, como está na planilha (número, faixa "6-10" ou vazio). */
+  agente?: string | number | null;
+  faixaEscapeMin?: number;
+}): { nota: number | null; fonte: FonteDaNota } {
+  const h = input.humana;
+  if (typeof h === 'number' && Number.isFinite(h) && h >= ESTRELA_LIMITE_REPROVAVEL) {
+    return { nota: h, fonte: 'humana' };
+  }
+  const bruta = String(input.agente ?? '').trim();
+  if (bruta === '' || bruta === '—' || bruta === '-') return { nota: null, fonte: 'ausente' };
+  if (bruta.includes('-')) return { nota: input.faixaEscapeMin ?? 6, fonte: 'agente' };
+  const n = Number(bruta);
+  if (!Number.isFinite(n)) return { nota: null, fonte: 'ausente' };
+  return { nota: n, fonte: 'agente' };
 }
 
 /** A frase da reprovação composta — nomeia os DOIS eixos, porque são dois. */

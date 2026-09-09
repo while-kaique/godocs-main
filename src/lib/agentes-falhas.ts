@@ -25,6 +25,7 @@ export type ClasseFalha =
   | 'formato_invalido'
   | 'teto_ferramentas'
   | 'dossie_sem_financeiro'
+  | 'sem_nota_avaliada'
   | 'tarefa_cancelada';
 
 export type Severidade = 'alerta' | 'registro';
@@ -96,6 +97,15 @@ export const FALHAS_AGENTE: readonly DescricaoFalha[] = [
       'Foi o bug de 08/09/2026: a mesa lia o dinheiro em vocabulário da v1 e recebia tudo `null`, ' +
       'o financeiro respondia "sem dados" e o piso de impacto NUNCA disparava — 41,4% de erro ' +
       'grave no retroativo, com o agente aprovando o que a triagem reprovou.',
+  },
+  {
+    classe: 'sem_nota_avaliada',
+    rotulo: 'Projeto de impacto baixo chegou à régua SEM nota avaliada',
+    severidade: 'registro',
+    sintoma:
+      'A régua composta poupa o projeto (é o certo — reprovar exige veredito de nota em mãos), mas ' +
+      '"não reprovou" e "ninguém avaliou" ficariam indistinguíveis. É exatamente esta fila que o ' +
+      'time de agentes precisa alcançar: 463 das 750 linhas de prod têm 0★ default na coluna manual.',
   },
   {
     classe: 'tarefa_cancelada',
