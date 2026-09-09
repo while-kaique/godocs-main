@@ -51,20 +51,22 @@ import {
 } from '@/components/dashboard/tabela-utils';
 import { SeletorPeriodo } from '@/components/calendario/calendario';
 import { FiltroEstrelas } from '@/components/dashboard/filtro-estrelas';
+import { FiltroCategorias } from '@/components/dashboard/filtro-categorias';
 import {
   FILTROS_VAZIOS,
   TODAS_AS_AREAS,
   TODOS_OS_PARECERES,
   aplicarFiltros,
   areasDisponiveis,
+  categoriasDisponiveis,
   contarFiltrosAtivos,
   contarPorPilula,
   pareceresDisponiveis,
   totalSemStatus,
   type FiltroEspecial,
-  type FiltroGanho,
   type FiltroParecer,
   type FiltroAgente,
+  type CategoriaFiltroGanho,
   casaAgente,
   casaFiltrosExceto,
   type FiltrosDashboard,
@@ -261,6 +263,9 @@ function Dashboard() {
   // própria dimensão), igual à das pílulas. Contando sobre a planilha inteira, o campo dizia
   // "Pré-pendente (26)" e abria uma lista de 3 com outro filtro ligado.
   const pareceres = useMemo(() => pareceresDisponiveis(projetos, filtros), [projetos, filtros]);
+  // ⚠️ Também depende dos FILTROS, e pela MESMA razão: a contagem de cada categoria é a do
+  // recorte atual menos a própria dimensão. Ver `categoriasDisponiveis`.
+  const categorias = useMemo(() => categoriasDisponiveis(projetos, filtros), [projetos, filtros]);
   const ativos = contarFiltrosAtivos(filtros);
   /** Ids marcados para a ação em lote. Vive na tela (nada persiste). */
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
@@ -433,15 +438,16 @@ function Dashboard() {
           ]}
           onChange={(v) => setFiltros((f) => ({ ...f, especial: v as FiltroEspecial }))}
         />
-        <Segmentado
-          rotulo="Ganho"
-          valor={filtros.ganho}
-          opcoes={[
-            { valor: 'todos', label: 'Todos' },
-            { valor: 'saving', label: 'Com saving' },
-            { valor: 'receita', label: 'Com receita' },
-          ]}
-          onChange={(v) => setFiltros((f) => ({ ...f, ganho: v as FiltroGanho }))}
+        {/* ⚠️ SUBSTITUI o antigo Segmentado "Ganho" ("Com saving" × "Com receita", escolha única
+            sobre o VALOR gravado), que falava o vocabulário da v1. Agora são as 4 CATEGORIAS da v2,
+            multi-seleção que soma (OU dentro da dimensão). Decisão do Luis, 09/09/2026:
+            "Era so mudar os que ja tinha e adaptalos devidamente." */}
+        <FiltroCategorias
+          selecionadas={filtros.categorias}
+          disponiveis={categorias}
+          onChange={(proximas: CategoriaFiltroGanho[]) =>
+            setFiltros((f) => ({ ...f, categorias: proximas }))
+          }
         />
         <SeletorPeriodo
           valor={filtros.periodo}

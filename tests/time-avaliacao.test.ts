@@ -31,6 +31,7 @@ import { normalizarJulgamentoMerito, type JulgamentoMerito } from '@/lib/avaliac
 import { normalizarSaidaEstrela } from '@/lib/avaliacao/cerebro-estrela';
 import type { Liberacao } from '@/lib/avaliacao/consenso';
 import type { Mensagem } from '@/lib/avaliacao/ferramentas';
+import { DIMENSOES_MERITO } from '@/lib/avaliacao/cerebro-merito';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -189,20 +190,27 @@ function rodar(over: Partial<Parameters<typeof avaliarComTime>[0]> = {}) {
 
 // ── 1. caminho feliz ─────────────────────────────────────────────────────────
 
-describe('avaliarComTime — caminho feliz (4 especialistas + estrela + cético, sem réplica)', () => {
-  it('faz 6 chamadas de LLM (4 especialistas, 1 estrela, 1 cético), fecha em 1 rodada e aprova', async () => {
+describe('avaliarComTime — caminho feliz (5 especialistas + estrela + cético, sem réplica)', () => {
+  it('faz 8 chamadas de LLM (5 especialistas, 1 estrela, 2 céticos), fecha em 1 rodada e aprova', async () => {
     const llm = fakeLlm();
     const r = await rodar({ chamarLlm: llm.fn });
 
     expect(r.projeto_id).toBe('T15-TIME-001');
-    // 7 = 4 especialistas + 1 estrela + 1 cético do mérito + 1 cético da ESTRELA (03/09/2026).
-    expect(r.chamadas_llm).toBe(7);
-    expect(llm.contagem).toEqual({ especialista: 4, estrela: 1, cetico: 1, cetico_estrela: 1 });
+    // 8 = 5 especialistas + 1 estrela + 1 cético do mérito + 1 cético da ESTRELA.
+    // ⚠️ Era 7: a 5ª dimensão (`categoria_ganho`) entrou em 09/09/2026. A contagem é derivada de
+    // `DIMENSOES_MERITO` para dimensão nova não virar número mágico neste arquivo.
+    expect(r.chamadas_llm).toBe(DIMENSOES_MERITO.length + 3);
+    expect(llm.contagem).toEqual({
+      especialista: DIMENSOES_MERITO.length,
+      estrela: 1,
+      cetico: 1,
+      cetico_estrela: 1,
+    });
     expect(r.rodadas_debate).toBe(1);
     expect(r.debate_fechou).toBe(true);
     expect(r.cetico.refuta).toBe(false);
     expect(r.merito.veredito).toBe('aprovar');
-    expect(r.merito.julgamentos).toHaveLength(4);
+    expect(r.merito.julgamentos).toHaveLength(DIMENSOES_MERITO.length);
     expect(r.merito.julgamentos.every((j) => !j.fallback)).toBe(true);
     expect(r.estrela.nota).toBe(3);
     expect(r.consenso.saida).toBe('aprovar');
@@ -217,13 +225,13 @@ describe('avaliarComTime — caminho feliz (4 especialistas + estrela + cético,
     expect(r.textos.comite).toBeNull();
   });
 
-  it('cada especialista recebe o prompt da SUA dimensão (as 4 dimensões, uma vez cada, sem réplica)', async () => {
+  it('cada especialista recebe o prompt da SUA dimensão (todas, uma vez cada, sem réplica)', async () => {
     const llm = fakeLlm();
     await rodar({ chamarLlm: llm.fn });
     const dims = llm.chamadas
       .filter((c) => c.papel === 'especialista')
       .map((c) => /dimensão "([a-z_]+)"/.exec(c.mensagens[0].content)?.[1]);
-    expect([...dims].sort()).toEqual(['evidencia', 'financeiro', 'plausibilidade_horas', 'precedente']);
+    expect([...dims].sort()).toEqual([...DIMENSOES_MERITO].sort());
     for (const c of llm.chamadas.filter((c) => c.papel === 'especialista')) {
       const user = c.mensagens.find((m) => m.role === 'user')?.content ?? '';
       expect(user).not.toMatch(/réplica|debate/i);
@@ -235,7 +243,7 @@ describe('avaliarComTime — caminho feliz (4 especialistas + estrela + cético,
 // ── 2. árvore do log ─────────────────────────────────────────────────────────
 
 describe('avaliarComTime — log em ÁRVORE (nada solto)', () => {
-  it('raiz orquestrador PRIMEIRO; 4 especialistas, 1 cérebro, 1 cético e 1 consenso pendurados nela', async () => {
+  it('raiz orquestrador PRIMEIRO; os especialistas, 1 cérebro, 1 cético e 1 consenso pendurados nela', async () => {
     const reg = fakeRegistrador();
     const r = await rodar({ registrar: reg.fn });
 
@@ -248,14 +256,14 @@ describe('avaliarComTime — log em ÁRVORE (nada solto)', () => {
 
     const porTipo = (t: string) => reg.nos.filter((n) => n.tipo === t);
     expect(porTipo('orquestrador')).toHaveLength(1);
-    expect(porTipo('especialista')).toHaveLength(4);
+    expect(porTipo('especialista')).toHaveLength(DIMENSOES_MERITO.length);
     expect(porTipo('cerebro')).toHaveLength(1);
     // 2 céticos: o do MÉRITO e o da ESTRELA. Os dois gravam com tipo 'cetico'.
     expect(porTipo('cetico')).toHaveLength(2);
     expect(porTipo('consenso')).toHaveLength(1);
     expect(porTipo('tool')).toHaveLength(0);
     expect(porTipo('debate')).toHaveLength(0);
-    expect(reg.nos).toHaveLength(9); // + o nó do cético da ESTRELA
+    expect(reg.nos).toHaveLength(DIMENSOES_MERITO.length + 5); // os 5 nós fixos da árvore + 1 por especialista
 
     for (const n of porTipo('especialista')) expect(n.pai_id).toBe(raiz.id);
     expect(porTipo('cerebro')[0].pai_id).toBe(raiz.id);
@@ -285,7 +293,7 @@ describe('avaliarComTime — log em ÁRVORE (nada solto)', () => {
     expect(idsEspecialistas.has(tools[0].pai_id as string)).toBe(true);
     expect(reg.nos.filter((n) => n.pai_id === null)).toHaveLength(1);
     expect(r.log.nos).toBe(reg.nos.length);
-    expect(r.chamadas_llm).toBe(8); // o especialista com ferramenta falou 2×, e há 2 céticos
+    expect(r.chamadas_llm).toBe(DIMENSOES_MERITO.length + 4); // o especialista com ferramenta falou 2×, e há 2 céticos
   });
 });
 
@@ -296,13 +304,13 @@ describe('avaliarComTime — debate com TETO (D15, MAX_RODADAS_DEBATE = 2)', () 
     expect(MAX_RODADAS_DEBATE).toBe(2);
   });
 
-  it('cético refuta a aprovação → réplica dos 4 especialistas + novo cético (11 chamadas, 2 rodadas, nó debate)', async () => {
+  it('cético refuta a aprovação → réplica dos especialistas + novo cético (2 rodadas, nó debate)', async () => {
     const llm = fakeLlm({ cetico: ({ n }) => (n === 1 ? ceticoRefuta() : ceticoAceita()) });
     const reg = fakeRegistrador();
     const r = await rodar({ chamarLlm: llm.fn, registrar: reg.fn });
 
-    expect(r.chamadas_llm).toBe(12); // + o cético da estrela
-    expect(llm.contagem).toEqual({ especialista: 8, estrela: 1, cetico: 2, cetico_estrela: 1 });
+    expect(r.chamadas_llm).toBe(DIMENSOES_MERITO.length * 2 + 4); // 2 rodadas + o cético da estrela
+    expect(llm.contagem).toEqual({ especialista: DIMENSOES_MERITO.length * 2, estrela: 1, cetico: 2, cetico_estrela: 1 });
     expect(r.rodadas_debate).toBe(2);
     expect(r.debate_fechou).toBe(true);
     expect(r.cetico.refuta).toBe(false);
@@ -313,8 +321,8 @@ describe('avaliarComTime — debate com TETO (D15, MAX_RODADAS_DEBATE = 2)', () 
     const userDe = (c: { mensagens: Mensagem[] }) => c.mensagens.find((m) => m.role === 'user')?.content ?? '';
     const semReplica = esp.filter((c) => !/réplica|debate/i.test(userDe(c)));
     const comReplica = esp.filter((c) => /réplica|debate/i.test(userDe(c)));
-    expect(semReplica).toHaveLength(4);
-    expect(comReplica).toHaveLength(4);
+    expect(semReplica).toHaveLength(DIMENSOES_MERITO.length);
+    expect(comReplica).toHaveLength(DIMENSOES_MERITO.length);
     for (const c of comReplica) expect(userDe(c)).toContain(MOTIVO_CETICO);
 
     // Árvore: nó debate (rodada 2) filho da raiz; os 4 especialistas da réplica filhos dele.
@@ -325,9 +333,9 @@ describe('avaliarComTime — debate com TETO (D15, MAX_RODADAS_DEBATE = 2)', () 
     expect(debates[0].pai_id).toBe(raiz.id);
     expect(debates[0].rodada).toBe(2);
     const especialistas = reg.nos.filter((n) => n.tipo === 'especialista');
-    expect(especialistas).toHaveLength(8);
-    expect(especialistas.filter((n) => n.pai_id === raiz.id)).toHaveLength(4);
-    expect(especialistas.filter((n) => n.pai_id === debates[0].id)).toHaveLength(4);
+    expect(especialistas).toHaveLength(DIMENSOES_MERITO.length * 2);
+    expect(especialistas.filter((n) => n.pai_id === raiz.id)).toHaveLength(DIMENSOES_MERITO.length);
+    expect(especialistas.filter((n) => n.pai_id === debates[0].id)).toHaveLength(DIMENSOES_MERITO.length);
     expect(reg.nos.filter((n) => n.tipo === 'cetico')).toHaveLength(3); // 2 do mérito (réplica) + 1 da estrela
     expect(reg.nos.filter((n) => n.pai_id === null)).toHaveLength(1);
   });
@@ -337,8 +345,8 @@ describe('avaliarComTime — debate com TETO (D15, MAX_RODADAS_DEBATE = 2)', () 
     const r = await rodar({ chamarLlm: llm.fn });
 
     expect(r.rodadas_debate).toBe(MAX_RODADAS_DEBATE);
-    expect(llm.contagem).toEqual({ especialista: 8, estrela: 1, cetico: 2, cetico_estrela: 1 });
-    expect(r.chamadas_llm).toBe(12); // + o cético da estrela
+    expect(llm.contagem).toEqual({ especialista: DIMENSOES_MERITO.length * 2, estrela: 1, cetico: 2, cetico_estrela: 1 });
+    expect(r.chamadas_llm).toBe(DIMENSOES_MERITO.length * 2 + 4); // 2 rodadas + o cético da estrela
     expect(r.cetico.refuta).toBe(true);
     expect(r.merito.veredito).toBe('aprovar');
     expect(r.debate_fechou).toBe(false);
@@ -377,7 +385,7 @@ describe('avaliarComTime — cético refuta um AJUSTE: não há o que debater', 
     expect(r.merito.veredito).toBe('ajuste');
     expect(r.cetico.refuta).toBe(true);
     expect(r.rodadas_debate).toBe(1);
-    expect(r.chamadas_llm).toBe(7); // + o cético da estrela
+    expect(r.chamadas_llm).toBe(DIMENSOES_MERITO.length + 3); // + o cético da estrela
     expect(r.debate_fechou).toBe(true);
     expect(r.consenso.saida).toBe('ajuste');
     expect(r.textos.ao_autor).not.toBeNull();
@@ -420,7 +428,7 @@ describe('avaliarComTime — ferramentas dos especialistas', () => {
     const r = await rodar({ chamarLlm: llm.fn, executar: exe.fn, ferramentasPorAgente: 1 });
 
     expect(exe.mock).toHaveBeenCalledTimes(1);
-    expect(r.merito.julgamentos).toHaveLength(4);
+    expect(r.merito.julgamentos).toHaveLength(DIMENSOES_MERITO.length);
     expect(r.consenso).toBeDefined();
   });
 
@@ -459,18 +467,18 @@ describe('avaliarComTime — resiliência (nunca lança)', () => {
     expect(r.erros[0]).toMatch(/estrela/i);
   });
 
-  it('LLM rejeita para TODOS → não lança; 4 julgamentos em fallback; sem julgamento válido a saída é humano; erros ≥ 6', async () => {
+  it('LLM rejeita para TODOS → não lança; todos os julgamentos em fallback; sem julgamento válido a saída é humano; erros ≥ 6', async () => {
     const chamarLlm: ChamarLlm = async () => {
       throw new Error('LLM indisponível');
     };
     const r = await rodar({ chamarLlm });
 
-    expect(r.merito.julgamentos).toHaveLength(4);
+    expect(r.merito.julgamentos).toHaveLength(DIMENSOES_MERITO.length);
     expect(r.merito.julgamentos.every((j) => j.fallback)).toBe(true);
     expect(r.estrela.nota).toBe(0);
     expect(r.cetico.fallback).toBe(true);
     expect(r.consenso.saida).toBe('humano');
-    expect(r.erros.length).toBeGreaterThanOrEqual(6);
+    expect(r.erros.length).toBeGreaterThanOrEqual(DIMENSOES_MERITO.length + 1);
     expect(r.textos.interno.length).toBeGreaterThan(0);
   });
 
@@ -485,7 +493,7 @@ describe('avaliarComTime — resiliência (nunca lança)', () => {
     expect(r.erros.some((e) => /log/i.test(e))).toBe(true);
     // O time continua avaliando mesmo sem log.
     expect(r.consenso.saida).toBe('aprovar');
-    expect(r.chamadas_llm).toBe(7); // + o cético da estrela
+    expect(r.chamadas_llm).toBe(DIMENSOES_MERITO.length + 3); // + o cético da estrela
   });
 
   it('registrador devolve null para a raiz → mesmo comportamento: nenhum filho registrado, raiz null', async () => {

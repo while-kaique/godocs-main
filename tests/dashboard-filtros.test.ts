@@ -22,6 +22,13 @@ import {
   type FiltrosDashboard,
   casaAgente,
 } from '@/lib/dashboard-filtros';
+import {
+  categoriasDeGanho,
+  casaCategorias,
+  categoriasDisponiveis,
+  rotuloCategorias,
+  descreverFaixaEstrelas,
+} from '@/lib/dashboard-filtros';
 import { ROTULO_ESTADO_PARECER, chaveDoEstado } from '@/lib/aprovacoes-parecer';
 import {
   PRESETS_PERIODO,
@@ -53,6 +60,8 @@ function proj(over: Partial<ProjetoDashboardResumo> = {}): ProjetoDashboardResum
     ganhoTotal: 1000,
     savingReais: 1000,
     receitaMensal: null,
+    savingEfetivado: null,
+    custoEvitadoHoras: null,
     complexidade: 'Média',
   tipoProjeto: null,
     tipos: 'Saving',
@@ -323,6 +332,14 @@ describe('peso do payload da listagem', () => {
         'nome',
         'receitaMensal',
         'savingReais',
+        // ⚠️ Estes DOIS não são desenhados: eles decidem a CATEGORIA de ganho no filtro
+        // (09/09/2026). O canário aceita porque são NÚMEROS CURTOS e existe precedente direto —
+        // `savingReais`/`receitaMensal` também servem só ao filtro. O que o gotcha 4 proíbe é
+        // TEXTO longo multiplicado por ~750 linhas (o `observacoes`, 160 KB do payload).
+        // ⚠️ A régua da categoria é o VALOR destas colunas, nunca o rótulo `tipos` — que ficou em
+        // vocabulário da v1 em 647 linhas enquanto os valores já foram realocados.
+        'savingEfetivado',
+        'custoEvitadoHoras',
         'status',
         'statusChave',
         // Rótulo CURTO ("Agente", "Dashboard") e DESENHADO — divide a célula "Tipo · Nível"
@@ -607,5 +624,158 @@ describe('filtro "o agente já rodou?" (08/09/2026) — a dimensão que faz o LO
     const p = proj({ id: 'A', estrelaAgente: '3' });
     expect(casaFiltrosExceto(p, { ...FILTROS_VAZIOS, agente: 'sem' }, 'agente')).toBe(true);
     expect(casaFiltrosExceto(p, { ...FILTROS_VAZIOS, agente: 'sem' }, 'status')).toBe(false);
+  });
+});
+
+// ─── Categorias de ganho da v2 — MULTI-seleção que soma (09/09/2026) ─────────────────────────
+//
+// Pedido do Luis: *"quero ver custo evitado, saving efetivado, ganho imensuravel, receita. E tem
+// que ser diamico tb, e somar, posso selecionar 2 ao msm tempo e filtrar devidamente."*
+describe('categoriasDeGanho — normaliza v1, v2 e snake_case', () => {
+  it('a categoria sai do VALOR das colunas da v2', () => {
+    expect(categoriasDeGanho(proj({ savingEfetivado: 5000 }))).toEqual(['saving_efetivado']);
+    expect(categoriasDeGanho(proj({ custoEvitadoHoras: 60 }))).toEqual(['custo_evitado']);
+    expect(categoriasDeGanho(proj({ receitaMensal: 900 }))).toEqual(['receita_incremental']);
+  });
+
+  it('sem NENHUM dos três números → imensurável (é a definição do formulário)', () => {
+    expect(categoriasDeGanho(proj())).toEqual(['imensuravel']);
+    // Zero não é valor: "0" numa coluna não declara categoria.
+    expect(categoriasDeGanho(proj({ savingEfetivado: 0, custoEvitadoHoras: 0 }))).toEqual(['imensuravel']);
+  });
+
+  it('imensurável NUNCA convive com as outras', () => {
+    const c = categoriasDeGanho(proj({ custoEvitadoHoras: 60 }));
+    expect(c).not.toContain('imensuravel');
+  });
+
+  it('⚠️ o RÓTULO velho não interfere — quem manda é o valor', () => {
+    // 647 das 750 linhas de prod ainda têm `Tipos de Ganho = "saving"` (vocabulário da v1), mas os
+    // VALORES já foram realocados para as colunas da v2. Ler o rótulo devolveria a base errada e
+    // exigiria um bucket de legado — que foi vetado, com razão. Aqui o rótulo é ignorado.
+    expect(categoriasDeGanho(proj({ tipos: 'saving', custoEvitadoHoras: 60 }))).toEqual(['custo_evitado']);
+    expect(categoriasDeGanho(proj({ tipos: 'especial', savingEfetivado: 100 }))).toEqual(['saving_efetivado']);
+  });
+
+  it('projeto em DUAS categorias devolve as duas — parou despesa E liberou horas', () => {
+    expect(categoriasDeGanho(proj({ savingEfetivado: 3000, custoEvitadoHoras: 40 })).sort()).toEqual(
+      ['custo_evitado', 'saving_efetivado'],
+    );
+  });
+
+
+});
+
+describe('casaCategorias — dentro da dimensão é OU', () => {
+  const custo = proj({ id: 'A', custoEvitadoHoras: 60 });
+  const receita = proj({ id: 'B', receitaMensal: 900 });
+  const ambos = proj({ id: 'C', custoEvitadoHoras: 60, receitaMensal: 900 });
+  const legado = proj({ id: 'D', savingEfetivado: 5000 });
+
+  it('nada selecionado não recorta nada', () => {
+    for (const p of [custo, receita, ambos, legado]) expect(casaCategorias(p, [])).toBe(true);
+  });
+
+  it('DUAS selecionadas trazem quem tem QUALQUER uma — é o que "somar" quer dizer', () => {
+    const sel = ['custo_evitado', 'receita_incremental'] as const;
+    expect(casaCategorias(custo, sel)).toBe(true);
+    expect(casaCategorias(receita, sel)).toBe(true);
+    expect(casaCategorias(ambos, sel)).toBe(true);
+    // Quem só tem saving efetivado não entra na seleção "custo evitado + receita".
+    expect(casaCategorias(legado, sel)).toBe(false);
+  });
+
+  it('some (E) com as outras dimensões, como todo filtro desta barra', () => {
+    const lista = [
+      proj({ id: 'A', custoEvitadoHoras: 60, area: 'Fiscal' }),
+      proj({ id: 'B', custoEvitadoHoras: 60, area: 'CX' }),
+      proj({ id: 'C', savingEfetivado: 5000, area: 'Fiscal' }),
+    ];
+    const r = aplicarFiltros(lista, filtros({ categorias: ['custo_evitado'], area: 'Fiscal' }));
+    expect(r.map((p) => p.id)).toEqual(['A']);
+  });
+
+  it('conta como UMA dimensão em "Limpar filtros", mesmo com 3 marcadas', () => {
+    expect(
+      contarFiltrosAtivos(filtros({ categorias: ['custo_evitado', 'imensuravel', 'receita_incremental'] })),
+    ).toBe(1);
+    expect(contarFiltrosAtivos(filtros({ categorias: [] }))).toBe(0);
+  });
+});
+
+describe('categoriasDisponiveis — dinâmico e contado sobre o RECORTE', () => {
+  const lista = [
+    proj({ id: 'A', custoEvitadoHoras: 60, statusChave: 'aprovado' }),
+    proj({ id: 'B', custoEvitadoHoras: 60, statusChave: 'reprovado' }),
+    proj({ id: 'C', receitaMensal: 900, statusChave: 'aprovado' }),
+    proj({ id: 'D', savingEfetivado: 5000, statusChave: 'aprovado' }),
+  ];
+
+  it('lista só o que EXISTE, na ordem dos cards da Etapa 2, com contagem', () => {
+    const d = categoriasDisponiveis(lista, filtros());
+    // Ordem dos cards da Etapa 2: saving efetivado antes de custo evitado, receita depois.
+    expect(d.map((x) => x.categoria)).toEqual(['saving_efetivado', 'custo_evitado', 'receita_incremental']);
+    expect(d.find((x) => x.categoria === 'custo_evitado')?.total).toBe(2);
+  });
+
+  it('⚠️ a contagem respeita os OUTROS filtros', () => {
+    // Contar sobre a base inteira fazia o campo dizer "2" e abrir uma lista de 1 — o mesmo
+    // defeito que as pílulas e o campo de pré-status já não têm.
+    const d = categoriasDisponiveis(lista, filtros({ status: 'aprovado' }));
+    expect(d.find((x) => x.categoria === 'custo_evitado')?.total).toBe(1);
+  });
+
+  it('⚠️ e IGNORA a própria dimensão — senão marcar uma apagaria as outras', () => {
+    const d = categoriasDisponiveis(lista, filtros({ categorias: ['custo_evitado'] }));
+    expect(d.map((x) => x.categoria)).toContain('receita_incremental');
+  });
+
+  it('⚠️ categoria MARCADA nunca desaparece, mesmo com 0 no recorte', () => {
+    // Opção que some deixa a pessoa sem saber o que está filtrando e sem como desmarcar.
+    const d = categoriasDisponiveis(lista, filtros({ categorias: ['imensuravel'] }));
+    const x = d.find((c) => c.categoria === 'imensuravel');
+    expect(x).toBeTruthy();
+    expect(x?.total).toBe(0);
+  });
+});
+
+describe('rotuloCategorias — o texto da pílula', () => {
+  it('vazio, uma e várias', () => {
+    expect(rotuloCategorias([])).toBe('Ganhos');
+    expect(rotuloCategorias(['custo_evitado'])).toBe('Custo evitado');
+    expect(rotuloCategorias(['custo_evitado', 'imensuravel'])).toBe('2 categorias');
+  });
+
+  it('sem seleção nada é recortado', () => {
+    expect(casaCategorias(proj({ custoEvitadoHoras: 60 }), [])).toBe(true);
+  });
+});
+
+// ─── Estrela EXATA (09/09/2026) ───────────────────────────────────────────────────────────────
+describe('faixa EXATA de estrelas', () => {
+  it('`min === max` recorta só aquela nota — era o que faltava', () => {
+    // Queixa do Luis: "O toast que abre para eu selecionar estrelas so mostre 1+, 2+, 3+. Nao
+    // consigo ver so o que é 1." O estado já sabia expressar isso; faltava a tela.
+    const lista = [
+      proj({ id: 'zero', estrelas: 0 }),
+      proj({ id: 'um', estrelas: 1 }),
+      proj({ id: 'dois', estrelas: 2 }),
+      proj({ id: 'semNota', estrelas: null }),
+    ];
+    expect(aplicarFiltros(lista, filtros({ estrelasMin: 1, estrelasMax: 1 })).map((p) => p.id)).toEqual(['um']);
+    // "1 ou mais" continua trazendo 1 e 2 — os dois recortes convivem.
+    expect(aplicarFiltros(lista, filtros({ estrelasMin: 1 })).map((p) => p.id)).toEqual(['um', 'dois']);
+  });
+
+  it('a fila do 0 pega quem tem 0 explícito E quem não tem nota (célula vazia conta como 0)', () => {
+    const lista = [proj({ id: 'zero', estrelas: 0 }), proj({ id: 'semNota', estrelas: null }), proj({ id: 'um', estrelas: 1 })];
+    expect(aplicarFiltros(lista, filtros({ estrelasMin: 0, estrelasMax: 0 })).map((p) => p.id)).toEqual(['zero', 'semNota']);
+  });
+
+  it('o rótulo e a frase distinguem exato de "ou mais"', () => {
+    expect(rotuloFaixaEstrelas(1, 1)).toBe('1');
+    expect(rotuloFaixaEstrelas(1, null)).toBe('1+');
+    expect(descreverFaixaEstrelas(1, 1)).toMatch(/Exatamente 1 estrela/);
+    expect(descreverFaixaEstrelas(1, null)).toMatch(/1 estrela ou mais/);
   });
 });

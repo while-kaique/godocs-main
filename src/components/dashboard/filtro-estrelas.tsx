@@ -9,8 +9,22 @@
  * de formulário no meio de uma barra de pílulas liam como configuração.
  *
  * As estrelas SÃO o controle: clicar na 3ª pede "3 ou mais", clicar de novo desfaz. As
- * duas pílulas cobrem as pontas ("Qualquer", "Sem nota"). Faixa com teto (`estrelasMax`)
- * continua entendida pelo filtro e pelo rótulo — só não há mais como pedi-la aqui.
+ * duas pílulas cobrem as pontas ("Qualquer", "Sem nota" = a fila 0–0).
+ *
+ * ## EXATO é o PADRÃO (09/09/2026)
+ * Clicar na estrela N devolve **só os de nota N**. Queixa do Luis: *"O toast que abre para eu
+ * selecionar estrelas so mostre 1+, 2+, 3+. Nao consigo ver so o que é 1"* — e, na volta seguinte,
+ * *"ao inves de clicar em 1 e ficar 1+ ficar so o que é projeto 1 e isso para todos"*. Então o
+ * comportamento primário do clique mudou: era faixa aberta, agora é a nota exata.
+ * O estado do filtro já sabia expressar isso desde sempre (`min === max`, que
+ * `rotuloFaixaEstrelas` desenha como "1" e `descreverFaixaEstrelas` como "Exatamente 1 estrela").
+ * ⚠️ **"ou mais" continua alcançável** pelo interruptor no topo do painel, porque "3 estrelas ou
+ * mais" é pergunta real de triagem — só deixou de ser o que o clique faz por default.
+ *
+ * ⚠️ No modo exato a fileira acende **só a estrela escolhida**, não de 1 até ela: preencher 1..N
+ * é o desenho universal de "N ou mais" e usá-lo para "exatamente N" faria a tela dizer o oposto do
+ * recorte. O modo também aparece em TEXTO (o interruptor e a frase embaixo) — estado nunca só por
+ * forma, nunca só por cor.
  *
  * ## Padrão da página
  * Reusa o `Popover` do calendário (mesmo posicionamento, Esc, clique fora) e o mesmo gatilho
@@ -99,6 +113,8 @@ export function FiltroEstrelas({
   );
 }
 
+type Modo = 'ou_mais' | 'exato';
+
 function Painel({
   min,
   max,
@@ -109,12 +125,26 @@ function Painel({
   onChange: (min: number | null, max: number | null) => void;
 }) {
   const [previa, setPrevia] = useState<number | null>(null);
+  // "Sem nota" é a fila 0–0 e não pode acender estrela nenhuma.
+  const semNota = min === 0 && max === 0;
+  // O modo nasce do que o filtro JÁ diz (uma faixa `min === max` só pode ter vindo do exato), então
+  // reabrir o painel não perde a intenção de quem filtrou. O 0–0 fica de fora: ele é a pílula.
+  // ⚠️ Nasce EXATO. Só cai em "ou mais" quando o filtro que chegou É uma faixa aberta
+  // (`min` com `max` nulo) — reabrir o painel não pode trocar a intenção de quem já filtrou.
+  const [modo, setModo] = useState<Modo>(min != null && max == null && min > 0 ? 'ou_mais' : 'exato');
   // A fileira reflete o piso da faixa; com só um teto ("até 3") vindo da URL, nada acende —
   // quem explica esse caso é a frase, não as estrelas.
   const base = min ?? 0;
   const aceso = previa ?? base;
-  // "Sem nota" é a fila 0–0 e não pode acender estrela nenhuma.
-  const semNota = min === 0 && max === 0;
+
+  /** No exato, só a escolhida acende; no "ou mais", de 1 até ela (o desenho universal). */
+  const acendeu = (n: number): boolean => {
+    if (semNota) return false;
+    if (modo === 'exato') return n === (previa ?? (min === max ? min : null));
+    return n <= aceso;
+  };
+  const escolhidaAgora = (n: number): boolean =>
+    modo === 'exato' ? min === n && max === n : min === n && max == null;
 
   return (
     <div className="w-[252px] p-3.5">
@@ -122,24 +152,48 @@ function Painel({
         Nota da triagem
       </p>
 
+      {/* O interruptor do modo, em TEXTO. Trocar de modo re-aplica o recorte na hora quando já há
+          uma estrela escolhida — senão a pessoa troca, não vê nada mudar e acha que não funcionou. */}
+      <div role="group" aria-label="Como comparar a nota" className="mt-2 flex gap-1.5">
+        {(['ou_mais', 'exato'] as Modo[]).map((m) => (
+          <Atalho
+            key={m}
+            ativo={modo === m && !semNota}
+            onClick={() => {
+              setModo(m);
+              const n = min;
+              if (n != null && n > 0) onChange(n, m === 'exato' ? n : null);
+            }}
+          >
+            {m === 'ou_mais' ? 'ou mais' : 'exatamente'}
+          </Atalho>
+        ))}
+      </div>
+
       {/* As estrelas SÃO o filtro: cada uma pede "N ou mais". Clicar na mesma desfaz.
           Duas linhas de 5 (não 10 corridas): a quebra é o que faz a 8ª ser lida como 8. */}
       <div
         role="group"
-        aria-label="Nota mínima"
+        aria-label={modo === 'exato' ? 'Nota exata' : 'Nota mínima'}
         className="mt-2 grid w-max grid-cols-5 gap-1"
         onMouseLeave={() => setPrevia(null)}
       >
         {Array.from({ length: DEGRAUS }, (_, i) => i + 1).map((n) => {
-          const cheia = !semNota && n <= aceso;
-          const escolhida = min === n && max == null;
+          const cheia = acendeu(n);
+          const escolhida = escolhidaAgora(n);
           return (
             <button
               key={n}
               type="button"
               aria-pressed={escolhida}
-              aria-label={`${n} ${n === 1 ? 'estrela' : 'estrelas'} ou mais`}
-              onClick={() => onChange(escolhida ? null : n, null)}
+              aria-label={
+                modo === 'exato'
+                  ? `Exatamente ${n} ${n === 1 ? 'estrela' : 'estrelas'}`
+                  : `${n} ${n === 1 ? 'estrela' : 'estrelas'} ou mais`
+              }
+              onClick={() =>
+                escolhida ? onChange(null, null) : onChange(n, modo === 'exato' ? n : null)
+              }
               onMouseEnter={() => setPrevia(n)}
               onFocus={() => setPrevia(n)}
               onBlur={() => setPrevia(null)}
@@ -158,7 +212,9 @@ function Painel({
       </div>
 
       <p className="mt-2 text-[12px] leading-snug text-muted-foreground" aria-live="polite">
-        {descreverFaixaEstrelas(previa != null ? previa : min, previa != null ? null : max)}
+        {previa != null
+          ? descreverFaixaEstrelas(previa, modo === 'exato' ? previa : null)
+          : descreverFaixaEstrelas(min, max)}
       </p>
 
       <div className="mt-3 flex gap-1.5">
@@ -166,7 +222,7 @@ function Painel({
           Qualquer
         </Atalho>
         <Atalho ativo={semNota} onClick={() => onChange(0, 0)}>
-          Sem nota
+          Sem nota (0)
         </Atalho>
       </div>
 

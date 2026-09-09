@@ -49,6 +49,7 @@ import {
   rotuloGrau,
   grauConfianca,
   aparenciaConfianca,
+  aparenciaGrauTexto,
 } from '@/lib/avaliacao-sombra-rotulos';
 import { partirParecerMesa, ROTULO_CURTO_DIMENSAO } from '@/lib/mesa-parecer';
 import {
@@ -491,7 +492,9 @@ function EstrelaSugerida({ estrela }: { estrela: NonNullable<AvaliacaoSombra['es
           <Star className="h-3.5 w-3.5 self-center" aria-hidden />
         </span>
         {estrela.confianca && (
-          <span className="text-[11.5px] text-muted-foreground">confiança {estrela.confianca}</span>
+          <span className="text-[11.5px] font-semibold" style={{ color: aparenciaGrauTexto(estrela.confianca).cor }}>
+                    confiança {estrela.confianca}
+                  </span>
         )}
         {estrela.contestada && (
           <span
@@ -538,7 +541,9 @@ function EstrelaDoTime({ time }: { time: NonNullable<AvaliacaoSombra['time']> })
           </span>
         )}
         {time.confianca && (
-          <span className="text-[11.5px] text-muted-foreground">confiança {time.confianca}</span>
+          <span className="text-[11.5px] font-semibold" style={{ color: aparenciaGrauTexto(time.confianca).cor }}>
+                    confiança {time.confianca}
+                  </span>
         )}
       </span>
       {time.motivos.length > 0 && (

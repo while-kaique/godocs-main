@@ -24,6 +24,8 @@ function resumo(
     dataOrdenacao: null,
     ganhoTotal: null,
     savingReais: null,
+    savingEfetivado: over.savingEfetivado ?? null,
+    custoEvitadoHoras: over.custoEvitadoHoras ?? null,
     receitaMensal: null,
     complexidade: null,
   tipoProjeto: null,

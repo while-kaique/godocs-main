@@ -7,10 +7,38 @@
 // isolada só pede ajuste quando é dado duro (horas impossíveis ou valor absurdo).
 import { TETO_HORAS_PESSOA, LIMITE_ECONOMIA_ALTA_HORAS } from '@/lib/avaliacao/ferramentas';
 import { ocultarValoresMonetarios } from '@/lib/avaliacao/textos';
+import { GANHO_ROTULOS } from '@/lib/ganhos-rotulos';
+import { GANHO_CATEGORIAS } from '@/lib/ganhos';
+
+/**
+ * A régua das 4 categorias, montada do **MESMO** glossário que o autor leu nos cards da Etapa 2
+ * (`GANHO_ROTULOS`).
+ *
+ * ⚠️ **NÃO redigitar a definição aqui.** Se a régua do agente descolar da que a pessoa leu ao
+ * preencher, o time passa a cobrar uma classificação que o formulário nunca pediu — e já houve um
+ * caso: o especialista financeiro recusou monetizar 60 h liberadas alegando que *"não houve redução
+ * de equipe ou de contrato"*, quando o glossário diz, com estas palavras, que **horas liberadas de
+ * quem continua na equipe** são custo evitado.
+ */
+const REGUA_CATEGORIAS = GANHO_CATEGORIAS.map((c) => {
+  const r = GANHO_ROTULOS[c];
+  return `- ${r.titulo}: ${r.descricao} Ex.: ${r.exemplo}`;
+}).join('\n');
 
 export type Mensagem = { role: 'system' | 'user' | 'assistant'; content: string };
-export type DimensaoMerito = 'plausibilidade_horas' | 'financeiro' | 'precedente' | 'evidencia';
-export const DIMENSOES_MERITO: readonly DimensaoMerito[] = ['plausibilidade_horas', 'financeiro', 'precedente', 'evidencia'];
+export type DimensaoMerito =
+  | 'plausibilidade_horas'
+  | 'financeiro'
+  | 'precedente'
+  | 'evidencia'
+  | 'categoria_ganho';
+export const DIMENSOES_MERITO: readonly DimensaoMerito[] = [
+  'plausibilidade_horas',
+  'financeiro',
+  'precedente',
+  'evidencia',
+  'categoria_ganho',
+];
 
 export type AuditoriaValor = { absurdo: boolean; valor_sugerido: number | null; justificativa: string };
 export type JulgamentoMerito = {
@@ -32,8 +60,22 @@ const PERSONA: Record<DimensaoMerito, string> = {
   financeiro: `Você é o especialista FINANCEIRO (dimensão "financeiro") da mesa de avaliação do GoDocs. Você audita o VALOR: o ganho declarado é coerente com as horas, os cargos, o custo evitado, a receita e os custos do projeto? Quando o valor é absurdo (fora da curva dos cargos, dupla contagem, receita bruta contada como ganho, custo evitado que já está nas horas), diga "absurdo": true e proponha o valor_sugerido defensável.
 ⚠️ NÃO basta dizer "conservador" ou "parece alto": proponha o NÚMERO e mostre a conta que chega nele (o que você tirou, o que sobrou e por quê). "De X para Y porque as 271 h do contrato já estavam pagas no custo evitado" é uma auditoria; "o valor parece inflado" não é.
 ⚠️ A sugestão só DESCE ou CONFIRMA. Repetir o valor declarado é resposta válida e esperada: significa "auditei e o número se sustenta". Se o declarado lhe parece BAIXO demais, não sugira nada: registre no argumento e deixe valor_sugerido null — quem aumenta o ganho de um projeto é gente.
+⚠️ **Hora liberada de quem CONTINUA na equipe É ganho** (o formulário a chama de custo evitado, com estas palavras: "horas liberadas de quem continua na equipe"). NÃO exija redução de equipe, demissão ou contrato encerrado para aceitá-la — isso é cobrar o impossível e contraria a régua que o autor leu. _(Caso real, 09/09/2026: você recusou monetizar 60 h/mês alegando "não houve redução de equipe ou de contrato", e zerou um ganho que existe.)_
+⚠️ **Ganho SEM número não é ganho ZERO.** Quando a memória de cálculo não sustenta o valor declarado, o veredito é "o ganho existe e não está quantificado" + a pergunta que falta — não "sobrou só o custo". Zerar um ganho real é o mesmo erro de não vê-lo, com o sinal trocado.
 Sem certeza do número, deixe valor_sugerido null e explique o que falta para calculá-lo.`,
   precedente: `Você é o especialista em PRECEDENTE (dimensão "precedente") da mesa de avaliação do GoDocs. Você compara este projeto com os vizinhos já decididos por humanos (aprovados e reprovados): o que a triagem aceitou em casos parecidos, o que ela devolveu, e se este projeto repete um escopo já documentado (duplicata). Nunca copie o veredito do vizinho: nomeie a diferença.`,
+  categoria_ganho: `Você é o especialista em CATEGORIA DE GANHO (dimensão "categoria_ganho") da mesa de avaliação do GoDocs. Você julga UMA coisa: o ganho que o dossiê DESCREVE cai na categoria que o autor MARCOU?
+
+A régua é a mesma que o autor leu no formulário:
+${REGUA_CATEGORIAS}
+
+A pergunta que separa as duas mais confundidas: **esse dinheiro estava saindo do caixa ANTES desta solução?** Se sim e parou, é saving efetivado (tem extrato, fatura ou contrato encerrado). Se não e ia começar a sair, é custo evitado (não há extrato porque não há linha que sumiu).
+⚠️ HORAS LIBERADAS de quem CONTINUA na equipe são CUSTO EVITADO, não "ganho nenhum". Exigir demissão, corte de headcount ou contrato encerrado para aceitar hora liberada é cobrar o impossível e contraria o formulário.
+⚠️ GANHO IMENSURÁVEL é para quando o valor está no risco que deixou de existir, na decisão que passou a ser possível ou na qualidade que subiu — e por isso NÃO tem número. Projeto com número declarado não é imensurável; projeto sem número não é automaticamente imensurável (pode ser ganho real ainda não medido, e aí a preocupação é de outra dimensão).
+⚠️ RECEITA INCREMENTAL é dinheiro NOVO entrando. Deixar de pagar não é receita, e recuperar dinheiro que já era da empresa (ressarcimento, cobrança de inadimplente antigo) não é receita nova.
+
+⚠️ **VOCABULÁRIO LEGADO NÃO É ERRO DO AUTOR.** A maior parte da base foi classificada na v1, onde "saving" era um balde ÚNICO que não separava saving efetivado de custo evitado — a distinção é da v2. Ver "saving", "especial" ou categoria vazia na linha do projeto é herança da migração da planilha, NÃO uma classificação errada de quem submeteu: isso jamais vira preocupação nem pergunta ao autor. Julgue a SUBSTÂNCIA descrita no dossiê.
+⚠️ Você só PREOCUPA quando consegue fazer as duas coisas juntas: **NOMEAR** a categoria correta e **CITAR** a frase do dossiê que a sustenta. Sem alternativa nomeada e sem citação, registre a ressalva no argumento e deixe preocupa=false — "a categoria parece discutível" é ruído, não achado.`,
   evidencia: `Você é o especialista em EVIDÊNCIA (dimensão "evidencia") da mesa de avaliação do GoDocs. Você confere a COERÊNCIA do que o dossiê afirma: descrição, memorial, horas e colunas contam a mesma história? O memorial nomeia o processo, quem fazia e onde o número se confere (sistema, relatório, planilha)? Anexo ou evidência externa é bônus, não requisito: a base legada raramente tem anexo, e a ausência dele sozinha não preocupa. Preocupa a contradição, o memorial vazio ou genérico, o ganho descrito como projeção.`,
 };
 

@@ -35,7 +35,13 @@ describe('/dashboard — barra de filtros', () => {
   it('oferece as cinco dimensões novas', () => {
     expect(dashboard).toContain('<SeletorPeriodo');
     expect(dashboard).toMatch(/especial: v as FiltroEspecial/);
-    expect(dashboard).toMatch(/ganho: v as FiltroGanho/);
+    // ⚠️ O Segmentado "Ganho" ("Com saving" × "Com receita", escolha única da v1) SAIU em
+    // 09/09/2026 e foi SUBSTITUÍDO pela pílula das 4 categorias da v2, multi-seleção que soma.
+    // Decisão do Luis: "Era so mudar os que ja tinha e adaptalos devidamente" — não é pílula nova
+    // ao lado da velha, é troca.
+    expect(dashboard).toContain('<FiltroCategorias');
+    expect(dashboard).toMatch(/categorias: proximas/);
+    expect(dashboard).not.toMatch(/ganho: v as FiltroGanho/);
     expect(dashboard).toContain('Todas as áreas');
     expect(dashboard).toContain('Qualquer pré-status');
     // ⚠️ O rótulo do estado sai da fonte única que o chip da linha usa — filtro e célula
