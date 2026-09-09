@@ -42,9 +42,11 @@ function formatarMensagem(
  *   sync da TeamGuide). Qualquer erro interno é engolido com `console.error`.
  * - **Cooldown por `fonte`**: a 1ª vez envia; repetições dentro de `COOLDOWN_ALERTA_MS` só
  *   incrementam a contagem (para o próximo aviso dizer "Nª ocorrência").
- * - **Webhook EXPLÍCITO de AJUDA**: sem `GOOGLE_CHAT_WEBHOOK_URL_AJUDA` no ambiente, PULA o
- *   envio — nunca cai no webhook default de projetos do `sendChatNotification` (senão erros
- *   de sistema iriam para o grupo das submissões). Env lida LAZY, dentro da função.
+ * - **Webhook EXPLÍCITO, nunca o default**: a preferência é o **watchdog**
+ *   (`GOOGLE_CHAT_WEBHOOK_URL_WATCHDOG`, o espaço que o Luis já usa para ser avisado de outros
+ *   projetos — pedido dele em 09/09/2026) e o de **Ajuda** é o fallback. Sem nenhum dos dois,
+ *   PULA o envio: erro de sistema jamais pode cair no webhook default de projetos do
+ *   `sendChatNotification`, que é o grupo das submissões. Envs lidas LAZY, dentro da função.
  */
 export async function alertarErroIntegracao(
   fonte: string,
@@ -53,8 +55,9 @@ export async function alertarErroIntegracao(
   cooldownMs: number = COOLDOWN_ALERTA_MS,
 ): Promise<void> {
   try {
-    const webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL_AJUDA;
-    if (!webhookUrl) return; // sem canal de Ajuda → não alerta (e não cai no default)
+    const webhookUrl =
+      process.env.GOOGLE_CHAT_WEBHOOK_URL_WATCHDOG || process.env.GOOGLE_CHAT_WEBHOOK_URL_AJUDA;
+    if (!webhookUrl) return; // sem canal próprio → não alerta (e NUNCA cai no default de projetos)
 
     const agora = Date.now();
     const estado = await getAlertaEstado(fonte);

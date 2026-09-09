@@ -20,6 +20,8 @@
  * (regra do CLAUDE.md) — nada de `const X = process.env...` no topo.
  */
 
+import { reportarFalhaDeAgente } from '@/lib/agentes-falhas';
+
 const OPENAI_EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
 const MODELO_PADRAO = 'text-embedding-3-large';
 
@@ -50,7 +52,12 @@ export type Embedding = {
 export async function gerarEmbedding(texto: string): Promise<Embedding | null> {
   const cfg = embeddingConfig();
   if (!cfg) {
-    console.warn('[embeddings] sem LLM_EMBEDDINGS_KEY/LLM_FALLBACK — seguindo sem memória vetorial');
+    // ⚠️ Não é aviso, é FALHA: sem vetor não há vizinho, e sem vizinho a nota ACHATA.
+    reportarFalhaDeAgente({
+      classe: 'embedding_indisponivel',
+      onde: 'embeddings.gerarEmbedding',
+      detalhe: 'sem LLM_EMBEDDINGS_KEY nem LLM_FALLBACK no ambiente',
+    });
     return null;
   }
   const [emb] = await gerarEmbeddingsLote([texto], cfg);
@@ -84,7 +91,13 @@ export async function gerarEmbeddingsLote(
     });
     if (!resp.ok) {
       const corpo = await resp.text().catch(() => '');
-      console.error(`[embeddings] HTTP ${resp.status}: ${corpo.slice(0, 300)}`);
+      // ⚠️ Foi ESTE ponto que falhou calado em 09/09/2026: 401 em série, 0 vetores, e o time
+      // julgando 12 projetos sem um único vizinho — com relatório completo saindo no fim.
+      reportarFalhaDeAgente({
+        classe: 'embedding_indisponivel',
+        onde: 'embeddings.gerarEmbeddingsLote',
+        detalhe: `HTTP ${resp.status} · ${corpo.slice(0, 200)}`,
+      });
       return textos.map(() => null);
     }
     const json = (await resp.json()) as {
@@ -101,7 +114,11 @@ export async function gerarEmbeddingsLote(
     }
     return saida;
   } catch (e) {
-    console.error('[embeddings] falha ao gerar lote:', e);
+    reportarFalhaDeAgente({
+      classe: 'embedding_indisponivel',
+      onde: 'embeddings.gerarEmbeddingsLote',
+      detalhe: e instanceof Error ? e.message : String(e),
+    });
     return textos.map(() => null);
   }
 }

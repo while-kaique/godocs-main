@@ -393,6 +393,26 @@ const SCHEMA_SQL = `
     contagem  INTEGER DEFAULT 0                      -- ocorrências suprimidas desde o último envio
   );
 
+  -- FALHAS dos agentes que não podem passar caladas (catálogo em src/lib/agentes-falhas.ts).
+  -- Append-only, INTERNA e DERIVADA: fora de SAFE_UPDATE_FIELDS, o sync reverso não a toca, e
+  -- apagá-la só perde histórico de diagnóstico. Existe para responder "os agentes falharam
+  -- esta semana, e de que jeito?" -- o console.error do Godeploy responde isso por ~1 dia e
+  -- ninguém lê. A classe é validada no código, não por CHECK, porque ampliar o catálogo é
+  -- decisão de produto e um CHECK velho recusaria a classe nova em silêncio no INSERT.
+  CREATE TABLE IF NOT EXISTS falha_agente (
+    id         TEXT PRIMARY KEY,
+    classe     TEXT NOT NULL,                        -- ClasseFalha (ex. 'rag_sem_vizinho')
+    onde       TEXT NOT NULL,                        -- módulo/função que detectou
+    projeto_id TEXT,                                 -- quando a falha é de UM projeto
+    ciclo_id   TEXT,                                 -- amarra com agente_log quando há ciclo
+    detalhe    TEXT,
+    alertou    INTEGER DEFAULT 0,                    -- 1 = mandou mensagem no watchdog
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_falha_agente_classe ON falha_agente(classe, created_at);
+  CREATE INDEX IF NOT EXISTS idx_falha_agente_data ON falha_agente(created_at);
+
   -- FAQ. Todo mundo LÊ em /faq, admin edita inline. Cada categoria é UM documento
   -- (coluna corpo, markdown leve) -- a lista de cards existe só no índice /faq.
   -- O conteúdo inicial nasce do FAQ_SEED (src/lib/faq/conteudo.ts) por seed IDEMPOTENTE

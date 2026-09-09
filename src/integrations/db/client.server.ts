@@ -2623,6 +2623,64 @@ export function upsertAlertaEstado(v: { chave: string; ultimo_em: number | null;
   );
 }
 
+export type FalhaAgenteRow = {
+  id: string;
+  classe: string;
+  onde: string;
+  projeto_id: string | null;
+  ciclo_id: string | null;
+  detalhe: string | null;
+  alertou: number | null;
+  created_at: string | null;
+};
+
+/** Registra UMA falha de agente. Append-only — ver `agentes-falhas.ts` para o catálogo. */
+export function insertFalhaAgente(v: {
+  id: string;
+  classe: string;
+  onde: string;
+  projeto_id?: string | null;
+  ciclo_id?: string | null;
+  detalhe?: string | null;
+  alertou?: boolean;
+}) {
+  return exec(
+    "INSERT INTO falha_agente (id, classe, onde, projeto_id, ciclo_id, detalhe, alertou) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [
+      v.id,
+      v.classe,
+      v.onde,
+      v.projeto_id ?? null,
+      v.ciclo_id ?? null,
+      v.detalhe ?? null,
+      v.alertou ? 1 : 0,
+    ],
+  );
+}
+
+/**
+ * Contagem de falhas por classe numa janela de horas. É o corpo do painel de saúde dos agentes.
+ * ⚠️ Agregada no SQL de propósito: a tabela cresce a cada backfill e a tela só quer o número.
+ */
+export function getFalhasAgentePorClasse(horas: number) {
+  return queryAll<{ classe: string; total: number; ultima: string | null }>(
+    `SELECT classe, COUNT(*) AS total, MAX(created_at) AS ultima
+       FROM falha_agente
+      WHERE created_at >= datetime('now', ?)
+      GROUP BY classe
+      ORDER BY total DESC`,
+    [`-${Math.max(1, Math.floor(horas))} hours`],
+  );
+}
+
+/** As últimas falhas, para a tela mostrar exemplos (bounded). */
+export function getFalhasAgenteRecentes(limite: number) {
+  return queryAll<FalhaAgenteRow>(
+    "SELECT * FROM falha_agente ORDER BY created_at DESC, id DESC LIMIT ?",
+    [Math.max(1, Math.min(200, Math.floor(limite)))],
+  );
+}
+
 // ─── Row types ──────────────────────────────────────────────────────────────
 
 export type AdminRow = {

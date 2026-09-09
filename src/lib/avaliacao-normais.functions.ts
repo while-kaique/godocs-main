@@ -97,6 +97,7 @@ import type {
   JulgamentoEspecialista,
   TextoProjeto,
 } from '@/lib/agents/especialista-avaliacao';
+import { reportarFalhaDeAgente } from '@/lib/agentes-falhas';
 
 /** Carimbo de origem gravado em cada recomendação (distingue do que possa vir depois). */
 export const ORIGEM_AGREGADOR = 'agregador-normais';
@@ -433,6 +434,28 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
   const linhaEspelho =
     ctx.linhaPorId.get(projetoId.trim().toLowerCase()) ?? ctx.linhaPorId.get(projetoId);
   const fin = financeiroDoProjeto(saving, receita, linhaEspelho);
+
+  // ⚠️ O SINAL do bug de 08/09/2026, para ele nunca voltar calado: se NADA do financeiro chegou
+  // (nem horas, nem impacto, nem despesa que parou, nem receita), o especialista financeiro vai
+  // responder "sem dados" e **o piso de impacto não dispara** — foi assim que a mesa aprovou o
+  // que a triagem reprovou em 41,4% dos casos. Projeto de ganho IMENSURÁVEL é o caso legítimo
+  // disso, e é por isso que a checagem exige a linha do espelho existir: sem linha nenhuma o
+  // problema é outro (id que não casa), e ele tem o próprio caminho.
+  if (
+    linhaEspelho &&
+    projeto.especial !== 1 &&
+    fin.horas === 0 &&
+    fin.economiaReaisMes == null &&
+    fin.custoEvitado == null &&
+    fin.valorReceita == null
+  ) {
+    reportarFalhaDeAgente({
+      classe: 'dossie_sem_financeiro',
+      onde: 'avaliacao-normais.computarVotos',
+      projetoId,
+      detalhe: 'a linha do espelho existe mas nenhum número financeiro chegou ao especialista',
+    });
+  }
 
   // ── Voto FTE (Plausibilidade) ──
   const membros = parseJson<string[]>((projeto.membros as string | null) ?? null) ?? [];
