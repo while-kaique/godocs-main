@@ -129,6 +129,29 @@ export const CORES_GRAU_NEUTRO = {
   borda: "rgba(91,100,112,0.30)",
 };
 
+/**
+ * A aparência a partir do GRAU já em texto (`"alta"` · `"media"`/`"média"` · `"baixa"`) — é o
+ * formato que a coluna `Confiança Agente` e o consenso do time entregam, sem número nenhum.
+ *
+ * ⚠️ **Pedido do Luis (09/09/2026): alta verde, média amarelo, baixa cinza.** As cores já existiam
+ * em `CORES_GRAU` e eram aplicadas só na pílula da MESA (que tem confiança numérica); o grau em
+ * TEXTO era desenhado como `text-muted-foreground`, cinza para os três.
+ * ⚠️ **A palavra continua na tela** — a cor acompanha o rótulo, nunca o substitui (piso de a11y do
+ * repo: estado nunca só por cor).
+ * ⚠️ Tolerante a acento e caixa: a planilha e o LLM já escreveram "média" e "Alta".
+ */
+export function aparenciaGrauTexto(grau: string | null | undefined) {
+  const t = String(grau ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (t === "alta") return CORES_GRAU.alta;
+  if (t === "media") return CORES_GRAU.media;
+  if (t === "baixa") return CORES_GRAU.baixa;
+  return CORES_GRAU_NEUTRO;
+}
+
 /** Escolhe a aparência a partir da confiança numérica (deriva o grau internamente). */
 export function aparenciaConfianca(conf: number | null | undefined) {
   const g = typeof conf === "number" && Number.isFinite(conf) ? grauConfianca(conf) : null;

@@ -7,6 +7,7 @@ import {
   faixaDeConfianca,
   grauConfianca,
   aparenciaConfianca,
+  aparenciaGrauTexto,
   CORES_GRAU,
   CORES_GRAU_NEUTRO,
 } from "@/lib/avaliacao-sombra-rotulos";
@@ -122,5 +123,38 @@ describe("aparenciaConfianca", () => {
     expect(aparenciaConfianca(null)).toBe(CORES_GRAU_NEUTRO);
     expect(aparenciaConfianca(undefined)).toBe(CORES_GRAU_NEUTRO);
     expect(aparenciaConfianca(NaN)).toBe(CORES_GRAU_NEUTRO);
+  });
+});
+
+// ─── Cor do GRAU da confiança (09/09/2026) ────────────────────────────────────────────────────
+describe('aparenciaGrauTexto — alta verde, média amarelo, baixa cinza', () => {
+  it('mapeia os 3 graus, tolerante a acento e caixa', () => {
+    // Pedido do Luis: "o que tiver confiança alta ficar verde, media amarelo, baixa cinza".
+    // A planilha e o LLM já escreveram "média" e "Alta", então normalizar é requisito, não zelo.
+    expect(aparenciaGrauTexto('alta')).toEqual(CORES_GRAU.alta);
+    expect(aparenciaGrauTexto('ALTA')).toEqual(CORES_GRAU.alta);
+    expect(aparenciaGrauTexto('media')).toEqual(CORES_GRAU.media);
+    expect(aparenciaGrauTexto('média')).toEqual(CORES_GRAU.media);
+    expect(aparenciaGrauTexto('baixa')).toEqual(CORES_GRAU.baixa);
+  });
+
+  it('grau ausente ou desconhecido cai no neutro, nunca em verde', () => {
+    // Pintar de verde o que não foi medido afirmaria confiança que ninguém apurou.
+    expect(aparenciaGrauTexto(null)).toEqual(CORES_GRAU_NEUTRO);
+    expect(aparenciaGrauTexto('')).toEqual(CORES_GRAU_NEUTRO);
+    expect(aparenciaGrauTexto('altíssima')).toEqual(CORES_GRAU_NEUTRO);
+  });
+
+  it('as 3 cores são distinguíveis entre si', () => {
+    const cores = [CORES_GRAU.alta.cor, CORES_GRAU.media.cor, CORES_GRAU.baixa.cor];
+    expect(new Set(cores).size).toBe(3);
+  });
+
+  it('⚠️ a PALAVRA continua na tela — a cor acompanha o rótulo, não o substitui', () => {
+    // Piso de a11y do repo: estado nunca só por cor.
+    const chip = readFileSync('src/components/dashboard/chip-agente.tsx', 'utf8');
+    expect(chip).toContain('aparenciaGrauTexto');
+    // O texto do grau segue sendo renderizado ao lado da cor.
+    expect(chip).toMatch(/rotuloGrau\(grau\)\.replace\("confiança ", ""\) : confianca/);
   });
 });

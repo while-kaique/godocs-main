@@ -112,6 +112,10 @@ export type ProjetoDashboardResumo = {
   ganhoTotal: number | null;
   savingReais: number | null;
   receitaMensal: number | null;
+  /** `Saving Efetivado` — despesa que a empresa pagava e parou. Só o FILTRO usa. */
+  savingEfetivado: number | null;
+  /** `Custo Evitado Horas` — horas humanas liberadas. Só o FILTRO usa. */
+  custoEvitadoHoras: number | null;
   complexidade: string | null; // eixo NÍVEL da categorização (item 5.4)
   /** Eixo TIPO da categorização (item 5.4) — rótulo legível, "—" quando indefinido. */
   tipoProjeto: string | null;
@@ -286,6 +290,15 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
     ganhoTotal: numero(row['Impacto Líquido']),
     savingReais: numero(row['Impacto Bruto']),
     receitaMensal: numero(row['Receita Incremental']),
+    // ⚠️ Os DOIS números que decidem a CATEGORIA de ganho da v2 no filtro do /dashboard. As colunas
+    // já estavam em `COLUNAS_RESUMO` (entraram para a mesa ler o financeiro), então isto não pede
+    // bump de `VERSAO_RECORTE_RESUMO` — o recorte do espelho já as carrega.
+    // ⚠️ A régua da categoria é o **VALOR gravado**, nunca a coluna de texto `Tipos de Ganho`: os
+    // valores foram realocados para as colunas da v2, mas o RÓTULO ficou em vocabulário da v1 em
+    // 647 das 750 linhas ("saving"). Filtrar pelo rótulo devolveria a base errada — é o mesmo
+    // princípio que o filtro de ganho anterior já seguia.
+    savingEfetivado: numero(row['Saving Efetivado']),
+    custoEvitadoHoras: numero(row['Custo Evitado Horas']),
     complexidade: texto(row['Complexidade']),
     tipoProjeto: texto(row['Tipo de Projeto']),
     tipos: texto(row['Tipos de Ganho']),

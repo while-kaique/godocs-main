@@ -41,6 +41,82 @@ export type FiltroGanho = "todos" | "saving" | "receita";
  */
 export type FiltroAgente = "todos" | "sem" | "com";
 
+/**
+ * Recorte pelas **CATEGORIAS DE GANHO da v2** — multi-seleção que SOMA (pedido do Luis,
+ * 09/09/2026: *"quero ver custo evitado, saving efetivado, ganho imensuravel, receita. E tem que
+ * ser diamico tb, e somar, posso selecionar 2 ao msm tempo"*).
+ *
+ * ⚠️ **Dentro da dimensão é OU; entre dimensões continua E.** Marcar "custo evitado" + "receita"
+ * devolve quem tem qualquer uma das duas (é o que "somar" quer dizer numa fila de triagem), e isso
+ * segue somando com área/período/estrelas como as outras dimensões.
+ *
+ * ⚠️ **São EXATAMENTE as 4 categorias da v2, e a régua é o VALOR** — ver `categoriasDeGanho`. Não
+ * existe bucket de legado: a base JÁ foi realocada para as colunas da v2, e quem lê o valor não
+ * precisa saber que a coluna de texto ficou atrasada.
+ * ⚠️ Este filtro **SUBSTITUIU** o antigo (`FiltroGanho`, "Com saving" × "Com receita", escolha
+ * única) — não é uma 6ª pílula na barra. *"Era so mudar os que ja tinha e adaptalos devidamente."*
+ */
+export type CategoriaFiltroGanho =
+  | "saving_efetivado"
+  | "custo_evitado"
+  | "receita_incremental"
+  | "imensuravel";
+
+/** Como cada categoria se chama na tela. FONTE ÚNICA (pílula, painel e `aria-label`). */
+export const ROTULO_CATEGORIA_GANHO: Record<CategoriaFiltroGanho, string> = {
+  saving_efetivado: "Saving efetivado",
+  custo_evitado: "Custo evitado",
+  receita_incremental: "Receita incremental",
+  imensuravel: "Ganho imensurável",
+};
+
+/** A ordem dos cards da Etapa 2 — a mesma que o autor viu ao escolher. */
+export const ORDEM_CATEGORIA_GANHO: readonly CategoriaFiltroGanho[] = [
+  "saving_efetivado",
+  "custo_evitado",
+  "receita_incremental",
+  "imensuravel",
+] as const;
+
+/**
+ * As categorias da **v2** de UM projeto — derivadas do **VALOR gravado**, nunca do rótulo. PURA.
+ *
+ * ⚠️ **Por que pelo valor, e não pela coluna `Tipos de Ganho`** (corrigido em 09/09/2026, depois de
+ * eu errar isto): os VALORES já foram realocados para as colunas da v2 (`Saving Efetivado`,
+ * `Custo Evitado Horas`, `Receita Incremental` estão preenchidas em 745 de 745 linhas), mas a
+ * coluna de TEXTO ficou em vocabulário da v1 — 647 das 750 linhas ainda dizem "saving". A 1ª versão
+ * deste filtro lia o texto e por isso precisava de um bucket de legado, que o Luis vetou com razão:
+ * *"que plano é esse de bucket de v1 se eu ja te falei que ja readaptamos toda a base realocando os
+ * valores para as devidas colunas mudadas?"*. Lendo o valor, o filtro funciona na base de hoje sem
+ * nenhuma gambiarra: custo evitado 648 · saving efetivado 47 · receita 18 · sem número 78.
+ *
+ * ⚠️ É a MESMA régua que o filtro de ganho anterior já seguia ("o VALOR gravado, não o rótulo de
+ * Tipos Projeto") — este só a estende às 4 categorias da v2.
+ * ⚠️ Um projeto pode estar em DUAS categorias (parou uma despesa **e** liberou horas), e é por isso
+ * que a seleção é múltipla e soma.
+ * ⚠️ **`imensuravel` é a AUSÊNCIA dos três números**, não uma coluna: é a definição do formulário
+ * ("o ganho é real mas não tem número"). Só entra quando nenhum dos outros entrou, então nunca
+ * convive com eles.
+ */
+export function categoriasDeGanho(p: ProjetoDashboardResumo): CategoriaFiltroGanho[] {
+  const cats: CategoriaFiltroGanho[] = [];
+  if (temValor(p.savingEfetivado)) cats.push("saving_efetivado");
+  if (temValor(p.custoEvitadoHoras)) cats.push("custo_evitado");
+  if (temValor(p.receitaMensal)) cats.push("receita_incremental");
+  if (cats.length === 0) cats.push("imensuravel");
+  return cats;
+}
+
+/** Nada selecionado = sem recorte. Com seleção, basta UMA categoria casar (OU). PURA. */
+export function casaCategorias(
+  p: ProjetoDashboardResumo,
+  selecionadas: readonly CategoriaFiltroGanho[],
+): boolean {
+  if (!selecionadas || selecionadas.length === 0) return true;
+  const doProjeto = categoriasDeGanho(p);
+  return selecionadas.some((c) => doProjeto.includes(c));
+}
+
 export const TODAS_AS_AREAS = "todas";
 export const TODOS_OS_PARECERES = "todos";
 
@@ -83,6 +159,11 @@ export type FiltrosDashboard = {
   soMultiplos: boolean;
   /** "O agente já rodou neste projeto?" — ver `FiltroAgente`. */
   agente: FiltroAgente;
+  /**
+   * Categorias de ganho da v2 marcadas. Vazio = sem recorte; 2+ SOMAM (OU) — ver
+   * `CategoriaFiltroGanho`.
+   */
+  categorias: CategoriaFiltroGanho[];
 };
 
 export const FILTROS_VAZIOS: FiltrosDashboard = {
@@ -96,6 +177,7 @@ export const FILTROS_VAZIOS: FiltrosDashboard = {
   estrelasMin: null,
   estrelasMax: null,
   soMultiplos: false,
+  categorias: [],
 };
 
 /** Um valor só conta como ganho quando é positivo (célula vazia e 0 não entram na fila). */
@@ -212,7 +294,8 @@ export type DimensaoFiltro =
   | "parecer"
   | "periodo"
   | "estrelas"
-  | "agente";
+  | "agente"
+  | "categorias";
 
 /**
  * O projeto passa por TODAS as dimensões, menos uma.
@@ -235,7 +318,8 @@ export function casaFiltrosExceto(
     (exceto === "parecer" || casaParecer(p, f.parecer)) &&
     (exceto === "periodo" || casaPeriodo(p, f.periodo)) &&
     (exceto === "estrelas" || casaEstrelas(p, f.estrelasMin, f.estrelasMax)) &&
-    (exceto === "agente" || casaAgente(p, f.agente))
+    (exceto === "agente" || casaAgente(p, f.agente)) &&
+    (exceto === "categorias" || casaCategorias(p, f.categorias))
   );
 }
 
@@ -253,8 +337,41 @@ export function aplicarFiltros(
       casaParecer(p, f.parecer) &&
       casaPeriodo(p, f.periodo) &&
       casaEstrelas(p, f.estrelasMin, f.estrelasMax) &&
-      casaAgente(p, f.agente),
+      casaAgente(p, f.agente) &&
+      casaCategorias(p, f.categorias),
   );
+}
+
+/**
+ * Categorias PRESENTES no recorte atual, com a contagem de cada uma — é a lista do painel.
+ *
+ * ⚠️ **A contagem é do RECORTE e ignora a PRÓPRIA dimensão** (`casaFiltrosExceto(..., 'categorias')`),
+ * a mesma régua das pílulas e do campo de pré-status: contar sobre a base inteira faria o painel
+ * dizer "Custo evitado (8)" e abrir uma lista de 2 com outro filtro ligado, e contar COM a própria
+ * dimensão apagaria as outras opções no instante em que uma fosse marcada.
+ * ⚠️ Categoria **marcada nunca desaparece** da lista, mesmo com 0 no recorte — quem marcou precisa
+ * poder desmarcar, e opção que some deixa a pessoa sem saber o que está filtrando (é o mesmo motivo
+ * do `<select>` de pré-status).
+ */
+export function categoriasDisponiveis(
+  projetos: ProjetoDashboardResumo[],
+  f: FiltrosDashboard,
+): { categoria: CategoriaFiltroGanho; total: number }[] {
+  const conta = new Map<CategoriaFiltroGanho, number>();
+  for (const p of projetos) {
+    if (!casaFiltrosExceto(p, f, "categorias")) continue;
+    for (const c of categoriasDeGanho(p)) conta.set(c, (conta.get(c) ?? 0) + 1);
+  }
+  return ORDEM_CATEGORIA_GANHO.filter(
+    (c) => (conta.get(c) ?? 0) > 0 || f.categorias.includes(c),
+  ).map((c) => ({ categoria: c, total: conta.get(c) ?? 0 }));
+}
+
+/** O texto da pílula do filtro de categorias. FONTE ÚNICA com o painel. PURA. */
+export function rotuloCategorias(selecionadas: readonly CategoriaFiltroGanho[]): string {
+  if (!selecionadas || selecionadas.length === 0) return "Ganhos";
+  if (selecionadas.length === 1) return ROTULO_CATEGORIA_GANHO[selecionadas[0]];
+  return `${selecionadas.length} categorias`;
 }
 
 /**
@@ -271,7 +388,9 @@ export function contarFiltrosAtivos(f: FiltrosDashboard): number {
     // A faixa de estrelas é UMA dimensão, mesmo com as duas pontas preenchidas.
     (f.estrelasMin != null || f.estrelasMax != null ? 1 : 0) +
     (f.soMultiplos ? 1 : 0) +
-    (f.agente !== "todos" ? 1 : 0)
+    (f.agente !== "todos" ? 1 : 0) +
+    // Multi-seleção conta como UMA dimensão, como a faixa de estrelas com as 2 pontas.
+    (f.categorias.length > 0 ? 1 : 0)
   );
 }
 

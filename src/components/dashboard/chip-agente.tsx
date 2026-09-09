@@ -19,6 +19,7 @@ import {
   rotuloGrau,
   grauConfianca,
   aparenciaConfianca,
+  aparenciaGrauTexto,
 } from "@/lib/avaliacao-sombra-rotulos";
 
 export type AgenteChipDados = {
@@ -82,7 +83,11 @@ export function ChipAgente({
               style={{ background: a.cor }}
             />
             <span className="text-[11px] font-semibold">
-              {grau ? rotuloGrau(grau).replace("confiança ", "") : confianca}
+              {/* ⚠️ A cor segue o GRAU (alta verde · média amarelo · baixa cinza), e a palavra
+                  fica: cor acompanha o rótulo, nunca o substitui. */}
+              <span style={{ color: aparenciaGrauTexto(grau ?? confianca).cor, fontWeight: 700 }}>
+                {grau ? rotuloGrau(grau).replace("confiança ", "") : confianca}
+              </span>
             </span>
           </span>
         )}

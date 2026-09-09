@@ -87,8 +87,17 @@ function userDe(msgs: ReturnType<typeof buildPromptMerito>): string {
 // ── 1. dimensões + prompt ─────────────────────────────────────────────────────
 
 describe('DIMENSOES_MERITO e buildPromptMerito', () => {
-  it('as 4 dimensões, nessa ordem', () => {
-    expect(DIMENSOES_MERITO).toEqual(['plausibilidade_horas', 'financeiro', 'precedente', 'evidencia']);
+  it('as 5 dimensões, nessa ordem', () => {
+    // ⚠️ `categoria_ganho` entrou em 09/09/2026 (pedido do Luis: o time tem de discernir se é
+    // custo evitado mesmo, saving efetivado, receita ou ganho imensurável). A lista é travada de
+    // propósito: dimensão nova muda a aritmética do quórum e é DECISÃO, não acidente.
+    expect(DIMENSOES_MERITO).toEqual([
+      'plausibilidade_horas',
+      'financeiro',
+      'precedente',
+      'evidencia',
+      'categoria_ganho',
+    ]);
   });
 
   it('devolve [system, user] para toda dimensão', () => {
@@ -102,11 +111,11 @@ describe('DIMENSOES_MERITO e buildPromptMerito', () => {
     }
   });
 
-  it('o system de cada dimensão é diferente dos outros três e cita a própria dimensão', () => {
+  it('o system de cada dimensão é diferente dos demais e cita a própria dimensão', () => {
     const systems = DIMENSOES_MERITO.map((dimensao) =>
       systemDe(buildPromptMerito({ dimensao, dossieTexto: dossieTexto(), vizinhos: [] })),
     );
-    expect(new Set(systems).size).toBe(4);
+    expect(new Set(systems).size).toBe(DIMENSOES_MERITO.length);
     DIMENSOES_MERITO.forEach((dimensao, i) => {
       expect(systems[i]).toContain(dimensao);
     });
