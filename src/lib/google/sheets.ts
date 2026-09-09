@@ -157,6 +157,18 @@ export const SHEET_COLUMNS = [
   'Saving Efetivado Agora',         // BE (a 2ª ponta do par; o saving é a DIFERENÇA)
   'Custo Evitado Não Contratado',   // BF (a vaga não aberta, a consultoria não contratada)
   'Impacto Líquido Mensal',         // BG (o líquido normalizado no tempo — vai ao Gomoon)
+  // ─── A recomendação do AGENTE, separada da nota humana (BH, BI) ─────────────
+  //
+  // ⚠️ Existem porque a coluna `Estrelas` **não consegue** carregar a faixa de escape: ela é
+  // numérica, `"6-10"` como texto quebraria soma e ordenação, e gravar `6` afirmaria uma posição
+  // que a régua se recusa a afirmar (quem crava 6..10 é o comitê humano). Sem um lugar próprio, a
+  // recomendação do agente ou ficava invisível na planilha ou era escrita DENTRO de `Estrelas` —
+  // e foi isso que aconteceu com as 129 células da run 9 em 05/09/2026, deixando indistinguível
+  // um `3` do agente de um `3` de gente.
+  // ⚠️ `Estrelas` volta a ser 100% HUMANA. Adotar a sugestão do agente como nota segue sendo ato
+  // de pessoa, feito no campo da ficha — nunca efeito colateral de uma rodada do classificador.
+  'Estrela Agente',                 // BH (0..5, ou "6-10" quando o agente indica o escape)
+  'Confiança Agente',               // BI (alta/média/baixa — o GRAU, nunca percentual)
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];

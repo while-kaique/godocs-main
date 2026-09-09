@@ -39,14 +39,22 @@ describe('alias de nome legado — a aba de prod ainda não foi migrada', () => 
   it('⚠️ sem o alias, 22 colunas que o código ESCREVE não existiriam em prod', () => {
     // Sem esta ponte o /dashboard leria `undefined` e mostraria R$ 0 para todo projeto,
     // e o append gravaria a linha sem número nenhum (com um console.warn que ninguém lê).
-    // Só sobram as 3 colunas genuinamente NOVAS da v2 — que não devem ter equivalente
-    // inventado, e cuja ausência é o próprio discriminador de "esta linha é v1".
+    // Só sobram as colunas genuinamente NOVAS — que não devem ter equivalente inventado, e
+    // cuja ausência é o próprio discriminador de "esta linha é v1": as 3 da v2 e as 2 do
+    // AGENTE (`Estrela Agente`/`Confiança Agente`, 08/09/2026), que nasceram porque a coluna
+    // `Estrelas` é numérica e não carrega a faixa de escape `6-10`.
     const fora = chavesForaDoCabecalho(
       CABECALHO_PROD_V1,
       Object.fromEntries(SHEET_COLUMNS.map((n) => [n, 'x'])),
     );
     expect(fora.sort()).toEqual(
-      ['Custo Evitado Não Contratado', 'Impacto Líquido Mensal', 'Saving Efetivado Agora'].sort(),
+      [
+        'Custo Evitado Não Contratado',
+        'Impacto Líquido Mensal',
+        'Saving Efetivado Agora',
+        'Estrela Agente',
+        'Confiança Agente',
+      ].sort(),
     );
   });
 

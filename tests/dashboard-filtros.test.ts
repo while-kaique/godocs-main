@@ -58,6 +58,8 @@ function proj(over: Partial<ProjetoDashboardResumo> = {}): ProjetoDashboardResum
     especial: false,
     aprovacaoLider: null,
     estrelas: null,
+    estrelaAgente: null,
+    confiancaAgente: null,
     busca: 'projeto fulano',
     ...over,
   };
@@ -306,11 +308,13 @@ describe('peso do payload da listagem', () => {
         'area',
         'autor',
         'busca',
+        'confiancaAgente',
         'complexidade',
         'dataOrdenacao',
         'dataSubmissao',
         'email',
         'especial',
+        'estrelaAgente',
         // Número curto e DESENHADO (coluna "Estrelas" + filtro por faixa) — passa no canário.
         'estrelas',
         'ganhoTotal',

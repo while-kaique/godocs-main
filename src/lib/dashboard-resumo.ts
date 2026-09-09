@@ -131,6 +131,16 @@ export type ProjetoDashboardResumo = {
    * número: é ele que sustenta o filtro por faixa e a coluna da tabela.
    */
   estrelas: number | null;
+  /**
+   * A recomendação do AGENTE (coluna "Estrela Agente"): `"0".."5"` ou **`"6-10"`**.
+   *
+   * ⚠️ TEXTO, não número, e é justamente por isso que ela não cabia em `Estrelas`: a faixa de
+   * escape não é um número. Fica ao lado da nota humana na tabela para a divergência
+   * (agente `6-10` × humano `2`) ser visível sem abrir ficha por ficha.
+   */
+  estrelaAgente: string | null;
+  /** O GRAU de confiança do agente (alta/média/baixa) — nunca percentual. */
+  confiancaAgente: string | null;
   busca: string;
 };
 
@@ -172,6 +182,9 @@ export const COLUNAS_RESUMO: readonly string[] = [
   'Tipos de Ganho',
   'Especial?',
   'Estrelas',
+  // A recomendação do agente viaja no resumo porque a TABELA a desenha (ao lado da nota humana).
+  'Estrela Agente',
+  'Confiança Agente',
   COLUNA_ESTADO_LIDER,
 ];
 
@@ -189,7 +202,8 @@ export const COLUNAS_RESUMO: readonly string[] = [
 // `linha_resumo` com as chaves da v1 e `mapResumo` leria `undefined` — Ganho/Saving/
 // Receita/Tipos nasceriam VAZIOS na tela, para sempre. Renomear é o mesmo caso de
 // "coluna nova" que este contador existe para cobrir.
-export const VERSAO_RECORTE_RESUMO = 6;
+// 7: entraram "Estrela Agente" e "Confiança Agente" (08/09/2026).
+export const VERSAO_RECORTE_RESUMO = 7;
 
 /**
  * Recorta de uma linha da planilha só as `COLUNAS_RESUMO`.
@@ -268,6 +282,8 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
     aprovacaoLider: texto(valorDaColuna(row as Record<string, string>, COLUNA_ESTADO_LIDER)),
     // Nota crua, sem teto: "8" na planilha vale 8 (a escala é aberta desde 17/08/2026).
     estrelas: numero(row['Estrelas']),
+    estrelaAgente: texto(row['Estrela Agente']),
+    confiancaAgente: texto(row['Confiança Agente']),
     // O que a busca alcança: nome do projeto, autor, e-mail, id, área e ferramenta.
     busca: chaveBusca(nome, autor, email, id, area, ferramenta),
   };

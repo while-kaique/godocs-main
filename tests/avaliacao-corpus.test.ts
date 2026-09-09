@@ -31,6 +31,8 @@ function resumo(
     especial: over.especial ?? false,
     aprovacaoLider: null,
     estrelas: null,
+    estrelaAgente: null,
+    confiancaAgente: null,
     busca: '',
   };
 }

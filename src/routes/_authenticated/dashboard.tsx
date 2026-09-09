@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   Sparkles,
   Star,
+  Bot,
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -623,6 +624,12 @@ function Dashboard() {
                 >
                   Estrelas
                 </Th>
+                {/* A recomendação do AGENTE ao lado da nota humana: é o que torna a divergência
+                    (agente "6-10" × humano 2) visível sem abrir ficha por ficha. ⚠️ Coluna
+                    PRÓPRIA porque `Estrelas` é numérica e não carrega a faixa de escape — e
+                    porque misturar as duas foi o que deixou indistinguível, nas 129 células da
+                    run 9, um `3` do agente de um `3` de gente. */}
+                <Th className="hidden lg:table-cell">Agente</Th>
                 {/* Os DOIS eixos da categorização (item 5.4) na mesma célula: o TIPO é o
                     que o projeto é, o NÍVEL é como o trabalho acontece. Coluna nova
                     alargaria uma tabela que já é densa — e a régua desta tela é escanear. */}

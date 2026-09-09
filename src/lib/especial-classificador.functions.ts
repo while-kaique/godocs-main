@@ -27,7 +27,9 @@ import {
   type EspecialEmbeddingRow,} from "@/integrations/db/client.server";
 import { lerResumosEspelho, lerLinhaEspelho } from "@/lib/sheet-espelho";
 import { chaveProjeto } from "@/lib/projeto-chave";
-import { TETO_AGENTE, ehEscape, normalizarEscape} from "@/lib/estrelas-regua";
+import { TETO_AGENTE, ehEscape, normalizarEscape, rotuloNotaAgente } from "@/lib/estrelas-regua";
+import { updateRowByProjectId } from "@/lib/google/sheets";
+import { espelharEscrita } from "@/lib/sheet-espelho";
 import { ajustarNotaComPainel, confiancaPorConsenso, type AjustePainel } from "@/lib/especiais-ajuste";
 import { verificarCoerencia, removerNumerosDivergentes } from "@/lib/coerencia-leitura";
 import { apenasEspeciais } from "@/lib/especiais-view";
@@ -643,6 +645,24 @@ export async function classificarEspecialProjeto(
       modelo: modeloChatConfigurado(),
     });
     gravado = true;
+    // A recomendação também vai para a PLANILHA, nas 2 colunas do agente — nunca em "Estrelas".
+    //
+    // ⚠️ Colunas PRÓPRIAS porque `Estrelas` é numérica e não carrega a faixa de escape: `"6-10"`
+    // ali quebraria soma e ordenação, e gravar `6` afirmaria uma posição que a régua se recusa a
+    // afirmar. `rotuloNotaAgente` é a FONTE ÚNICA desse rótulo (a mesma que a tela usa).
+    // ⚠️ `espelharEscrita` no mesmo passo: toda escrita nossa no Sheets remenda o espelho na hora,
+    // senão a coluna só apareceria na tela no próximo cron (invariante 1 do espelho).
+    // ⚠️ Best-effort: falhar aqui não pode desfazer a recomendação que já está no SQLite.
+    try {
+      const celulas = {
+        'Estrela Agente': rotuloNotaAgente(recomendacao.estrelas_recomendada).rotulo,
+        'Confiança Agente': recomendacao.confianca,
+      };
+      await updateRowByProjectId(projetoId, celulas);
+      await espelharEscrita(projetoId, celulas);
+    } catch (e) {
+      console.error("[especial-classificador] falha ao escrever as colunas do agente:", e);
+    }
   }
 
   return {
