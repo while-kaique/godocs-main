@@ -86,12 +86,20 @@ export function impactoMensalDeclarado(input: {
 }
 
 /**
- * Teto de estrela para o piso poder reprovar.
+ * Limite de estrela para o piso poder reprovar: a nota tem de ser **estritamente abaixo de 1** —
+ * ou seja, **zero**.
+ *
+ * ⚠️ **Isto já esteve errado aqui, e o erro era MEU.** Eu tinha posto `1` como TETO (`<= 1`), o
+ * que reprovava também os **1★**. O dono do produto corrigiu: *"você inventou o <= 1, eu falei
+ * < 1"* — e ele havia escrito, antes, `(100 e com 0 estrelas)`. A diferença não é acadêmica: são
+ * **6 projetos APROVADOS de 1★** (`RA Monitor`, `Controle de Vencimentos`, `[ECOMM] Alerta de
+ * pedidos travados`, `Direcionador de Fórum`, `Pesquisa Satisfação Prima Vida`, `[DUDA] Cupons`)
+ * que o `<= 1` derrubava **sem uma única evidência no gabarito**.
  *
  * ⚠️ **Medido contra o gabarito do dono do produto (08/09/2026):** dos **137** projetos que ele
  * reprovou à mão em 04/09 pela régua de impacto, **137 tinham 0★. Sem exceção.** Ou seja, a régua
- * que ele aplicou nunca foi só o piso — era piso **E** nota baixa, e o piso sozinho é mais largo
- * que o julgamento que ele exerceu.
+ * que ele aplicou nunca foi só o piso — era piso **E** nota zero, e o piso sozinho é mais largo
+ * que o julgamento que ele exerceu. Extrapolar para 1★ foi ir além do que o dado sustenta.
  *
  * O que a estrela poupa, medido na base de prod: **10 projetos APROVADOS** que o piso sozinho
  * reprovaria e que têm 2★ a 4★ — `Funil R&S` (4★), `Onboarding & Integração` (3★), `Portal de
@@ -101,7 +109,7 @@ export function impactoMensalDeclarado(input: {
  *
  * Relatório: `docs/baselines/rodadas/piso-impacto-precisao-08-09.json`.
  */
-export const TETO_ESTRELA_REPROVAVEL = 1;
+export const ESTRELA_LIMITE_REPROVAVEL = 1;
 
 /**
  * A régua COMPOSTA da reprovação por impacto: o número é irrelevante **e** o projeto é baixo.
@@ -117,13 +125,14 @@ export function reprovaPeloPiso(input: {
   /** Nota humana (coluna "Estrelas"); na falta dela, a recomendada pelo agente. */
   estrela?: number | null;
   piso?: number;
-  tetoEstrela?: number;
+  limiteEstrela?: number;
 }): boolean {
   if (!abaixoDoPisoDeImpacto(input.impactoMensal, input.piso ?? PISO_IMPACTO_MENSAL)) return false;
-  const teto = input.tetoEstrela ?? TETO_ESTRELA_REPROVAVEL;
+  const limite = input.limiteEstrela ?? ESTRELA_LIMITE_REPROVAVEL;
   const e = input.estrela;
   if (typeof e !== 'number' || !Number.isFinite(e)) return true;
-  return e <= teto;
+  // ⚠️ `<`, não `<=`: nota 1 NÃO reprova. Ver o aviso da constante.
+  return e < limite;
 }
 
 /** A frase da reprovação composta — nomeia os DOIS eixos, porque são dois. */

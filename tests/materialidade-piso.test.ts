@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import {
   abaixoDoPisoDeImpacto,
   reprovaPeloPiso,
-  TETO_ESTRELA_REPROVAVEL,
+  ESTRELA_LIMITE_REPROVAVEL,
   impactoMensalDeclarado,
   motivoPisoDeImpacto,
   PISO_IMPACTO_MENSAL,
@@ -119,13 +119,24 @@ describe('gabarito de 04/09/2026 — o piso reprova os 137 e mais ninguém', () 
 });
 
 describe('reprovaPeloPiso — a régua COMPOSTA, medida contra o gabarito de 04/09', () => {
-  it('o teto de estrela é 1', () => {
-    expect(TETO_ESTRELA_REPROVAVEL).toBe(1);
+  it('a régua é ESTRITAMENTE abaixo de 1 — ou seja, nota zero', () => {
+    expect(ESTRELA_LIMITE_REPROVAVEL).toBe(1);
   });
 
-  it('impacto baixo + nota baixa (ou sem nota) → reprova', () => {
+  it('⚠️ nota 1 NÃO reprova (o `<= 1` era invenção minha; o gabarito só tem 0★)', () => {
+    // Correção do dono do produto: *"você inventou o <= 1, eu falei < 1"*. São 6 projetos
+    // APROVADOS de 1★ que o teto errado derrubava sem nenhuma evidência: RA Monitor (R$ 37,92),
+    // Controle de Vencimentos (R$ 41,37), [ECOMM] Alerta de pedidos travados (R$ 42,58),
+    // Direcionador de Fórum (R$ 42,75), Pesquisa Satisfação Prima Vida (R$ 38,62) e
+    // [DUDA] Cupons (R$ 98,50).
+    expect(reprovaPeloPiso({ impactoMensal: 37.92, estrela: 1 })).toBe(false);
+    expect(reprovaPeloPiso({ impactoMensal: 98.5, estrela: 1 })).toBe(false);
+    // e nada acima de 1, obviamente
+    expect(reprovaPeloPiso({ impactoMensal: 42.75, estrela: 2 })).toBe(false);
+  });
+
+  it('impacto baixo + nota ZERO (ou sem nota) → reprova', () => {
     expect(reprovaPeloPiso({ impactoMensal: 18.16, estrela: 0 })).toBe(true);
-    expect(reprovaPeloPiso({ impactoMensal: 18.16, estrela: 1 })).toBe(true);
     // ⚠️ Ausência de nota NÃO poupa: é o estado da maioria dos que a rodada de 04/09 pegou, e
     // exigir estrela para reprovar tornaria o piso inerte justamente em quem ninguém avaliou.
     expect(reprovaPeloPiso({ impactoMensal: 18.16, estrela: null })).toBe(true);

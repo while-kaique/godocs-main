@@ -189,8 +189,8 @@ export function agregarVotos(input: {
   // votos "compensa" um ganho de R$ 18/mês. Vem DEPOIS do isento de especial de propósito (especial
   // não tem memorial financeiro, então não há impacto declarado a julgar).
   // ⚠️ `reprovavel`, não `abaixoDoPiso`: a régua é COMPOSTA (impacto irrelevante **E** nota
-  // baixa). Medido em 08/09/2026 — os 137 reprovados à mão tinham todos 0★, e o piso sozinho
-  // derrubaria 10 projetos APROVADOS com 2★–4★, quase todos de processo.
+  // ZERO, estritamente `< 1`). Medido em 08/09/2026 — os 137 reprovados à mão tinham todos 0★, e
+  // o piso sozinho derrubaria 16 projetos APROVADOS de 1★ a 4★, quase todos de processo.
   if (input.financeiro.reprovavel) {
     return reprovadoPeloPiso(input.financeiro.motivo);
   }
