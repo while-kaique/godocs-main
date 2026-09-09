@@ -177,6 +177,18 @@ export const COLUNAS_RESUMO: readonly string[] = [
   // "Impacto Bruto". Não vira campo do payload da listagem (não entra em
   // `ProjetoDashboardResumo`), como `Ferramenta` e `Freq. Custo Evitado`.
   'Impacto Líquido Mensal',
+  // Lidas pela MESA de avaliação (`avaliacao-normais.functions.ts`), NÃO pelo `mapResumo` —
+  // como `Ferramenta` e `Freq. Custo Evitado`, existem no `linha_resumo` do espelho sem virar
+  // campo do payload da listagem.
+  //
+  // ⚠️ **Por que a mesa precisa delas (08/09/2026).** Ela lia o financeiro de
+  // `documentacao.conteudo.saving` — vocabulário da **v1**, e do SQLite. Projeto v2 não tem
+  // aqueles campos e legado que só vive na planilha não tem `documentacao` nenhuma, então
+  // `materialidade` dava **0**, o financeiro devolvia "sem dados financeiros" e o piso de impacto
+  // **nunca disparava**. Medido no retroativo de prod: **41,4% de erro grave** (12 de 29), o
+  // agente aprovando o que a triagem reprovou — porque não via número algum.
+  'Custo Evitado Horas',
+  'Saving Efetivado',
   'Complexidade',
   'Tipo de Projeto',
   'Tipos de Ganho',
@@ -203,7 +215,9 @@ export const COLUNAS_RESUMO: readonly string[] = [
 // Receita/Tipos nasceriam VAZIOS na tela, para sempre. Renomear é o mesmo caso de
 // "coluna nova" que este contador existe para cobrir.
 // 7: entraram "Estrela Agente" e "Confiança Agente" (08/09/2026).
-export const VERSAO_RECORTE_RESUMO = 7;
+// 8: entraram "Custo Evitado Horas" e "Saving Efetivado" (08/09/2026) — a MESA passou a ler o
+//    financeiro do espelho (v2) em vez de `documentacao.conteudo.saving` (v1).
+export const VERSAO_RECORTE_RESUMO = 8;
 
 /**
  * Recorta de uma linha da planilha só as `COLUNAS_RESUMO`.

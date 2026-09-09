@@ -36,7 +36,13 @@ import {
 } from '@/integrations/db/client.server';
 import { lerResumosEspelho } from '@/lib/sheet-espelho';
 import { chaveProjeto } from '@/lib/projeto-chave';
-import { mapResumo, type ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
+import {
+  mapResumo,
+  numero,
+  texto,
+  type ProjetoDashboardResumo,
+} from '@/lib/dashboard-resumo';
+import type { SheetRow } from '@/lib/google/sheets';
 import { ehLideranca } from '@/lib/areas/teamguide.server';
 import type { DocumentacaoGerada } from '@/lib/agents/types';
 import {
@@ -249,6 +255,20 @@ export type ResultadoAvaliacaoNormal = {
 type ContextoAvaliacao = {
   dry: boolean;
   resumoPorId: Map<string, ProjetoDashboardResumo>;
+  /**
+   * A LINHA recortada do espelho, por id — de onde a mesa lê o financeiro da **v2**.
+   *
+   * ⚠️ **Existe porque a mesa estava CEGA ao dinheiro.** Ela lia
+   * `documentacao.conteudo.saving` (vocabulário v1, do SQLite): projeto v2 não tem aqueles
+   * campos e legado que só vive na planilha não tem `documentacao` nenhuma, então
+   * `materialidade` dava 0, o financeiro devolvia "sem dados financeiros" e o piso de impacto
+   * nunca disparava. Medido no retroativo de prod (08/09/2026): **41,4% de erro grave** — o
+   * agente aprovando o que a triagem reprovou, porque não via número.
+   * ⚠️ Vem das MESMAS `linhas` que o `resumoPorId` já consome (`lerResumosEspelho`): **zero I/O
+   * novo**. E fica FORA de `ProjetoDashboardResumo` de propósito — campo que a tabela não desenha
+   * não viaja no payload da listagem (gotcha 4 do dashboard).
+   */
+  linhaPorId: Map<string, SheetRow>;
   /** Corpus de aprovados JÁ montado — construído UMA vez pelo chamador (não por candidato). */
   corpus: ExemplarEspecial[];
   embeddings: MapaEmbedding;
@@ -306,6 +326,75 @@ export function materialidadeMesa(
 }
 
 /**
+ * Indexa as linhas do espelho por id, tolerante a caixa (legado vem em MAIÚSCULA da planilha e o
+ * app grava hex minúsculo). PURA.
+ */
+export function mapaDeLinhas(linhas: SheetRow[]): Map<string, SheetRow> {
+  const m = new Map<string, SheetRow>();
+  for (const l of linhas) {
+    const id = texto((l as Record<string, string>)['ID Projeto']);
+    if (id) m.set(id.trim().toLowerCase(), l);
+  }
+  return m;
+}
+
+/**
+ * O financeiro do projeto, com a ponte **v1 → v2**. PURA.
+ *
+ * ⚠️ **É o fix de 08/09/2026.** A mesa lia só `documentacao.conteudo.saving` (v1, do SQLite):
+ * projeto v2 não tem aqueles campos, legado que só vive na planilha não tem `documentacao`, e o
+ * resultado era `materialidade = 0` → financeiro "sem dados" → **o piso nunca disparava**. No
+ * retroativo de prod isso deu **41,4% de erro grave** (12 de 29): o agente aprovando o que a
+ * triagem reprovou, porque não via número nenhum.
+ *
+ * A ordem é sempre **v1 primeiro** (quando existe, é o dado que o formulário da v1 gravou) e a
+ * linha do espelho depois. Assim projeto v1 segue julgado byte-idêntico ao de antes.
+ *
+ * ⚠️ **`Impacto Líquido Mensal` é a coluna do PISO**, não `Impacto Líquido`: foi ela que a rodada
+ * de 04/09 usou (136 dos 137 batem ao centavo), e as duas divergem em projeto que não é mensal.
+ */
+export function financeiroDoProjeto(
+  saving: Record<string, unknown> | undefined,
+  receita: Record<string, unknown> | undefined,
+  linha: SheetRow | undefined,
+): {
+  horas: number;
+  economiaReaisMes: number | null;
+  custoEvitado: number | null;
+  valorReceita: number | null;
+  temSaving: boolean;
+  temReceita: boolean;
+} {
+  const cel = (nome: string) => (linha as Record<string, string> | undefined)?.[nome];
+  const linhasHoras =
+    (saving?.linhas as Array<{ economia_horas_mes?: number | null }> | undefined) ?? [];
+  const horasV1 =
+    typeof saving?.economia_horas_mes === 'number'
+      ? (saving.economia_horas_mes as number)
+      : linhasHoras.reduce((s, l) => s + (Number(l?.economia_horas_mes) || 0), 0);
+  // v2: as horas humanas liberadas vivem em `Custo Evitado Horas` (a v2 chama de "custo evitado"
+  // o braço de HORAS; o `Saving Efetivado` é a despesa que parou). Ver `coluna-chave.ts`.
+  const horas = horasV1 > 0 ? horasV1 : (numero(cel('Custo Evitado Horas')) ?? 0);
+
+  const economiaV1 =
+    typeof saving?.economia_reais_mes === 'number' ? (saving.economia_reais_mes as number) : null;
+  const custoV1 =
+    typeof saving?.custo_evitado_reais === 'number' ? (saving.custo_evitado_reais as number) : null;
+  const receitaV1 =
+    typeof receita?.valor_ganho_mensal === 'number' ? (receita.valor_ganho_mensal as number) : null;
+
+  const categorias = (texto(cel('Tipos de Ganho')) ?? '').toLowerCase();
+  return {
+    horas,
+    economiaReaisMes: economiaV1 ?? numero(cel('Impacto Líquido Mensal')),
+    custoEvitado: custoV1 ?? numero(cel('Saving Efetivado')),
+    valorReceita: receitaV1 ?? numero(cel('Receita Incremental')),
+    temSaving: !!saving || /saving|custo evitado/.test(categorias),
+    temReceita: !!receita || /receita/.test(categorias),
+  };
+}
+
+/**
  * Roda a MESA completa sobre um projeto JÁ carregado (não especial): FTE + Financeiro + RAG →
  * Agregador → Cético → conciliação. PURO de efeito colateral (só LÊ doc/TeamGuide); NÃO grava.
  */
@@ -328,14 +417,15 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
   const saving = conteudo.saving as Record<string, unknown> | undefined;
   const receita = conteudo.receita as Record<string, unknown> | undefined;
 
+  // O financeiro com a ponte v1 → v2 (`financeiroDoProjeto`): sem ela a mesa fica CEGA ao
+  // dinheiro em todo projeto da v2 e em todo legado que só vive na planilha.
+  const linhaEspelho =
+    ctx.linhaPorId.get(projetoId.trim().toLowerCase()) ?? ctx.linhaPorId.get(projetoId);
+  const fin = financeiroDoProjeto(saving, receita, linhaEspelho);
+
   // ── Voto FTE (Plausibilidade) ──
   const membros = parseJson<string[]>((projeto.membros as string | null) ?? null) ?? [];
-  const linhas =
-    (saving?.linhas as Array<{ economia_horas_mes?: number | null }> | undefined) ?? [];
-  const horas =
-    typeof saving?.economia_horas_mes === 'number'
-      ? (saving.economia_horas_mes as number)
-      : linhas.reduce((s, l) => s + (Number(l?.economia_horas_mes) || 0), 0);
+  const horas = fin.horas;
   const fte = avaliarPlausibilidadeFTE({
     horasTotais: horas,
     pessoasDeclaradas: membros.length + 1, // + o autor (não entra em `membros`)
@@ -346,14 +436,7 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
   });
 
   // ── Voto Financeiro ──
-  const economiaReaisMes =
-    typeof saving?.economia_reais_mes === 'number' ? (saving.economia_reais_mes as number) : null;
-  const custoEvitado =
-    typeof saving?.custo_evitado_reais === 'number' ? (saving.custo_evitado_reais as number) : null;
-  const valorReceita =
-    typeof receita?.valor_ganho_mensal === 'number'
-      ? (receita.valor_ganho_mensal as number)
-      : null;
+  const { economiaReaisMes, custoEvitado, valorReceita } = fin;
   const materialidade = materialidadeMesa(economiaReaisMes, valorReceita);
   // A NOTA entra no financeiro porque a reprovação por impacto é COMPOSTA: só reprova ganho
   // irrelevante quando o projeto também é baixo. Preferimos a nota HUMANA; sem ela, a recomendada
@@ -373,8 +456,10 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
     return Number.isFinite(n) ? n : null;
   })();
   const financeiro = avaliarFinanceiro({
-    temSaving: !!saving,
-    temReceita: !!receita,
+    // v2: quem declara as categorias é a coluna "Tipos de Ganho" (o `documentacao.saving` da v1
+    // não existe lá) — sem isto, `temDados` era falso e o financeiro nem chegava às checagens.
+    temSaving: fin.temSaving,
+    temReceita: fin.temReceita,
     economiaReaisMes,
     economiaHorasMes: horas,
     custoEvitadoReais: custoEvitado,
@@ -671,6 +756,7 @@ export async function avaliarProjetoNormal(
   return avaliarComContexto(projetoId, {
     dry: opts.dry ?? false,
     resumoPorId,
+    linhaPorId: mapaDeLinhas(linhas),
     corpus,
     embeddings: ger.mapa,
     correcoes,
@@ -715,6 +801,7 @@ export async function carregarContextoPainel(
   const { linhas } = await lerResumosEspelho();
   const resumos = linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null);
   const resumoPorId = new Map(resumos.map((p) => [p.id, p]));
+  const linhaPorId = mapaDeLinhas(linhas);
   const aprovados = selecionarAprovadosNormais(resumos);
 
   let embeddings = decodificarEmbeddings(await getEmbeddingsProjetos());
@@ -729,7 +816,7 @@ export async function carregarContextoPainel(
   const correcoes = await carregarCorrecoesDaTriagem('avaliacao-normais');
 
   return {
-    ctx: { dry: opts.dry, resumoPorId, corpus, embeddings, correcoes },
+    ctx: { dry: opts.dry, resumoPorId, linhaPorId, corpus, embeddings, correcoes },
     resumos,
     aprovados,
     gerados: ger.gerados,
