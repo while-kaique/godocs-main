@@ -98,6 +98,7 @@ import type {
   TextoProjeto,
 } from '@/lib/agents/especialista-avaliacao';
 import { reportarFalhaDeAgente } from '@/lib/agentes-falhas';
+import { abaixoDoPisoDeImpacto, notaParaOPiso } from '@/lib/materialidade-piso';
 
 /** Carimbo de origem gravado em cada recomendação (distingue do que possa vir depois). */
 export const ORIGEM_AGREGADOR = 'agregador-normais';
@@ -473,22 +474,31 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
   const { economiaReaisMes, custoEvitado, valorReceita } = fin;
   const materialidade = materialidadeMesa(economiaReaisMes, valorReceita);
   // A NOTA entra no financeiro porque a reprovação por impacto é COMPOSTA: só reprova ganho
-  // irrelevante quando o projeto também é baixo. Preferimos a nota HUMANA; sem ela, a recomendada
-  // pelo agente.
+  // irrelevante quando o projeto também é baixo.
   //
-  // ⚠️ `"6-10"` NÃO é número: `Number("6-10")` é NaN, e NaN cairia em "sem nota", que **reprova**.
-  // Então a faixa de escape é traduzida para o piso dela (6) — ela é justamente o caso que mais
-  // precisa ser poupado.
+  // ⚠️ **FONTE ÚNICA `notaParaOPiso`** (09/09/2026). Esta expressão era escrita aqui e tratava o
+  // `0` da coluna humana como VEREDITO — e esse `0` é o default de uma coluna manual (463 de 750
+  // linhas de prod; ~426 já existiam em 17/08, antes de qualquer agente). Resultado: a perna
+  // "nota < 1" valia em 466 de 750 projetos e o piso decidia sem filtro de nota nenhum. Agora
+  // quem resolve é a pura, o `0` humano cai para a nota do AGENTE, e sem nota avaliada o piso
+  // **não reprova** — vai para conferência humana.
   const resumoDoProjeto = ctx.resumoPorId.get(projetoId) ?? ctx.resumoPorId.get(projetoId.toLowerCase());
-  const estrelaProjeto = ((): number | null => {
-    const humana = resumoDoProjeto?.estrelas;
-    if (typeof humana === 'number' && Number.isFinite(humana)) return humana;
-    const bruta = (resumoDoProjeto?.estrelaAgente ?? '').trim();
-    if (!bruta) return null;
-    if (bruta.includes('-')) return FAIXA_ESCAPE.min;
-    const n = Number(bruta);
-    return Number.isFinite(n) ? n : null;
-  })();
+  const { nota: estrelaProjeto, fonte: fonteDaNota } = notaParaOPiso({
+    humana: resumoDoProjeto?.estrelas ?? null,
+    agente: resumoDoProjeto?.estrelaAgente ?? null,
+    faixaEscapeMin: FAIXA_ESCAPE.min,
+  });
+  // ⚠️ Sinal, não silêncio: projeto que o piso pouparia só porque ninguém deu nota é exatamente o
+  // que a fila do time tem de alcançar. Sem isto, "não reprovou" e "não foi avaliado" ficariam
+  // indistinguíveis — a família de bug que este arquivo passou o dia inteiro pagando.
+  if (fonteDaNota === 'ausente' && abaixoDoPisoDeImpacto(materialidade)) {
+    reportarFalhaDeAgente({
+      classe: 'sem_nota_avaliada',
+      onde: 'avaliacao-normais.computarVotos',
+      projetoId,
+      detalhe: `impacto ${materialidade.toFixed(2)}/mês abaixo do piso e nenhuma nota avaliada — o time ainda não classificou este projeto`,
+    });
+  }
   const financeiro = avaliarFinanceiro({
     // v2: quem declara as categorias é a coluna "Tipos de Ganho" (o `documentacao.saving` da v1
     // não existe lá) — sem isto, `temDados` era falso e o financeiro nem chegava às checagens.

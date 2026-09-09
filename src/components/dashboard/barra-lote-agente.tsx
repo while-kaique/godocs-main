@@ -14,8 +14,15 @@ import { Bot, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api-client';
 
-/** Projetos por requisição. Espelha o `LOTE_MAX_PROJETOS` do servidor. */
-export const LOTE_TAMANHO = 8;
+/**
+ * Projetos por requisição. Espelha o `LOTE_MAX_PROJETOS` do servidor.
+ *
+ * ⚠️ **1, não 8** (09/09/2026): a nota passou a vir do TIME INTEIRO, que são ~30 chamadas de LLM
+ * por projeto em vez de ~5. O request que carrega isso é síncrono e o edge corta trabalho longo
+ * (medido: 30 projetos morreram em 7 min). O ganho de agrupar era pequeno e o preço é a barra
+ * inteira falhar no meio.
+ */
+export const LOTE_TAMANHO = 1;
 
 type Progresso = { feitos: number; total: number; erros: number } | null;
 

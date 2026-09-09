@@ -17,7 +17,95 @@
  * chama isto — submissão, botão da ficha, lote — nunca recebe exceção.
  */
 import { avaliarProjetoNormal } from '@/lib/avaliacao-normais.functions';
-import { classificarEspecialProjeto } from '@/lib/especial-classificador.functions';
+import { avaliarProjetoComTime } from '@/lib/avaliacao/time.functions';
+import { lerLinhaEspelho, espelharEscrita } from '@/lib/sheet-espelho';
+import { updateRowByProjectId } from '@/lib/google/sheets';
+import { upsertAvaliacaoEspecial } from '@/integrations/db/client.server';
+import { rotuloNotaAgente } from '@/lib/estrelas-regua';
+import { chaveProjeto } from '@/lib/projeto-chave';
+import { numero } from '@/lib/dashboard-resumo';
+import { ESTRELA_LIMITE_REPROVAVEL } from '@/lib/materialidade-piso';
+
+/**
+ * Origem da nota quando quem a produziu foi o TIME INTEIRO (≠ `agente-classificador`, o de 1
+ * agente). Distinguir importa: a régua de reprovação por impacto só pode se apoiar em nota que o
+ * time avaliou, e sem carimbo próprio não há como saber de onde ela veio.
+ */
+export const ORIGEM_TIME_COMPLETO = 'time-completo';
+
+/**
+ * A metade da NOTA, agora pelo TIME INTEIRO.
+ *
+ * ⚠️ **Era o classificador de 1 agente** (`classificarEspecialProjeto`), e o Luis vetou isso em
+ * 09/09/2026: *"a avaliação de estrelas nao pode ser feitas considerando so o cerebro de estrelas,
+ * tem que ser o time todo, pois deve considerar todo o projeto em si"*. O time é
+ * orquestrador → 4 especialistas do mérito (com ferramentas) → cérebro da estrela → cético →
+ * cético da estrela → debate, e é ele que lê o projeto inteiro.
+ *
+ * ⚠️ **SÍNCRONA, nunca em `waitUntil`.** O caminho em background já prometeu estrela que não
+ * chegou (medido: `waitUntil() tasks did not complete... cancelled`, 2 de 4 chamadas respondidas).
+ * Quem itera é a tela, um projeto por request.
+ *
+ * ⚠️ **Nota humana `>= 1` é ÂNCORA e não é reclassificada** (salvo `forcar`) — a mesma régua do
+ * classificador. Já o `0` humano NÃO segura nada: ele é o default da coluna manual (463 de 750
+ * linhas de prod), e tratá-lo como veredito é o que deixava o piso decidindo sobre um valor que
+ * ninguém escreveu.
+ */
+async function estrelaPeloTimeInteiro(
+  projetoIdBruto: string,
+  opts: { dry?: boolean; forcar?: boolean },
+): Promise<{ ok: boolean; motivo?: string; estrelas?: number | null }> {
+  const projetoId = chaveProjeto(projetoIdBruto);
+  if (!opts.forcar) {
+    try {
+      const linha = await lerLinhaEspelho(projetoId);
+      const humana = numero((linha as Record<string, string> | null)?.['Estrelas']);
+      if (humana != null && humana >= ESTRELA_LIMITE_REPROVAVEL) {
+        return { ok: false, motivo: `nota humana ${humana} é âncora — não reclassifica`, estrelas: humana };
+      }
+    } catch {
+      // Não conseguir ler a âncora não pode impedir a avaliação: segue e o time julga.
+    }
+  }
+
+  const r = await avaliarProjetoComTime(projetoId, { gatilho: 'time-completo' });
+  if (!r.ok) return { ok: false, motivo: r.motivo };
+  const c = r.resultado.consenso;
+
+  if (opts.dry) return { ok: true, estrelas: c.estrela };
+
+  // Persistência em DOIS lugares, e os dois são necessários:
+  //  - `especial_avaliacao` é de onde a FICHA lê a recomendação;
+  //  - as 2 colunas da PLANILHA são de onde a MESA lê a nota para a régua do piso
+  //    (`resumoPorId.estrelaAgente`). Sem a 2ª, o time avaliaria e o piso continuaria cego.
+  // ⚠️ NUNCA a coluna "Estrelas": ela é 100% humana (adotar a sugestão é ato de pessoa).
+  try {
+    await upsertAvaliacaoEspecial({
+      projeto_id: projetoId,
+      estrelas_recomendada: c.estrela,
+      confianca: c.confianca,
+      leitura: r.resultado.textos.interno,
+      contestada: c.contestacao != null,
+      origem: ORIGEM_TIME_COMPLETO,
+      modelo: null,
+    });
+  } catch (e) {
+    console.error('[time-completo] falha ao gravar a recomendação do time:', e);
+  }
+  try {
+    // `rotuloNotaAgente` é a FONTE ÚNICA do rótulo (a mesma da tela): a faixa 6-10 vira "6-10",
+    // porque `Estrela Agente` precisa carregá-la sem afirmar um número que a régua não afirma.
+    const celulas = {
+      'Estrela Agente': rotuloNotaAgente(c.estrela).rotulo,
+      'Confiança Agente': c.confianca,
+    };
+    await updateRowByProjectId(projetoId, celulas);
+    await espelharEscrita(projetoId, celulas);
+  } catch (e) {
+    console.error('[time-completo] falha ao escrever as colunas do agente:', e);
+  }
+  return { ok: true, estrelas: c.estrela };
+}
 
 export type ResultadoTimeCompleto = {
   ok: boolean;
@@ -39,11 +127,10 @@ function resumoMesa(r: unknown): ResultadoTimeCompleto['mesa'] {
 
 function resumoEstrela(r: unknown): ResultadoTimeCompleto['estrela'] {
   const o = (r ?? {}) as Record<string, unknown>;
-  const rec = (o.recomendacao ?? {}) as Record<string, unknown>;
   return {
     ok: o.ok === true,
     motivo: typeof o.motivo === 'string' ? o.motivo : undefined,
-    estrelas: typeof rec.estrelas_recomendada === 'number' ? rec.estrelas_recomendada : null,
+    estrelas: typeof o.estrelas === 'number' ? o.estrelas : null,
   };
 }
 
@@ -58,7 +145,7 @@ export async function avaliarProjetoComTimeCompleto(
   const dry = opts.dry ?? false;
   const [mesa, estrela] = await Promise.allSettled([
     avaliarProjetoNormal(projetoId, { dry }),
-    classificarEspecialProjeto(projetoId, { dry, forcar: opts.forcar }),
+    estrelaPeloTimeInteiro(projetoId, { dry, forcar: opts.forcar }),
   ]);
   const m = mesa.status === 'fulfilled' ? resumoMesa(mesa.value) : { ok: false, motivo: String(mesa.reason) };
   const e =
@@ -87,8 +174,16 @@ export async function avaliarComTimeCompletoEmBackground(projetoId: string): Pro
   }
 }
 
-/** Teto de projetos por chamada do LOTE. */
-export const LOTE_MAX_PROJETOS = 8;
+/**
+ * Teto de projetos por chamada do LOTE.
+ *
+ * ⚠️ **Caiu de 8 para 1 em 09/09/2026, quando a nota passou a vir do TIME INTEIRO.** Com o
+ * classificador de 1 agente eram ~5 chamadas de LLM por projeto e 8 caberiam; o time são ~30
+ * (4 especialistas com ferramentas + estrela + 2 céticos + debate). E o teto do request não é
+ * teórico: um retroativo de 30 projetos morreu em **7 minutos** com `curl 56` — o edge corta.
+ * Quem itera é a TELA, um projeto por vez, com progresso em texto (padrão do disparo de e-mails).
+ */
+export const LOTE_MAX_PROJETOS = 1;
 
 export type ResultadoLote = {
   ok: boolean;

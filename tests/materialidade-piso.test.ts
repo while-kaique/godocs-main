@@ -10,6 +10,7 @@ import {
   ESTRELA_LIMITE_REPROVAVEL,
   impactoMensalDeclarado,
   motivoPisoDeImpacto,
+  notaParaOPiso,
   PISO_IMPACTO_MENSAL,
 } from '@/lib/materialidade-piso';
 import { avaliarFinanceiro } from '@/lib/agents/avaliacao-financeira';
@@ -135,12 +136,23 @@ describe('reprovaPeloPiso — a régua COMPOSTA, medida contra o gabarito de 04/
     expect(reprovaPeloPiso({ impactoMensal: 42.75, estrela: 2 })).toBe(false);
   });
 
-  it('impacto baixo + nota ZERO (ou sem nota) → reprova', () => {
+  it('impacto baixo + nota ZERO AVALIADA → reprova', () => {
     expect(reprovaPeloPiso({ impactoMensal: 18.16, estrela: 0 })).toBe(true);
-    // ⚠️ Ausência de nota NÃO poupa: é o estado da maioria dos que a rodada de 04/09 pegou, e
-    // exigir estrela para reprovar tornaria o piso inerte justamente em quem ninguém avaliou.
-    expect(reprovaPeloPiso({ impactoMensal: 18.16, estrela: null })).toBe(true);
-    expect(reprovaPeloPiso({ impactoMensal: 18.16 })).toBe(true);
+  });
+
+  it('⚠️ INVERTIDO em 09/09/2026: SEM nota avaliada NÃO reprova', () => {
+    // Este teste afirmava o contrário ("ausência de nota NÃO poupa"), e o contrário estava errado
+    // por uma razão de DADO: a coluna "Estrelas" tem 463 de 750 linhas em `0`, e esse `0` é o
+    // estado inicial de uma coluna MANUAL — ~426 zeros já existiam em 17/08/2026, antes de
+    // qualquer agente. Então a perna "nota < 1" valia em 466 de 750 projetos e o piso decidia sem
+    // filtro de nota nenhum. Palavras do Luis: "tem mts projetos que sao 0 estrelas pq nao
+    // passaram pela avaliação".
+    //
+    // A régua nova: reprovar exige veredito de nota EM MÃOS. Quem não foi avaliado vai para
+    // conferência humana. E o repo já concordava com isso em outro lugar — o harness do retroativo
+    // só aceita gabarito com `nota humana >= 1`, tratando 0 como "sem nota" desde sempre.
+    expect(reprovaPeloPiso({ impactoMensal: 18.16, estrela: null })).toBe(false);
+    expect(reprovaPeloPiso({ impactoMensal: 18.16 })).toBe(false);
   });
 
   it('⚠️ nota ALTA poupa — é o que o piso sozinho errava', () => {
@@ -182,5 +194,44 @@ describe('gabarito de 04/09 — a régua composta reproduz o julgamento humano',
   it('com estrela 0, a régua composta pega os 137 alvos (o mesmo recall do piso sozinho)', () => {
     const escapam = alvos.filter((a) => !reprovaPeloPiso({ impactoMensal: a.imp, estrela: 0 }));
     expect(escapam.map((a) => `${a.nome}: ${a.imp}`)).toEqual([]);
+  });
+});
+
+// ─── `notaParaOPiso` — de onde a nota do piso pode sair (09/09/2026) ──────────────────────────
+describe('notaParaOPiso — o `0` humano é default, não veredito', () => {
+  it('nota humana >= 1 VENCE e é âncora', () => {
+    expect(notaParaOPiso({ humana: 4, agente: '0' })).toEqual({ nota: 4, fonte: 'humana' });
+    expect(notaParaOPiso({ humana: 1, agente: '5' })).toEqual({ nota: 1, fonte: 'humana' });
+  });
+
+  it('⚠️ humana `0` NÃO é nota — cai para a do agente', () => {
+    // O caso de 463 das 750 linhas de prod. Sem isto, o piso decide sobre um default.
+    expect(notaParaOPiso({ humana: 0, agente: '3' })).toEqual({ nota: 3, fonte: 'agente' });
+  });
+
+  it('humana `0` e agente vazio → AUSENTE (e o piso então não reprova)', () => {
+    expect(notaParaOPiso({ humana: 0, agente: '' })).toEqual({ nota: null, fonte: 'ausente' });
+    expect(notaParaOPiso({ humana: 0, agente: '—' })).toEqual({ nota: null, fonte: 'ausente' });
+    expect(notaParaOPiso({ humana: null, agente: null })).toEqual({ nota: null, fonte: 'ausente' });
+    // E a régua composta poupa quem está nesse estado:
+    const { nota } = notaParaOPiso({ humana: 0, agente: '' });
+    expect(reprovaPeloPiso({ impactoMensal: 19.96, estrela: nota })).toBe(false);
+  });
+
+  it('agente `0` É veredito do agente — e com impacto baixo reprova', () => {
+    expect(notaParaOPiso({ humana: 0, agente: '0' })).toEqual({ nota: 0, fonte: 'agente' });
+    const { nota } = notaParaOPiso({ humana: 0, agente: '0' });
+    expect(reprovaPeloPiso({ impactoMensal: 19.96, estrela: nota })).toBe(true);
+  });
+
+  it('⚠️ a faixa de escape "6-10" vira o piso dela, nunca NaN', () => {
+    // `Number("6-10")` é NaN, e NaN cairia em "sem nota" justamente no caso que mais precisa ser
+    // poupado — o projeto que o comitê vai cravar entre 6 e 10.
+    expect(notaParaOPiso({ humana: 0, agente: '6-10' })).toEqual({ nota: 6, fonte: 'agente' });
+    expect(notaParaOPiso({ humana: 0, agente: '6-10', faixaEscapeMin: 6 }).nota).toBe(6);
+  });
+
+  it('texto lixo do agente não vira nota', () => {
+    expect(notaParaOPiso({ humana: 0, agente: 'sei lá' })).toEqual({ nota: null, fonte: 'ausente' });
   });
 });
