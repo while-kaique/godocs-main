@@ -119,6 +119,7 @@ import {
   licoesDaTriagemParaPrompt,
   licoesParaPrompt,
 } from "@/lib/correcoes.functions";
+import { reportarFalhaDeAgente } from "@/lib/agentes-falhas";
 
 /** Carimbo de origem gravado em cada recomendação do agente (distingue do seed da força-tarefa). */
 export const ORIGEM_AGENTE = "agente-classificador";
@@ -378,17 +379,39 @@ async function recuperarVizinhos(
     topK: Math.max(k * 3, 12),
     filtro: args.filtro,
   });
+  // ⚠️ `null` = índice INDISPONÍVEL (≠ `[]`, que é índice vazio — ver o gotcha 1 do Pinecone).
+  // Só o `null` cai no SQLite, e a queda é REGISTRADA: o fallback funciona e a resposta sai
+  // correta, então nada quebra na cara de ninguém — mas o filtro `tem_nota_humana` é do servidor
+  // do índice, e sem ele o anti-feedback-loop fica mais fraco.
   if (matches != null) {
-    return {
-      vizinhos: vizinhosDeMatches(matches, args.exemplarPorId, { k, excluirId: args.excluirId }),
-      origem: "pinecone",
-    };
+    const vizinhos = vizinhosDeMatches(matches, args.exemplarPorId, { k, excluirId: args.excluirId });
+    if (vizinhos.length === 0) {
+      reportarFalhaDeAgente({
+        classe: 'rag_sem_vizinho',
+        onde: 'especial-classificador.recuperarVizinhos (pinecone)',
+        projetoId: args.excluirId,
+        detalhe: `índice respondeu ${matches.length} matches, nenhum virou vizinho utilizável`,
+      });
+    }
+    return { vizinhos, origem: "pinecone" };
   }
+  reportarFalhaDeAgente({
+    classe: 'indice_indisponivel',
+    onde: 'especial-classificador.recuperarVizinhos',
+    projetoId: args.excluirId,
+    detalhe: 'Pinecone não respondeu — caiu no cosseno em JS sobre o corpus do SQLite',
+  });
   const corpus = await args.corpusFallback();
-  return {
-    vizinhos: selecionarVizinhos(alvoVetor, corpus, { k, excluirId: args.excluirId }),
-    origem: "sqlite",
-  };
+  const vizinhos = selecionarVizinhos(alvoVetor, corpus, { k, excluirId: args.excluirId });
+  if (vizinhos.length === 0) {
+    reportarFalhaDeAgente({
+      classe: 'rag_sem_vizinho',
+      onde: 'especial-classificador.recuperarVizinhos (fallback sqlite)',
+      projetoId: args.excluirId,
+      detalhe: `corpus de ${corpus.length} exemplares e nenhum vizinho acima do piso`,
+    });
+  }
+  return { vizinhos, origem: "sqlite" };
 }
 
 /**
@@ -807,6 +830,14 @@ export async function classificarEspeciaisPendentes(
         licoes: licoesParaPrompt(correcoesDaTriagem, montado.alvo.projeto_id ?? "", vizinhos),
       });
       if (!rec) {
+        // ⚠️ Perder a nota é a decisão certa (inventar é pior — ver `acharCamposRecomendacao`),
+        // mas perder CALADO faz a base encolher sem ninguém notar.
+        reportarFalhaDeAgente({
+          classe: 'formato_invalido',
+          onde: 'especial-classificador.classificarEspeciaisPendentes',
+          projetoId: cand.id,
+          detalhe: 'o LLM não devolveu recomendação legível após as tentativas',
+        });
         resultados.push({ ok: false, projeto_id: cand.id, motivo: "LLM sem recomendação" });
         continue;
       }
@@ -1227,6 +1258,12 @@ export async function medirConcordanciaAgente(
         funcao: det.funcao === FUNCAO_INDEFINIDA ? null : det.funcao,
       });
       if (!rec) {
+        reportarFalhaDeAgente({
+          classe: 'formato_invalido',
+          onde: 'especial-classificador (harness de concordância)',
+          projetoId: alvoResumo.id,
+          detalhe: 'o juiz não devolveu recomendação legível após as tentativas',
+        });
         falhas.push({ projeto_id: alvoResumo.id, motivo: "juiz sem recomendação" });
         continue;
       }

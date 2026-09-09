@@ -2148,3 +2148,71 @@ projetos que entraram depois da run). Nenhuma célula vazia.
 quando a aba real tinha **58** — ou seja, a cobertura que aquele canário garante é contra o
 SNAPSHOT, não contra a planilha. Quem confere a aba real é o aviso do `appendRow` em runtime.
 Fechar a deriva é trabalho da branch da v2, que é quem escreve nessa aba.
+
+---
+
+## Feature adicional — Agentic logging: as falhas dos agentes que NÃO podem passar caladas
+
+**Pedido** (Luis, 09/09/2026): *"devemos ter agentic logging para sabermos se os agentes vao falhar
+nesses tipos de falha e outras importantes ou nao. Pois nao podemos sofrer falha silenciosa"*.
+
+**O caso de origem, medido.** O harness do retroativo (`scripts/avaliacao-retro/rodar.ts`) lia a
+chave de embeddings **errada** — `LLM_FALLBACK ?? LLM_API_KEY`, e a `LLM_FALLBACK` do `.env` está
+revogada — em vez de seguir a precedência do próprio app (`LLM_EMBEDDINGS_KEY` ∨ `LLM_FALLBACK`).
+Efeito em cadeia: **401 em série** na OpenAI → **0 vetores** no cache → o time de agentes julgou
+**12 projetos sem um único vizinho** → notas achatadas (**0★ em 12 de 12**, viés **−1,43**, 0★ para
+projetos que a triagem deu 4★ e 2★) → e o relatório **saiu completo**, acusando *"achatamento
+suspeito — revisar a régua"*. Ou seja: uma integração caída se apresentou como **defeito de
+régua**, que é o pior desfecho possível numa rodada de calibragem.
+
+⚠️ **Nada no caminho gritava:** `gerarEmbeddingsLote` fazia `console.error` e devolvia `null`, e em
+produção isso é um log que ninguém lê e que expira.
+
+**A régua da feature.** **Degradação silenciosa é falha.** Um agente que responde com menos material
+do que deveria não erra visivelmente — ele erra **com aparência de resultado**. A severidade segue
+disso: `'alerta'` quando a falha **muda o resultado de um julgamento sem dizer que mudou**;
+`'registro'` quando a degradação é prevista e coberta (o fallback do Pinecone para cosseno em JS,
+que responde certo — só com o anti-feedback-loop mais fraco).
+
+**Onde aterrissou.**
+
+| peça | arquivo |
+|---|---|
+| catálogo + hook (PURO) | `src/lib/agentes-falhas.ts` |
+| relator (grava + alerta) + painel | `src/lib/agentes-falhas.functions.ts` |
+| tabela append-only | `falha_agente` (`schema.ts`) |
+| rota | `GET /api/admin/agentes-saude?horas=24` (`requireAdmin`) |
+| canal | `GOOGLE_CHAT_WEBHOOK_URL_WATCHDOG` (fallback: `..._AJUDA`) |
+| testes | `tests/agentes-falhas.test.ts` (20 casos) |
+
+**As 7 classes** (`FALHAS_AGENTE`, catálogo FECHADO — classe nova é decisão, com `sintoma` escrito):
+`embedding_indisponivel` · `rag_sem_vizinho` · `indice_indisponivel` · `formato_invalido` ·
+`teto_ferramentas` · `dossie_sem_financeiro` · `tarefa_cancelada`.
+
+**O que não pode regredir.**
+
+- **O relator é HOOK, não import.** Quem detecta são módulos BAIXOS (`embeddings.ts`, o
+  classificador); importar o gravador ali arrastaria SQLite + cliente de Chat para dentro de todo
+  consumidor de embedding — **inclusive os scripts de rodada, que não têm banco**. Molde: o
+  `setDemoBackend` do `api-client.ts`. Sem relator instalado o caminho é **idêntico** ao de antes,
+  com um `console.error` de prefixo estável (`[falha-agente]`) que é grepável.
+- **O worker instala o relator DEPOIS do `g.__waitUntil`.** A gravação vai em `runBackground`; sem
+  o waitUntil registrado ela seria cancelada — e a falha que avisa sobre falha silenciosa não pode
+  ser a próxima falha silenciosa. Teste prende a ordem.
+- **Cooldown por CLASSE, nunca por projeto.** Backfill de 750 projetos com a chave fora mandaria
+  750 mensagens dizendo a mesma coisa. Quem conta as repetições é o `alertarErroIntegracao`
+  ("Nª ocorrência desde o último aviso").
+- **A gravação vem ANTES do alerta e independe dele.** Com cooldown, a 2ª ocorrência é contada em
+  silêncio: se o registro dependesse do envio, a segunda metade de um backfill quebrado
+  desapareceria do histórico — exatamente o que esta feature existe para impedir.
+- **O alerta NUNCA cai no webhook default de projetos.** Preferência: watchdog; fallback: Ajuda;
+  sem nenhum dos dois, **pula**. (Erro de sistema no grupo das submissões já foi bug real.)
+- **`dossie_sem_financeiro` exige a linha do espelho EXISTIR** e ignora **especial**: sem linha o
+  problema é outro (id que não casa, com caminho próprio), e ganho **imensurável** é o caso legítimo
+  de não haver número — alertar nele seria alarme sobre projeto correto.
+- **`saudeDosAgentes` nunca lança** e classe fora do catálogo aparece como *"não catalogada"*, nunca
+  omitida: a falha existe e alguém precisa nomeá-la.
+
+**Fix irmão, no mesmo PR:** o harness passou a usar `LLM_EMBEDDINGS_KEY` e ganhou uma **trava** que
+**aborta a rodada** quando o cache de vetores nasce vazio — relatório bonito sobre RAG morto é pior
+que rodada que falha.

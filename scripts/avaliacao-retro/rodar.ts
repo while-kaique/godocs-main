@@ -26,6 +26,14 @@ const CONC = Number(process.env.RETRO_CONC ?? 4);
 const VARIANTE = process.env.RETRO_VARIANTE ?? null;
 const IDS = (process.env.RETRO_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const TETO_USD = Number(process.env.RETRO_TETO_USD ?? 60);
+// ⚠️ A chave dos EMBEDDINGS segue a MESMA precedência do app (`LLM_EMBEDDINGS_KEY` ∨ `LLM_FALLBACK`).
+// Este script pegava só `LLM_FALLBACK ?? LLM_API_KEY` e, com a `LLM_FALLBACK` do `.env` revogada
+// (401 na OpenAI), o cache de vetores nascia VAZIO e o time rodava com o **RAG morto** — sem um
+// vizinho —, que é a causa nº 1 do achatamento das notas (sem vizinho a média cai para ~3,6★,
+// com vizinho ~4,9★). E ele falhava CALADO: o relatório saía completo, com as notas achatadas,
+// acusando "achatamento suspeito" como se fosse a régua. Medido em 09/09/2026 numa sonda de 3
+// projetos: 0 vetores gerados, o time deu 0★ a um projeto 4★ e a outro 2★, viés −2,00.
+const KEY_EMB = process.env.LLM_EMBEDDINGS_KEY ?? process.env.LLM_FALLBACK ?? process.env.LLM_API_KEY!;
 const KEY = process.env.LLM_FALLBACK ?? process.env.LLM_API_KEY!;
 const OUT_DIR = path.resolve(__dirname, '../../docs/plans/retro-rodadas');
 
@@ -96,10 +104,20 @@ it('retroativo em sombra — time de agentes sobre a base de prod', async () => 
     console.log(`embeddings a gerar: ${faltam.length}`);
     for (let i = 0; i < faltam.length; i += 64) {
       const lote = faltam.slice(i, i + 64);
-      const embs = await gerarEmbeddingsLote(lote.map(textoEmb), { apiKey: KEY, modelo: process.env.LLM_EMBEDDINGS_MODEL ?? 'text-embedding-3-large' });
+      const embs = await gerarEmbeddingsLote(lote.map(textoEmb), { apiKey: KEY_EMB, modelo: process.env.LLM_EMBEDDINGS_MODEL ?? 'text-embedding-3-large' });
       lote.forEach((r, k) => { if (embs[k]) cache[g(r, 'ID Projeto')] = embs[k]!.vetor; });
       fs.writeFileSync(cachePath, JSON.stringify(cache));
     }
+  }
+  // ⚠️ TRAVA: sem vetor não há vizinho, e sem vizinho a rodada MEDE OUTRA COISA (o achatamento
+  // documentado). Falhar aqui é obrigatório — o defeito de 09/09/2026 foi justamente o relatório
+  // sair completo e bonito sobre um RAG morto, culpando a régua.
+  if (Object.keys(cache).length === 0) {
+    throw new Error(
+      'RAG MORTO: nenhum embedding foi gerado (cache vazio). Confira a chave ' +
+        '`LLM_EMBEDDINGS_KEY` — 401 na OpenAI deixa a rodada sem um único vizinho e as notas saem ' +
+        'achatadas, o que INVALIDA a medição. Rodada abortada de propósito.',
+    );
   }
   const referencia = gabaritos.filter((x) => !x.descontinuado && (classificarGabarito(x) === 'nota_humana' || classificarGabarito(x) === 'status_assentado') && cache[x.id]);
   const vizinhosDe = (id: string) => {

@@ -168,6 +168,7 @@ import {
 import { traduzirErroValidacao } from "@/lib/erro-validacao";
 import { getGodocsEnv } from "@/lib/env";
 import type { GoDeployDB } from "@/integrations/db/db-adapter";
+import { garantirRelatorDeFalhas, saudeDosAgentes } from "@/lib/agentes-falhas.functions";
 
 // Env do Godeploy — inclui DB (SQLite embutido) e env vars como strings
 interface Env {
@@ -1521,6 +1522,15 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       });
     }
 
+    // ── SAÚDE dos agentes: as falhas que não podem passar caladas ──
+    // Responde "os agentes falharam, e de que jeito?" sem depender do log do Godeploy (que
+    // ninguém lê e que expira). `horas` recorta a janela (default 24h).
+    if (pathname === "/api/admin/agentes-saude" && method === "GET") {
+      await requireAdmin(request);
+      const horas = Number(url.searchParams.get("horas") ?? 24) || 24;
+      return json(await saudeDosAgentes({ horas }), 200, { "Cache-Control": "no-store" });
+    }
+
     // ── Reconciliação da análise sob demanda (admin) ──
     // MESMO trabalho do cron /api/cron/reanalisar-pendentes, sem o header de cron:
     // repõe "Complexidade"/"Classificação" que a análise em background não chegou a
@@ -1723,6 +1733,12 @@ export default {
     if (ctx && typeof ctx.waitUntil === "function") {
       g.__waitUntil = (p: Promise<unknown>) => ctx.waitUntil(p);
     }
+
+    // Instala o RELATOR das falhas dos agentes (catálogo em `agentes-falhas.ts`). Idempotente,
+    // não lê env nenhuma e vem DEPOIS do `__waitUntil` de propósito: o relator grava em
+    // `runBackground`, e sem o waitUntil registrado a gravação seria cancelada — a falha que
+    // avisa sobre falhas silenciosas não pode ser a próxima falha silenciosa.
+    garantirRelatorDeFalhas();
 
     // Injeta o banco SQLite do Godeploy (env.DB) no client.
     // setDb é async (roda initSchema na primeira chamada) — aguardamos antes de
