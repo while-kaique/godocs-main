@@ -347,8 +347,18 @@ export function mapaDeLinhas(linhas: SheetRow[]): Map<string, SheetRow> {
  * retroativo de prod isso deu **41,4% de erro grave** (12 de 29): o agente aprovando o que a
  * triagem reprovou, porque não via número nenhum.
  *
- * A ordem é sempre **v1 primeiro** (quando existe, é o dado que o formulário da v1 gravou) e a
- * linha do espelho depois. Assim projeto v1 segue julgado byte-idêntico ao de antes.
+ * ⚠️ **A ordem é a PLANILHA primeiro, o v1 do SQLite só como rede** (corrigido em 09/09/2026).
+ * A 1ª versão deste fix fazia o contrário — "v1 primeiro, quando existe" — e isso mantinha o piso
+ * inerte nos projetos que ele existe para pegar: a v2 PONDERA as horas no `Impacto Líquido Mensal`
+ * (7,5h liberadas viram R$ 19,96), enquanto o `economia_reais_mes` da v1 conta a hora pelo valor
+ * CHEIO (~R$ 200 no mesmo projeto). Ou seja: o número v1 é ~10× o v2 e passava longe do piso de
+ * R$ 100. Medido no retroativo de prod: **os 11 `erro_grave` que sobraram eram todos** impacto v2
+ * entre R$ 19,96 e R$ 90,61, nota 0 e Status **Reprovado** — a régua composta devia ter reprovado
+ * os 11, e não reprovou nenhum. Régua e número tinham de sair da MESMA fonte.
+ *
+ * ⚠️ A planilha é a fonte da verdade do repo, e as 4 colunas financeiras da v2 estão **100%
+ * preenchidas** (745 de 745 linhas de prod em 09/09/2026) — o `?? v1` é rede para a linha que
+ * perdesse a coluna, não caminho normal.
  *
  * ⚠️ **`Impacto Líquido Mensal` é a coluna do PISO**, não `Impacto Líquido`: foi ela que a rodada
  * de 04/09 usou (136 dos 137 batem ao centavo), e as duas divergem em projeto que não é mensal.
@@ -374,7 +384,8 @@ export function financeiroDoProjeto(
       : linhasHoras.reduce((s, l) => s + (Number(l?.economia_horas_mes) || 0), 0);
   // v2: as horas humanas liberadas vivem em `Custo Evitado Horas` (a v2 chama de "custo evitado"
   // o braço de HORAS; o `Saving Efetivado` é a despesa que parou). Ver `coluna-chave.ts`.
-  const horas = horasV1 > 0 ? horasV1 : (numero(cel('Custo Evitado Horas')) ?? 0);
+  const horasV2 = numero(cel('Custo Evitado Horas'));
+  const horas = horasV2 != null && horasV2 > 0 ? horasV2 : horasV1;
 
   const economiaV1 =
     typeof saving?.economia_reais_mes === 'number' ? (saving.economia_reais_mes as number) : null;
@@ -386,9 +397,9 @@ export function financeiroDoProjeto(
   const categorias = (texto(cel('Tipos de Ganho')) ?? '').toLowerCase();
   return {
     horas,
-    economiaReaisMes: economiaV1 ?? numero(cel('Impacto Líquido Mensal')),
-    custoEvitado: custoV1 ?? numero(cel('Saving Efetivado')),
-    valorReceita: receitaV1 ?? numero(cel('Receita Incremental')),
+    economiaReaisMes: numero(cel('Impacto Líquido Mensal')) ?? economiaV1,
+    custoEvitado: numero(cel('Saving Efetivado')) ?? custoV1,
+    valorReceita: numero(cel('Receita Incremental')) ?? receitaV1,
     temSaving: !!saving || /saving|custo evitado/.test(categorias),
     temReceita: !!receita || /receita/.test(categorias),
   };

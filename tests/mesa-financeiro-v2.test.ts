@@ -53,14 +53,54 @@ describe('financeiroDoProjeto — a ponte v1 → v2', () => {
     expect(f.economiaReaisMes).not.toBeCloseTo(999, 2);
   });
 
-  it('projeto v1 segue byte-idêntico: o SQLite vence a planilha', () => {
+  it('⚠️ a PLANILHA vence o SQLite v1 — régua e número saem da mesma fonte', () => {
+    // CORRIGIDO em 09/09/2026. A 1ª versão do fix fazia o contrário ("v1 primeiro, quando
+    // existe") e o piso seguia inerte justo em quem ele existe para pegar: a v2 PONDERA as horas
+    // no `Impacto Líquido Mensal` e a v1 conta a hora pelo valor CHEIO, então o número v1 é ~10× o
+    // v2 e passa longe do piso de R$ 100. Medido: os 11 `erro_grave` que sobraram no retroativo de
+    // prod eram todos impacto v2 entre R$ 19,96 e R$ 90,61, nota 0 e Status Reprovado — e a mesa
+    // aprovou os 11.
     const saving = { economia_horas_mes: 40, economia_reais_mes: 5000, custo_evitado_reais: 1200 };
     const receita = { valor_ganho_mensal: 800 };
     const f = financeiroDoProjeto(saving, receita, linhaV2());
+    expect(f.horas).toBe(60);
+    expect(f.economiaReaisMes).toBeCloseTo(18.16, 2);
+    expect(f.custoEvitado).toBeCloseTo(324005.09, 2);
+    expect(f.valorReceita).toBe(0);
+  });
+
+  it('o v1 é a REDE: linha sem a coluna da v2 cai no número do SQLite', () => {
+    // As 4 colunas financeiras da v2 estão 100% preenchidas em prod (745/745 em 09/09/2026), então
+    // este caminho é rede para a linha que perdesse a coluna — não é o caminho normal.
+    const saving = { economia_horas_mes: 40, economia_reais_mes: 5000, custo_evitado_reais: 1200 };
+    const receita = { valor_ganho_mensal: 800 };
+    const semV2 = linhaV2({
+      'Impacto Líquido Mensal': '',
+      'Saving Efetivado': '—',
+      'Receita Incremental': '',
+      'Custo Evitado Horas': '0',
+    });
+    const f = financeiroDoProjeto(saving, receita, semV2);
     expect(f.horas).toBe(40);
     expect(f.economiaReaisMes).toBe(5000);
     expect(f.custoEvitado).toBe(1200);
     expect(f.valorReceita).toBe(800);
+  });
+
+  it('⚠️ o caso REAL dos 11: impacto v2 baixo + número v1 alto → REPROVA pelo v2', () => {
+    // `9d46f0e8…` (Burndown Melhoria e Dados CX): 7,5h liberadas → `Impacto Líquido Mensal`
+    // R$ 19,96 na v2, contra ~R$ 200 se a hora entrasse cheia. Nota 0, Status Reprovado.
+    const linha = linhaV2({ 'Custo Evitado Horas': '7,50', 'Impacto Líquido Mensal': '19,96', 'Saving Efetivado': '0,00' });
+    const f = financeiroDoProjeto({ economia_reais_mes: 199.5, economia_horas_mes: 7.5 }, undefined, linha);
+    expect(f.economiaReaisMes).toBeCloseTo(19.96, 2);
+    const fin = avaliarFinanceiro({
+      temSaving: f.temSaving,
+      economiaReaisMes: f.economiaReaisMes,
+      economiaHorasMes: f.horas,
+      materialidade: f.economiaReaisMes,
+      estrela: 0,
+    });
+    expect(fin.reprovavel).toBe(true);
   });
 
   it('v1 com as horas nas LINHAS (sem o total) soma as linhas', () => {
