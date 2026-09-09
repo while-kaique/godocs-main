@@ -6,6 +6,56 @@
 
 ---
 
+## 2026-09-09 — A MESA estava CEGA ao dinheiro: lia o financeiro em vocabulário da v1, do SQLite
+
+**Sintoma (medido).** Retroativo em prod com 30 projetos, 29 comparáveis: **acerto 58,6% · erro
+grave 41,4%** — 12 casos em que a mesa **aprovaria o que a triagem reprovou**. Quase todos da leva
+que o dono do produto reprovou pelo piso de impacto, ou seja: **o piso não estava disparando**.
+
+**Causa-raiz.** `computarVotos` (`avaliacao-normais.functions.ts`) lia o financeiro de
+`documentacao.conteudo.saving` / `.receita` — vocabulário da **v1**, e do **SQLite**. Para projeto
+da **v2** aqueles campos não existem, e para **legado que só vive na planilha** não existe
+`documentacao` nenhuma. Resultado em cadeia: `economia_reais_mes` e `receita` null →
+`materialidade = 0` → `avaliarFinanceiro` cai no `temDados: false` e devolve *"Sem dados
+financeiros para avaliar"* → **o piso nunca é alcançado** → a mesa aprova projeto de R$ 18/mês
+porque não vê número algum. A mesma cegueira valia para as **horas** (o voto de FTE recebia 0).
+
+⚠️ **É o bug IRMÃO do dossiê**, corrigido no dia anterior, no arquivo vizinho: lá era o time
+autônomo, aqui é a mesa que roda em PRODUÇÃO a cada submissão. O fix do dossiê não a alcançou.
+
+**Fix.** `financeiroDoProjeto(saving, receita, linha)` (PURA) faz a ponte **v1 → v2**, sempre com o
+SQLite primeiro (projeto v1 segue byte-idêntico) e a linha do espelho depois:
+
+| campo | v1 (SQLite) | v2 (espelho) |
+|---|---|---|
+| horas | `saving.economia_horas_mes` (ou a soma das `linhas`) | `Custo Evitado Horas` |
+| economia mensal | `saving.economia_reais_mes` | **`Impacto Líquido Mensal`** |
+| despesa que parou | `saving.custo_evitado_reais` | `Saving Efetivado` |
+| receita | `receita.valor_ganho_mensal` | `Receita Incremental` |
+| tem saving/receita | `!!saving` / `!!receita` | as categorias de `Tipos de Ganho` |
+
+A linha vem de `ctx.linhaPorId`, montado das **MESMAS** `linhas` que o `resumoPorId` já consome
+(`lerResumosEspelho`) — **zero I/O novo**.
+
+**⚠️ O que não pode regredir.**
+- **`Impacto Líquido Mensal`, não `Impacto Líquido`**: foi a coluna que a rodada de 04/09 usou
+  (136/137 ao centavo), e as duas divergem em projeto que não é mensal.
+- **v1 vence a planilha** na ordem de leitura: quando o SQLite tem o dado, ele é o que o formulário
+  da v1 gravou.
+- `Custo Evitado Horas` e `Saving Efetivado` entraram em `COLUNAS_RESUMO` ⇒ **`VERSAO_RECORTE_RESUMO`
+  = 8** (re-espelhamento único). ⚠️ Elas **não** viraram campos de `ProjetoDashboardResumo`: a mesa
+  as lê da linha crua, como `Ferramenta` e `Freq. Custo Evitado` — campo que a tabela não desenha
+  não viaja no payload da listagem (gotcha 4).
+- `temSaving`/`temReceita` da v2 saem das **categorias**: sem isso o `temDados` seguia falso e o
+  financeiro nem chegava às checagens, mesmo com os números em mãos.
+
+**Status.** Testes: `tests/mesa-financeiro-v2.test.ts` — a linha v2 chegando, o v1 intocado, a
+coluna certa do piso, e o antes/depois na mesa (cega **não** reprova · vendo o número **reprova**,
+e com nota 1 não reprova porque a régua é `< 1`). Suíte 3918 verde. ⚠️ **A acurácia precisa ser
+RE-MEDIDA** depois deste fix: os 41,4% foram medidos com a mesa cega.
+
+---
+
 ## 2026-09-08 — O piso de impacto reprovava sozinho, e a régua que o dono do produto aplicou tinha DOIS eixos
 
 **Como apareceu.** Ao ser questionado sobre o que falta para tirar o time da sombra, eu disse que o
