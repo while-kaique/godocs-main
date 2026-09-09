@@ -190,7 +190,6 @@ av('audConsolida',{titulo:'Consolidação da nota',tipo:'code',sub:'sem média, 
 rot('orq','estrela','time da ESTRELA');
 LENTES.forEach((l,i)=>rot('estrela',l[0], i===0?'gerencia as 4':''));
 LENTES.forEach(l=>rot(l[0],'audConsolida',''));
-rot('estrela','audConsolida','a nota base',{porBaixo:{laneOut:530,y:1069,laneIn:1062}});
 rot('audConsolida','revisor','a nota');
 
 // ─── ferramentas: folhas à direita do agente ────────────────────────────────
@@ -220,14 +219,6 @@ function rota(a,b,e){
     // de cima para chegar na de baixo (medido: estrela → buscar_duplicata).
     return {d:`M${a.x} ${ay}L${e.espinha} ${ay}L${e.espinha} ${by}L${b.x} ${by}`,
             lx:e.espinha, ly:(ay+by)/2};
-  }
-  if(e.porBaixo){
-    // Destino à direita com CAIXAS NO CAMINHO: sai pela direita, anda até uma faixa livre
-    // (laneOut), procura um corredor HORIZONTAL vazio (y), atravessa e sobe/desce na faixa
-    // de entrada (laneIn). É o que tira a seta de cima do bloco em vez de escondê-la.
-    const {laneOut:lo,y:yc,laneIn:li}=e.porBaixo;
-    return {d:`M${a.x+a.w} ${ay}L${lo} ${ay}L${lo} ${yc}L${li} ${yc}L${li} ${by}L${b.x} ${by}`,
-            lx:lo+(li-lo)*0.7, ly:yc-6};
   }
   if(e.volta){
     // Aresta de RETORNO: desce até um corredor livre, volta pela ESQUERDA do destino e entra
