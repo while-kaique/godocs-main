@@ -23,21 +23,36 @@ porque não vê número algum. A mesma cegueira valia para as **horas** (o voto 
 ⚠️ **É o bug IRMÃO do dossiê**, corrigido no dia anterior, no arquivo vizinho: lá era o time
 autônomo, aqui é a mesa que roda em PRODUÇÃO a cada submissão. O fix do dossiê não a alcançou.
 
-**Fix.** `financeiroDoProjeto(saving, receita, linha)` (PURA) faz a ponte **v1 → v2**, sempre com o
-SQLite primeiro (projeto v1 segue byte-idêntico) e a linha do espelho depois:
+**Fix.** `financeiroDoProjeto(saving, receita, linha)` (PURA) faz a ponte **v1 → v2**, com a
+**PLANILHA primeiro** e o SQLite v1 só como **rede**:
 
-| campo | v1 (SQLite) | v2 (espelho) |
+| campo | v2 (espelho) — vence | v1 (SQLite) — rede |
 |---|---|---|
-| horas | `saving.economia_horas_mes` (ou a soma das `linhas`) | `Custo Evitado Horas` |
-| economia mensal | `saving.economia_reais_mes` | **`Impacto Líquido Mensal`** |
-| despesa que parou | `saving.custo_evitado_reais` | `Saving Efetivado` |
-| receita | `receita.valor_ganho_mensal` | `Receita Incremental` |
-| tem saving/receita | `!!saving` / `!!receita` | as categorias de `Tipos de Ganho` |
+| horas | `Custo Evitado Horas` | `saving.economia_horas_mes` (ou a soma das `linhas`) |
+| economia mensal | **`Impacto Líquido Mensal`** | `saving.economia_reais_mes` |
+| despesa que parou | `Saving Efetivado` | `saving.custo_evitado_reais` |
+| receita | `Receita Incremental` | `receita.valor_ganho_mensal` |
+| tem saving/receita | as categorias de `Tipos de Ganho` | `!!saving` / `!!receita` |
 
 A linha vem de `ctx.linhaPorId`, montado das **MESMAS** `linhas` que o `resumoPorId` já consome
 (`lerResumosEspelho`) — **zero I/O novo**.
 
+**⚠️ 2ª volta (09/09/2026) — a precedência nasceu INVERTIDA.** A 1ª versão do fix dizia "SQLite
+primeiro, quando existe, para o projeto v1 seguir byte-idêntico". Parecia conservador e era o
+contrário: mantinha o piso **inerte justo em quem ele existe para pegar**. A v2 **PONDERA** as horas
+no `Impacto Líquido Mensal` (7,5h liberadas viram **R$ 19,96**), enquanto `economia_reais_mes` da v1
+conta a hora pelo valor **CHEIO** (~R$ 200 no mesmo projeto) — o número v1 é **~10× o v2** e passa
+longe do piso de R$ 100. Medido: dos 29 comparáveis do retroativo, sobraram **11 `erro_grave`**, e os
+11 eram impacto v2 entre **R$ 19,96 e R$ 90,61**, nota **0** e Status **Reprovado** — a régua composta
+devia ter reprovado os 11 e não reprovou **nenhum**. Régua e número têm de sair da **MESMA** fonte, e
+a fonte da verdade do repo é a **planilha**. As 4 colunas financeiras da v2 estão **100% preenchidas**
+em prod (745/745 em 09/09/2026), então o `?? v1` é rede para a linha que perdesse a coluna, não
+caminho normal. Confirmado em prod depois do deploy: `9d46f0e8…`, `legado-075` e `legado-083`
+passaram de `aprovar` para `reprovar`, citando o valor e a nota.
+
 **⚠️ O que não pode regredir.**
+- **A PLANILHA vence o v1**, nunca o inverso (é a 2ª volta acima; teste explícito em
+  `tests/mesa-financeiro-v2.test.ts`, com o caso real do `9d46f0e8…`).
 - **`Impacto Líquido Mensal`, não `Impacto Líquido`**: foi a coluna que a rodada de 04/09 usou
   (136/137 ao centavo), e as duas divergem em projeto que não é mensal.
 - **v1 vence a planilha** na ordem de leitura: quando o SQLite tem o dado, ele é o que o formulário
