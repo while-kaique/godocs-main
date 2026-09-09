@@ -47,12 +47,14 @@ export type ResultadoFinanceiro = {
    */
   abaixoDoPiso: boolean;
   /**
-   * A régua COMPOSTA: impacto abaixo do piso **E** nota baixa (`reprovaPeloPiso`). É ESTE campo
+   * A régua COMPOSTA: impacto abaixo do piso **E** nota **ZERO** (`reprovaPeloPiso` — a régua é
+   * estritamente `< 1`). É ESTE campo
    * que o agregador transforma em `reprovar` — não o `abaixoDoPiso`, que é só o sinal do dinheiro.
    *
-   * ⚠️ Medido: os 137 que o dono do produto reprovou à mão tinham **todos 0★**. O piso sozinho
+   * ⚠️ Medido: os 137 que o dono do produto reprovou à mão tinham **todos 0★** — e por isso a
+   * régua é `< 1`, não `<= 1` (o teto errado derrubava 6 projetos aprovados de 1★). O piso sozinho
    * derrubaria 10 projetos APROVADOS com 2★–4★, quase todos de processo, onde o valor não está no
-   * dinheiro. `false` quando não veio estrela alta — ver `reprovaPeloPiso`.
+   * dinheiro. `false` para qualquer nota ≥ 1 — ver `reprovaPeloPiso`.
    */
   reprovavel: boolean;
 };
@@ -85,8 +87,8 @@ export function avaliarFinanceiro(input: {
   materialidade?: number | null;
   teto?: number | null;
   /**
-   * Nota do projeto (humana, ou a recomendada pelo agente na falta dela). Só a nota ALTA poupa a
-   * reprovação por impacto; ausência NÃO poupa. Campo OPCIONAL: sem ele o comportamento é o de
+   * Nota do projeto (humana, ou a recomendada pelo agente na falta dela). Qualquer nota **≥ 1**
+   * poupa a reprovação por impacto; ausência de nota NÃO poupa. Campo OPCIONAL: sem ele o comportamento é o de
    * antes do gate composto.
    */
   estrela?: number | null;

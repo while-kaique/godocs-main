@@ -29,6 +29,15 @@ R$ 97,02), `Agente de Waitlists` (3★)… quase todos de Gente & Gestão e proc
 família em que **o valor não está no dinheiro** (o ganho imensurável da própria régua). Reprovar um
 4★ porque ele move R$ 89,70/mês é aplicar o eixo errado.
 
+**⚠️ Corrigido no mesmo dia, pelo dono do produto.** Eu implementei o limite como **`≤ 1`** e ele
+apontou: *"você inventou o <= 1, eu falei < 1"* — e ele havia escrito, antes, `(100 e com 0
+estrelas)`. A régua é **estritamente `< 1`**, ou seja **nota zero**. A diferença são **6 projetos
+APROVADOS de 1★** (`RA Monitor` R$ 37,92 · `Pesquisa Satisfação Prima Vida` R$ 38,62 · `Controle de
+Vencimentos` R$ 41,37 · `[ECOMM] Alerta de pedidos travados` R$ 42,58 · `Direcionador de Fórum`
+R$ 42,75 · `[DUDA] Cupons` R$ 98,50) que o teto errado derrubava **sem uma única evidência no
+gabarito** — os 137 eram 0★ em 137. Extrapolar de 0 para 1 foi ir além do que o dado sustenta, e a
+extensão da régua caiu de **35 para 29** aprovados.
+
 **Fix.** `reprovaPeloPiso` (`materialidade-piso.ts`) passa a exigir os dois eixos, e o financeiro
 distingue **`abaixoDoPiso`** (o sinal do dinheiro, que segue aparecendo no parecer) de
 **`reprovavel`** (a régua composta, que é o que o agregador transforma em `reprovar`). A nota entra
