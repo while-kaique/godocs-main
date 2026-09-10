@@ -225,7 +225,15 @@ export async function avaliarProjetoComTime(
       ancoras: ancorasDe(linhas),
       // ⚠️ Env em RUNTIME, DEFAULT desligado (sem ela o teto é o de sempre). Ligada, desliga a
       // réplica do mérito, que é o que faz a passada caber nos 300 s do edge.
-      ...(debateDoTimeDesligado() ? { maxRodadasDebate: 1 } : {}),
+      // ⚠️ **PASSADA CURTA — é teto de INFRAESTRUTURA (300 s do edge), medido hoje.** O gargalo é
+      // PROFUNDIDADE em série, não volume: 5 especialistas (com até 2 rodadas de ferramenta cada,
+      // ou seja 3 chamadas em série) → cérebro da estrela (mais 3) → 2 céticos. Cortar os elos que
+      // o FUNIL não usa mais:
+      //   • a réplica do mérito (o mérito é da mesa desde a junta);
+      //   • a 2ª rodada de ferramenta por agente (1 basta: a ferramenta é consulta, não conversa).
+      // ⚠️ Isto NÃO mexe no que o dono do produto pediu: o cérebro da estrela continua lendo o
+      // painel do impacto, e a nota continua saindo do time inteiro.
+      ...(debateDoTimeDesligado() ? { maxRodadasDebate: 1, ferramentasPorAgente: 1 } : {}),
     });
     if (abriuAqui && cicloId) {
       try {
