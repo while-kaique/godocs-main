@@ -87,13 +87,17 @@ async function estrelaPeloTimeInteiro(
   confianca?: 'alta' | 'media' | 'baixa';
 }> {
   const projetoId = chaveProjeto(projetoIdBruto);
+  // ⚠️ **Âncora protege a NOTA, não impede o JULGAMENTO** (corrigido 09/09/2026). Antes isto era um
+  // `return` seco: projeto com nota humana ≥ 1 saía sem o time rodar. Com a JUNTA no fluxo, isso
+  // virou um buraco — a metade da estrela chegava vazia e a decisão de funil caía em Pendente por
+  // "falta uma metade", em projeto que gente já tinha avaliado. São 15 dos 90 do backlog.
+  // Hoje o time roda igual (o veredito é dele), e o que a âncora bloqueia é a ESCRITA da nota.
+  let ancoraHumana: number | null = null;
   if (!opts.forcar) {
     try {
       const linha = await lerLinhaEspelho(projetoId);
       const humana = numero((linha as Record<string, string> | null)?.['Estrelas']);
-      if (humana != null && humana >= ESTRELA_LIMITE_REPROVAVEL) {
-        return { ok: false, motivo: `nota humana ${humana} é âncora — não reclassifica`, estrelas: humana };
-      }
+      if (humana != null && humana >= ESTRELA_LIMITE_REPROVAVEL) ancoraHumana = humana;
     } catch {
       // Não conseguir ler a âncora não pode impedir a avaliação: segue e o time julga.
     }
@@ -104,6 +108,19 @@ async function estrelaPeloTimeInteiro(
   const c = r.resultado.consenso;
 
   if (opts.dry) return { ok: true, estrelas: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca };
+
+  // A âncora humana vence a nota do time: ela é verdade e exemplar do corpus, e a régua nunca
+  // reclassifica quem gente já julgou. O VEREDITO do time segue valendo (é o que a junta lê).
+  if (ancoraHumana != null) {
+    return {
+      ok: true,
+      estrelas: ancoraHumana,
+      saida: c.saida,
+      escape: c.escape,
+      confianca: c.confianca,
+      motivo: `nota humana ${ancoraHumana} é âncora — o time julgou o mérito e não reescreveu a nota`,
+    };
+  }
 
   // Persistência em DOIS lugares, e os dois são necessários:
   //  - `especial_avaliacao` é de onde a FICHA lê a recomendação;
