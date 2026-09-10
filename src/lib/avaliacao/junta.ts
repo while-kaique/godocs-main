@@ -110,6 +110,37 @@ export function juntarAnalises(args: {
     return { status: 'Pendente', flag6a10: false, porque: porques[0], concordam: false, confianca: 'baixa', porques };
   }
 
+  // 2b — ⚠️ **O MÉRITO TEM UM DONO SÓ: a mesa.** Medido em prod (10/09/2026, 9 projetos do
+  // backlog): a mesa aprovou **8 de 9** e a junta mandou **7** para Pendente, porque o time
+  // devolvia `ajuste`. Não era divergência de conteúdo: são **duas implementações do MESMO
+  // julgamento de mérito** (5 especialistas cada) discordando entre si, e tratar isso como dúvida
+  // legítima paralisava o funil inteiro — que é o defeito que este arquivo existe para matar.
+  //
+  // A mesa é quem tem a régua calibrada (o piso composto, as lições da triagem, as rodadas 9 e 10
+  // medidas) e é ela que roda em produção a cada submissão. O time entra com o que só ele produz:
+  // a NOTA. Então: mérito da mesa + nota do time = uma análise só.
+  //
+  // ⚠️ O que o time AINDA veta, e por isso não é "a mesa decide sozinha":
+  //   • `reprovar` do time (régua mecânica: piso composto ou invalidez citada) — tratado acima;
+  //   • a faixa **6-10** — tratada no passo 1, e ela vence tudo;
+  //   • a nota, que a mesa não produz.
+  // ⚠️ E `ajuste` do time NÃO é descartado: ele vira a JUSTIFICATIVA que o autor lê, com as
+  // perguntas dos especialistas. O que ele deixou de fazer é impedir a decisão.
+  if (daMesa === 'Aprovado' && doTime.status === 'Pendente') {
+    porques.push('O time do impacto aprovou o projeto.');
+    if (doTime.status === 'Pendente') {
+      porques.push('A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito.');
+    }
+    return {
+      status: 'Aprovado',
+      flag6a10: false,
+      porque: 'O time do impacto aprovou o projeto; o mérito é dele.',
+      concordam: false,
+      confianca: confTime,
+      porques,
+    };
+  }
+
   // 2 — concordam
   if (doTime.status === daMesa) {
     porques.push(`As duas metades do time chegaram ao mesmo lugar: ${daMesa}.`);

@@ -71,6 +71,21 @@ describe('juntarAnalises', () => {
     expect(j.confianca).toBe('baixa');
   });
 
+  it('⚠️ mesa APROVA + time em ajuste → Aprovado: o mérito tem um dono só', () => {
+    // Medido em prod: a mesa aprovou 8 de 9 e a junta mandava 7 para Pendente porque o time
+    // devolvia `ajuste`. São duas implementações do MESMO julgamento de mérito, e tratar isso
+    // como dúvida paralisava o funil. A mesa é a calibrada; o time entra com a NOTA.
+    const j = juntarAnalises({ impacto: imp('aprovar'), estrela: est('ajuste') });
+    expect(j.status).toBe('Aprovado');
+    expect(j.porques.join(' ')).toMatch(/aprovou o projeto/);
+    expect(j.porques.join(' ')).toMatch(/não impedem a aprovação/);
+  });
+
+  it('⚠️ mas o time ainda VETA: reprovar mecânico e faixa 6-10 vencem a aprovação da mesa', () => {
+    expect(juntarAnalises({ impacto: imp('aprovar'), estrela: est('reprovar') }).status).toBe('Pendente');
+    expect(juntarAnalises({ impacto: imp('aprovar'), estrela: est('aprovar', { escape: true }) }).flag6a10).toBe(true);
+  });
+
   it('em_validacao e isento da mesa contam como Pendente (vocabulário dela)', () => {
     expect(juntarAnalises({ impacto: imp('em_validacao'), estrela: est('humano') }).status).toBe('Pendente');
     expect(juntarAnalises({ impacto: imp('isento'), estrela: est('humano') }).concordam).toBe(true);
