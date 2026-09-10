@@ -55,7 +55,15 @@ if (fs.existsSync(OUT)) {
     /* arquivo pela metade (morte no meio da escrita) → recomeça do zero, que é o lado seguro */
   }
 }
-const pendente = fila.filter((r) => !feitosAntes.has(String(r['ID Projeto']).trim()));
+// ⚠️ **PULAR os projetos que estouram o teto do edge SEMPRE.** Medido: `legado-254` e
+// `e4b1dcc3…` falharam 4 vezes em 295-300 s, em concorrência 2, 3, 4 e 6 — não é carga, é a
+// passada deles que não cabe. E como a retomada os coloca no INÍCIO da fila (nunca tiveram 200),
+// cada reinício gastava 2×295 s neles antes de andar. Eles saem do lote e são tratados um a um.
+const pular = new Set(String(process.env.BACKLOG_PULAR ?? '').split(',').map((x) => x.trim()).filter(Boolean));
+const pendente = fila.filter(
+  (r) => !feitosAntes.has(String(r['ID Projeto']).trim()) && !pular.has(String(r['ID Projeto']).trim()),
+);
+if (pular.size) console.log(`pulando ${pular.size} projeto(s) por decisão explícita: ${[...pular].join(', ')}`);
 if (feitosAntes.size) console.log(`retomando: ${feitosAntes.size} já decidido(s), ${pendente.length} na fila`);
 const alvo = LIMITE ? pendente.slice(0, LIMITE) : pendente;
 console.log(`fila: ${alvo.length} projeto(s) de ${rows.length} linhas · concorrência ${CONC} · base ${BASE}`);
