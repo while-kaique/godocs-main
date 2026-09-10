@@ -19,7 +19,13 @@ const CONC = Number(process.env.BACKLOG_CONC ?? 2);
 const OUT = process.env.BACKLOG_OUT ?? '/tmp/backlog-time.json';
 const CORPUS = process.env.BACKLOG_CORPUS ?? '/tmp/retro-corpus-full.json';
 const LIMITE = Number(process.env.BACKLOG_LIMITE ?? 0); // 0 = todos
-const TIMEOUT_MS = Number(process.env.BACKLOG_TIMEOUT_MS ?? 420_000);
+// ⚠️ **O EDGE CORTA EM 300 s, EXATOS.** Medido em 10/09/2026: 6 falhas do lote, todas em
+// 300358-300833 ms. Não é rede instável e re-tentar não resolve — quem passa de 5 min sempre
+// falha. O timeout aqui fica um pouco ABAIXO disso para o erro chegar como nosso e não como
+// conexão derrubada, e a concorrência é o botão que controla o tempo da passada: cada projeto já
+// dispara 5 especialistas, e 3 em paralelo enfileiram no gateway (~8 slots) e empurram a passada
+// de ~220 s para além do corte.
+const TIMEOUT_MS = Number(process.env.BACKLOG_TIMEOUT_MS ?? 295_000);
 
 const env = {};
 for (const l of fs.readFileSync('/home/notebook/godocs-main/.env', 'utf8').split('\n')) {
