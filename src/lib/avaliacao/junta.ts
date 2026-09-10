@@ -120,6 +120,15 @@ export function juntarAnalises(args: {
    * teve o número zerado por custo, e esse caso continua sendo "número a conferir".
    */
   semNumeroDeGanho?: boolean;
+  /**
+   * A triagem devolveu o projeto para ajuste e **o reenvio nunca chegou** (o Status ainda é
+   * `Reenvio Pendente` / `rejeitado`).
+   *
+   * ⚠️ É a ÚNICA reprovação por material que existe, e ela é um FATO do fluxo, não um juízo de
+   * mérito: um reenvio reescreve o Status, então o Status parado ali significa literalmente "o
+   * autor não voltou". Ver a TRAVA 3 no corpo.
+   */
+  reenvioNaoChegou?: boolean;
 }): Juncao {
   const { impacto, estrela } = args;
   const especial = args.especial === true;
@@ -272,17 +281,52 @@ export function juntarAnalises(args: {
         porques,
       };
     }
+    // ⚠️ **TRAVA 3 — "não consegui confirmar o número" NUNCA MAIS REPROVA** (10/09/2026, decisão
+    // direta do dono do produto sobre um caso concreto).
+    //
+    // O caso: «Plataforma Smartonline - Pagamento de DIFAL», **R$ 117.475/mês**, foi de Pendente a
+    // **Reprovado** com o texto *"o valor líquido de R$ 117.475 por mês é alto e depende quase
+    // todo da estimativa de multas e juros evitados… não há memória de cálculo"*. Palavras dele:
+    // *"Isso é inadmissível, so pra deixar claro. Nao quero que isso aconteça de forma alguma"*.
+    //
+    // E ele está certo pela natureza da coisa: **falta de memória de cálculo é pergunta ao autor,
+    // não veredito sobre o projeto**. Quem duvida do número pede a conta; quem reprova afirma que
+    // o trabalho não vale — e o agente não tem material para afirmar isso. As travas 1 e 2 acima
+    // tapavam dois vãos (nota ≥ 1★, ganho sem número), mas deixavam de fora justamente a classe do
+    // caso: projeto **Pendente**, nota 0 ou congelada em 0, impacto ALTO. Medido na staging depois
+    // das travas 1 e 2: o «SendApp» (R$ 97 mil/mês, nota 0 lá) **voltou a ser gravado Reprovado**.
+    //
+    // ⚠️ **A ÚNICA reprovação por material que sobra é a que ele mesmo pediu hoje**: a triagem
+    // devolveu o projeto para ajuste e **o reenvio nunca chegou** (*"O novo 'reenvio pendente' vai
+    // ser reprovado com justificativa"*). Essa é detectável sem LLM e sem juízo sobre o mérito —
+    // é um FATO do fluxo —, e o texto dela já é o ramo do reenvio em `justificativaDaReprovacao`.
+    //
+    // ⚠️ Quem quiser reprovar por dúvida no número continua podendo: é a triagem, na tela. O que
+    // deixou de existir é o agente fazendo isso sozinho.
+    if (args.reenvioNaoChegou) {
+      porques.push(
+        'A triagem devolveu este projeto para ajuste e o reenvio não chegou: é por isso que ele é reprovado, e não por um julgamento do mérito.',
+      );
+      return {
+        status: 'Reprovado',
+        flag6a10: false,
+        porque: 'Reenvio pedido pela triagem que nunca chegou: reprovado por isso, e o reenvio reabre.',
+        concordam: doTime.status === daMesa,
+        confianca: confTime,
+        porques,
+        semMaterial: true,
+      };
+    }
     porques.push(
-      'O time não conseguiu validar o projeto com o material que existe, então o desfecho é reprovar com o que falta declarado, em vez de deixá-lo esperando sem dono.',
+      'O time não conseguiu confirmar o número do ganho com o material que existe. Isso é uma pergunta ao autor, não um veredito sobre o projeto, então a decisão fica com a triagem.',
     );
     return {
-      status: 'Reprovado',
+      status: 'Pendente',
       flag6a10: false,
-      porque: 'O time não fechou com o material que existe: reprovado com o que falta, e o reenvio reabre.',
-      concordam: doTime.status === daMesa,
-      confianca: confTime,
+      porque: 'Falta confirmar o número do ganho: o agente não reprova por isso, quem decide é a triagem.',
+      concordam: false,
+      confianca: 'baixa',
       porques,
-      semMaterial: true,
     };
   }
 

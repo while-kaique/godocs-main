@@ -332,6 +332,11 @@ export async function avaliarProjetoComTimeCompleto(
     especial,
     fecharPendente: agenteFechaPendente(),
     semNumeroDeGanho: semNumeroDeGanhoNaLinha(linhaAtual, especial),
+    // ⚠️ O Status parado em `Reenvio Pendente` é o FATO "o autor não voltou" (um reenvio o
+    // reescreveria) — a única reprovação por material que sobrou. Ver a TRAVA 3 da junta.
+    reenvioNaoChegou: ['reenvio pendente', 'rejeitado'].includes(
+      String(linhaAtual?.['Status'] ?? '').trim().toLowerCase(),
+    ),
   });
 
   // ── O funil ──────────────────────────────────────────────────────────────────────────────────

@@ -128,12 +128,20 @@ describe('fecharPendente — o funil sem limbo (opt-in)', () => {
     expect(juntarAnalises({ impacto: { veredito: 'em_validacao' }, estrela: { saida: 'ajuste' } }).status).toBe('Pendente');
   });
 
-  it('ligado: em_validacao + ajuste → Reprovado, com tom EXORTATIVO', async () => {
+  it('ligado: reenvio que NUNCA CHEGOU → Reprovado, com tom EXORTATIVO', async () => {
+    // ⚠️ **REESCRITO em 10/09/2026.** Este teste afirmava que `em_validacao + ajuste` reprovava
+    // por si só ("o time não conseguiu validar com o material que existe"). Foi ao ar e produziu o
+    // caso que o dono do produto chamou de inadmissível: «Smartonline - Pagamento de DIFAL»,
+    // R$ 117.475/mês, reprovado por *"não há memória de cálculo"*. Falta de memória de cálculo é
+    // PERGUNTA AO AUTOR, não veredito — hoje esse cenário vai para Pendente (teste abaixo).
+    // A única reprovação por material que sobrou é o FATO do fluxo: a triagem devolveu e o autor
+    // não voltou.
     const { juntarAnalises } = await import('@/lib/avaliacao/junta');
     const j = juntarAnalises({
       impacto: { veredito: 'em_validacao' },
       estrela: { saida: 'ajuste' },
       fecharPendente: true,
+      reenvioNaoChegou: true,
     });
     expect(j.status).toBe('Reprovado');
     expect(j.semMaterial).toBe(true);
