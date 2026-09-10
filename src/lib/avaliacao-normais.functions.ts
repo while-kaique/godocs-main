@@ -91,6 +91,7 @@ import {
   type VotosDeterministicos,
 } from '@/lib/agents/mesa-especialistas';
 import { carregarCorrecoesDaTriagem, licoesParaPrompt } from '@/lib/correcoes.functions';
+import { linhaDoQueSeCobra, linhaImpactoBrutoLiquido } from '@/lib/avaliacao/dossie';
 import { FAIXA_ESCAPE } from '@/lib/estrelas-regua';
 import type { Correcao } from '@/lib/correcoes';
 import type {
@@ -554,12 +555,41 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
     const entrada = await montarEntradaSemanticaNormal(projetoId, ctx.resumoPorId.get(projetoId));
     // Texto SEM R$ escondido do usuário (o `motivo` do voto é o único que pode citar valor, e ele já
     // fala do ganho TOTAL, não de valor/hora por cargo — ver `serializarVotos`/`montarEntradas`).
+    // ⚠️ **O QUE É EXIGÍVEL vai no TEXTO que a mesa lê** (10/09/2026). Sem isto, medido nos 24
+    // pareceres do recorte pré-aprovado de prod: **13** reprovariam por "faltam as horas mensais e
+    // o número de pessoas", e **8 desses** declaram `Ganho imensurável` — categoria em que o
+    // formulário NÃO pede horas; os outros 5 declaram `Custo evitado` com as horas já preenchidas.
+    // E **2 dos 4** casos de "divergência de valor" eram o fator 2 do peso das horas (bruto ×
+    // líquido), que não é divergência nenhuma.
+    // ⚠️ A trava tem de entrar AQUI, não no dossiê do time: quem produz o veredito do funil é a
+    // MESA, e ela tem contexto próprio. Eu corrigi o dossiê do time primeiro e o parecer não mudou.
+    // ⚠️ Célula lida por um helper LOCAL: o `const texto` abaixo sombreia o helper `texto()` do
+    // módulo dentro deste bloco inteiro (TDZ), então chamá-lo aqui não compila.
+    const cel2 = (nome: string) => {
+      const v = (linhaEspelho as Record<string, string> | undefined)?.[nome];
+      const t = String(v ?? '').trim();
+      return t === '' || t === '—' || t === '-' ? null : t;
+    };
+    const num2 = (nome: string) => {
+      const t = cel2(nome);
+      if (t === null) return null;
+      const n = Number(t.replace(/[R$\s.]/g, '').replace(',', '.'));
+      return Number.isFinite(n) ? n : null;
+    };
+    const exigivel = linhaDoQueSeCobra(
+      (cel2('Tipos de Ganho') ?? '').split(/[,;]/).map((x: string) => x.trim()).filter(Boolean),
+      { saving_horas: fin.horas || null, custo_evitado_reais: fin.custoEvitado, receita_mensal: fin.valorReceita },
+    );
+    const impactoLinha = linhaImpactoBrutoLiquido(
+      num2('Impacto Bruto'),
+      num2('Impacto Líquido Mensal') ?? num2('Impacto Líquido'),
+    );
     const texto: TextoProjeto = {
       nome: entrada?.nome ?? '',
       area: entrada?.area ?? '',
       descricao: entrada?.descricao ?? '',
       o_que_faz: entrada?.o_que_faz ?? '',
-      memorial: entrada?.memorial ?? '',
+      memorial: [entrada?.memorial ?? '', impactoLinha, exigivel].filter(Boolean).join('\n\n'),
       doc: entrada?.doc ?? '',
     };
     const vizinhosTexto = vizinhosArr.map((v) => [v.nome, v.area].filter(Boolean).join(', '));
