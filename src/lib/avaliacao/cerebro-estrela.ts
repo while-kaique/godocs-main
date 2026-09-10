@@ -25,6 +25,7 @@ import {
   type Contestacao,
 } from '@/lib/estrelas-regua';
 import { tipoValido, nivelValido, descreverCategorizacao } from '@/lib/categorizacao-projeto';
+import type { JulgamentoMerito } from '@/lib/avaliacao/cerebro-merito';
 
 export type Mensagem = { role: 'system' | 'user' | 'assistant'; content: string };
 export type VizinhoTexto = { id: string; nome: string; nota: number; similaridade: number; resumo: string };
@@ -43,6 +44,19 @@ export type SaidaEstrela = {
   contestacao: Contestacao | null;
   ancora_congelada: boolean;
   sinais: { temEvidenciaCitada: boolean; temVizinhos: boolean };
+  /**
+   * O cérebro AVALIOU de fato, ou esta saída é o fallback?
+   *
+   * ⚠️ **Precisa ser ESTRUTURAL, e é por isso que este campo existe.** O fallback devolve
+   * `nota: 0` (é a saída honesta: sem julgamento, o projeto não sobe), e a régua composta da
+   * reprovação (`reprovaPeloPiso`) reprova impacto pequeno com nota zero. Somados sem este
+   * campo, **uma falha do modelo viraria REPROVAÇÃO de um projeto que ninguém julgou** — a
+   * família de defeito que este repo já pagou caro (o RAG morto que achatou 12 notas em 0★ e
+   * saiu no relatório como se fosse a régua).
+   * ⚠️ Não inferir isso de `sem_evidencia` nem do prefixo do racional: as duas coisas são
+   * verdadeiras em julgamento legítimo e ruim.
+   */
+  avaliada: boolean;
 };
 
 export const RACIONAL_MAX = 600;
@@ -77,6 +91,37 @@ DISCIPLINA:
 - ⚠️ Uma PLATAFORMA (outros projetos a consomem por API, MCP, integração; vários times constroem sobre ela) é o caso em que a régua de 0–5 mede a coisa errada: ela não "assume um processo", ela SUSTENTA muitos. Avalie-a pelo escape.
 - Se o dossiê traz nota humana maior que a sua, não a copie: registre em "gatilho_que_falhou" o que não se sustenta, com citação. A decisão fica com o comitê.`;
 
+/**
+ * O que o time do impacto achou, como BLOCO DECLARADO para o prompt da estrela. PURO.
+ *
+ * ⚠️ Só entra quem **PREOCUPOU** e quem auditou VALOR: um "não preocupa" de cada dimensão é
+ * ruído de 5 linhas que empurra o dossiê para fora da janela sem dizer nada. E `fallback: true`
+ * fica FORA — parecer que não existiu não pode virar evidência sobre a altura do projeto.
+ * ⚠️ A régua de leitura vai junto, na última linha: informa, não decide.
+ */
+export function blocoPainelDoImpacto(painel?: readonly JulgamentoMerito[] | null): string[] {
+  if (!painel || !painel.length) return [];
+  const linhas: string[] = [];
+  for (const j of painel) {
+    if (j.fallback) continue;
+    const valor =
+      j.valor && j.valor.absurdo
+        ? ` [auditoria de valor: absurdo${j.valor.valor_sugerido != null ? `, sugere R$ ${j.valor.valor_sugerido}` : ''}]`
+        : '';
+    if (j.preocupa) linhas.push(`- ${j.dimensao} PREOCUPA: ${j.argumento}${valor}`);
+    else if (valor) linhas.push(`- ${j.dimensao} não preocupa, mas auditou o valor:${valor}`);
+  }
+  if (!linhas.length) {
+    return ['', 'O QUE O TIME DO IMPACTO CONCLUIU: nenhuma das 5 dimensões levantou preocupação sobre este projeto.'];
+  }
+  return [
+    '',
+    'O QUE O TIME DO IMPACTO CONCLUIU SOBRE ESTE MESMO PROJETO (vocês são um time só):',
+    ...linhas,
+    'Use isto como EVIDÊNCIA sobre a altura do projeto, não como ordem: quem posiciona a estrela é a régua. Se algo aqui contradiz o nível que você ia dar, diga no racional o que pesou.',
+  ];
+}
+
 export function buildPromptEstrela(args: {
   dossieTexto: string;
   vizinhos: VizinhoTexto[];
@@ -87,6 +132,20 @@ export function buildPromptEstrela(args: {
    * Sem isto, a "volta" seria a mesma pergunta ao mesmo modelo e daria a mesma resposta.
    */
   objecaoDoCetico?: string | null;
+  /**
+   * O que o TIME DO IMPACTO concluiu sobre este mesmo projeto, quando já concluiu.
+   *
+   * ⚠️ **É um time só, e era aqui que ele estava partido ao meio** (09/09/2026, pedido do dono
+   * do produto: *"tem que ser o time todo, pois deve considerar todo o projeto em si"* e *"o
+   * impacto possui informações importantes para ajudar a definir estrelas também"*). Os 5
+   * julgamentos já estão prontos quando este cérebro roda (a rodada do mérito vem antes), e
+   * ficavam de fora do prompt: os dois cérebros liam o MESMO dossiê em paralelo e só se
+   * encontravam no consenso, depois de a nota estar fechada.
+   * ⚠️ Custo: **zero chamada nova e zero latência** — só material que já existe.
+   * ⚠️ O painel INFORMA, não decide: quem posiciona a estrela é a régua. Um financeiro que
+   * achou o valor absurdo é evidência sobre a ALTURA do projeto, não uma ordem de baixar a nota.
+   */
+  painelDoImpacto?: readonly JulgamentoMerito[] | null;
 }): Mensagem[] {
   const system = [
     // ⚠️ **A ORDEM aqui é o conserto de um defeito MEDIDO** (03/09/2026, 65 especiais de
@@ -141,6 +200,7 @@ export function buildPromptEstrela(args: {
           'Se a objeção procede, corrija a nota. Se não procede, MANTENHA a nota e diga no racional qual evidência do dossiê a derruba. Concordar sem evidência é pior que discordar com ela.',
         ]
       : []),
+    ...blocoPainelDoImpacto(args.painelDoImpacto),
     '',
     'Recomende a estrela deste projeto no formato pedido.',
   ].join('\n');
@@ -256,6 +316,7 @@ export function normalizarSaidaEstrela(
     contestacao,
     ancora_congelada,
     sinais: { temEvidenciaCitada: evidencias.length > 0, temVizinhos: ctx.temVizinhos },
+    avaliada: true,
   };
 }
 
@@ -278,5 +339,7 @@ export function saidaEstrelaFallback(
     contestacao: null,
     ancora_congelada: ctx.notaHumana !== null && ctx.notaHumana >= NOTA_ANCORA_CONGELADA,
     sinais: { temEvidenciaCitada: false, temVizinhos: ctx.temVizinhos },
+    // ⚠️ NÃO avaliada: a nota 0 acima é ausência de julgamento, não julgamento de que vale 0.
+    avaliada: false,
   };
 }

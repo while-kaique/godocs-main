@@ -66,7 +66,7 @@ function estrela(over: Record<string, unknown> = {}) {
     nivel: 'garante',
     racional: 'Garante a integridade do cadastro.',
     contestacao: null,
-    ancora_congelada: false,
+    ancora_congelada: false, avaliada: true,
     sinais: { temEvidenciaCitada: true, temVizinhos: true },
     ...over,
   } as never;
@@ -109,10 +109,66 @@ describe('porta (i) — piso de impacto (RF-243)', () => {
     expect(agregarJulgamentos({ julgamentos: [], especial: true, reprovavel: true }).veredito).toBe('isento');
   });
 
-  it('no time (consenso): impacto abaixo do piso → reprovar, mesmo com mérito aprovando', () => {
-    const c = conciliar(merito(), estrela(), ctx({ impactoMensal: 18.16 }));
+  // ⚠️ **Este teste MUDOU em 09/09/2026, e o antigo estava errado, não o novo.** Ele afirmava
+  // "impacto abaixo do piso → reprovar, mesmo com mérito aprovando", com a fixture de estrela em
+  // **3★** — ou seja, prendia no time a régua de UMA perna (só dinheiro), enquanto a régua real,
+  // fixada pelo dono do produto, é COMPOSTA: impacto irrelevante **E** nota zero. O time é quem
+  // tem a nota na mesma passada, e reprovar um 3★ por mover R$ 18/mês é aplicar o eixo errado
+  // (medido: 10 projetos APROVADOS de 2★–4★ seriam derrubados, quase todos de processo).
+  it('no time (consenso): impacto abaixo do piso E nota zero → reprovar', () => {
+    const c = conciliar(merito(), estrela({ nota: 0, criterio_aplicado: 'experimenta' }), ctx({ impactoMensal: 18.16 }));
     expect(c.saida).toBe('reprovar');
     expect(c.motivos.join(' ')).toContain('18,16');
+    // a frase nomeia os DOIS eixos, porque são dois
+    expect(c.motivos.join(' ')).toMatch(/nota do projeto é 0/);
+  });
+
+  it('⚠️ impacto abaixo do piso com nota ALTA NÃO reprova — é o eixo em que o projeto vale', () => {
+    const c = conciliar(merito(), estrela({ nota: 3 }), ctx({ impactoMensal: 18.16 }));
+    expect(c.saida).not.toBe('reprovar');
+  });
+
+  it('⚠️ FALLBACK da estrela não é nota zero: falha do modelo NÃO vira reprovação', () => {
+    // O fallback devolve `nota: 0` de propósito (sem julgamento o projeto não sobe). Se o piso
+    // lesse essa nota, um modelo fora do ar reprovaria projeto que ninguém avaliou — a família
+    // do RAG morto, que achatou 12 notas em 0★ e saiu no relatório como defeito da régua.
+    const c = conciliar(merito(), estrela({ nota: 0, avaliada: false }), ctx({ impactoMensal: 18.16 }));
+    expect(c.saida).not.toBe('reprovar');
+  });
+
+  // ⚠️ 09/09/2026 — o piso deixou de ser curto-circuito. Correção do dono do produto: o agente
+  // pode defender que o projeto não é experimentação, a reprovação tem de vir com justificativa, e
+  // ele não pode sair com confiança alta só porque o gate bateu.
+  it('zero SEM evidência citada não reprova: vai ao humano', () => {
+    const c = conciliar(
+      merito(),
+      estrela({ nota: 0, sem_evidencia: true, evidencias: [], sinais: { temEvidenciaCitada: false, temVizinhos: true } }),
+      ctx({ impactoMensal: 18.16 }),
+    );
+    expect(c.saida).toBe('humano');
+    expect(c.motivos.join(' ')).toMatch(/não seria defensável|decisão é de gente/);
+  });
+
+  it('a reprovação pelo piso CARREGA o argumento, e declara quando o impacto não viu problema', () => {
+    const c = conciliar(merito(), estrela({ nota: 0, racional: 'Roda uma vez por trimestre e ninguém depende dele.' }), ctx({ impactoMensal: 18.16 }));
+    expect(c.saida).toBe('reprovar');
+    const t = c.motivos.join(' ');
+    expect(t).toContain('Roda uma vez por trimestre');
+    expect(t).toMatch(/NÃO levantou problema/);
+    expect(t).toMatch(/Evidência citada/);
+  });
+
+  it('reprovação pelo piso NUNCA sai com confiança alta', () => {
+    const c = conciliar(merito(), estrela({ nota: 0 }), ctx({ impactoMensal: 18.16 }));
+    expect(c.saida).toBe('reprovar');
+    expect(c.confianca).not.toBe('alta');
+    expect(c.motivos.join(' ')).toMatch(/confiança fica em média/);
+  });
+
+  it('a nota HUMANA vence a do agente na régua composta', () => {
+    // Humana 4★ e agente 0★, impacto de R$ 18: quem gente já julgou é âncora e não é reprovado.
+    const c = conciliar(merito(), estrela({ nota: 0 }), ctx({ impactoMensal: 18.16, notaHumana: 4 }));
+    expect(c.saida).not.toBe('reprovar');
   });
 
   it('sem número declarado (null/0) o piso NÃO dispara', () => {
@@ -196,7 +252,7 @@ describe('porta (ii) — projeto inválido, nomeado E citado (RF-244)', () => {
 
 describe('modo sombra (RF-246) — não existe caminho em que o time reprove sozinho', () => {
   it('reprovar não age sozinho nem com as duas flags de liberação ligadas', () => {
-    const c = conciliar(merito(), estrela(), ctx({ impactoMensal: 10, liberacao: LIBERADO }));
+    const c = conciliar(merito(), estrela({ nota: 0 }), ctx({ impactoMensal: 10, liberacao: LIBERADO }));
     expect(c.saida).toBe('reprovar');
     expect(c.age_sozinho).toBe(false);
     expect(c.motivos.join(' ')).toMatch(/sombra/i);
@@ -224,12 +280,12 @@ describe('todos os leitores do enum têm rótulo próprio (nenhum fall-through)'
   });
 
   it('a justificativa interna do time nomeia a saída (não sai undefined no texto)', () => {
-    const c = conciliar(merito(), estrela(), ctx({ impactoMensal: 18.16 }));
+    const c = conciliar(merito(), estrela({ nota: 0 }), ctx({ impactoMensal: 18.16 }));
     const t = textoJustificativaInterna({
       projeto: { id: 'p1', nome: 'Projeto' },
       consenso: c,
       merito: merito(),
-      estrela: estrela(),
+      estrela: estrela({ nota: 0 }),
     } as never);
     expect(t).toContain('Reprovar');
     expect(t).not.toContain('undefined');

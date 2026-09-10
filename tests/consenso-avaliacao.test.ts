@@ -89,7 +89,7 @@ function estrela(over: Partial<SaidaEstrelaLocal> = {}): SaidaEstrela {
     nivel: 'garante',
     racional: 'Garante a integridade do cadastro sem intervenção humana.',
     contestacao: null,
-    ancora_congelada: false,
+    ancora_congelada: false, avaliada: true,
     sinais: { temEvidenciaCitada: true, temVizinhos: true },
     ...over,
   } as unknown as SaidaEstrela;

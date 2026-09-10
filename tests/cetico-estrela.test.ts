@@ -21,7 +21,7 @@ function estrela(over: Partial<SaidaEstrela> = {}): SaidaEstrela {
     nivel: null,
     racional: 'decide preço sozinho',
     contestacao: null,
-    ancora_congelada: false,
+    ancora_congelada: false, avaliada: true,
     sinais: { temEvidenciaCitada: true, temVizinhos: true },
     ...over,
   };

@@ -331,7 +331,16 @@ export async function avaliarComTime(args: {
   // ── cérebro B ──
   async function rodarEstrela(rodada: number, objecaoDoCetico: string | null): Promise<SaidaEstrela> {
     const ini = Date.now();
-    const prompt = buildPromptEstrela({ dossieTexto, vizinhos: vizinhosEstrela, ferramentasTexto, objecaoDoCetico });
+    // ⚠️ `julgamentos` (os 5 do mérito) já está preenchido aqui: a rodada 1 do mérito roda ANTES
+    // do cérebro da estrela. Passá-lo custa zero chamada e zero latência, e é o que faz os dois
+    // times serem UM (pedido do dono do produto, 09/09/2026).
+    const prompt = buildPromptEstrela({
+      dossieTexto,
+      vizinhos: vizinhosEstrela,
+      ferramentasTexto,
+      objecaoDoCetico,
+      painelDoImpacto: julgamentos,
+    });
     const loop = await loopComFerramentas({ chamarLlm: chamar('estrela'), mensagensIniciais: prompt, executar: args.executar, maxChamadas: maxTools });
     const ctx = { temVizinhos, notaHumana: args.notaHumana };
     let erro: string | null = null;
@@ -451,6 +460,7 @@ export async function avaliarComTime(args: {
     liberacao: args.liberacao,
     // Porta (i) da reprovação: o número declarado, escolhido por `impactoMensalDeclarado` (nunca
     // recalculado aqui). Ausente → `null`, e o piso não dispara.
+    notaHumana: args.notaHumana,
     impactoMensal: impactoMensalDeclarado({
       ganhoTotalMensal: dossie.financeiro.ganho_total_mensal,
       savingReais: dossie.financeiro.saving_reais,

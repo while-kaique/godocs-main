@@ -9,7 +9,7 @@
 import { confiancaDe, type Confianca, type Contestacao } from '@/lib/estrelas-regua';
 import type { SaidaMerito, AuditoriaValor } from '@/lib/avaliacao/cerebro-merito';
 import type { SaidaEstrela } from '@/lib/avaliacao/cerebro-estrela';
-import { abaixoDoPisoDeImpacto, motivoPisoDeImpacto } from '@/lib/materialidade-piso';
+import { reprovaPeloPiso, motivoPisoComEstrela, notaParaOPiso } from '@/lib/materialidade-piso';
 
 /**
  * ⚠️ `reprovar` entrou em 08/09/2026 (D4 do plano de calibragem). O time passa a poder reprovar
@@ -151,6 +151,13 @@ export function conciliar(
      * `materialidade-piso.ts`), então todo chamador antigo segue com o comportamento de antes.
      */
     impactoMensal?: number | null;
+    /**
+     * A nota HUMANA da coluna "Estrelas", quando existe. Campo OPCIONAL: ausente → só a nota do
+     * agente entra na régua composta, que é o comportamento de todo chamador antigo.
+     * ⚠️ `notaParaOPiso` é quem decide a precedência (humana ≥ 1 vence e é âncora; o `0` humano
+     * é DEFAULT de coluna manual e cai para a do agente). Não reimplementar aqui.
+     */
+    notaHumana?: number | null;
   },
 ): Consenso {
   const divergencias: string[] = [];
@@ -171,24 +178,74 @@ export function conciliar(
     divergencias.push(frase(`O mérito aprova, mas a estrela desqualifica o projeto por ${ROTULO_DESQ[b.desqualificador]}`));
   }
 
-  const confianca = confiancaDe({
+  const confiancaBruta = confiancaDe({
     cerebrosConcordam: divergencias.length === 0,
     temEvidenciaCitada: a.sinais.temEvidenciaCitada && b.sinais.temEvidenciaCitada,
     temVizinhos: a.sinais.temVizinhos || b.sinais.temVizinhos,
   });
+  let confianca: Confianca = confiancaBruta;
   const escape = b.escape.indicado && b.escape.valido;
 
   // ── As DUAS portas da reprovação (D4), ANTES de todo o resto ────────────────────────────────
   // (i) PISO DE IMPACTO — mecânica. Vem primeiro porque rejeição mecânica sobrepõe a aprovação do
   // LLM, nunca o contrário: nenhum arranjo de pareceres compensa um ganho de R$ 18/mês.
-  const abaixoDoPiso = abaixoDoPisoDeImpacto(ctx.impactoMensal);
+  //
+  // ⚠️ **A régua é COMPOSTA, e até 09/09/2026 este ponto usava só o DINHEIRO** (`abaixoDoPisoDeImpacto`
+  // sozinho), enquanto a segunda perna (nota) morava apenas na MESA. O time é justamente quem tem a
+  // nota em mãos, na MESMA passada, e não a usava: ele recomendaria reprovar um projeto de 2★–4★
+  // com impacto pequeno — medido na base de prod, **10 projetos aprovados** de Gente & Gestão e
+  // processo, a família em que o valor não está no dinheiro. Régua e número saem agora da mesma
+  // fonte (`materialidade-piso.ts`).
+  //
+  // ⚠️ **Fallback da estrela NÃO é nota** (`b.avaliada`): o fallback devolve `nota: 0`, e somá-lo à
+  // régua faria **falha do modelo virar reprovação** de projeto que ninguém julgou. É a família do
+  // RAG morto, que achatou 12 notas em 0★ e saiu no relatório como se o defeito fosse a régua.
+  const { nota: notaDoPiso, fonte: fonteDaNota } = notaParaOPiso({
+    humana: ctx.notaHumana ?? null,
+    agente: b.avaliada ? b.nota : null,
+  });
+  const abaixoDoPiso = reprovaPeloPiso({ impactoMensal: ctx.impactoMensal, estrela: notaDoPiso });
   // (ii) INVALIDEZ nomeada E citada — régua declarada, lista fechada.
   const invalido = invalidezComprovada(b);
 
+  // ⚠️ **O piso NÃO é um curto-circuito** (09/09/2026, correção do dono do produto: *"o piso de 100
+  // && estrela = 0 nao é passivel de reprovar instantaneamente, o agente pode defender que aquele
+  // projeto nao é um experimentação... É reprovado de fato, mas deve ter a justificativa. Hoje o
+  // agente so ve que bateu o piso e esquece de tudo e simplesmente bota confiança 100% só por causa
+  // do gate"*).
+  //
+  // Duas consequências, e as duas estão abaixo:
+  //   (a) **zero sem citação não reprova.** A régua composta usa a nota como 2º eixo, e uma nota
+  //       zero que o cérebro não sustentou com trecho do material é a MESMA classe de "invalidez
+  //       sem citação", que este consenso já se recusa a reprovar. Vai ao humano.
+  //   (b) **o parecer carrega o argumento**, inclusive quando o time do impacto NÃO viu problema:
+  //       quem lê a reprovação precisa saber que ela veio da régua e não de uma objeção dos
+  //       especialistas, senão não há como contestá-la.
+  const zeroDefendido = b.avaliada && b.sinais.temEvidenciaCitada;
+
   let saida: SaidaConsenso;
-  if (abaixoDoPiso) {
+  if (abaixoDoPiso && !zeroDefendido) {
+    saida = 'humano';
+    motivos.push(
+      frase(
+        `O ganho declarado está abaixo do piso e a nota é ${notaDoPiso ?? 'zero'}, mas esse zero não vem com evidência citada do material: reprovar assim não seria defensável, então a decisão é de gente`,
+      ),
+    );
+  } else if (abaixoDoPiso) {
     saida = 'reprovar';
-    motivos.push(frase(motivoPisoDeImpacto(ctx.impactoMensal as number)));
+    motivos.push(frase(motivoPisoComEstrela(ctx.impactoMensal as number, notaDoPiso)));
+    motivos.push(frase(`A nota usada na régua veio da fonte ${fonteDaNota}`));
+    if (b.racional) motivos.push(frase(`Por que a nota é ${notaDoPiso}: ${b.racional}`));
+    if (b.evidencias[0]) motivos.push(frase(`Evidência citada para a nota: ${b.evidencias[0]}`));
+    if (a.veredito === 'aprovar') {
+      motivos.push(
+        frase(
+          'O time do impacto NÃO levantou problema neste projeto: o que reprova aqui é a régua composta (ganho irrelevante e nenhuma altura em outro eixo), não uma objeção dos especialistas',
+        ),
+      );
+    } else if (a.ressalvas[0]) {
+      motivos.push(frase(`O impacto também tem ressalva: ${a.ressalvas[0]}`));
+    }
   } else if (invalido) {
     saida = 'reprovar';
     motivos.push(
@@ -217,6 +274,17 @@ export function conciliar(
   } else {
     saida = 'aprovar';
     motivos.push(frase(`Mérito aprova e estrela ${b.nota} (${b.criterio_aplicado}) com confiança ${confianca}`));
+  }
+
+  // ⚠️ **TETO da confiança na reprovação pelo piso.** `confiancaDe` mede concordância dos dois
+  // cérebros, evidência citada e vizinhos — nenhum desses sinais fala do PISO. Então o caso mais
+  // constrangedor saía "confiança alta": dois cérebros satisfeitos, o mérito aprovando, e a régua
+  // reprovando por cima, com cara de certeza absoluta. A decisão é mecânica sobre UMA nota, e
+  // certeza mecânica não é certeza de julgamento.
+  const reprovouPeloPiso = saida === 'reprovar' && abaixoDoPiso;
+  if (reprovouPeloPiso && confianca === 'alta') {
+    confianca = 'media';
+    motivos.push(frase('A confiança fica em média: a reprovação vem da régua do piso, não de um julgamento convergente dos dois cérebros'));
   }
 
   if (b.ancora_congelada) {
