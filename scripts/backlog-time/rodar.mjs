@@ -108,7 +108,21 @@ if (fs.existsSync(OUT)) {
   try { feitos.push(...JSON.parse(fs.readFileSync(OUT, 'utf8')).filter((r) => r?.http === 200)); } catch { /* ignora */ }
 }
 let i = 0;
+// ⚠️ **ARRANQUE ESCALONADO — é isto que permite paralelizar sem nerfar o time.**
+//
+// O pico de cada projeto é MOMENTÂNEO: os 5 especialistas da mesa e os 5 do time disparam
+// juntos, ou seja ~10 chamadas simultâneas, e o resto da passada (cérebro, céticos) usa 1 ou 2.
+// Com 32 slots no ai-proxy, 3 projetos alinhados já batem o teto (30) e o 4º enfileira — a fila
+// alonga a passada e ela estoura os 300 s do edge, que foi exatamente o que medi: conc 4 cortou 2
+// de 4, conc 6 devolveu 502 em 5 de 6.
+//
+// Escalonar o INÍCIO de cada worker desencontra os picos: com N workers e um passo de
+// `PASSO_MS`, os disparos de 5 caem em janelas diferentes e a média de slots ocupados fica bem
+// abaixo do teto, permitindo mais projetos ao mesmo tempo COM a passada inteira.
+const PASSO_MS = Number(process.env.BACKLOG_PASSO_MS ?? 45_000);
+
 async function worker(n) {
+  if (n > 1) await new Promise((r) => setTimeout(r, (n - 1) * PASSO_MS));
   while (i < alvo.length) {
     const meu = i++;
     const r = await rodarUm(alvo[meu]);
