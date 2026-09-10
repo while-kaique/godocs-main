@@ -55,3 +55,24 @@ describe('⚠️ a tela lê a régua da FONTE ÚNICA, não redigita', () => {
     expect(fonte).toMatch(/faixa deste projeto/);
   });
 });
+
+/**
+ * ⚠️ **UMA nota, UMA régua na ficha** (10/09/2026). A tela mostrava a nota do TIME (os seis verbos
+ * da régua) e a do classificador de 1 agente, que consolida as 4 LENTES por eixos e justifica com
+ * completude de DOCUMENTAÇÃO ("faltaria mostrar essa adoção obrigatória pela área"). Palavras do
+ * dono do produto: *"Isso de faltar documentação disso e aquilo nao faz o menor sentido"* e *"Nao
+ * quero ter duas abordagens ali nao pois ta confundindo no frontend"*.
+ */
+describe('a ficha traz UMA nota', () => {
+  const servidor = readFileSync('src/lib/dashboard-admin.functions.ts', 'utf8');
+
+  it('o payload do detalhe não carrega mais a nota do classificador', () => {
+    expect(servidor).toMatch(/estrela: null,/);
+    expect(servidor).not.toMatch(/estrelas: estrela\.estrelas_recomendada/);
+  });
+
+  it('⚠️ só a EXIBIÇÃO saiu: a tabela segue guardando as duas origens', () => {
+    // Nada de histórico se perde — o painel de auditoria em lote continua podendo lê-las.
+    expect(servidor).toMatch(/especial_avaliacao. continua guardando as duas origens/);
+  });
+});

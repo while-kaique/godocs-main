@@ -532,15 +532,17 @@ export function montarAvaliacaoSombra(
         }
       : null,
     especialistas: pareceresDosVotos(mesa?.votos),
-    estrela: estrela
-      ? {
-          estrelas: estrela.estrelas_recomendada,
-          confianca: estrela.confianca,
-          leitura: estrela.leitura,
-          contestada: estrela.contestada === 1,
-          quando: estrela.criado_em,
-        }
-      : null,
+    // ⚠️ **A NOTA DO CLASSIFICADOR DE 1 AGENTE SAIU DA FICHA (10/09/2026).** A tela mostrava DUAS
+    // notas com DUAS réguas: a do time (os seis verbos de `estrelas-regua.ts`, que é a régua que o
+    // dono do produto escreveu) e a deste classificador, que consolida as 4 LENTES por eixos e
+    // escreve coisas como *"faltaria mostrar essa adoção obrigatória pela área"* — critério de
+    // completude de DOCUMENTAÇÃO, não do que o projeto faz. Palavras dele, olhando o «SendApp»:
+    // *"Isso de faltar documentação disso e aquilo nao faz o menor sentido"* e *"Nao quero ter duas
+    // abordagens ali nao pois ta confundindo no frontend"*.
+    // ⚠️ Só a EXIBIÇÃO saiu: `especial_avaliacao` continua guardando as duas origens
+    // (`agente-classificador` e `time-completo`), então nada de histórico se perde e o painel de
+    // auditoria em lote segue podendo lê-las.
+    estrela: null,
     time: interpretarConsensoDoTime(time),
     deliberacao: delib
       ? {
