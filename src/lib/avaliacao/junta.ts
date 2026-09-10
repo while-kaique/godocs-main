@@ -117,6 +117,26 @@ export function juntarAnalises(args: {
     return { ...doTime, concordam: true, confianca: confTime, porques };
   }
 
+  // 3b — ⚠️ **REPROVAÇÃO MECÂNICA não é divergência: é a mesa sem a nota em mãos.**
+  //
+  // O time só reprova por RÉGUA DECLARADA (piso de impacto composto ou invalidez nomeada e
+  // citada), e a régua do piso precisa de DOIS números: o impacto e a nota. O time tem os dois na
+  // mesma passada; a MESA lê a nota da coluna `Estrela Agente` da planilha, que está vazia em todo
+  // projeto que o time nunca avaliou — ou seja, na primeira passada ela não tem como chegar ao
+  // mesmo lugar, e tratar isso como "as metades divergiram" bloquearia a decisão correta e exigiria
+  // uma segunda rodada inteira só para a mesa enxergar o que o time acabou de escrever.
+  //
+  // ⚠️ O limite é estreito e está aqui: só vale quando a mesa **não aprovou**. Mesa aprovando
+  // contra time reprovando é divergência DE VERDADE (ela julgou o mérito com o material todo) e cai
+  // em Pendente, como qualquer outra.
+  if (doTime.status === 'Reprovado' && daMesa !== 'Aprovado') {
+    porques.push(doTime.porque);
+    porques.push(
+      `A análise do impacto ficou em ${daMesa} e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar.`,
+    );
+    return { ...doTime, concordam: false, confianca: confTime, porques };
+  }
+
   // 3 — discordam
   porques.push(
     `As duas metades do time divergiram: a análise do impacto aponta ${daMesa} e a da estrela aponta ${doTime.status}. Fica pendente para gente decidir.`,

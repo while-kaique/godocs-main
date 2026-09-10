@@ -55,6 +55,22 @@ describe('juntarAnalises', () => {
     expect(j.porques.join(' ')).toMatch(/especial/i);
   });
 
+  it('⚠️ reprovação MECÂNICA com a mesa em em_validacao → Reprovado, não divergência', () => {
+    // O time só reprova por régua declarada, e a régua do piso precisa da NOTA. A mesa lê a nota
+    // da coluna `Estrela Agente`, vazia em todo projeto que o time nunca avaliou: na primeira
+    // passada ela não tem como chegar ao mesmo lugar. Chamar isso de divergência exigiria uma
+    // segunda rodada inteira só para a mesa enxergar o que o time acabou de escrever.
+    const j = juntarAnalises({ impacto: imp('em_validacao'), estrela: est('reprovar') });
+    expect(j.status).toBe('Reprovado');
+    expect(j.porques.join(' ')).toMatch(/não contradiz a reprovação/);
+  });
+
+  it('⚠️ mas mesa APROVANDO contra time reprovando segue sendo divergência → Pendente', () => {
+    const j = juntarAnalises({ impacto: imp('aprovar'), estrela: est('reprovar') });
+    expect(j.status).toBe('Pendente');
+    expect(j.confianca).toBe('baixa');
+  });
+
   it('em_validacao e isento da mesa contam como Pendente (vocabulário dela)', () => {
     expect(juntarAnalises({ impacto: imp('em_validacao'), estrela: est('humano') }).status).toBe('Pendente');
     expect(juntarAnalises({ impacto: imp('isento'), estrela: est('humano') }).concordam).toBe(true);
