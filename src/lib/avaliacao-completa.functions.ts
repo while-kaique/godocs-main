@@ -29,6 +29,13 @@ import { ESTRELA_LIMITE_REPROVAVEL } from '@/lib/materialidade-piso';
 import { juntarAnalises, type Juncao } from '@/lib/avaliacao/junta';
 import { justificativaDaReprovacao } from '@/lib/funil-status';
 import { definirStatusProjeto } from '@/lib/dashboard-admin.functions';
+import {
+  podeAgenteGravarStatus,
+  podeAgenteEscreverNota,
+  porqueNaoEncostou,
+  ehAtorHumano,
+} from '@/lib/decisao-humana';
+import { getAdminStatusLogs, queryAdminActivitiesPorAcao } from '@/integrations/db/client.server';
 
 /**
  * Quem aparece na auditoria quando quem decidiu foi o time. ⚠️ Não usar um e-mail de pessoa: o
@@ -129,11 +136,24 @@ async function estrelaPeloTimeInteiro(
   // A régua: é do agente quando o número da célula é IGUAL ao que ele recomendou em
   // `Estrela Agente`. ⚠️ Caso de borda declarado: humano que concorda e digita o mesmo número é
   // tratado como agente — e o efeito é reescrever a célula com o MESMO valor, que é inofensivo.
-  if (!opts.forcar) {
-    const naCelula = numero(linhaAtual?.['Estrelas']);
-    const recomendada = String(linhaAtual?.['Estrela Agente'] ?? '').trim();
-    const foiOAgente = naCelula != null && recomendada !== '' && String(naCelula) === recomendada;
-    if (naCelula != null && naCelula >= ESTRELA_LIMITE_REPROVAVEL && !foiOAgente) ancoraHumana = naCelula;
+  // ⚠️ **`forcar` NÃO fura mais a âncora** (10/09/2026). A trava estava ATRÁS de
+  // `if (!opts.forcar)`, e `forcar` é o que TODA rerodada manual usa — então a proteção da nota de
+  // gente era exatamente o que se perdia quando alguém pedia para reavaliar. Medido: o «SendApp»
+  // tinha **7★ do Bruno** e voltou a **2★**. Dono do produto: *"Quero que coloque restrição para
+  // nao classificar as estrelas que foram alteradas pelo bruno ou qualquer outro humano"*.
+  // `forcar` continua querendo dizer "rode a avaliação de novo" — nunca "reescreva a nota que uma
+  // pessoa deu".
+  // ⚠️ E o piso de `ESTRELA_LIMITE_REPROVAVEL` saiu daqui: **`0` também é nota de gente** (é a
+  // caixa «Experimenta» desde 05/09), e exigir `>= 1` deixava o agente reescrever justamente o
+  // zero que alguém cravou.
+  {
+    const humanoMexeu = await humanoAlterouEstrelas(projetoId);
+    const nota = podeAgenteEscreverNota({
+      naCelula: numero(linhaAtual?.['Estrelas']),
+      recomendadaPeloAgente: linhaAtual?.['Estrela Agente'],
+      humanoMexeu,
+    });
+    if (!nota.pode) ancoraHumana = nota.ancora;
   }
 
   const r = await avaliarProjetoComTime(projetoId, { gatilho: 'time-completo' });
@@ -345,16 +365,32 @@ export async function avaliarProjetoComTimeCompleto(
         !junta.flag6a10 && e.ok && typeof e.estrelas === 'number' && e.estrelas >= 0 && e.estrelas <= 5
           ? e.estrelas
           : undefined;
-      await definirStatusProjeto(
-        {
-          projeto_id: projetoId,
-          status: junta.status,
-          ...(junta.status === 'Reprovado' ? { motivo_reprovado: justificativa } : {}),
-          ...(notaParaCelula !== undefined ? { estrelas: notaParaCelula } : {}),
-        },
-        ATOR_TIME_AGENTES,
-      );
-      status_gravado = junta.status;
+      // ⚠️ **A DECISÃO DE GENTE VENCE** (10/09/2026) — ver `src/lib/decisao-humana.ts` para os três
+      // casos medidos no `admin_activity_log`. O agente não rebaixa `Aprovado`, não encosta em
+      // `Descontinuado` (flag do dono, não veredito) e não escreve por cima de status que uma
+      // pessoa gravou. Quando ele se recusa, a avaliação continua registrada como RECOMENDAÇÃO:
+      // o que não acontece é a escrita.
+      const permissao = podeAgenteGravarStatus({
+        statusAtual: linhaAtual?.['Status'],
+        alvo: junta.status,
+        atorDoStatusAtual: await atorDoUltimoStatus(projetoId),
+      });
+      if (!permissao.pode) {
+        const porque = porqueNaoEncostou(permissao.motivo!, junta.status);
+        junta.porques.push(porque);
+        console.log(`[time-completo] ${projetoId}: status NÃO gravado — ${porque}`);
+      } else {
+        await definirStatusProjeto(
+          {
+            projeto_id: projetoId,
+            status: junta.status,
+            ...(junta.status === 'Reprovado' ? { motivo_reprovado: justificativa } : {}),
+            ...(notaParaCelula !== undefined ? { estrelas: notaParaCelula } : {}),
+          },
+          ATOR_TIME_AGENTES,
+        );
+        status_gravado = junta.status;
+      }
     } catch (err) {
       // Falhar aqui não desfaz a avaliação, que já está gravada. O relatório do lote mostra o nulo.
       console.error('[time-completo] falha ao gravar o Status do funil:', err);
@@ -364,6 +400,49 @@ export async function avaliarProjetoComTimeCompleto(
   // `ok` é OU, não E: uma metade que funcionou já é resultado — e o caso mais comum de "falha" da
   // nota é legítimo (o projeto tem nota humana e é âncora), não erro.
   return { ok: m.ok || e.ok, projeto_id: projetoId, mesa: m, estrela: e, junta, status_gravado };
+}
+
+/**
+ * Quem gravou o ÚLTIMO status deste projeto? `undefined` = não deu para saber.
+ *
+ * ⚠️ **Nunca lança**: falha de auditoria não pode impedir a avaliação — e, quando ela falha, as
+ * travas duras (`Aprovado`/`Descontinuado`) continuam valendo, que é o motivo de elas não serem
+ * derivadas desta leitura.
+ */
+async function atorDoUltimoStatus(projetoId: string): Promise<string | null | undefined> {
+  try {
+    const logs = await getAdminStatusLogs(projetoId, 1);
+    const l = logs[0] as { admin_email?: string | null; ator_email?: string | null } | undefined;
+    if (!l) return null; // sem histórico = ninguém decidiu ainda
+    return l.admin_email ?? l.ator_email ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Alguma PESSOA já alterou as estrelas deste projeto? (auditoria `admin_activity_log`)
+ *
+ * ⚠️ É a rede da âncora: a coluna `Estrelas` não guarda autoria, então um humano que digita o
+ * MESMO número que o agente recomendou seria lido como "foi o agente". Com o registro na mão, não
+ * é. ⚠️ Consulta filtrada por AÇÃO no SQL (a janela por data empurraria as linhas de estrelas —
+ * que são poucas e antigas — para fora, sem sinal).
+ * ⚠️ Nunca lança, e o default é `false`: aqui a régua da célula já protege o caso comum, e um erro
+ * de leitura não pode congelar a nota de toda a base.
+ */
+async function humanoAlterouEstrelas(projetoId: string): Promise<boolean> {
+  try {
+    const linhas = (await queryAdminActivitiesPorAcao(['estrelas'], 500)) as {
+      projeto_id?: string | null;
+      ator_email?: string | null;
+    }[];
+    const id = projetoId.trim().toLowerCase();
+    return linhas.some(
+      (l) => String(l.projeto_id ?? '').trim().toLowerCase() === id && ehAtorHumano(l.ator_email),
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
