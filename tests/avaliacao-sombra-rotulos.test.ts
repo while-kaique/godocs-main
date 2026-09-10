@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
   rotuloVeredito,
@@ -156,5 +157,45 @@ describe('aparenciaGrauTexto — alta verde, média amarelo, baixa cinza', () =>
     expect(chip).toContain('aparenciaGrauTexto');
     // O texto do grau segue sendo renderizado ao lado da cor.
     expect(chip).toMatch(/rotuloGrau\(grau\)\.replace\("confiança ", ""\) : confianca/);
+  });
+});
+
+/**
+ * A FICHA conta só a versão nova (pedido do Luis, 10/09/2026: *"corrigir o frontend para refletir
+ * somente a nova versao do godocs e nao ter elementos da versao antiga que nos confunde"*).
+ *
+ * ⚠️ Três frases daquele painel viraram MENTIRA no mesmo dia, por mudança de comportamento e não de
+ * texto: o agente passou a gravar o Status e a nota de 0 a 5. É a lição do repo — ampliar o enum
+ * obriga varrer os LEITORES, não só os escritores — aplicada à tela.
+ */
+describe('a ficha não fala mais da versão antiga', () => {
+  const ficha = readFileSync('src/components/dashboard/projeto-detalhe-dialog.tsx', 'utf8');
+
+  it('⚠️ não diz "não muda o status" — ele muda desde 10/09/2026', () => {
+    // O agente gravou Aprovado em 50 projetos e Reprovado em 15 no dia em que este teste nasceu.
+    expect(ficha).not.toMatch(/não muda o status<\/strong>\. A/);
+    expect(ficha).toMatch(/decide o status/);
+  });
+
+  it('⚠️ não diz "quem grava a nota é a triagem" — de 0 a 5 quem grava é o agente', () => {
+    expect(ficha).not.toMatch(/Quem grava a nota é a triagem/);
+  });
+
+  it('⚠️ o selo não diz "Sombra": o modo acabou', () => {
+    expect(ficha).not.toMatch(/aria-hidden \/> Sombra\n/);
+    expect(ficha).toMatch(/aria-hidden \/> Time de agentes/);
+  });
+
+  it('⚠️ o cabeçalho mostra a nota do TIME, não a do classificador legado', () => {
+    // Antes exibia a do classificador e caía na do time como fallback: a mesma tela mostrava 4, 5
+    // e a faixa 6-10 em prosa, três respostas para "qual é a nota".
+    expect(ficha).toMatch(/time\?\.estrela \?\? estrela\?\.estrelas/);
+    expect(ficha).not.toMatch(/estrela\?\.estrelas \?\? time\?\.estrela/);
+  });
+
+  it('⚠️ a faixa 6-10 é DESTAQUE com texto, não só cor', () => {
+    expect(ficha).toMatch(/faixa \{rotulo\} · falta o comitê cravar/);
+    // e sai da fonte única, a mesma da planilha e do chip da lista
+    expect(ficha).toMatch(/rotuloNotaAgente\(n\)/);
   });
 });

@@ -19,7 +19,13 @@ const CONC = Number(process.env.BACKLOG_CONC ?? 2);
 const OUT = process.env.BACKLOG_OUT ?? '/tmp/backlog-time.json';
 const CORPUS = process.env.BACKLOG_CORPUS ?? '/tmp/retro-corpus-full.json';
 const LIMITE = Number(process.env.BACKLOG_LIMITE ?? 0); // 0 = todos
-const TIMEOUT_MS = Number(process.env.BACKLOG_TIMEOUT_MS ?? 420_000);
+// ⚠️ **O EDGE CORTA EM 300 s, EXATOS.** Medido em 10/09/2026: 6 falhas do lote, todas em
+// 300358-300833 ms. Não é rede instável e re-tentar não resolve — quem passa de 5 min sempre
+// falha. O timeout aqui fica um pouco ABAIXO disso para o erro chegar como nosso e não como
+// conexão derrubada, e a concorrência é o botão que controla o tempo da passada: cada projeto já
+// dispara 5 especialistas, e 3 em paralelo enfileiram no gateway (~8 slots) e empurram a passada
+// de ~220 s para além do corte.
+const TIMEOUT_MS = Number(process.env.BACKLOG_TIMEOUT_MS ?? 295_000);
 
 const env = {};
 for (const l of fs.readFileSync('/home/notebook/godocs-main/.env', 'utf8').split('\n')) {
@@ -33,11 +39,38 @@ if (!COOKIE) throw new Error('E2E_COOKIE ausente no .env');
 // ⚠️ Descontinuado fica fora: o dono desligou a automação, e julgar mérito de algo desligado
 // gasta chamada num veredito que ninguém vai aplicar (ver `src/lib/funil-status.ts`).
 const rows = JSON.parse(fs.readFileSync(CORPUS, 'utf8'));
-const fila = rows.filter((r) => {
-  const s = String(r['Status'] ?? '').trim().toLowerCase();
-  return s !== 'aprovado' && s !== 'reprovado' && s !== 'descontinuado';
-});
-const alvo = LIMITE ? fila.slice(0, LIMITE) : fila;
+// Lista EXPLÍCITA de ids (`BACKLOG_IDS`): quando ela vem, é ela a fila, na ordem dada. Serve para
+// alvos cirúrgicos — "os que estão sem estrela", "os pré-aprovados" — sem reprocessar a base.
+const idsPedidos = String(process.env.BACKLOG_IDS ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+const fila = idsPedidos.length
+  ? idsPedidos.map((id) => rows.find((r) => String(r['ID Projeto']).trim() === id) ?? { 'ID Projeto': id, 'Nome do Projeto': '' })
+  : rows.filter((r) => {
+      const s = String(r['Status'] ?? '').trim().toLowerCase();
+      return s !== 'aprovado' && s !== 'reprovado' && s !== 'descontinuado';
+    });
+// ⚠️ **RETOMA de onde parou.** O run já morreu duas vezes em 10/09/2026 (um `timeout` meu e o
+// processo de fundo levando SIGKILL), e sem isto reiniciar significava re-rodar ~3 min por projeto
+// já decidido — em 90 projetos, mais de uma hora de chamada de LLM jogada fora. Só conta como
+// feito quem voltou **http 200**: falha de rede tem de ser re-tentada, não marcada como pronta.
+const feitosAntes = new Set();
+if (fs.existsSync(OUT)) {
+  try {
+    for (const r of JSON.parse(fs.readFileSync(OUT, 'utf8'))) if (r?.http === 200) feitosAntes.add(String(r.id));
+  } catch {
+    /* arquivo pela metade (morte no meio da escrita) → recomeça do zero, que é o lado seguro */
+  }
+}
+// ⚠️ **PULAR os projetos que estouram o teto do edge SEMPRE.** Medido: `legado-254` e
+// `e4b1dcc3…` falharam 4 vezes em 295-300 s, em concorrência 2, 3, 4 e 6 — não é carga, é a
+// passada deles que não cabe. E como a retomada os coloca no INÍCIO da fila (nunca tiveram 200),
+// cada reinício gastava 2×295 s neles antes de andar. Eles saem do lote e são tratados um a um.
+const pular = new Set(String(process.env.BACKLOG_PULAR ?? '').split(',').map((x) => x.trim()).filter(Boolean));
+const pendente = fila.filter(
+  (r) => !feitosAntes.has(String(r['ID Projeto']).trim()) && !pular.has(String(r['ID Projeto']).trim()),
+);
+if (pular.size) console.log(`pulando ${pular.size} projeto(s) por decisão explícita: ${[...pular].join(', ')}`);
+if (feitosAntes.size) console.log(`retomando: ${feitosAntes.size} já decidido(s), ${pendente.length} na fila`);
+const alvo = LIMITE ? pendente.slice(0, LIMITE) : pendente;
 console.log(`fila: ${alvo.length} projeto(s) de ${rows.length} linhas · concorrência ${CONC} · base ${BASE}`);
 
 async function rodarUm(row) {
@@ -76,15 +109,32 @@ async function rodarUm(row) {
 }
 
 const feitos = [];
+if (fs.existsSync(OUT)) {
+  try { feitos.push(...JSON.parse(fs.readFileSync(OUT, 'utf8')).filter((r) => r?.http === 200)); } catch { /* ignora */ }
+}
 let i = 0;
+// ⚠️ **ARRANQUE ESCALONADO — é isto que permite paralelizar sem nerfar o time.**
+//
+// O pico de cada projeto é MOMENTÂNEO: os 5 especialistas da mesa e os 5 do time disparam
+// juntos, ou seja ~10 chamadas simultâneas, e o resto da passada (cérebro, céticos) usa 1 ou 2.
+// Com 32 slots no ai-proxy, 3 projetos alinhados já batem o teto (30) e o 4º enfileira — a fila
+// alonga a passada e ela estoura os 300 s do edge, que foi exatamente o que medi: conc 4 cortou 2
+// de 4, conc 6 devolveu 502 em 5 de 6.
+//
+// Escalonar o INÍCIO de cada worker desencontra os picos: com N workers e um passo de
+// `PASSO_MS`, os disparos de 5 caem em janelas diferentes e a média de slots ocupados fica bem
+// abaixo do teto, permitindo mais projetos ao mesmo tempo COM a passada inteira.
+const PASSO_MS = Number(process.env.BACKLOG_PASSO_MS ?? 45_000);
+
 async function worker(n) {
+  if (n > 1) await new Promise((r) => setTimeout(r, (n - 1) * PASSO_MS));
   while (i < alvo.length) {
     const meu = i++;
     const r = await rodarUm(alvo[meu]);
     feitos.push(r);
     const v = r.resposta?.consenso?.saida ?? r.resposta?.saida ?? r.resposta?.erro ?? r.erro ?? '?';
     console.log(
-      `[${feitos.length}/${alvo.length}] w${n} ${r.id} · http ${r.http} · ${(r.ms / 1000).toFixed(0)}s · ${String(v).slice(0, 40)}`,
+      `[${feitos.length}/${feitosAntes.size + alvo.length}] w${n} ${r.id} · http ${r.http} · ${(r.ms / 1000).toFixed(0)}s · ${String(v).slice(0, 40)}`,
     );
     fs.writeFileSync(OUT, JSON.stringify(feitos, null, 1));
   }

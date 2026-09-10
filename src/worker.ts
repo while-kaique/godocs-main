@@ -74,6 +74,7 @@ import {
   avaliarComTimeCompletoEmBackground,
   avaliarLoteComTime,
   avaliarProjetoComTimeCompleto,
+  drenarFilaDoFunil,
 } from "@/lib/avaliacao-completa.functions";
 import {
   classificarEspecialProjeto,
@@ -510,6 +511,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // ── Cron: RETROATIVO — mede a mesa contra o veredito humano (fatia C, MODO SOMBRA) ──
     // Roda a mesa nos projetos já decididos pelo humano (aprovado/reprovado no espelho) e grava
     // acerto/erro em `avaliacao_retroativa`. NO-OP se OFF. SEM tocar status. Bounded/idempotente.
+    // ── Cron: o time DRENA a fila do funil (10/09/2026) ──
+    // ⚠️ Existe porque o fan-out da submissão roda em `waitUntil` e a plataforma CORTA trabalho
+    // longo em background (visto nos logs de prod: `outcome: "canceled"` em `time-completo`).
+    // Aqui a passada roda dentro do próprio request, que é onde ela cabe.
+    if (pathname === "/api/cron/avaliar-fila" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await drenarFilaDoFunil());
+    }
+
     if (pathname === "/api/cron/avaliacao-retroativa" && method === "POST") {
       if (!request.headers.get("x-godeploy-cron")) {
         return errorJson("Rota exclusiva de cron.", 403);

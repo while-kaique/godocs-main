@@ -432,6 +432,40 @@ function bloco(titulo: string, linhas: (string | null)[]): string {
  * escondido do usuário por decisão de produto, e o memorial de saving vai junto porque carrega
  * R$ dentro. Ligue só para agentes internos que auditam VALOR.
  */
+/**
+ * A linha do impacto, com a explicação de que bruto e líquido diferem POR CONSTRUÇÃO. PURA.
+ * FONTE ÚNICA do texto — ver o comentário do achado no lugar de uso.
+ */
+export function linhaImpactoBrutoLiquido(bruto: number | null, liquido: number | null): string | null {
+  if (bruto === null && liquido === null) return null;
+  // ⚠️ Usa o MESMO `fmt` do resto do dossiê: número com outra formatação para o mesmo campo é
+  // ruído que o agente pode ler como duas grandezas diferentes.
+  return `Impacto bruto: ${fmt(bruto)} · impacto líquido MENSAL: ${fmt(liquido)} — os dois estão CORRETOS e diferem por construção (no líquido as horas entram ponderadas), e o número que vale para a régua é o LÍQUIDO MENSAL. A diferença entre eles NÃO é contradição nem erro de cálculo do autor.`;
+}
+
+export function linhaDoQueSeCobra(
+  tipos: readonly string[],
+  fin: { saving_horas: number | null; custo_evitado_reais: number | null; receita_mensal: number | null },
+): string {
+  const t = tipos.join(' ').toLowerCase();
+  const imensuravel = t.includes('imensur');
+  const soImensuravel = imensuravel && !t.includes('custo evitado') && !t.includes('saving') && !t.includes('receita');
+  if (soImensuravel) {
+    return 'O QUE É EXIGÍVEL AQUI: o autor declarou GANHO IMENSURÁVEL, e nessa categoria o formulário NÃO pede horas nem valor em R$ — a ausência dos dois é a resposta certa, não uma lacuna. NÃO peça horas mensais, número de pessoas nem memória de cálculo financeira: o que se cobra é o processo alterado e onde o efeito se verifica.';
+  }
+  const partes: string[] = ['O QUE É EXIGÍVEL AQUI:'];
+  if (t.includes('custo evitado')) {
+    partes.push(
+      `custo evitado é a despesa que NUNCA NASCEU, inclusive horas liberadas de quem segue na equipe — as horas dele estão em "Horas humanas liberadas" (${fin.saving_horas ?? 0} h) e NÃO se cobra extrato de algo que não foi pago.`,
+    );
+  }
+  if (t.includes('saving')) partes.push('saving efetivado é despesa que existia e parou: aí sim cabe pedir onde se confere.');
+  if (t.includes('receita')) partes.push('receita incremental exige a base do número e onde ele é medido.');
+  if (partes.length === 1) return '';
+  if (imensuravel) partes.push('A parte IMENSURÁVEL do ganho não tem horas nem R$ por definição: não a trate como dado faltando.');
+  return partes.join(' ');
+}
+
 export function dossieParaTexto(d: Dossie, opts: { comReais?: boolean } = {}): string {
   const reais = opts.comReais === true;
   const t = (s: string | null) => (reais ? s : ocultarReais(s));
@@ -480,11 +514,29 @@ export function dossieParaTexto(d: Dossie, opts: { comReais?: boolean } = {}): s
     'Confira se o ganho descrito cai na categoria que o autor marcou. Despesa que EXISTIA e parou é saving efetivado, e tem extrato. Despesa que NUNCA NASCEU, inclusive horas liberadas de quem segue na equipe, é custo evitado: não tem extrato, e cobrar comprovante dela é cobrar o impossível.',
   ].join('\n');
 
+/**
+ * O que é EXIGÍVEL deste projeto, dada a categoria de ganho que o autor declarou. PURA.
+ *
+ * ⚠️ **Não é ajuda ao agente, é trava.** Sem ela, o especialista de horas cobra "horas mensais e
+ * número de pessoas" de projeto que declarou **ganho imensurável** — onde a ausência de horas é a
+ * RESPOSTA, não a lacuna — e cobra horas de projeto de **custo evitado** que já as informou noutra
+ * coluna. Medido em prod: 13 de 24 pareceres do recorte pré-aprovado caíam nisso.
+ * ⚠️ A régua sai da categoria DECLARADA, que é a mesma que o autor leu no formulário. Categoria
+ * nova entra aqui no mesmo commit em que entra no formulário.
+ */
   const linhasFin: (string | null)[] = [
     glossario,
     d.classificacao.tipos.length
       ? `Categorias de ganho DECLARADAS pelo autor: ${d.classificacao.tipos.join(', ')}`
       : 'Categorias de ganho declaradas pelo autor: nenhuma informada.',
+    // ⚠️ **A CATEGORIA DIZ QUAL CAMPO PODE SER COBRADO — e não dizer isso custou 13 pareceres.**
+    // _(medido em prod, 10/09/2026: dos 24 pareceres do recorte pré-aprovado, **13** reprovariam
+    // por "faltam as horas mensais e o número de pessoas" — e **8 desses declaram `Ganho
+    // imensurável`**, ou seja o autor disse que o valor NÃO está em horas nem em dinheiro, o que a
+    // régua aceita; os outros 5 declaram `Custo evitado` COM horas preenchidas (78h, 29h, 20h, 6h)
+    // e impacto líquido positivo. Ou seja: o agente cobrava dado que a régua não pede ou que já
+    // estava ali.)_ A linha abaixo é a trava: ela não pede juízo, declara o que é exigível.
+    linhaDoQueSeCobra(d.classificacao.tipos, fin),
     // ⚠️ Rótulo pela SUBSTÂNCIA, não pelo jargão de uma versão. A coluna que alimenta este
     // campo é `Custo Evitado Horas` na v2 e `Saving Horas` na v1: são HORAS HUMANAS LIBERADAS nas
     // duas. Chamá-las de "saving" fazia o agente trocar os dois conceitos (ver o glossário).
@@ -504,9 +556,15 @@ export function dossieParaTexto(d: Dossie, opts: { comReais?: boolean } = {}): s
     reais && fin.ganho_total_mensal !== null
       ? `Ganho mensal do projeto: ${fmt(fin.ganho_total_mensal)}`
       : null,
-    reais && (fin.impacto_bruto !== null || fin.impacto_liquido !== null)
-      ? `Impacto bruto: ${fmt(fin.impacto_bruto)} · impacto líquido: ${fmt(fin.impacto_liquido)}`
-      : null,
+    // ⚠️ **BRUTO E LÍQUIDO DIFEREM POR CONSTRUÇÃO, e o dossiê tem de DIZER isso.**
+    // _(achado do dono do produto em 10/09/2026, olhando um parecer real: *"a duvida do agente
+    // financeiro é sobre o valor 40 vs 80. Sendo que nao sao valores errados, um é bruto e o outro
+    // é liquido. Os dois estao certos e o utilizado é o impacto liquido mensal"*.)_ Impressos lado
+    // a lado sem explicação, os dois números pareciam contradição e o financeiro pedia "conciliar
+    // o valor" — medido nos pareceres de prod: **2 dos 4 casos de "divergência de valor" eram
+    // exatamente o fator 2** do peso das horas (33,10 × 16,55 · 96,52 × 193,03). O agente não
+    // estava errando de raciocínio: estava lendo um dossiê que afirmava um conflito inexistente.
+    reais ? linhaImpactoBrutoLiquido(fin.impacto_bruto, fin.impacto_liquido) : null,
     // ⚠️ **A INVERSÃO que este rótulo consertou (08/09/2026).** Este campo é alimentado pela
     // coluna `Custo Evitado` na v1 e `Saving Efetivado` na v2 — e as duas querem dizer a MESMA
     // coisa: uma despesa que a empresa PAGAVA e parou de pagar. Mas na v2 "custo evitado" é o

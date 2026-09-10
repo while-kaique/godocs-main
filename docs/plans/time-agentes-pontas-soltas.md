@@ -110,3 +110,53 @@ conserto, não passo opcional.
 | 5 | **P7** colapsar `ajuste` em `humano` | alinha código e desenho nas 3 saídas |
 | 6 | **P6** anexos legíveis (texto + visão) + backfill | material, e é o que mais muda a análise |
 | 7 | **P8** cron de vazão · **P9** remedir a acurácia | só faz sentido com o resto no lugar |
+
+
+---
+
+# O que 10/09/2026 mediu: o time errava por MATERIAL, não por régua
+
+O estudo acima previa 9 pontas soltas. Ao ligar a junta e rodar o backlog em produção,
+apareceram **sete defeitos** que o estudo não previa — e **quatro deles foram apontados pelo dono
+do produto olhando o resultado na tela**, não por mim lendo o código. Isso é o achado principal do
+dia, e ele é sobre método: **nenhum dos sete aparecia no código lido de fora, e nenhum era erro de
+raciocínio do agente.** Em todos, o agente raciocinava certo sobre um material errado.
+
+| # | Defeito | Como apareceu | Efeito medido |
+|---|---|---|---|
+| 1 | Duas avaliações independentes do mesmo projeto, sem fusão | resposta da rota com 2 blocos | veredito e nota nunca se falavam |
+| 2 | Piso da mesa lê a nota na planilha, vazia em quem o time nunca avaliou | 1ª rodada | tudo em Pendente por "divergência" inexistente |
+| 3 | Âncora de nota humana barrava o JULGAMENTO, não só a nota | leitura do código ao ligar a junta | 15 de 90 presos em Pendente |
+| 4 | Checagem de especial lia a planilha; a mesa lê o SQLite | validação em staging | 11 especiais em Pendente indevido |
+| 5 | Mérito duplicado paralisava o funil | **medição**: mesa aprovou 8 de 9 e a junta mandou 7 para Pendente | funil não fechava |
+| 6 | **Bruto × líquido lido como contradição** | **dono do produto**, olhando um parecer | 2 dos 4 casos de "divergência de valor" eram o fator 2 do peso das horas |
+| 7 | **Cobrança de horas em projeto de ganho imensurável** | **dono do produto**: *"quem esta errando somos nós e vamos ter muitos ruidos"* | **13 de 24** pareceres do recorte pré-aprovado; 8 eram de ganho imensurável DECLARADO |
+
+## As três lições, na ordem em que custaram caro
+
+**1. O defeito de um time de agentes aparece na TELA, não no código.** Os sete só ficaram visíveis
+quando alguém leu o resultado. É a mesma razão pela qual o grafo em HTML precisou de um verificador
+de geometria: revisão de código não pega "o agente cobrou um campo que a régua não pede".
+
+**2. Corrigir o material é mais barato e mais eficaz que calibrar o prompt.** O defeito 7 foi
+consertado com **uma linha declarada no contexto** (`linhaDoQueSeCobra`) e mudou o veredito de um
+projeto real de "faltam as horas" para **Aprovado** na mesma passada. Nenhuma calibragem de prompt
+teria achado isso, porque o prompt não estava errado.
+
+**3. Consertar no lugar errado não dá sinal nenhum.** Eu apliquei as travas 6 e 7 primeiro no dossiê
+do **time**; o parecer em prod não mudou, porque quem produz o veredito do funil é a **mesa**, que lê
+contexto próprio. Perdi ~15 minutos por não ter conferido de onde vinha o TEXTO do parecer antes de
+editar. ⚠️ **Antes de mexer num prompt, descubra qual dos dois caminhos produziu a frase que você
+está tentando mudar.**
+
+## O que ficou aberto
+
+- **As 4 lentes seguem fora do time** e os **vizinhos do time são lexicais**, não o RAG por
+  embedding (as duas do estudo original, não regrediram nem foram fechadas).
+- **`AGENTE_FECHA_PENDENTE` está codado e DESLIGADO**: com ele, Pendente que não é faixa 6-10 vira
+  Reprovado com justificativa concisa. Decisão de produto pendente.
+- **O teto de 300 s do edge** é o limite de vazão: a passada mede 130-290 s e mais concorrência
+  alonga a passada até estourar (medido: conc 6 → 502 em 5 de 6; conc 4 → 2 de 4 cortados). O
+  arranque escalonado foi o que permitiu 6 em paralelo com a passada inteira.
+- **Os crons de prod não disparam desde 08/09** (`last=never` no cron novo). É plataforma, não
+  código nosso, e afeta o espelho da planilha — abrir com o time do Godeploy.

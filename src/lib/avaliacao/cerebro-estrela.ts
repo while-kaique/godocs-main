@@ -20,6 +20,10 @@ import {
   REGRAS_DO_PORQUE,
   contarFrases,
   CONTESTACAO_MAX_FRASES,
+  descreverEixoImpacto,
+  descreverShare,
+  PISO_IMPACTO_NAO_VALE_COM,
+  type PisoDeImpacto,
   type ChavePisoZero,
   type ChaveGatilhoEscape,
   type Contestacao,
@@ -44,6 +48,15 @@ export type SaidaEstrela = {
   contestacao: Contestacao | null;
   ancora_congelada: boolean;
   sinais: { temEvidenciaCitada: boolean; temVizinhos: boolean };
+  /**
+   * O SEGUNDO EIXO elevou a nota? (`null` = o tamanho não garantiu piso, ou o piso não venceu.)
+   *
+   * ⚠️ Existe para a tela e o parecer poderem DIZER que a caixa veio do tamanho, e não da função:
+   * um projeto que "só executa" e é 15% do ganho da empresa fica em 5★, e quem lê precisa saber
+   * por qual eixo. Sem este campo, a nota subiria sem explicação — que é a forma mais rápida de
+   * uma régua declarada virar mágica.
+   */
+  piso_impacto: { chave: string; de: number; para: number; share: number; porque: string } | null;
   /**
    * O cérebro AVALIOU de fato, ou esta saída é o fallback?
    *
@@ -146,6 +159,14 @@ export function buildPromptEstrela(args: {
    * achou o valor absurdo é evidência sobre a ALTURA do projeto, não uma ordem de baixar a nota.
    */
   painelDoImpacto?: readonly JulgamentoMerito[] | null;
+  /**
+   * O TAMANHO deste projeto dentro da base, já calculado (`pisoPorImpacto`).
+   *
+   * ⚠️ Entra no prompt para o agente RACIOCINAR com o tamanho na mão — o piso em si é aplicado
+   * por fora, na normalização, porque prompt não segura (é a lição registrada três vezes neste
+   * repo). Ausente: o prompt fica byte-idêntico ao de antes na parte do segundo eixo.
+   */
+  pisoDeImpacto?: PisoDeImpacto | null;
 }): Mensagem[] {
   const system = [
     // ⚠️ **A ORDEM aqui é o conserto de um defeito MEDIDO** (03/09/2026, 65 especiais de
@@ -168,6 +189,8 @@ export function buildPromptEstrela(args: {
     'PASSO 2 — se o PASSO 1 for "não", só então posicione o projeto de 0 a 5 pela régua abaixo. Em "escape.indicado": false, o campo "escape.por_que_nao" é OBRIGATÓRIO: diga em uma frase qual dos dois gatilhos falta e por quê. Não é permitido pular o PASSO 1 em silêncio.',
     '',
     descreverReguaAgente(),
+    '',
+    descreverEixoImpacto(args.pisoDeImpacto),
     '',
     descreverCategorizacao(),
     '',
@@ -241,7 +264,7 @@ function primeirasFrases(texto: string, n: number): string {
 
 export function normalizarSaidaEstrela(
   bruto: unknown,
-  ctx: { temVizinhos: boolean; notaHumana: number | null },
+  ctx: { temVizinhos: boolean; notaHumana: number | null; pisoDeImpacto?: PisoDeImpacto | null },
 ): SaidaEstrela | null {
   if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) return null;
   const o = bruto as Record<string, unknown>;
@@ -250,11 +273,28 @@ export function normalizarSaidaEstrela(
   let nota = Math.max(0, Math.min(TETO_AGENTE, Math.round(n)));
 
   const evidencias = strings(o.evidencias);
-  let sem_evidencia = false;
-  if (nota > 0 && evidencias.length === 0) {
-    nota -= 1;
-    sem_evidencia = true;
-  }
+  // ⚠️ **FALTA DE CITAÇÃO MARCA, NÃO DERRUBA A NOTA** (10/09/2026, decisão do dono do produto).
+  //
+  // Aqui a nota caía **um nível inteiro** quando o agente não citava trecho do material. A
+  // intenção era certa — impedir que um projeto reivindicasse 5★ com auto-elogio —, mas o efeito
+  // media a coisa errada: **a estrela responde o que o projeto FAZ** (impacto e complexidade), e
+  // documentação incompleta do AUTOR passava a mudar a caixa do projeto. Palavras dele: *"devemos
+  // garantir de que as estrelas sejam dadas por nivel de complexidade do projeto e o quao
+  // impactante ele é independente de faltar informação do cliente ou nao"* e *"eu lembro dessa
+  // separação ser pra garantir que o projeto n suba nem desça em relação a caixinha (estrela) que
+  // deve pertencer"*.
+  //
+  // ⚠️ É o MESMO princípio que o repo já mediu nas lentes: *a base lê o dossiê inteiro e diz em
+  // que CAIXA o projeto está; um eixo fraco não desmente a caixa, e para BAIXO existe só o piso,
+  // que exige citação nomeada.* Sem citação, portanto: a nota FICA e a saída é MARCADA.
+  //
+  // ⚠️ O que a marca continua bloqueando, e é por isso que ela não é decorativa:
+  //   • **confiança** — `confiancaDe` exige `temEvidenciaCitada` nos dois cérebros para dar `alta`;
+  //   • **escape 6-10** — `escapeValido` recusa `sem_evidencia` (`consenso.ts`), então nada sobe
+  //     para a faixa sem citação;
+  //   • **reprovação pelo piso** — exige zero DEFENDIDO com citação, então nada desce por aqui.
+  // Ou seja: sem citação o projeto não sobe nem desce de caixa, que é exatamente o pedido.
+  const sem_evidencia = nota > 0 && evidencias.length === 0;
 
   // Promoção: só com dependente NOMEADO (não promessa) e nunca acima do teto.
   const depCru = typeof o.dependente_nomeado === 'string' ? o.dependente_nomeado.trim() : '';
@@ -275,12 +315,47 @@ export function normalizarSaidaEstrela(
   const valido = indicadoCru && nota >= TETO_AGENTE && escapeValido({ sugestao: TETO_AGENTE + 1, evidencias: evEsc });
   const escape = { indicado: valido, valido, evidencias: evEsc };
 
-  const criterio_aplicado = verboDe(nota);
   const desqCru = typeof o.desqualificador === 'string' ? o.desqualificador.trim() : '';
   const desqualificador = nota === 0 && CHAVES_PISO.has(desqCru) ? (desqCru as ChavePisoZero) : null;
 
+  // ── SEGUNDO EIXO: o piso pelo TAMANHO ──────────────────────────────────────────────────────
+  // ⚠️ Aplicado AQUI, determinístico, e não pedido ao modelo: com o tamanho só no prompt, o
+  // «SendApp» saiu 2★ três vezes seguidas em produção (2, 2, 2) sendo ~15% do impacto líquido
+  // mensal de toda a base. A régua de 0-5 mede FUNÇÃO e é cega ao tamanho; o tamanho entra como
+  // PISO, nunca como teto, e nunca desce nota — ver `EIXO_IMPACTO`.
+  // ⚠️ Duas recusas declaradas: projeto FORA DE USO ou RESSUBMISSÃO não sobe por dinheiro
+  // (`PISO_IMPACTO_NAO_VALE_COM`), e o piso não empurra para a faixa 6-10 (teto `TETO_AGENTE`) —
+  // entrar nela continua exigindo os dois gatilhos citados e o número continua sendo do comitê.
+  let piso_impacto: SaidaEstrela['piso_impacto'] = null;
+  const piso = ctx.pisoDeImpacto ?? null;
+  const pisoBloqueado = desqualificador !== null && PISO_IMPACTO_NAO_VALE_COM.includes(desqualificador);
+  if (piso && !pisoBloqueado) {
+    const alvo = Math.min(TETO_AGENTE, piso.piso);
+    if (alvo > nota) {
+      piso_impacto = {
+        chave: piso.chave,
+        de: nota,
+        para: alvo,
+        share: piso.share,
+        porque: `O projeto responde por ${descreverShare(piso.share)}, e nessa faixa a régua garante ${alvo}★ no mínimo.`,
+      };
+      nota = alvo;
+    }
+  }
+
+  const criterio_aplicado = verboDe(nota);
+
   const racionalCru = typeof o.racional === 'string' && o.racional.trim() ? o.racional.trim() : '';
-  const racional = cortar(racionalCru || `Nível ${nota} (${criterio_aplicado}) sem racional do modelo.`, RACIONAL_MAX);
+  // ⚠️ Quando o piso do tamanho elevou a nota, o racional do modelo justifica a nota ANTIGA — e
+  // ficaria dizendo "é 2★ porque executa" ao lado de um 5★. A linha do piso entra na frente, e é
+  // o único caso em que este módulo acrescenta texto ao racional do agente.
+  const racionalDoPiso = piso_impacto
+    ? `Nota ${piso_impacto.para} pelo tamanho do impacto (${descreverShare(piso_impacto.share)}); pela função na cadeia o agente havia posicionado em ${piso_impacto.de}. `
+    : '';
+  const racional = cortar(
+    racionalDoPiso + (racionalCru || `Nível ${nota} (${criterio_aplicado}) sem racional do modelo.`),
+    RACIONAL_MAX,
+  );
 
   const tipo = tipoValido(o.tipo);
   const nivel = nivelValido(o.nivel);
@@ -317,6 +392,7 @@ export function normalizarSaidaEstrela(
     ancora_congelada,
     sinais: { temEvidenciaCitada: evidencias.length > 0, temVizinhos: ctx.temVizinhos },
     avaliada: true,
+    piso_impacto,
   };
 }
 
@@ -341,5 +417,8 @@ export function saidaEstrelaFallback(
     sinais: { temEvidenciaCitada: false, temVizinhos: ctx.temVizinhos },
     // ⚠️ NÃO avaliada: a nota 0 acima é ausência de julgamento, não julgamento de que vale 0.
     avaliada: false,
+    // ⚠️ E o piso do tamanho NÃO se aplica ao fallback: elevar a nota de um julgamento que não
+    // aconteceu produziria um 5★ que ninguém raciocinou — pior que o zero honesto.
+    piso_impacto: null,
   };
 }

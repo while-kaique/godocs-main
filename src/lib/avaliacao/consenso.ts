@@ -163,6 +163,12 @@ export function conciliar(
   const divergencias: string[] = [];
   const motivos: string[] = [];
 
+  // ⚠️ **O SEGUNDO EIXO tem de aparecer no parecer, em qualquer desfecho** (10/09/2026). Quando o
+  // tamanho do impacto ELEVA a nota, o racional do modelo justifica a nota antiga — e uma nota que
+  // sobe sem explicação é o jeito mais rápido de uma régua declarada virar mágica na tela. Aqui
+  // ela entra como primeiro motivo, porque é o que muda a caixa do projeto.
+  if (b.piso_impacto) motivos.push(frase(b.piso_impacto.porque));
+
   if (ctx.ceticoRefuta && a.veredito === 'aprovar') {
     divergencias.push(frase('O cético refuta a aprovação do mérito'));
   }

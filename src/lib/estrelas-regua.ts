@@ -185,6 +185,185 @@ export const CRITERIOS_ESTRELA: NivelEstrela[] = [
 export const PROMOCAO_DEPENDENTE_NOMEADO =
   'Outro processo ou projeto depende dele como fonte, com o dependente NOMEADO. Não vale "poderá ser consultado" nem "abre portas para".';
 
+// ─── O SEGUNDO EIXO: o TAMANHO do impacto ────────────────────────────────────
+
+/**
+ * ⚠️ **Por que este eixo existe (10/09/2026, dono do produto).** A régua acima mede UMA coisa:
+ * quanto da cadeia `informação → ação → consequência` o projeto assume. É uma régua de FUNÇÃO, e
+ * ela é cega ao tamanho — então um projeto pode responder, sozinho, por um sexto do ganho mensal
+ * de toda a empresa e ainda sair «Executa», porque "assume a ação recorrente e roda sem ninguém
+ * iniciar" descreve exatamente o que ele faz.
+ *
+ * Não era desafinação de prompt: o «SendApp» saiu **2★ em três rodadas de produção** (2, 2, 2),
+ * com o critério "executa" aplicado e evidência citada do dossiê. A nota estava certa PARA A RÉGUA
+ * que existia. Palavras dele: *"pelo o que esta escrito e pelo impacto do prjoeto, ele claramente
+ * é um muda o jogo… tem um impacto liqudio de ~100mil por mes. É 20% de todos os projetos da
+ * empresa em ganho liquido mensal"* e, antes, *"devemos garantir de que as estrelas sejam dadas
+ * por nivel de complexidade do projeto e o quao impactante ele é"* — duas dimensões, e só uma
+ * estava implementada.
+ *
+ * ⚠️ **É PISO, nunca teto, e nunca desce nota.** A nota final é o MAIOR entre o que a régua da
+ * função concluiu e o piso do tamanho: dinheiro grande não pode segurar um projeto embaixo, e
+ * dinheiro pequeno não derruba projeto que garante, decide ou assume (é o mesmo princípio já
+ * medido nas lentes: *um eixo fraco não desmente a caixa; para baixo existe só o piso*).
+ *
+ * ⚠️ **É CALCULADO, não julgado.** O corte é share do impacto líquido mensal da base aprovada, em
+ * número, e não uma frase no prompt pedindo "considere o impacto" — porque prompt não segura (este
+ * repo já pagou por isso três vezes). O prompt recebe o eixo para RACIOCINAR; o piso é aplicado
+ * por fora, determinístico, e diz qual faixa aplicou.
+ */
+export const PRINCIPIO_SEGUNDO_EIXO =
+  'Quanto do ganho mensal da empresa depende deste projeto sozinho.';
+
+/**
+ * O denominador: soma do `Impacto Líquido Mensal` de TODOS os projetos aprovados.
+ *
+ * ⚠️ **Medido, datado e declarado** — R$ 630.566/mês em 10/09/2026, sobre 561 aprovados de
+ * produção (a mediana da base é R$ 284/mês, o que é a razão de os cortes abaixo serem pequenos em
+ * percentual e enormes em posição). Serve como referência quando o total real não é passado; quem
+ * tem a base em mãos deve passar `totalBase` e o cálculo usa o número do dia.
+ * ⚠️ Reancorar isto é DECISÃO (muda nota na base inteira), não manutenção.
+ */
+export const BASE_IMPACTO_MENSAL_REFERENCIA = 630_566;
+export const BASE_IMPACTO_MEDIDA_EM = '10/09/2026';
+
+/**
+ * As faixas do segundo eixo, em share da base. Ordem: da maior para a menor (a primeira que casa
+ * vence). Os cortes foram escolhidos pela FORMA da base medida, não por gosto:
+ * `≥4%` = 3 projetos · `≥1,5%` = 11 · `≥0,5%` = 37 (6,6% dos aprovados, dentro do teto de 20%
+ * acima de 3★ que a `DISTRIBUICAO_ESPERADA` declara).
+ */
+export const EIXO_IMPACTO = [
+  {
+    chave: 'dominante',
+    shareMin: 0.04,
+    piso: 5,
+    texto:
+      'Sozinho responde por 4% ou mais do impacto líquido mensal de toda a base aprovada. Nessa altura o projeto não é "uma automação da área": desligá-lo tira um pedaço visível do resultado da empresa no mês.',
+  },
+  {
+    chave: 'material',
+    shareMin: 0.015,
+    piso: 4,
+    texto:
+      'Responde por 1,5% ou mais do impacto líquido mensal da base — dezenas de vezes a mediana. O ganho dele aparece no consolidado da empresa, não só no da área.',
+  },
+  {
+    chave: 'relevante',
+    shareMin: 0.005,
+    piso: 3,
+    texto:
+      'Responde por 0,5% ou mais do impacto líquido mensal da base. Está entre as poucas dezenas de projetos que carregam o número da empresa.',
+  },
+] as const;
+
+export type ChaveEixoImpacto = (typeof EIXO_IMPACTO)[number]['chave'];
+
+/**
+ * Share a partir do qual o projeto é CANDIDATO NATURAL à faixa 6–10.
+ *
+ * ⚠️ **Candidato, não promovido.** A entrada na faixa continua exigindo os dois gatilhos citados
+ * (`GATILHOS_ESCAPE`) e o número final continua sendo do comitê humano. O que o tamanho faz é
+ * obrigar o agente a olhar: um projeto que é 10% do ganho da empresa e não é "muda o jogo" precisa
+ * de uma frase dizendo qual gatilho falta — que é o que o `escape.por_que_nao` já cobra.
+ */
+export const CANDIDATO_ESCAPE_SHARE = 0.1;
+
+/**
+ * O piso NÃO vale quando o projeto está fora de uso ou é ressubmissão.
+ *
+ * ⚠️ São os dois desqualificadores que dizem *"isto não é um projeto vivo"* — e é o único jeito de
+ * um número grande num projeto parado não virar 5★. Os outros cinco itens do `PISO_ZERO` (marginal,
+ * só o autor, apenas mensurável…) NÃO bloqueiam: eles falam do tamanho ou do alcance, e é
+ * justamente sobre isso que este eixo tem dado novo — um projeto que é 15% do ganho da empresa não
+ * é "marginal", e afirmar as duas coisas juntas é contradição, não critério.
+ */
+export const PISO_IMPACTO_NAO_VALE_COM: readonly ChavePisoZero[] = ['fora_de_uso', 'ressubmissao'];
+
+export type PisoDeImpacto = {
+  chave: ChaveEixoImpacto;
+  /** A nota mínima que este tamanho garante. */
+  piso: number;
+  /** Fração da base que este projeto representa (0..1). */
+  share: number;
+  shareMin: number;
+  texto: string;
+  /** O tamanho é grande o bastante para o projeto ser candidato à faixa 6–10? */
+  candidatoAoEscape: boolean;
+};
+
+/**
+ * A régua do segundo eixo, PURA e determinística. `null` = o tamanho não garante piso nenhum.
+ *
+ * ⚠️ **Impacto ausente, zero ou negativo devolve `null`** — e isso é deliberado: especial e ganho
+ * imensurável não têm número, e "sem número" não pode virar nem piso nem castigo (é a mesma
+ * disciplina de `notaParaOPiso`, onde nota ausente não reprova).
+ * ⚠️ `totalBase` inválido cai na referência medida em vez de dividir por zero.
+ */
+export function pisoPorImpacto(args: {
+  impactoMensal: number | null | undefined;
+  totalBase?: number | null;
+}): PisoDeImpacto | null {
+  const v = typeof args.impactoMensal === 'number' && Number.isFinite(args.impactoMensal) ? args.impactoMensal : 0;
+  if (v <= 0) return null;
+  const totalCru = typeof args.totalBase === 'number' && Number.isFinite(args.totalBase) ? args.totalBase : 0;
+  const total = totalCru > 0 ? totalCru : BASE_IMPACTO_MENSAL_REFERENCIA;
+  const share = v / total;
+  const faixa = EIXO_IMPACTO.find((f) => share >= f.shareMin);
+  if (!faixa) return null;
+  return {
+    chave: faixa.chave,
+    piso: faixa.piso,
+    share,
+    shareMin: faixa.shareMin,
+    texto: faixa.texto,
+    candidatoAoEscape: share >= CANDIDATO_ESCAPE_SHARE,
+  };
+}
+
+/** Como o share aparece para gente ler: "15,4% do impacto mensal da base". */
+export function descreverShare(share: number): string {
+  const pct = share * 100;
+  const casas = pct >= 10 ? 1 : pct >= 1 ? 1 : 2;
+  return `${pct.toFixed(casas).replace('.', ',')}% do impacto líquido mensal da base`;
+}
+
+/**
+ * Renderiza o segundo eixo para o prompt, com o tamanho DESTE projeto já calculado quando ele
+ * existe. Fonte única — não redigitar percentual nem corte no prompt.
+ */
+export function descreverEixoImpacto(piso?: PisoDeImpacto | null): string {
+  const faixas = EIXO_IMPACTO.map(
+    (f) => `  - ${f.piso}★ no mínimo: ${f.texto}`,
+  ).join('\n');
+  const linhas = [
+    `SEGUNDO EIXO — TAMANHO DO IMPACTO: ${PRINCIPIO_SEGUNDO_EIXO}`,
+    '',
+    'A régua de 0★–5★ acima mede FUNÇÃO (quanto da cadeia o projeto assume) e é cega ao tamanho.',
+    'Um projeto pode "só executar" e ainda ser uma das maiores fontes de ganho da empresa — nesse caso',
+    'a caixa dele não é 2★. O tamanho entra como PISO, calculado, nunca como teto:',
+    '',
+    faixas,
+    '',
+    `Fora de uso e ressubmissão NÃO recebem piso por tamanho (projeto parado não sobe por dinheiro).`,
+    'Alcance também é tamanho: um projeto usado por VÁRIAS empresas do grupo carrega mais processos',
+    'que um usado por uma área, e isso pesa no seu racional.',
+  ];
+  if (piso) {
+    linhas.push(
+      '',
+      `TAMANHO DESTE PROJETO: ${descreverShare(piso.share)} — piso ${piso.piso}★ (faixa "${piso.chave}").`,
+      `A sua nota não pode ficar abaixo de ${piso.piso}★, e ela será elevada automaticamente se ficar. Justifique a partir daí.`,
+    );
+    if (piso.candidatoAoEscape) {
+      linhas.push(
+        `⚠️ Nessa altura o projeto é CANDIDATO NATURAL à faixa ${FAIXA_ESCAPE.min}★–${FAIXA_ESCAPE.max}★: examine os dois gatilhos do PASSO 1 com cuidado e, se recusar, diga qual falta.`,
+      );
+    }
+  }
+  return linhas.join('\n');
+}
+
 // ─── 6★ a 10★ — o escape ("Muda o Jogo") ─────────────────────────────────────
 
 /** A faixa inteira, que o agente indica mas não fatia. */
