@@ -49,8 +49,10 @@ async function rodarUm(row) {
     const resp = await fetch(`${BASE}/api/admin/avaliacao/time-completo`, {
       method: 'POST',
       headers: { Cookie: COOKIE, 'Content-Type': 'application/json' },
-      // `dry: false` grava a RECOMENDAÇÃO (nota + confiança do agente), nunca o Status.
-      body: JSON.stringify({ projetoId: id, dry: false, forcar: true }),
+      // `dry: false` grava a recomendação e (com a flag ligada) o Status do funil.
+      // ⚠️ **SEM `forcar`**: 15 dos 90 têm nota HUMANA, e `forcar` a sobrescreveria. A âncora
+      // protege a nota; o time roda e julga o mérito de qualquer forma.
+      body: JSON.stringify({ projetoId: id, dry: false }),
       signal: ctl.signal,
     });
     const txt = await resp.text();
