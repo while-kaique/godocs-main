@@ -116,3 +116,49 @@ describe('justificativaDaReprovacao — a causa REAL, não um carimbo', () => {
     expect(t.endsWith('…')).toBe(true);
   });
 });
+
+describe('fecharPendente — o funil sem limbo (opt-in)', () => {
+  it('desligado: nada muda', async () => {
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    expect(juntarAnalises({ impacto: { veredito: 'em_validacao' }, estrela: { saida: 'ajuste' } }).status).toBe('Pendente');
+  });
+
+  it('ligado: em_validacao + ajuste → Reprovado, com tom EXORTATIVO', async () => {
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    const j = juntarAnalises({
+      impacto: { veredito: 'em_validacao' },
+      estrela: { saida: 'ajuste' },
+      fecharPendente: true,
+    });
+    expect(j.status).toBe('Reprovado');
+    expect(j.semMaterial).toBe(true);
+    const t = justificativaDaReprovacao({
+      porques: j.porques,
+      parecerDaMesa: 'Financeiro: o memorial diz R$ 80,85 e a conta dá R$ 40,43.',
+      semMaterial: true,
+    });
+    // não pode soar como juízo de valor sobre o trabalho da pessoa
+    expect(t).toMatch(/não é um juízo sobre o valor do que você fez/);
+    expect(t).toMatch(/O que precisa ser respondido/);
+    expect(t).toMatch(/reenvie/);
+    expect(t).toMatch(/R\$ 80,85/);
+  });
+
+  it('⚠️ ligado, a faixa 6-10 SEGUE Pendente: reprovar diria o oposto do que o time concluiu', async () => {
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    const j = juntarAnalises({
+      impacto: { veredito: 'em_validacao' },
+      estrela: { saida: 'humano', escape: true },
+      fecharPendente: true,
+    });
+    expect(j.status).toBe('Pendente');
+    expect(j.flag6a10).toBe(true);
+  });
+
+  it('⚠️ ligado, mesa APROVANDO nunca vira reprovação', async () => {
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    expect(
+      juntarAnalises({ impacto: { veredito: 'aprovar' }, estrela: { saida: 'ajuste' }, fecharPendente: true }).status,
+    ).toBe('Aprovado');
+  });
+});

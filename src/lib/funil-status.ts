@@ -131,6 +131,12 @@ export function justificativaDaReprovacao(args: {
   statusAnterior?: string | null;
   /** O que a triagem pediu na coluna `Motivo Reenvio`, quando pediu algo. */
   motivoReenvio?: string | null;
+  /**
+   * A reprovação veio de "o time não fechou com o material que existe" (o Pendente que o funil
+   * deixou de aceitar), e não de uma régua de mérito. Muda o TOM: aqui a justificativa é
+   * EXORTATIVA — ela diz o que falta e que reenviar reabre a avaliação.
+   */
+  semMaterial?: boolean;
 }): string {
   const partes: string[] = [];
   const anterior = String(args.statusAnterior ?? '').trim().toLowerCase();
@@ -144,6 +150,19 @@ export function justificativaDaReprovacao(args: {
     if (temPedido) partes.push(`O que a triagem pediu: ${pedido}`);
     partes.push(
       'Para corrigir: edite o projeto com o ajuste e reenvie. O time reavalia o projeto no reenvio e a decisão pode mudar.',
+    );
+  } else if (args.semMaterial) {
+    // ⚠️ O tom aqui é o que decide se isto ajuda ou humilha. O time NÃO disse que o projeto é
+    // ruim: disse que não consegue validá-lo com o que está escrito. A frase abre por isso, lista
+    // o que os especialistas pediram e fecha em "reenvie", que é o caminho real de volta.
+    partes.push(
+      'O time avaliou este projeto e não conseguiu validá-lo com o material que existe hoje. Isto não é um juízo sobre o valor do que você fez: é a constatação de que falta informação para sustentar o ganho declarado.',
+    );
+    const parecer = String(args.parecerDaMesa ?? '').trim();
+    if (parecer) partes.push('', 'O que precisa ser respondido:', parecer);
+    partes.push(
+      '',
+      'Para corrigir: edite o projeto respondendo os pontos acima e reenvie. O reenvio reabre a avaliação e a decisão pode mudar.',
     );
   } else {
     partes.push(...args.porques);

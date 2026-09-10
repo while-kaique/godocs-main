@@ -52,6 +52,16 @@ function vazioNaPlanilha(v: string | undefined | null): boolean {
   return t === '' || t === '—' || t === '-';
 }
 
+/**
+ * O funil deixa de aceitar Pendente como desfecho do agente? Env em RUNTIME, **DEFAULT OFF**.
+ * ⚠️ Ligar é decisão de PRODUTO: o autor passa a receber uma reprovação com o que falta em vez de
+ * ficar num limbo. Ver `juntarAnalises.fecharPendente`.
+ */
+export function agenteFechaPendente(): boolean {
+  const v = String(process.env.AGENTE_FECHA_PENDENTE ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'sim' || v === 'on';
+}
+
 export function agenteDecideFunil(): boolean {
   const v = String(process.env.AGENTE_DECIDE_FUNIL ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'sim' || v === 'on';
@@ -271,6 +281,7 @@ export async function avaliarProjetoComTimeCompleto(
     impacto: m.ok && m.veredito ? { veredito: m.veredito } : null,
     estrela: estrela.status === 'fulfilled' ? ladoEstrela(estrela.value) : null,
     especial,
+    fecharPendente: agenteFechaPendente(),
   });
 
   // ── O funil ──────────────────────────────────────────────────────────────────────────────────
@@ -291,6 +302,7 @@ export async function avaliarProjetoComTimeCompleto(
         parecerDaMesa: m.motivo,
         statusAnterior: linhaAtual?.['Status'],
         motivoReenvio: linhaAtual?.['Motivo Reenvio'],
+        semMaterial: junta.semMaterial === true,
       });
       // ⚠️ **O AGENTE CLASSIFICA de 0 a 5 na coluna `Estrelas`** (decisão do dono do produto,
       // 10/09/2026: *"estrelas é preenchido por humano NO CASO DE 6-10, nos outros casos o AGENTE

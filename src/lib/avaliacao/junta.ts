@@ -36,6 +36,8 @@ export type Juncao = DecisaoDoFunil & {
   confianca: 'alta' | 'media' | 'baixa';
   /** Uma linha por razão, na ordem em que pesaram. É o que vira parecer legível. */
   porques: string[];
+  /** A reprovação veio de "não deu para validar", não de régua de mérito. Muda o TOM do texto. */
+  semMaterial?: boolean;
 };
 
 /** Veredito da MESA → status do funil. Vocabulário dela, não do time. */
@@ -65,6 +67,18 @@ export function juntarAnalises(args: {
   impacto: LadoImpacto;
   estrela: LadoEstrela;
   especial?: boolean;
+  /**
+   * O funil deixa de aceitar Pendente como desfecho do agente: tudo que não é Aprovado e não é a
+   * faixa 6-10 vira **Reprovado com justificativa exortativa**.
+   *
+   * ⚠️ **É decisão de PRODUTO, não otimização** — e o preço é explícito: o autor recebe uma
+   * reprovação em vez de um silêncio. Em troca, o funil esvazia e ninguém fica num limbo que
+   * ninguém olha (medido em 10/09/2026: 59 projetos em Pendente, a maioria com pergunta concreta
+   * ao autor, e o cron não os busca porque já têm nota).
+   * ⚠️ A faixa **6-10 continua Pendente**: ali o agente aprovaria e o que falta é o comitê cravar
+   * o número — reprovar seria afirmar o oposto do que o time concluiu.
+   */
+  fecharPendente?: boolean;
 }): Juncao {
   const { impacto, estrela } = args;
   const especial = args.especial === true;
@@ -138,6 +152,22 @@ export function juntarAnalises(args: {
       concordam: false,
       confianca: confTime,
       porques,
+    };
+  }
+
+  // 3c — o funil sem Pendente (opt-in, ver `fecharPendente`)
+  if (args.fecharPendente && doTime.status !== 'Aprovado' && daMesa !== 'Aprovado') {
+    porques.push(
+      'O time não conseguiu validar o projeto com o material que existe, então o desfecho é reprovar com o que falta declarado, em vez de deixá-lo esperando sem dono.',
+    );
+    return {
+      status: 'Reprovado',
+      flag6a10: false,
+      porque: 'O time não fechou com o material que existe: reprovado com o que falta, e o reenvio reabre.',
+      concordam: doTime.status === daMesa,
+      confianca: confTime,
+      porques,
+      semMaterial: true,
     };
   }
 
