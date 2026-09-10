@@ -20,7 +20,7 @@ import { avaliarProjetoNormal } from '@/lib/avaliacao-normais.functions';
 import { avaliarProjetoComTime } from '@/lib/avaliacao/time.functions';
 import { lerLinhaEspelho, espelharEscrita } from '@/lib/sheet-espelho';
 import { updateRowByProjectId } from '@/lib/google/sheets';
-import { upsertAvaliacaoEspecial } from '@/integrations/db/client.server';
+import { upsertAvaliacaoEspecial, getProjetoById } from '@/integrations/db/client.server';
 import { rotuloNotaAgente } from '@/lib/estrelas-regua';
 import { chaveProjeto } from '@/lib/projeto-chave';
 import { numero } from '@/lib/dashboard-resumo';
@@ -259,8 +259,25 @@ export async function avaliarProjetoComTimeCompleto(
   return { ok: m.ok || e.ok, projeto_id: projetoId, mesa: m, estrela: e, junta, status_gravado };
 }
 
-/** O projeto é especial? Fail-safe: erro de leitura → `false` (a junta então exige as 2 metades). */
+/**
+ * O projeto é especial?
+ *
+ * ⚠️ **A fonte é a MESMA que a mesa usa: `projetos.especial` no SQLite.** A 1ª versão disto lia a
+ * coluna `Especial?` da planilha e ERRAVA — medido na staging em 10/09/2026: a mesa respondeu
+ * `"especial, NO-OP"` e esta função devolveu `false`, então a junta caiu em "falta uma metade" e
+ * mandou para Pendente um projeto em que o time era a única metade que podia julgar. Atingiria os
+ * 11 especiais do backlog. Quem decide se a mesa roda é o SQLite; perguntar isso à planilha é
+ * consultar uma segunda fonte para uma pergunta que já tem dono.
+ * ⚠️ Fail-safe em DUAS camadas: erro no banco cai para a planilha, e erro nos dois → `false` (a
+ * junta então exige as duas metades, que é o lado conservador).
+ */
 async function ehEspecial(projetoId: string): Promise<boolean> {
+  try {
+    const p = await getProjetoById(projetoId);
+    if (p) return p.especial === 1;
+  } catch {
+    // cai na planilha
+  }
   try {
     const linha = (await lerLinhaEspelho(projetoId)) as Record<string, string> | null;
     return /^(sim|1|true)$/i.test(String(linha?.['Especial?'] ?? '').trim());
