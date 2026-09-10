@@ -145,3 +145,19 @@ describe('⚠️ a reprovação MECÂNICA da mesa também não é divergência',
     expect(j.flag6a10).toBe(true);
   });
 });
+
+describe('fecharPendente: a condição é só sobre a MESA (o mérito tem um dono)', () => {
+  it('⚠️ mesa em_validacao + time APROVANDO → Reprovado quando o funil fecha', () => {
+    // Medido em prod: a 1ª versão exigia que nenhum dos dois tivesse aprovado, e o primeiro
+    // projeto da fila (mesa `em_validacao` + time `aprovar`) voltou para Pendente — o limbo que
+    // esta regra existe para fechar. Se a aprovação da mesa vale quando o time não aprova (2b), o
+    // inverso vale também: a aprovação do time não estabelece um mérito que a mesa não deu.
+    const j = juntarAnalises({ impacto: imp('em_validacao'), estrela: est('aprovar'), fecharPendente: true });
+    expect(j.status).toBe('Reprovado');
+    expect(j.semMaterial).toBe(true);
+  });
+
+  it('e a mesa aprovando segue mandando: Aprovado, com o funil fechando ou não', () => {
+    expect(juntarAnalises({ impacto: imp('aprovar'), estrela: est('ajuste'), fecharPendente: true }).status).toBe('Aprovado');
+  });
+});

@@ -181,7 +181,13 @@ export function juntarAnalises(args: {
   }
 
   // 3c — o funil sem Pendente (opt-in, ver `fecharPendente`)
-  if (args.fecharPendente && doTime.status !== 'Aprovado' && daMesa !== 'Aprovado') {
+  // ⚠️ A condição é **só sobre a MESA**, e isso é coerência com a regra 2b: o mérito tem UM dono.
+  // Se a aprovação da mesa vale mesmo quando o time não aprova, o inverso também vale — a mesa em
+  // `em_validacao` significa mérito não estabelecido, e a aprovação do time não o estabelece.
+  // _(medido em prod, 10/09/2026: a 1ª versão exigia que NENHUM dos dois tivesse aprovado, e o
+  // primeiro projeto da fila veio com mesa `em_validacao` + time `aprovar` — caiu em "divergiram"
+  // e voltou para Pendente, justamente o limbo que esta regra existe para fechar.)_
+  if (args.fecharPendente && daMesa !== 'Aprovado') {
     porques.push(
       'O time não conseguiu validar o projeto com o material que existe, então o desfecho é reprovar com o que falta declarado, em vez de deixá-lo esperando sem dono.',
     );
