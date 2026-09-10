@@ -18,7 +18,7 @@
  */
 import { avaliarProjetoNormal } from '@/lib/avaliacao-normais.functions';
 import { avaliarProjetoComTime } from '@/lib/avaliacao/time.functions';
-import { lerLinhaEspelho, espelharEscrita } from '@/lib/sheet-espelho';
+import { lerLinhaEspelho, espelharEscrita, lerResumosEspelho } from '@/lib/sheet-espelho';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { upsertAvaliacaoEspecial, getProjetoById } from '@/integrations/db/client.server';
 import { rotuloNotaAgente } from '@/lib/estrelas-regua';
@@ -441,4 +441,55 @@ export async function avaliarLoteComTime(
     itens.push(await avaliarProjetoComTimeCompleto(id, opts));
   }
   return { ok: true, pedidos: ids.length, rodados: itens.filter((i) => i.ok).length, itens };
+}
+
+// ─── CRON: drenar a fila do funil ────────────────────────────────────────────────────────────────
+
+/**
+ * Quantos projetos o cron avalia por corrida. **UM.**
+ *
+ * ⚠️ Não é timidez: uma passada do time mede **131 a 277 s** (mediana 223 s, medido em prod em
+ * 10/09/2026) e o request do edge corta perto de **7 min**. Dois projetos em série na mesma corrida
+ * caberiam no melhor caso e morreriam no pior, e o modo de morrer é o que importa: a requisição
+ * cortada perde o 2º projeto **depois** de gastar as chamadas de LLM dele. Um por corrida, a cada
+ * 5 min, dá **12 por hora** — mais que o fluxo de submissão do dia.
+ */
+export const CRON_AVALIACAO_POR_CORRIDA = 1;
+
+/**
+ * Roda o time no projeto mais antigo que está **Pendente sem decisão do agente**.
+ *
+ * ⚠️ **Por que um cron, e não o fan-out da submissão:** a submissão já chama o time em
+ * `runBackground` (`waitUntil`), e a plataforma **corta** trabalho longo em background — medido nos
+ * logs de prod de hoje, `outcome: "canceled"` em `time-completo`. O time são ~30 chamadas de LLM;
+ * ele não sobrevive ali. O cron roda **dentro do próprio request**, que é onde a passada cabe.
+ * ⚠️ **A fila é a mesma régua da tela** (`Status` Pendente + `Estrela Agente` vazia): sem a 2ª
+ * condição o cron reavaliaria para sempre os mesmos projetos que ele acabou de decidir como
+ * Pendente (a faixa 6-10 e as divergências ficam Pendente **com** nota, e é a nota que os tira da
+ * fila). ⚠️ NUNCA lança: cron que derruba a rota vira alerta em vez de trabalho feito.
+ */
+export async function drenarFilaDoFunil(
+  opts: { limite?: number; dry?: boolean } = {},
+): Promise<{ ok: boolean; avaliados: string[]; fila: number; motivo?: string }> {
+  const limite = Math.max(1, Math.min(opts.limite ?? CRON_AVALIACAO_POR_CORRIDA, 3));
+  try {
+    const { linhas } = await lerResumosEspelho();
+    const fila = linhas
+      .filter((r) => {
+        const l = r as unknown as Record<string, string>;
+        const status = String(l['Status'] ?? '').trim().toLowerCase();
+        if (status !== 'pendente') return false;
+        return vazioNaPlanilha(l['Estrela Agente']);
+      })
+      .map((r) => String((r as unknown as Record<string, string>)['ID Projeto'] ?? '').trim())
+      .filter(Boolean);
+    const avaliados: string[] = [];
+    for (const id of fila.slice(0, limite)) {
+      const r = await avaliarProjetoComTimeCompleto(id, { dry: opts.dry });
+      avaliados.push(`${id} → ${r.status_gravado ?? r.junta?.status ?? 'sem decisão'}`);
+    }
+    return { ok: true, avaliados, fila: fila.length };
+  } catch (e) {
+    return { ok: false, avaliados: [], fila: 0, motivo: e instanceof Error ? e.message : String(e) };
+  }
 }
