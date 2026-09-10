@@ -10,6 +10,11 @@ import {
   statusFunilDeLegado,
   justificativaDaReprovacao,
   MOTIVO_REPROVADO_MAX,
+  resumirPontos,
+  PONTO_MAX,
+  PONTOS_MAX,
+  resumirEmUmaFrase,
+  RESUMO_FALTA_MAX,
 } from '@/lib/funil-status';
 
 describe('statusDoFunil — o desfecho do time vira status', () => {
@@ -137,11 +142,16 @@ describe('fecharPendente — o funil sem limbo (opt-in)', () => {
       parecerDaMesa: 'Financeiro: o memorial diz R$ 80,85 e a conta dá R$ 40,43.',
       semMaterial: true,
     });
-    // não pode soar como juízo de valor sobre o trabalho da pessoa
-    expect(t).toMatch(/não é um juízo sobre o valor do que você fez/);
-    expect(t).toMatch(/O que precisa ser respondido/);
+    // ⚠️ CONCISA (pedido do dono do produto): uma frase de veredito, os pontos em bullet, uma
+    // frase de saída. E o tom não pode soar como juízo de valor sobre o trabalho da pessoa.
+    expect(t).toMatch(/Não é um juízo sobre o valor do trabalho/);
+    expect(t).toMatch(/Falta: /);
+    // ⚠️ NÃO nomeia o agente: atribuição por agente é organização interna do time e o autor não
+    // precisa dela (quem quiser tem o painel da ficha, com os quatro pareceres).
+    expect(t).not.toMatch(/Financeiro:|Cético:/);
     expect(t).toMatch(/reenvie/);
     expect(t).toMatch(/R\$ 80,85/);
+    expect(t.length).toBeLessThan(560);
   });
 
   it('⚠️ ligado, a faixa 6-10 SEGUE Pendente: reprovar diria o oposto do que o time concluiu', async () => {
@@ -160,5 +170,53 @@ describe('fecharPendente — o funil sem limbo (opt-in)', () => {
     expect(
       juntarAnalises({ impacto: { veredito: 'aprovar' }, estrela: { saida: 'ajuste' }, fecharPendente: true }).status,
     ).toBe('Aprovado');
+  });
+});
+
+describe('resumirPontos — recorta o parecer, não reescreve', () => {
+  it('uma linha por especialista, primeira frase, rótulo preservado', () => {
+    const p = resumirPontos(
+      'Financeiro: O memorial diz R$ 80,85 e a conta dá R$ 40,43. Também falta confirmar o custo do proxy.\nCético: Faltam os logs do agendador. O código não agenda sozinho.',
+    );
+    expect(p).toHaveLength(2);
+    expect(p[0]).toBe('Financeiro: O memorial diz R$ 80,85 e a conta dá R$ 40,43.');
+    expect(p[1]).toBe('Cético: Faltam os logs do agendador.');
+  });
+
+  it('⚠️ descarta a linha que fala do PROCESSO, não do que o autor faz', () => {
+    const p = resumirPontos('Financeiro: falta a nota fiscal.\nOs especialistas divergiram, então vai para a triagem.');
+    expect(p).toHaveLength(1);
+    expect(p.join(' ')).not.toMatch(/divergiram/);
+  });
+
+  it(`no máximo ${PONTOS_MAX} pontos e cada um até ${PONTO_MAX} chars`, () => {
+    const p = resumirPontos(['a: ' + 'x'.repeat(400), 'b: dois.', 'c: três.', 'd: quatro.'].join('\n'));
+    expect(p).toHaveLength(PONTOS_MAX);
+    expect(p[0].length).toBeLessThanOrEqual(PONTO_MAX);
+    expect(p[0].endsWith('…')).toBe(true);
+  });
+
+  it('vazio devolve lista vazia', () => {
+    expect(resumirPontos(null)).toEqual([]);
+    expect(resumirPontos('   ')).toEqual([]);
+  });
+});
+
+describe('resumirEmUmaFrase — o autor não vê agente por agente', () => {
+  it('emenda os pontos numa frase, sem rótulo de agente', () => {
+    const f = resumirEmUmaFrase(
+      'Financeiro: O memorial diz R$ 80,85 e a conta dá R$ 40,43.\nCético: Faltam os logs do agendador.',
+    );
+    expect(f).not.toMatch(/Financeiro|Cético/);
+    expect(f).toBe('o memorial diz R$ 80,85 e a conta dá R$ 40,43; faltam os logs do agendador.');
+  });
+
+  it(`corta em ${RESUMO_FALTA_MAX} chars`, () => {
+    const f = resumirEmUmaFrase(['a: ' + 'x'.repeat(300), 'b: ' + 'y'.repeat(300)].join('\n'));
+    expect(f.length).toBeLessThanOrEqual(RESUMO_FALTA_MAX);
+  });
+
+  it('sem parecer devolve vazio', () => {
+    expect(resumirEmUmaFrase(null)).toBe('');
   });
 });

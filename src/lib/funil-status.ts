@@ -152,18 +152,19 @@ export function justificativaDaReprovacao(args: {
       'Para corrigir: edite o projeto com o ajuste e reenvie. O time reavalia o projeto no reenvio e a decisão pode mudar.',
     );
   } else if (args.semMaterial) {
-    // ⚠️ O tom aqui é o que decide se isto ajuda ou humilha. O time NÃO disse que o projeto é
-    // ruim: disse que não consegue validá-lo com o que está escrito. A frase abre por isso, lista
-    // o que os especialistas pediram e fecha em "reenvie", que é o caminho real de volta.
+    // ⚠️ **CONCISA por pedido do dono do produto** (10/09/2026): *"reprovar com justificativa
+    // concisa"*. O parecer da mesa vem com uma linha por especialista e frases longas; despejá-lo
+    // inteiro produz parede de texto, e parede de texto não é lida — foi a lição do aviso de
+    // reprovação em "Meus Projetos", que precisou virar uma tira de uma linha.
+    // A forma: UMA frase de veredito, UMA linha por ponto (cortada), UMA de saída.
+    // ⚠️ O tom importa tanto quanto o tamanho: o time não disse que o projeto é ruim, disse que
+    // não consegue validá-lo com o que está escrito — e a primeira frase diz isso.
     partes.push(
-      'O time avaliou este projeto e não conseguiu validá-lo com o material que existe hoje. Isto não é um juízo sobre o valor do que você fez: é a constatação de que falta informação para sustentar o ganho declarado.',
+      'Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.',
     );
-    const parecer = String(args.parecerDaMesa ?? '').trim();
-    if (parecer) partes.push('', 'O que precisa ser respondido:', parecer);
-    partes.push(
-      '',
-      'Para corrigir: edite o projeto respondendo os pontos acima e reenvie. O reenvio reabre a avaliação e a decisão pode mudar.',
-    );
+    const falta = resumirEmUmaFrase(args.parecerDaMesa);
+    if (falta) partes.push(`Falta: ${falta}`);
+    partes.push('Responda esses pontos e reenvie: o reenvio reabre a avaliação.');
   } else {
     partes.push(...args.porques);
     const parecer = String(args.parecerDaMesa ?? '').trim();
@@ -172,4 +173,60 @@ export function justificativaDaReprovacao(args: {
 
   const t = partes.join('\n').trim();
   return t.length > MOTIVO_REPROVADO_MAX ? `${t.slice(0, MOTIVO_REPROVADO_MAX - 1)}…` : t;
+}
+
+/** Teto de cada ponto na justificativa concisa. Linha que não cabe na tela não é lida. */
+export const PONTO_MAX = 190;
+/** Quantos pontos entram. Acima disso deixa de ser "o que falta" e vira relatório. */
+export const PONTOS_MAX = 3;
+
+/**
+ * O parecer da mesa reduzido a poucos pontos curtos. PURO.
+ *
+ * ⚠️ **Recorta, não reescreve** (a mesma disciplina do resumo do card do Chat): o texto é o do
+ * especialista, com o rótulo dele preservado, cortado na primeira frase. Reescrever criaria uma
+ * segunda voz dizendo por que o projeto foi reprovado.
+ * ⚠️ Descarta a linha de fechamento do agregador ("Os especialistas divergiram…", "Só um
+ * especialista objetou…"), que fala do PROCESSO e não do que o autor tem de fazer.
+ */
+export function resumirPontos(parecer?: string | null): string[] {
+  const cru = String(parecer ?? '').trim();
+  if (!cru) return [];
+  const out: string[] = [];
+  for (const linha of cru.split(/\r?\n/)) {
+    const t = linha.trim();
+    if (!t) continue;
+    if (/^(os especialistas|só um especialista|nenhum especialista|o time)/i.test(t)) continue;
+    const m = t.match(/^([^:]{3,24}:)?\s*(.*)$/);
+    const rotulo = (m?.[1] ?? '').trim();
+    const corpo = (m?.[2] ?? t).split(/(?<=[.!?])\s+/)[0].trim();
+    const frase = `${rotulo ? rotulo + ' ' : ''}${corpo}`.replace(/\s{2,}/g, ' ');
+    out.push(frase.length > PONTO_MAX ? `${frase.slice(0, PONTO_MAX - 1)}…` : frase);
+    if (out.length >= PONTOS_MAX) break;
+  }
+  return out;
+}
+
+/** Teto do resumo do que falta. Curto por decisão: parede de texto não é lida. */
+export const RESUMO_FALTA_MAX = 320;
+
+/**
+ * O que falta, em UMA frase, SEM dizer qual agente falou. PURO.
+ *
+ * ⚠️ **Pedido do dono do produto** (10/09/2026): *"n precisa deixar claro agente por agente para o
+ * leitor. Quero ainda mais conciso"*. O autor não precisa saber que o Financeiro disse X e o Cético
+ * disse Y — isso é organização INTERNA do time e só empurra o texto para longe de ser lido. Quem
+ * quiser a atribuição por agente tem o painel da ficha, que mostra os quatro pareceres.
+ * ⚠️ Continua **recortando, não reescrevendo**: pega a 1ª frase de cada ponto, tira o rótulo do
+ * agente e emenda. Sem LLM — o texto sai igual todas as vezes e não custa chamada.
+ */
+export function resumirEmUmaFrase(parecer?: string | null): string {
+  const pontos = resumirPontos(parecer).map((p) => {
+    const semRotulo = p.replace(/^[^:]{3,24}:\s*/, '').trim();
+    // minúscula na emenda, para virar uma frase só em vez de um bloco de sentenças soltas
+    return semRotulo.charAt(0).toLowerCase() + semRotulo.slice(1).replace(/\.$/, '');
+  });
+  if (!pontos.length) return '';
+  const t = pontos.join('; ') + '.';
+  return t.length > RESUMO_FALTA_MAX ? `${t.slice(0, RESUMO_FALTA_MAX - 1)}…` : t;
 }
