@@ -101,3 +101,23 @@ describe('juntarAnalises', () => {
       }
   });
 });
+
+describe('teto do debate do mérito — é infraestrutura, não opinião', () => {
+  it('o default segue 2 rodadas e o campo é OPCIONAL', async () => {
+    // ⚠️ O edge corta a requisição em 300s EXATOS (medido: 6 falhas entre 300358 e 300833 ms) e a
+    // passada completa encosta nisso. `maxRodadasDebate: 1` desliga a réplica, que custa uma
+    // rodada inteira dos 5 especialistas + o cético — e ela é dispensável no caminho do funil,
+    // porque o MÉRITO passou a ser da mesa.
+    const { MAX_RODADAS_DEBATE } = await import('@/lib/avaliacao/time');
+    expect(MAX_RODADAS_DEBATE).toBe(2);
+  });
+
+  it('a env do corte é OPT-IN: sem ela, nada muda', async () => {
+    const { debateDoTimeDesligado } = await import('@/lib/avaliacao/time.functions');
+    delete process.env.TIME_SEM_REPLICA;
+    expect(debateDoTimeDesligado()).toBe(false);
+    process.env.TIME_SEM_REPLICA = '1';
+    expect(debateDoTimeDesligado()).toBe(true);
+    delete process.env.TIME_SEM_REPLICA;
+  });
+});

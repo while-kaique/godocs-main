@@ -206,6 +206,20 @@ export async function avaliarComTime(args: {
   ferramentasPorAgente?: number;
   /** Âncoras congeladas da faixa 6–10 (D16): entram SEMPRE no dossiê de comitê, além dos vizinhos ≥ 6. */
   ancoras?: AncoraComite[];
+  /**
+   * Teto de rodadas do debate do MÉRITO. Default `MAX_RODADAS_DEBATE` (2) = comportamento de
+   * sempre.
+   *
+   * ⚠️ **Existe por causa de um teto de INFRAESTRUTURA, medido em 10/09/2026: o edge corta a
+   * requisição em 300 s exatos** (6 falhas do lote, todas entre 300358 e 300833 ms), e a passada
+   * completa encosta nisso — mediana 223 s, máximo observado 277 s, e uma parte estourando.
+   * Baixar para 1 desliga a réplica, que custa **uma rodada inteira dos 5 especialistas + o
+   * cético**.
+   * ⚠️ E hoje ela é dispensável no caminho do FUNIL: desde que a junta passou a tirar o MÉRITO da
+   * mesa, o veredito do time só importa em `reprovar` (régua mecânica, que a réplica não muda) e a
+   * contribuição dele é a NOTA. A réplica existia para resolver o mérito — que deixou de ser dele.
+   */
+  maxRodadasDebate?: number;
 }): Promise<ResultadoTime> {
   const { dossie, vizinhos } = args;
   const maxTools = args.ferramentasPorAgente ?? FERRAMENTAS_POR_AGENTE;
@@ -427,7 +441,8 @@ export async function avaliarComTime(args: {
   let merito = consolidarMerito(julgamentos, { temVizinhos });
   let cetico = await rodarCetico(julgamentos, estrela, raizId, 1);
   let rodadas = 1;
-  while (cetico.refuta && merito.veredito === 'aprovar' && rodadas < MAX_RODADAS_DEBATE) {
+  const tetoDebate = args.maxRodadasDebate ?? MAX_RODADAS_DEBATE;
+  while (cetico.refuta && merito.veredito === 'aprovar' && rodadas < tetoDebate) {
     rodadas++;
     const debateId = await registrarSeguro(
       { pai_id: raizId, agente: 'debate', tipo: 'debate', rodada: rodadas, entrada: `réplica ao cético: ${cetico.motivo ?? 'sem motivo'}` },

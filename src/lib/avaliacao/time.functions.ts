@@ -147,6 +147,16 @@ function candidatosDe(linhas: LinhaEsp[]) {
     .map((r) => ({ id: g(r, 'ID Projeto')!, nome: g(r, 'Projeto') ?? '', saving_reais: numero(g(r, 'Saving Reais')), receita_mensal: numero(g(r, 'Receita Mensal')), status: g(r, 'Status') }));
 }
 
+/**
+ * A réplica do mérito está desligada? Env lida em RUNTIME (nunca em escopo de módulo).
+ * ⚠️ Motivo em `avaliarComTime.maxRodadasDebate`: é teto de infraestrutura (300 s do edge), não
+ * opinião sobre a qualidade do debate.
+ */
+export function debateDoTimeDesligado(): boolean {
+  const v = String(process.env.TIME_SEM_REPLICA ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'sim' || v === 'on';
+}
+
 export async function avaliarProjetoComTime(
   projetoId: string,
   opts: OpcoesTime = {},
@@ -213,6 +223,9 @@ export async function avaliarProjetoComTime(
       registrar: registrar as never,
       liberacao,
       ancoras: ancorasDe(linhas),
+      // ⚠️ Env em RUNTIME, DEFAULT desligado (sem ela o teto é o de sempre). Ligada, desliga a
+      // réplica do mérito, que é o que faz a passada caber nos 300 s do edge.
+      ...(debateDoTimeDesligado() ? { maxRodadasDebate: 1 } : {}),
     });
     if (abriuAqui && cicloId) {
       try {
