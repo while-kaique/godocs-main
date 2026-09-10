@@ -39,6 +39,21 @@ export function grauConfianca(n: number): Confianca {
   return 'baixa';
 }
 
+/**
+ * O INVERSO de `grauConfianca`: o número que representa um grau. PURO.
+ *
+ * ⚠️ **Existe porque `projeto_avaliacao.confianca` é uma coluna REAL e o time produz GRAU.** O
+ * número aqui é **renderização do grau**, não medição: ele sai dos MESMOS limiares, então
+ * `grauConfianca(numeroDoGrau(g)) === g` sempre (teste explícito). Não inventar precisão do tipo
+ * 0,87 — a decisão do dono do produto em 08/09/2026 foi justamente tirar o percentual da tela,
+ * porque o float era o placar da votação disfarçado de medida.
+ */
+export function numeroDoGrau(g: Confianca): number {
+  if (g === 'alta') return LIMIAR_GRAU_ALTA;
+  if (g === 'media') return LIMIAR_GRAU_MEDIA;
+  return LIMIAR_GRAU_MEDIA / 2;
+}
+
 // ─── Concilia o voto do cético no preliminar do agregador ──────────────────────
 
 /**

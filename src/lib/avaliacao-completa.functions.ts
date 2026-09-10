@@ -25,6 +25,29 @@ import { rotuloNotaAgente } from '@/lib/estrelas-regua';
 import { chaveProjeto } from '@/lib/projeto-chave';
 import { numero } from '@/lib/dashboard-resumo';
 import { ESTRELA_LIMITE_REPROVAVEL } from '@/lib/materialidade-piso';
+import { juntarAnalises, type Juncao } from '@/lib/avaliacao/junta';
+import { definirStatusProjeto } from '@/lib/dashboard-admin.functions';
+
+/**
+ * Quem aparece na auditoria quando quem decidiu foi o time. ⚠️ Não usar um e-mail de pessoa: o
+ * `admin_status_log` e o feed do painel existem para responder "quem mudou este status", e atribuir
+ * a decisão do agente a um humano apaga exatamente essa resposta.
+ */
+export const ATOR_TIME_AGENTES = 'time-de-agentes@godocs';
+
+/**
+ * O time escreve o Status do funil? Env lida em RUNTIME (nunca em escopo de módulo — no Godeploy
+ * `process` não existe na avaliação do módulo e derruba o worker no bootstrap).
+ *
+ * ⚠️ **DEFAULT OFF de propósito.** Com a flag desligada o comportamento é byte-idêntico ao de
+ * antes: o time avalia, grava a recomendação e não encosta no funil. Ligar é decisão de produto —
+ * é o momento em que a plataforma passa a ser gerenciada por agentes — e tem de ser um ato
+ * explícito num ambiente por vez, não efeito colateral de um deploy.
+ */
+export function agenteDecideFunil(): boolean {
+  const v = String(process.env.AGENTE_DECIDE_FUNIL ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'sim' || v === 'on';
+}
 
 /**
  * Origem da nota quando quem a produziu foi o TIME INTEIRO (≠ `agente-classificador`, o de 1
@@ -54,15 +77,27 @@ export const ORIGEM_TIME_COMPLETO = 'time-completo';
 async function estrelaPeloTimeInteiro(
   projetoIdBruto: string,
   opts: { dry?: boolean; forcar?: boolean },
-): Promise<{ ok: boolean; motivo?: string; estrelas?: number | null }> {
+): Promise<{
+  ok: boolean;
+  motivo?: string;
+  estrelas?: number | null;
+  /** O consenso do TIME, que até 09/09/2026 era CALCULADO e JOGADO FORA aqui. */
+  saida?: string;
+  escape?: boolean;
+  confianca?: 'alta' | 'media' | 'baixa';
+}> {
   const projetoId = chaveProjeto(projetoIdBruto);
+  // ⚠️ **Âncora protege a NOTA, não impede o JULGAMENTO** (corrigido 09/09/2026). Antes isto era um
+  // `return` seco: projeto com nota humana ≥ 1 saía sem o time rodar. Com a JUNTA no fluxo, isso
+  // virou um buraco — a metade da estrela chegava vazia e a decisão de funil caía em Pendente por
+  // "falta uma metade", em projeto que gente já tinha avaliado. São 15 dos 90 do backlog.
+  // Hoje o time roda igual (o veredito é dele), e o que a âncora bloqueia é a ESCRITA da nota.
+  let ancoraHumana: number | null = null;
   if (!opts.forcar) {
     try {
       const linha = await lerLinhaEspelho(projetoId);
       const humana = numero((linha as Record<string, string> | null)?.['Estrelas']);
-      if (humana != null && humana >= ESTRELA_LIMITE_REPROVAVEL) {
-        return { ok: false, motivo: `nota humana ${humana} é âncora — não reclassifica`, estrelas: humana };
-      }
+      if (humana != null && humana >= ESTRELA_LIMITE_REPROVAVEL) ancoraHumana = humana;
     } catch {
       // Não conseguir ler a âncora não pode impedir a avaliação: segue e o time julga.
     }
@@ -72,7 +107,20 @@ async function estrelaPeloTimeInteiro(
   if (!r.ok) return { ok: false, motivo: r.motivo };
   const c = r.resultado.consenso;
 
-  if (opts.dry) return { ok: true, estrelas: c.estrela };
+  if (opts.dry) return { ok: true, estrelas: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca };
+
+  // A âncora humana vence a nota do time: ela é verdade e exemplar do corpus, e a régua nunca
+  // reclassifica quem gente já julgou. O VEREDITO do time segue valendo (é o que a junta lê).
+  if (ancoraHumana != null) {
+    return {
+      ok: true,
+      estrelas: ancoraHumana,
+      saida: c.saida,
+      escape: c.escape,
+      confianca: c.confianca,
+      motivo: `nota humana ${ancoraHumana} é âncora — o time julgou o mérito e não reescreveu a nota`,
+    };
+  }
 
   // Persistência em DOIS lugares, e os dois são necessários:
   //  - `especial_avaliacao` é de onde a FICHA lê a recomendação;
@@ -104,7 +152,7 @@ async function estrelaPeloTimeInteiro(
   } catch (e) {
     console.error('[time-completo] falha ao escrever as colunas do agente:', e);
   }
-  return { ok: true, estrelas: c.estrela };
+  return { ok: true, estrelas: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca };
 }
 
 export type ResultadoTimeCompleto = {
@@ -114,6 +162,10 @@ export type ResultadoTimeCompleto = {
   mesa: { ok: boolean; motivo?: string; veredito?: string | null };
   /** A nota: `{ok, estrelas}` ou o motivo (já tem nota humana, sem vizinhos…). */
   estrela: { ok: boolean; motivo?: string; estrelas?: number | null };
+  /** A JUNÇÃO das duas metades: uma análise só, com o status do funil que ela implica. */
+  junta?: Juncao;
+  /** O Status realmente gravado na planilha, ou `null` quando a flag está desligada / `dry`. */
+  status_gravado?: string | null;
 };
 
 function resumoMesa(r: unknown): ResultadoTimeCompleto['mesa'] {
@@ -122,6 +174,18 @@ function resumoMesa(r: unknown): ResultadoTimeCompleto['mesa'] {
     ok: o.ok === true,
     motivo: typeof o.motivo === 'string' ? o.motivo : undefined,
     veredito: typeof o.veredito === 'string' ? o.veredito : null,
+  };
+}
+
+/** O que a metade da estrela devolveu, na forma que a junta lê. */
+function ladoEstrela(r: unknown) {
+  const o = (r ?? {}) as Record<string, unknown>;
+  if (o.ok !== true || typeof o.saida !== 'string') return null;
+  return {
+    saida: o.saida,
+    escape: o.escape === true,
+    estrela: typeof o.estrelas === 'number' ? o.estrelas : null,
+    confianca: (o.confianca as 'alta' | 'media' | 'baixa' | undefined) ?? null,
   };
 }
 
@@ -152,9 +216,74 @@ export async function avaliarProjetoComTimeCompleto(
     estrela.status === 'fulfilled'
       ? resumoEstrela(estrela.value)
       : { ok: false, motivo: String(estrela.reason) };
+
+  // ── A JUNTA: uma análise só ──────────────────────────────────────────────────────────────────
+  // ⚠️ Até 09/09/2026 as duas metades acabavam AQUI, lado a lado, e ninguém as fundia: o veredito
+  // ficava sendo o da mesa e a nota a do time, sem nenhuma peça olhando as duas. É a caixa "Junta
+  // as duas análises" do grafo, que o desenho afirmava e o código não tinha.
+  const especial = await ehEspecial(projetoId);
+  const junta = juntarAnalises({
+    impacto: m.ok && m.veredito ? { veredito: m.veredito } : null,
+    estrela: estrela.status === 'fulfilled' ? ladoEstrela(estrela.value) : null,
+    especial,
+  });
+
+  // ── O funil ──────────────────────────────────────────────────────────────────────────────────
+  let status_gravado: string | null = null;
+  if (!dry && agenteDecideFunil()) {
+    try {
+      // ⚠️ Reusa `definirStatusProjeto`, que é o ÚNICO ponto do sistema que sabe gravar Status
+      // direito: escreve na planilha, remenda o espelho na hora (invariante 1) e registra nas DUAS
+      // auditorias. Uma escrita própria aqui teria de repetir isso e envelheceria em silêncio.
+      // ⚠️ A justificativa vai em `Motivo Reprovado` só na REPROVAÇÃO, que é a coluna que o AUTOR
+      // lê no card dele. `Observações` NÃO é tocada: ela é o parecer do analisador e é o texto que
+      // o disparo de e-mails manda.
+      const justificativa = motivoParaOAutor(junta, m.motivo);
+      await definirStatusProjeto(
+        {
+          projeto_id: projetoId,
+          status: junta.status,
+          ...(junta.status === 'Reprovado' ? { motivo_reprovado: justificativa } : {}),
+        },
+        ATOR_TIME_AGENTES,
+      );
+      status_gravado = junta.status;
+    } catch (err) {
+      // Falhar aqui não desfaz a avaliação, que já está gravada. O relatório do lote mostra o nulo.
+      console.error('[time-completo] falha ao gravar o Status do funil:', err);
+    }
+  }
+
   // `ok` é OU, não E: uma metade que funcionou já é resultado — e o caso mais comum de "falha" da
   // nota é legítimo (o projeto tem nota humana e é âncora), não erro.
-  return { ok: m.ok || e.ok, projeto_id: projetoId, mesa: m, estrela: e };
+  return { ok: m.ok || e.ok, projeto_id: projetoId, mesa: m, estrela: e, junta, status_gravado };
+}
+
+/** O projeto é especial? Fail-safe: erro de leitura → `false` (a junta então exige as 2 metades). */
+async function ehEspecial(projetoId: string): Promise<boolean> {
+  try {
+    const linha = (await lerLinhaEspelho(projetoId)) as Record<string, string> | null;
+    return /^(sim|1|true)$/i.test(String(linha?.['Especial?'] ?? '').trim());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * O texto que vai para a coluna que o AUTOR lê. PURO o suficiente para não precisar de I/O.
+ *
+ * ⚠️ **Teto de 4000 chars** porque é o teto do schema de `Motivo Reprovado`. O corte é no fim, com
+ * reticência, e nunca no meio da primeira razão: quem lê precisa do porquê principal, não do
+ * rodapé. ⚠️ A justificativa pode ser ANULADORA (o projeto não se sustenta) ou
+ * INFORMATIVA/EXORTATIVA (o que mudar e reenviar) — as duas são legítimas, e é por isso que o
+ * texto junta a régua da junta com o parecer dos especialistas, em vez de só carimbar o veredito.
+ */
+export function motivoParaOAutor(junta: Juncao, parecerDaMesa?: string | null): string {
+  const partes = [...junta.porques];
+  const parecer = String(parecerDaMesa ?? '').trim();
+  if (parecer) partes.push('', 'O que os especialistas apontaram:', parecer);
+  const t = partes.join('\n').trim();
+  return t.length > 4000 ? `${t.slice(0, 3999)}…` : t;
 }
 
 /**
