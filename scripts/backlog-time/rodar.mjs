@@ -37,7 +37,21 @@ const fila = rows.filter((r) => {
   const s = String(r['Status'] ?? '').trim().toLowerCase();
   return s !== 'aprovado' && s !== 'reprovado' && s !== 'descontinuado';
 });
-const alvo = LIMITE ? fila.slice(0, LIMITE) : fila;
+// ⚠️ **RETOMA de onde parou.** O run já morreu duas vezes em 10/09/2026 (um `timeout` meu e o
+// processo de fundo levando SIGKILL), e sem isto reiniciar significava re-rodar ~3 min por projeto
+// já decidido — em 90 projetos, mais de uma hora de chamada de LLM jogada fora. Só conta como
+// feito quem voltou **http 200**: falha de rede tem de ser re-tentada, não marcada como pronta.
+const feitosAntes = new Set();
+if (fs.existsSync(OUT)) {
+  try {
+    for (const r of JSON.parse(fs.readFileSync(OUT, 'utf8'))) if (r?.http === 200) feitosAntes.add(String(r.id));
+  } catch {
+    /* arquivo pela metade (morte no meio da escrita) → recomeça do zero, que é o lado seguro */
+  }
+}
+const pendente = fila.filter((r) => !feitosAntes.has(String(r['ID Projeto']).trim()));
+if (feitosAntes.size) console.log(`retomando: ${feitosAntes.size} já decidido(s), ${pendente.length} na fila`);
+const alvo = LIMITE ? pendente.slice(0, LIMITE) : pendente;
 console.log(`fila: ${alvo.length} projeto(s) de ${rows.length} linhas · concorrência ${CONC} · base ${BASE}`);
 
 async function rodarUm(row) {
@@ -76,6 +90,9 @@ async function rodarUm(row) {
 }
 
 const feitos = [];
+if (fs.existsSync(OUT)) {
+  try { feitos.push(...JSON.parse(fs.readFileSync(OUT, 'utf8')).filter((r) => r?.http === 200)); } catch { /* ignora */ }
+}
 let i = 0;
 async function worker(n) {
   while (i < alvo.length) {
@@ -84,7 +101,7 @@ async function worker(n) {
     feitos.push(r);
     const v = r.resposta?.consenso?.saida ?? r.resposta?.saida ?? r.resposta?.erro ?? r.erro ?? '?';
     console.log(
-      `[${feitos.length}/${alvo.length}] w${n} ${r.id} · http ${r.http} · ${(r.ms / 1000).toFixed(0)}s · ${String(v).slice(0, 40)}`,
+      `[${feitos.length}/${feitosAntes.size + alvo.length}] w${n} ${r.id} · http ${r.http} · ${(r.ms / 1000).toFixed(0)}s · ${String(v).slice(0, 40)}`,
     );
     fs.writeFileSync(OUT, JSON.stringify(feitos, null, 1));
   }
