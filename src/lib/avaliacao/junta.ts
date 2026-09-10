@@ -155,6 +155,31 @@ export function juntarAnalises(args: {
     };
   }
 
+  // 3b-espelho — ⚠️ **A REPROVAÇÃO MECÂNICA DA MESA também não é divergência.**
+  //
+  // Eu criei a regra 3b só para o lado do TIME e esqueci o espelho dela: no `GoCaixa` (prod,
+  // 10/09/2026) a mesa reprovou por régua — *"impacto declarado de R$ 16,55/mês, abaixo do piso
+  // de R$ 100,00, e a nota do projeto é 0"* — o time não reprovou junto, e a junta gravou
+  // **Pendente**, jogando fora uma decisão que é aritmética.
+  //
+  // ⚠️ Mesmo limite do outro lado: só vale quando o TIME não aprovou. Time aprovando contra mesa
+  // reprovando é divergência DE VERDADE e cai em Pendente, porque aí duas leituras do mesmo
+  // material discordam — não é uma metade sem o número na mão.
+  if (daMesa === 'Reprovado' && doTime.status !== 'Aprovado') {
+    porques.push('A análise do impacto reprovou o projeto por régua declarada.');
+    if (doTime.status === 'Pendente') {
+      porques.push('A avaliação da estrela não aprovou o projeto, então não há leitura que sustente mantê-lo.');
+    }
+    return {
+      status: 'Reprovado',
+      flag6a10: false,
+      porque: 'A análise do impacto reprovou por régua declarada e a estrela não sustenta o contrário.',
+      concordam: doTime.status === daMesa,
+      confianca: confTime,
+      porques,
+    };
+  }
+
   // 3c — o funil sem Pendente (opt-in, ver `fecharPendente`)
   if (args.fecharPendente && doTime.status !== 'Aprovado' && daMesa !== 'Aprovado') {
     porques.push(

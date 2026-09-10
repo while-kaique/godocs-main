@@ -121,3 +121,27 @@ describe('teto do debate do mérito — é infraestrutura, não opinião', () =>
     delete process.env.TIME_SEM_REPLICA;
   });
 });
+
+describe('⚠️ a reprovação MECÂNICA da mesa também não é divergência', () => {
+  it('mesa reprova + time em ajuste → Reprovado', () => {
+    // Caso real (GoCaixa, prod 10/09/2026): a mesa reprovou por régua — "impacto de R$ 16,55/mês,
+    // abaixo do piso de R$ 100, e a nota é 0" — o time não reprovou junto, e a junta gravava
+    // PENDENTE, jogando fora uma decisão que é aritmética. A regra 3b existia só para o lado do
+    // time; faltava o espelho.
+    const j = juntarAnalises({ impacto: imp('reprovar'), estrela: est('ajuste') });
+    expect(j.status).toBe('Reprovado');
+    expect(j.porques.join(' ')).toMatch(/régua declarada/);
+  });
+
+  it('⚠️ mas time APROVANDO contra mesa reprovando segue divergência → Pendente', () => {
+    const j = juntarAnalises({ impacto: imp('reprovar'), estrela: est('aprovar') });
+    expect(j.status).toBe('Pendente');
+    expect(j.confianca).toBe('baixa');
+  });
+
+  it('a faixa 6-10 vence até a reprovação da mesa', () => {
+    const j = juntarAnalises({ impacto: imp('reprovar'), estrela: est('humano', { escape: true }) });
+    expect(j.status).toBe('Pendente');
+    expect(j.flag6a10).toBe(true);
+  });
+});
