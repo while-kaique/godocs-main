@@ -103,6 +103,8 @@ async function estrelaPeloTimeInteiro(
   saida?: string;
   escape?: boolean;
   confianca?: 'alta' | 'media' | 'baixa';
+  /** O cérebro da estrela julgou de fato? (`false` = fallback dele — ver `LadoEstrela.avaliada`) */
+  avaliada?: boolean;
 }> {
   const projetoId = chaveProjeto(projetoIdBruto);
   // ⚠️ **Âncora protege a NOTA, não impede o JULGAMENTO** (corrigido 09/09/2026). Antes isto era um
@@ -138,7 +140,10 @@ async function estrelaPeloTimeInteiro(
   if (!r.ok) return { ok: false, motivo: r.motivo };
   const c = r.resultado.consenso;
 
-  if (opts.dry) return { ok: true, estrelas: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca };
+  // ⚠️ `avaliada` viaja junto: a junta precisa distinguir "o time julgou e é 0★" de "o cérebro
+  // da estrela caiu no fallback e devolveu 0". Sem isso, uma falha de modelo viraria decisão.
+  const avaliada = r.resultado.estrela.avaliada !== false;
+  if (opts.dry) return { ok: true, estrelas: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca, avaliada };
 
   // A âncora humana vence a nota do time: ela é verdade e exemplar do corpus, e a régua nunca
   // reclassifica quem gente já julgou. O VEREDITO do time segue valendo (é o que a junta lê).
@@ -149,6 +154,8 @@ async function estrelaPeloTimeInteiro(
       saida: c.saida,
       escape: c.escape,
       confianca: c.confianca,
+      // nota de gente é julgamento por definição
+      avaliada: true,
       motivo: `nota humana ${ancoraHumana} é âncora — o time julgou o mérito e não reescreveu a nota`,
     };
   }
@@ -199,7 +206,7 @@ async function estrelaPeloTimeInteiro(
   } catch (e) {
     console.error('[time-completo] falha ao escrever as colunas do agente:', e);
   }
-  return { ok: true, estrelas: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca };
+  return { ok: true, estrelas: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca, avaliada };
 }
 
 export type ResultadoTimeCompleto = {
@@ -233,7 +240,24 @@ function ladoEstrela(r: unknown) {
     escape: o.escape === true,
     estrela: typeof o.estrelas === 'number' ? o.estrelas : null,
     confianca: (o.confianca as 'alta' | 'media' | 'baixa' | undefined) ?? null,
+    avaliada: o.avaliada !== false,
   };
+}
+
+/**
+ * O projeto declarou ganho SEM valor financeiro? (ganho imensurável ou especial)
+ *
+ * ⚠️ Lê as CATEGORIAS declaradas pelo autor (`Tipos de Ganho`), que é a régua do formulário, e não
+ * `impacto === 0`: impacto zerado por custo continua sendo "número a conferir". É o discriminador
+ * da trava 2 da junta.
+ */
+function semNumeroDeGanhoNaLinha(linha: Record<string, string> | null, especial: boolean): boolean {
+  if (especial) return true;
+  const cats = String(linha?.['Tipos de Ganho'] ?? '').toLowerCase();
+  if (!cats) return false;
+  const temImensuravel = cats.includes('imensur');
+  const temNumero = /saving|custo evitado|receita/.test(cats);
+  return temImensuravel && !temNumero;
 }
 
 function resumoEstrela(r: unknown): ResultadoTimeCompleto['estrela'] {
@@ -282,6 +306,7 @@ export async function avaliarProjetoComTimeCompleto(
     estrela: estrela.status === 'fulfilled' ? ladoEstrela(estrela.value) : null,
     especial,
     fecharPendente: agenteFechaPendente(),
+    semNumeroDeGanho: semNumeroDeGanhoNaLinha(linhaAtual, especial),
   });
 
   // ── O funil ──────────────────────────────────────────────────────────────────────────────────

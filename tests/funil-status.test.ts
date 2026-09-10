@@ -142,10 +142,19 @@ describe('fecharPendente — o funil sem limbo (opt-in)', () => {
       parecerDaMesa: 'Financeiro: o memorial diz R$ 80,85 e a conta dá R$ 40,43.',
       semMaterial: true,
     });
-    // ⚠️ CONCISA (pedido do dono do produto): uma frase de veredito, os pontos em bullet, uma
-    // frase de saída. E o tom não pode soar como juízo de valor sobre o trabalho da pessoa.
-    expect(t).toMatch(/Não é um juízo sobre o valor do trabalho/);
-    expect(t).toMatch(/Falta: /);
+    // ⚠️ CONCISA (pedido do dono do produto): o ponto do projeto, a régua em uma linha, a saída.
+    // ⚠️ **REESCRITO em 10/09/2026.** Este teste exigia que o texto ABRISSE por
+    // *"Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o
+    // valor do trabalho."* e trouxesse o prefixo `Falta: `. Foi ao ar assim e o dono do produto
+    // leu nove reprovações seguidas com a MESMA primeira frase: *"parece padornizado o motivo de
+    // reprovação, pelo amor de Deus, nao faz sentido isso"*. O carimbo na frente empurrava o ponto
+    // concreto do projeto para a segunda linha — e em projeto de ganho imensurável ele afirmava um
+    // "ganho declarado" que não existia. Hoje o texto começa pelo que ficou sem resposta NESTE
+    // projeto; a ressalva de que não é juízo de valor continua, uma linha depois.
+    expect(t).toMatch(/O que ficou sem resposta neste projeto: /);
+    expect(t.indexOf('O que ficou sem resposta')).toBeLessThan(t.indexOf('não é um juízo'));
+    expect(t).toMatch(/não é um juízo sobre o valor do trabalho/i);
+    expect(t).not.toMatch(/^Reprovado por faltar informação/);
     // ⚠️ NÃO nomeia o agente: atribuição por agente é organização interna do time e o autor não
     // precisa dela (quem quiser tem o painel da ficha, com os quatro pareceres).
     expect(t).not.toMatch(/Financeiro:|Cético:/);

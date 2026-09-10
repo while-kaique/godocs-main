@@ -159,12 +159,29 @@ export function justificativaDaReprovacao(args: {
     // A forma: UMA frase de veredito, UMA linha por ponto (cortada), UMA de saída.
     // ⚠️ O tom importa tanto quanto o tamanho: o time não disse que o projeto é ruim, disse que
     // não consegue validá-lo com o que está escrito — e a primeira frase diz isso.
-    partes.push(
-      'Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.',
-    );
+    // ⚠️ **O PREÂMBULO CARIMBADO SAIU** (10/09/2026, dono do produto olhando 9 reprovações
+    // seguidas): *"parece padornizado o motivo de reprovação, pelo amor de Deus, nao faz sentido
+    // isso"*. A frase de abertura era literalmente a MESMA em todas — *"Reprovado por faltar
+    // informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho."* —,
+    // então o autor lia primeiro um jargão institucional e só depois o que era dele. Pior: em
+    // projeto de ganho imensurável ela AFIRMAVA um ganho declarado que não existia, e em projeto
+    // com estrela ela contradizia a nota que o mesmo time acabara de dar (as duas coisas agora têm
+    // trava própria na junta, e este ramo ficou raro — mas o texto que sobrou tem de ser honesto).
+    //
+    // A forma nova: o texto ABRE pelo ponto concreto do projeto e a régua vem depois, em uma linha.
+    // Sem ponto concreto não há reprovação por material a redigir, e a frase diz só o que houve.
     const falta = resumirEmUmaFrase(args.parecerDaMesa);
-    if (falta) partes.push(`Falta: ${falta}`);
-    partes.push('Responda esses pontos e reenvie: o reenvio reabre a avaliação.');
+    if (falta) {
+      partes.push(`O que ficou sem resposta neste projeto: ${falta}`);
+      partes.push(
+        'O time não consegue confirmar o ganho com o que está escrito hoje. Isso não é um juízo sobre o valor do trabalho.',
+      );
+    } else {
+      partes.push(
+        'O time não conseguiu confirmar o ganho deste projeto com o material que existe hoje, e não há um ponto único a apontar.',
+      );
+    }
+    partes.push('Responda esse ponto e reenvie: o reenvio reabre a avaliação.');
   } else {
     partes.push(...args.porques);
     const parecer = String(args.parecerDaMesa ?? '').trim();
@@ -172,7 +189,13 @@ export function justificativaDaReprovacao(args: {
   }
 
   const t = partes.join('\n').trim();
-  return t.length > MOTIVO_REPROVADO_MAX ? `${t.slice(0, MOTIVO_REPROVADO_MAX - 1)}…` : t;
+  // ⚠️ **Nunca vazio.** Medido em prod: o «Feel Nutrition» apareceu Reprovado com `Motivo
+  // Reprovado` em branco — o autor vê o card cinza e não tem o que responder. Sem causa
+  // conhecida, o texto diz isso e manda para a triagem, que é a verdade.
+  const texto =
+    t ||
+    'Reprovado sem uma causa registrada pelo time. Procure a triagem: este caso precisa de conferência humana.';
+  return texto.length > MOTIVO_REPROVADO_MAX ? `${texto.slice(0, MOTIVO_REPROVADO_MAX - 1)}…` : texto;
 }
 
 /** Teto de cada ponto na justificativa concisa. Linha que não cabe na tela não é lida. */

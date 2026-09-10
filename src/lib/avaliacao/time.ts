@@ -39,6 +39,7 @@ import {
 } from '@/lib/avaliacao/cetico-estrela';
 import { conciliar, type Consenso, type Liberacao } from '@/lib/avaliacao/consenso';
 import { impactoMensalDeclarado } from '@/lib/materialidade-piso';
+import { pisoPorImpacto } from '@/lib/estrelas-regua';
 import { textoJustificativaInterna, textoAoAutor, dossieDeComite, ocultarValoresMonetarios } from '@/lib/avaliacao/textos';
 import type { TipoNo } from '@/lib/agentes-log';
 
@@ -339,6 +340,19 @@ export async function avaliarComTime(args: {
     return cet;
   }
 
+  // ── o SEGUNDO EIXO da estrela: o tamanho do impacto ─────────────────────────────────────────
+  // ⚠️ **Zero I/O e zero chamada nova.** O número é o MESMO que a porta (i) da reprovação usa
+  // (`impactoMensalDeclarado` sobre o financeiro do dossiê), então régua de subir e régua de
+  // descer leem a mesma fonte — se lessem números diferentes, o time diria duas coisas sobre o
+  // mesmo projeto. O denominador é a referência medida e datada em `estrelas-regua.ts`.
+  const pisoDeImpacto = pisoPorImpacto({
+    impactoMensal: impactoMensalDeclarado({
+      ganhoTotalMensal: dossie.financeiro.ganho_total_mensal,
+      savingReais: dossie.financeiro.saving_reais,
+      receitaMensal: dossie.financeiro.receita_mensal,
+    }),
+  });
+
   // ── rodada 1 ──
   let julgamentos = await rodarRodada(raizId, 1);
 
@@ -354,9 +368,10 @@ export async function avaliarComTime(args: {
       ferramentasTexto,
       objecaoDoCetico,
       painelDoImpacto: julgamentos,
+      pisoDeImpacto,
     });
     const loop = await loopComFerramentas({ chamarLlm: chamar('estrela'), mensagensIniciais: prompt, executar: args.executar, maxChamadas: maxTools });
-    const ctx = { temVizinhos, notaHumana: args.notaHumana };
+    const ctx = { temVizinhos, notaHumana: args.notaHumana, pisoDeImpacto };
     let erro: string | null = null;
     let saida: SaidaEstrela | null = null;
     if (loop.motivo_fim === 'concluiu') saida = normalizarSaidaEstrela(loop.resultado, ctx);

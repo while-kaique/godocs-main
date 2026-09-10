@@ -161,3 +161,95 @@ describe('fecharPendente: a condição é só sobre a MESA (o mérito tem um don
     expect(juntarAnalises({ impacto: imp('aprovar'), estrela: est('ajuste'), fecharPendente: true }).status).toBe('Aprovado');
   });
 });
+
+describe('⚠️ as DUAS travas do fecharPendente (10/09/2026) — medidas em prod', () => {
+  it('nota ≥ 1 SUSTENTA o projeto: o funil aprova em vez de contradizer a própria nota', async () => {
+    // ⚠️ **O defeito era este e foi para produção.** A regra 3c olhava só a mesa e reprovava tudo
+    // que ela não aprovava, sem NUNCA olhar a nota — 9 projetos reprovados com estrela de 1★ a 5★,
+    // inclusive a «Plataforma Smartonline - Pagamento de DIFAL» (5★, R$ 117 mil/mês) e o «Painel
+    // de descritivos de cargo» (2★). Dono do produto: *"Como pode um projeto valer estrelas e ser
+    // reprovado? É contraditorio demais"*.
+    const { juntarAnalises, NOTA_SUSTENTA_APROVACAO } = await import('@/lib/avaliacao/junta');
+    expect(NOTA_SUSTENTA_APROVACAO).toBe(1);
+    const j = juntarAnalises({
+      impacto: { veredito: 'em_validacao' },
+      estrela: { saida: 'ajuste', estrela: 2, confianca: 'media' },
+      fecharPendente: true,
+    });
+    expect(j.status).toBe('Aprovado');
+    expect(j.semMaterial).toBeUndefined();
+    expect(j.porques.join(' ')).toMatch(/2★/);
+    // 5★ idem — é o caso do DIFAL.
+    expect(
+      juntarAnalises({ impacto: { veredito: 'em_validacao' }, estrela: { saida: 'ajuste', estrela: 5 }, fecharPendente: true }).status,
+    ).toBe('Aprovado');
+  });
+
+  it('⚠️ nota 0 AVALIADA continua reprovando: a trava é da nota, não do carinho', async () => {
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    const j = juntarAnalises({
+      impacto: { veredito: 'em_validacao' },
+      estrela: { saida: 'ajuste', estrela: 0, avaliada: true },
+      fecharPendente: true,
+    });
+    expect(j.status).toBe('Reprovado');
+    expect(j.semMaterial).toBe(true);
+  });
+
+  it('⚠️ FALLBACK do cérebro (nota 0 não avaliada) não vira aprovação nem reprovação por nota', async () => {
+    // `avaliada: false` é ausência de julgamento. Ela não sustenta (não aprova) e o desfecho segue
+    // a régua do material, como antes — o que ela não pode é ser lida como "o time disse 0".
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    const j = juntarAnalises({
+      impacto: { veredito: 'em_validacao' },
+      estrela: { saida: 'ajuste', estrela: 0, avaliada: false },
+      fecharPendente: true,
+    });
+    expect(j.status).toBe('Reprovado');
+    // e nota 3 de um fallback (impossível hoje, mas o contrato é explícito) também não sustenta
+    expect(
+      juntarAnalises({ impacto: { veredito: 'em_validacao' }, estrela: { saida: 'ajuste', estrela: 3, avaliada: false }, fecharPendente: true })
+        .status,
+    ).toBe('Reprovado');
+  });
+
+  it('⚠️ GANHO SEM NÚMERO não é "número não comprovado" — vai para conferência humana', async () => {
+    // Medido: «Acompanhamento de Despesa com Frete Real» (Ganho imensurável, 2★) reprovado por
+    // *"faltar informação que sustente o ganho declarado"* — não havia número nenhum declarado.
+    // Dono do produto: *"Tem que haver calibre devido para os que sao subidos como ganho
+    // imensuravel"*.
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    const j = juntarAnalises({
+      impacto: { veredito: 'em_validacao' },
+      estrela: { saida: 'ajuste', estrela: 0, avaliada: true },
+      fecharPendente: true,
+      semNumeroDeGanho: true,
+    });
+    expect(j.status).toBe('Pendente');
+    expect(j.semMaterial).toBeUndefined();
+    expect(j.porques.join(' ')).toMatch(/sem valor financeiro/);
+  });
+
+  it('⚠️ a régua MECÂNICA continua acima das duas travas: mesa Reprovado vence a nota', async () => {
+    // A reprovação da mesa é aritmética (piso composto) ou invalidez nomeada e citada. Nota alta
+    // não a desmente — se desmentisse, a régua do piso deixaria de existir.
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    const j = juntarAnalises({
+      impacto: { veredito: 'reprovar' },
+      estrela: { saida: 'ajuste', estrela: 4 },
+      fecharPendente: true,
+    });
+    expect(j.status).toBe('Reprovado');
+  });
+
+  it('⚠️ e a faixa 6-10 segue vencendo tudo, com ou sem nota', async () => {
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    const j = juntarAnalises({
+      impacto: { veredito: 'em_validacao' },
+      estrela: { saida: 'humano', escape: true, estrela: 6 },
+      fecharPendente: true,
+    });
+    expect(j.status).toBe('Pendente');
+    expect(j.flag6a10).toBe(true);
+  });
+});

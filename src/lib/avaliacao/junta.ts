@@ -27,6 +27,16 @@ export type LadoEstrela = {
   escape?: boolean | null;
   estrela?: number | null;
   confianca?: 'alta' | 'media' | 'baixa' | null;
+  /**
+   * O cérebro da estrela JULGOU, ou a nota é o fallback dele?
+   *
+   * ⚠️ Sem este campo, `nota 0` significa duas coisas opostas — "o time olhou e é a caixa
+   * «Experimenta»" e "o modelo não respondeu" — e a régua da nota abaixo trataria uma falha de
+   * infraestrutura como julgamento. É o mesmo motivo pelo qual `SaidaEstrela.avaliada` existe.
+   * `undefined` (chamador antigo) é lido como avaliada: quem passa nota sem dizer o contrário
+   * está afirmando um julgamento.
+   */
+  avaliada?: boolean | null;
 } | null;
 
 export type Juncao = DecisaoDoFunil & {
@@ -39,6 +49,29 @@ export type Juncao = DecisaoDoFunil & {
   /** A reprovação veio de "não deu para validar", não de régua de mérito. Muda o TOM do texto. */
   semMaterial?: boolean;
 };
+
+/**
+ * A partir de quantas estrelas a NOTA sustenta o projeto no funil.
+ *
+ * ⚠️ **Por que existe (10/09/2026, dono do produto).** A regra 3c abaixo olhava só a mesa e
+ * fechava em Reprovado tudo que ela não aprovava — **sem nunca olhar a nota**. Resultado medido em
+ * prod: 9 projetos reprovados com estrela do time entre 1★ e 5★, inclusive a «Plataforma
+ * Smartonline - Pagamento de DIFAL» (5★, R$ 117 mil/mês) e o «Painel de descritivos de cargo»
+ * (2★). Palavras dele: *"Como pode um projeto valer estrelas e ser reprovado?"* e *"É
+ * contraditorio demais… Nao era pra ser reprovado"*.
+ *
+ * A contradição é real e é de RÉGUA, não de afinação: a estrela ≥ 1★ afirma que o projeto está
+ * numa das caixas da régua — informa, executa, garante, decide ou assume —, e essa é a mesma
+ * pergunta que o funil faz ("isto é um projeto?"). Reprovar por falta de comprovação do NÚMERO,
+ * depois de dizer que o projeto executa uma rotina recorrente, é responder as duas coisas ao
+ * contrário no mesmo parecer.
+ *
+ * ⚠️ **O que a nota NÃO derruba:** a régua mecânica continua acima dela — piso composto (impacto
+ * < R$ 100 **e** nota zero, onde 1★ nunca chega) e invalidez nomeada e citada (fora de uso,
+ * ressubmissão), que são as duas portas do `reprovar` do time e a reprovação da mesa (3b/3b-espelho).
+ * O que a nota fecha é só a porta do "não deu para validar o número".
+ */
+export const NOTA_SUSTENTA_APROVACAO = 1;
 
 /** Veredito da MESA → status do funil. Vocabulário dela, não do time. */
 function statusDaMesa(veredito: string): StatusFunil {
@@ -79,6 +112,14 @@ export function juntarAnalises(args: {
    * o número — reprovar seria afirmar o oposto do que o time concluiu.
    */
   fecharPendente?: boolean;
+  /**
+   * O projeto foi submetido SEM valor financeiro de ganho (ganho imensurável ou especial).
+   *
+   * ⚠️ É o discriminador da TRAVA 2 do passo 3c. Vem das categorias de ganho declaradas pelo
+   * autor, não de `impacto === 0`: impacto zero também acontece em projeto que declarou número e
+   * teve o número zerado por custo, e esse caso continua sendo "número a conferir".
+   */
+  semNumeroDeGanho?: boolean;
 }): Juncao {
   const { impacto, estrela } = args;
   const especial = args.especial === true;
@@ -87,6 +128,9 @@ export function juntarAnalises(args: {
   const doTime = estrela ? statusDoFunil({ saida: estrela.saida, escape: estrela.escape }) : null;
   const daMesa = impacto ? statusDaMesa(impacto.veredito) : null;
   const confTime = estrela?.confianca ?? 'baixa';
+  // A nota, e se ela é julgamento de fato (ver `LadoEstrela.avaliada` e `NOTA_SUSTENTA_APROVACAO`).
+  const nota = typeof estrela?.estrela === 'number' && Number.isFinite(estrela.estrela) ? estrela.estrela : null;
+  const notaSustenta = estrela?.avaliada !== false && nota !== null && nota >= NOTA_SUSTENTA_APROVACAO;
 
   // 1 — a faixa de escape
   if (doTime?.flag6a10) {
@@ -188,6 +232,46 @@ export function juntarAnalises(args: {
   // primeiro projeto da fila veio com mesa `em_validacao` + time `aprovar` — caiu em "divergiram"
   // e voltou para Pendente, justamente o limbo que esta regra existe para fechar.)_
   if (args.fecharPendente && daMesa !== 'Aprovado') {
+    // ⚠️ **TRAVA 1 — a NOTA sustenta o projeto.** Ver `NOTA_SUSTENTA_APROVACAO`: se o time
+    // posicionou o projeto em 1★ ou mais, ele já respondeu "isto é um projeto" com a régua na mão.
+    // Fechar em Reprovado por não confirmar o NÚMERO seria dizer o contrário no mesmo parecer.
+    if (notaSustenta) {
+      porques.push(
+        `A avaliação da estrela colocou o projeto em ${nota}★, então ele está numa das caixas da régua: o projeto existe e faz o que descreve.`,
+      );
+      porques.push(
+        'A análise do impacto não conseguiu confirmar o número do ganho com o material que existe. Isso fica registrado no parecer como ponto a acompanhar e não derruba o projeto.',
+      );
+      return {
+        status: 'Aprovado',
+        flag6a10: false,
+        porque: `O projeto vale ${nota}★ pela régua; o que falta é confirmar o número, e isso fica como ressalva.`,
+        concordam: false,
+        confianca: confTime === 'alta' ? 'media' : confTime,
+        porques,
+      };
+    }
+    // ⚠️ **TRAVA 2 — sem número declarado não há "número não comprovado".** Ganho imensurável e
+    // especial entram no GoDocs sem valor financeiro por decisão de produto, e a justificativa
+    // deste ramo fala de "ganho declarado que não se sustenta": aplicá-la aqui é responder outra
+    // pergunta. Medido em prod: «Acompanhamento de Despesa com Frete Real» (Ganho imensurável,
+    // 2★) reprovado por *"faltar informação que sustente o ganho declarado"* — não havia ganho
+    // declarado em número nenhum. Dono do produto: *"Tem que haver calibre devido para os que sao
+    // subidos como ganho imensuravel"*.
+    if (args.semNumeroDeGanho) {
+      porques.push(
+        'O projeto foi submetido como ganho sem valor financeiro, então não há número de ganho a confirmar: a régua do material não se aplica a ele.',
+      );
+      porques.push('Sem um número para conferir, quem decide o mérito é a triagem humana.');
+      return {
+        status: 'Pendente',
+        flag6a10: false,
+        porque: 'Ganho sem valor financeiro: não há número a comprovar, então a decisão é humana.',
+        concordam: false,
+        confianca: 'baixa',
+        porques,
+      };
+    }
     porques.push(
       'O time não conseguiu validar o projeto com o material que existe, então o desfecho é reprovar com o que falta declarado, em vez de deixá-lo esperando sem dono.',
     );
