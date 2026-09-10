@@ -147,14 +147,26 @@ describe('⚠️ a reprovação MECÂNICA da mesa também não é divergência',
 });
 
 describe('fecharPendente: a condição é só sobre a MESA (o mérito tem um dono)', () => {
-  it('⚠️ mesa em_validacao + time APROVANDO → Reprovado quando o funil fecha', () => {
-    // Medido em prod: a 1ª versão exigia que nenhum dos dois tivesse aprovado, e o primeiro
-    // projeto da fila (mesa `em_validacao` + time `aprovar`) voltou para Pendente — o limbo que
-    // esta regra existe para fechar. Se a aprovação da mesa vale quando o time não aprova (2b), o
-    // inverso vale também: a aprovação do time não estabelece um mérito que a mesa não deu.
+  it('⚠️ mesa em_validacao + time APROVANDO: a mesa manda, e o desfecho é a TRIAGEM', () => {
+    // A condição continua sendo só sobre a MESA (o mérito tem um dono): a aprovação do time não
+    // estabelece um mérito que a mesa não deu, então isto NÃO vira Aprovado.
+    // ⚠️ **Mas também não vira mais Reprovado** (TRAVA 3, 10/09/2026): o que falta aqui é
+    // confirmar o número, e isso é pergunta ao autor. Este teste exigia `Reprovado` e era, junto
+    // com o irmão dele em `funil-status`, o que produziu a reprovação do «Smartonline DIFAL»
+    // (R$ 117.475/mês) por *"não há memória de cálculo"* — chamada de inadmissível pelo dono do
+    // produto, com razão. Sem reenvio pendente, o desfecho é Pendente.
     const j = juntarAnalises({ impacto: imp('em_validacao'), estrela: est('aprovar'), fecharPendente: true });
-    expect(j.status).toBe('Reprovado');
-    expect(j.semMaterial).toBe(true);
+    expect(j.status).toBe('Pendente');
+    expect(j.semMaterial).toBeUndefined();
+    // e com o reenvio que a triagem pediu e nunca voltou, aí sim reprova — é fato do fluxo
+    const r = juntarAnalises({
+      impacto: imp('em_validacao'),
+      estrela: est('aprovar'),
+      fecharPendente: true,
+      reenvioNaoChegou: true,
+    });
+    expect(r.status).toBe('Reprovado');
+    expect(r.semMaterial).toBe(true);
   });
 
   it('e a mesa aprovando segue mandando: Aprovado, com o funil fechando ou não', () => {
@@ -185,18 +197,53 @@ describe('⚠️ as DUAS travas do fecharPendente (10/09/2026) — medidas em pr
     ).toBe('Aprovado');
   });
 
-  it('⚠️ nota 0 AVALIADA continua reprovando: a trava é da nota, não do carinho', async () => {
+  it('⚠️ nota 0 AVALIADA já NÃO reprova por material — vai para a triagem (TRAVA 3)', async () => {
+    // ⚠️ **REESCRITO no mesmo dia em que nasceu.** Eu tinha fechado só dois vãos (nota ≥ 1★ e
+    // ganho sem número) e este teste guardava o terceiro aberto: projeto com nota 0, impacto
+    // alto, reprovado por "não consegui confirmar o número". Medido na staging logo depois: o
+    // «SendApp» (R$ 97 mil/mês, nota 0 lá) voltou a ser gravado **Reprovado**. É a classe do caso
+    // que o dono do produto chamou de inadmissível — e ele está certo: quem duvida do número pede
+    // a conta, quem reprova afirma que o trabalho não vale.
     const { juntarAnalises } = await import('@/lib/avaliacao/junta');
     const j = juntarAnalises({
       impacto: { veredito: 'em_validacao' },
       estrela: { saida: 'ajuste', estrela: 0, avaliada: true },
       fecharPendente: true,
     });
-    expect(j.status).toBe('Reprovado');
-    expect(j.semMaterial).toBe(true);
+    expect(j.status).toBe('Pendente');
+    expect(j.semMaterial).toBeUndefined();
+    expect(j.porques.join(' ')).toMatch(/pergunta ao autor/);
   });
 
-  it('⚠️ FALLBACK do cérebro (nota 0 não avaliada) não vira aprovação nem reprovação por nota', async () => {
+  it('⚠️ e nem impacto ALTO com nota 0 reprova — é o caso do DIFAL, textualmente', async () => {
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    for (const nota of [0, null]) {
+      const j = juntarAnalises({
+        impacto: { veredito: 'em_validacao' },
+        estrela: { saida: 'ajuste', estrela: nota, avaliada: true },
+        fecharPendente: true,
+      });
+      expect(j.status).toBe('Pendente');
+    }
+  });
+
+  it('a ÚNICA reprovação por material que sobrou é o reenvio que não chegou', async () => {
+    // Fato do fluxo, não juízo de mérito: um reenvio reescreveria o Status, então o Status parado
+    // em `Reenvio Pendente` significa literalmente "o autor não voltou". Foi o pedido do dono do
+    // produto: "O novo 'reenvio pendente' vai ser reprovado com justificativa".
+    const { juntarAnalises } = await import('@/lib/avaliacao/junta');
+    const j = juntarAnalises({
+      impacto: { veredito: 'em_validacao' },
+      estrela: { saida: 'ajuste', estrela: 0, avaliada: true },
+      fecharPendente: true,
+      reenvioNaoChegou: true,
+    });
+    expect(j.status).toBe('Reprovado');
+    expect(j.semMaterial).toBe(true);
+    expect(j.porques.join(' ')).toMatch(/reenvio não chegou/);
+  });
+
+  it('⚠️ FALLBACK do cérebro (nota 0 não avaliada) não sustenta e também não reprova', async () => {
     // `avaliada: false` é ausência de julgamento. Ela não sustenta (não aprova) e o desfecho segue
     // a régua do material, como antes — o que ela não pode é ser lida como "o time disse 0".
     const { juntarAnalises } = await import('@/lib/avaliacao/junta');
@@ -205,12 +252,14 @@ describe('⚠️ as DUAS travas do fecharPendente (10/09/2026) — medidas em pr
       estrela: { saida: 'ajuste', estrela: 0, avaliada: false },
       fecharPendente: true,
     });
-    expect(j.status).toBe('Reprovado');
+    // ⚠️ Pendente desde a TRAVA 3: o fallback não sustenta a aprovação e também não autoriza a
+    // reprovação — ausência de julgamento nunca é decisão, em nenhuma das duas direções.
+    expect(j.status).toBe('Pendente');
     // e nota 3 de um fallback (impossível hoje, mas o contrato é explícito) também não sustenta
     expect(
       juntarAnalises({ impacto: { veredito: 'em_validacao' }, estrela: { saida: 'ajuste', estrela: 3, avaliada: false }, fecharPendente: true })
         .status,
-    ).toBe('Reprovado');
+    ).toBe('Pendente');
   });
 
   it('⚠️ GANHO SEM NÚMERO não é "número não comprovado" — vai para conferência humana', async () => {

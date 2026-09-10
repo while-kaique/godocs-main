@@ -88,7 +88,10 @@ describe('podeAgenteGravarStatus — os três casos medidos', () => {
   it('a frase do log nomeia a causa e não culpa ninguém', () => {
     expect(porqueNaoEncostou('aprovado', 'Reprovado')).toMatch(/já está Aprovado/);
     expect(porqueNaoEncostou('descontinuado', 'Reprovado')).toMatch(/Descontinuado/);
-    expect(porqueNaoEncostou('decisao_humana', 'Aprovado')).toMatch(/decidido por uma pessoa/);
+    // ⚠️ a frase mudou junto com a trava reforçada: ela agora diz também COMO destravar (só o
+    // reenvio do autor reabre), porque quem lê o log precisa saber o que fazer com o projeto.
+    expect(porqueNaoEncostou('decisao_humana', 'Aprovado')).toMatch(/A triagem já decidiu/);
+    expect(porqueNaoEncostou('decisao_humana', 'Aprovado')).toMatch(/quando o autor reenviar/);
   });
 });
 
@@ -126,5 +129,54 @@ describe('podeAgenteEscreverNota — a âncora que `forcar` não fura', () => {
     // `Estrela Agente = "6-10"` não é comparável a um 7 digitado: a régua se recusa a afirmar a
     // posição, então quem pôs 7 foi o comitê.
     expect(podeAgenteEscreverNota({ naCelula: 7, recomendadaPeloAgente: '6-10' }).pode).toBe(false);
+  });
+});
+
+describe('⚠️ decisaoDeAdminBloqueia — o buraco que a 1ª trava deixou', () => {
+  it('o atropelo de ontem NÃO autoriza o de hoje (o caso SendApp, 3 escritas)', async () => {
+    // Olhar só quem escreveu o status ATUAL protege contra o primeiro atropelo e libera todos os
+    // seguintes: no «SendApp» o agente gravou Pendente às 20:00, 20:09 e 20:54 depois de o Bruno
+    // ter aprovado às 19:57 — e da segunda vez em diante o status atual já era dele.
+    const { decisaoDeAdminBloqueia, podeAgenteGravarStatus, ATOR_AGENTE } = await import('@/lib/decisao-humana');
+    const historico = [
+      { ator: ATOR_AGENTE, quando: '2026-09-10 20:00:44' },
+      { ator: 'bruno.bezerra@gocase.com', quando: '2026-09-10 19:57:15' },
+    ];
+    expect(decisaoDeAdminBloqueia({ historico })).toBe(true);
+    // o status atual é do PRÓPRIO agente e ele ainda assim não pode escrever
+    const r = podeAgenteGravarStatus({
+      statusAtual: 'Pendente',
+      alvo: 'Reprovado',
+      atorDoStatusAtual: ATOR_AGENTE,
+      historico,
+    });
+    expect(r.pode).toBe(false);
+    expect(r.motivo).toBe('decisao_humana');
+  });
+
+  it('⚠️ o REENVIO do autor reabre — é o único fato que destrava', async () => {
+    // Sem esta saída, projeto que a triagem devolveu e o autor corrigiu ficaria travado para
+    // sempre. O reenvio reabrir a avaliação é o desenho já aprovado do funil.
+    const { decisaoDeAdminBloqueia } = await import('@/lib/decisao-humana');
+    const historico = [{ ator: 'bruno.bezerra@gocase.com', quando: '2026-08-26 22:13:08' }];
+    expect(decisaoDeAdminBloqueia({ historico, ultimoReenvioEm: '2026-09-01 10:00:00' })).toBe(false);
+    // reenvio ANTERIOR à decisão não destrava (a triagem decidiu vendo o reenvio)
+    expect(decisaoDeAdminBloqueia({ historico, ultimoReenvioEm: '2026-08-20 10:00:00' })).toBe(true);
+    // ⚠️ empate protege a decisão humana
+    expect(decisaoDeAdminBloqueia({ historico, ultimoReenvioEm: '2026-08-26 22:13:08' })).toBe(true);
+  });
+
+  it('histórico só do agente não bloqueia (senão o funil pararia sozinho)', async () => {
+    const { decisaoDeAdminBloqueia, ATOR_AGENTE } = await import('@/lib/decisao-humana');
+    expect(
+      decisaoDeAdminBloqueia({ historico: [{ ator: ATOR_AGENTE, quando: '2026-09-10 20:00:44' }] }),
+    ).toBe(false);
+  });
+
+  it('sem histórico não bloqueia', async () => {
+    const { decisaoDeAdminBloqueia } = await import('@/lib/decisao-humana');
+    expect(decisaoDeAdminBloqueia({})).toBe(false);
+    expect(decisaoDeAdminBloqueia({ historico: [] })).toBe(false);
+    expect(decisaoDeAdminBloqueia({ historico: null })).toBe(false);
   });
 });

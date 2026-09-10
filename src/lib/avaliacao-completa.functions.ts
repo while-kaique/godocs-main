@@ -34,8 +34,13 @@ import {
   podeAgenteEscreverNota,
   porqueNaoEncostou,
   ehAtorHumano,
+  type EscritaDeStatus,
 } from '@/lib/decisao-humana';
-import { getAdminStatusLogs, queryAdminActivitiesPorAcao } from '@/integrations/db/client.server';
+import {
+  getAdminStatusLogs,
+  queryAdminActivitiesPorAcao,
+  getReenviosDoProjeto,
+} from '@/integrations/db/client.server';
 
 /**
  * Quem aparece na auditoria quando quem decidiu foi o time. ⚠️ Não usar um e-mail de pessoa: o
@@ -327,6 +332,11 @@ export async function avaliarProjetoComTimeCompleto(
     especial,
     fecharPendente: agenteFechaPendente(),
     semNumeroDeGanho: semNumeroDeGanhoNaLinha(linhaAtual, especial),
+    // ⚠️ O Status parado em `Reenvio Pendente` é o FATO "o autor não voltou" (um reenvio o
+    // reescreveria) — a única reprovação por material que sobrou. Ver a TRAVA 3 da junta.
+    reenvioNaoChegou: ['reenvio pendente', 'rejeitado'].includes(
+      String(linhaAtual?.['Status'] ?? '').trim().toLowerCase(),
+    ),
   });
 
   // ── O funil ──────────────────────────────────────────────────────────────────────────────────
@@ -370,10 +380,13 @@ export async function avaliarProjetoComTimeCompleto(
       // `Descontinuado` (flag do dono, não veredito) e não escreve por cima de status que uma
       // pessoa gravou. Quando ele se recusa, a avaliação continua registrada como RECOMENDAÇÃO:
       // o que não acontece é a escrita.
+      const trilha = await historicoDeStatus(projetoId);
       const permissao = podeAgenteGravarStatus({
         statusAtual: linhaAtual?.['Status'],
         alvo: junta.status,
         atorDoStatusAtual: await atorDoUltimoStatus(projetoId),
+        historico: trilha.historico,
+        ultimoReenvioEm: trilha.ultimoReenvioEm,
       });
       if (!permissao.pode) {
         const porque = porqueNaoEncostou(permissao.motivo!, junta.status);
@@ -418,6 +431,43 @@ async function atorDoUltimoStatus(projetoId: string): Promise<string | null | un
   } catch {
     return undefined;
   }
+}
+
+/**
+ * O histórico de escritas de status + o carimbo do último reenvio.
+ *
+ * ⚠️ É o material da trava reforçada (`decisaoDeAdminBloqueia`): sem o histórico INTEIRO, a régua
+ * só vê a última escrita — e o «SendApp» mostrou que o agente reescreve três vezes seguidas depois
+ * de atropelar uma decisão uma vez. O reenvio é a ÚNICA coisa que reabre a avaliação, e é por isso
+ * que ele é lido aqui junto: sem ele, um projeto que a triagem devolveu e o autor corrigiu ficaria
+ * travado para sempre.
+ * ⚠️ Nunca lança, e duas consultas por PROJETO são irrelevantes num caminho que gasta ~30 chamadas
+ * de LLM — mas não devem entrar em nenhum laço de lote sem serem revistas.
+ */
+async function historicoDeStatus(
+  projetoId: string,
+): Promise<{ historico: EscritaDeStatus[]; ultimoReenvioEm: string | null }> {
+  const out: { historico: EscritaDeStatus[]; ultimoReenvioEm: string | null } = {
+    historico: [],
+    ultimoReenvioEm: null,
+  };
+  try {
+    const logs = (await getAdminStatusLogs(projetoId, 50)) as {
+      admin_email?: string | null;
+      created_at?: string | null;
+    }[];
+    out.historico = logs.map((l) => ({ ator: l.admin_email ?? null, quando: l.created_at ?? null }));
+  } catch {
+    /* sem histórico, valem só as travas duras */
+  }
+  try {
+    const reenvios = (await getReenviosDoProjeto(projetoId)) as { created_at?: string | null }[];
+    const carimbos = reenvios.map((r) => String(r.created_at ?? '').trim()).filter(Boolean).sort();
+    out.ultimoReenvioEm = carimbos.length ? carimbos[carimbos.length - 1] : null;
+  } catch {
+    /* sem reenvio conhecido = nada reabre; a trava fica do lado seguro */
+  }
+  return out;
 }
 
 /**

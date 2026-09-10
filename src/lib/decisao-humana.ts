@@ -48,6 +48,53 @@ export const STATUS_INTOCAVEIS_PELO_AGENTE = ['Aprovado', 'Descontinuado'] as co
 
 export type MotivoDeNaoEncostar = 'aprovado' | 'descontinuado' | 'decisao_humana' | null;
 
+/** Um registro de escrita de status, como a auditoria guarda. */
+export type EscritaDeStatus = {
+  /** Quem escreveu. Vazio/ausente conta como GENTE (default invertido). */
+  ator?: string | null;
+  /** Carimbo comparável como texto ISO/`YYYY-MM-DD HH:MM:SS` (é o formato do log). */
+  quando?: string | null;
+};
+
+/**
+ * Existe decisão de admin que o agente não pode desfazer? PURA.
+ *
+ * ⚠️ **Isto fecha o buraco que a 1ª versão da trava deixou** (10/09/2026, pedido do dono do
+ * produto: *"travar para que o agente [não] faça mudanças em cima do que nós do admin tenhamos
+ * alterado"*). Olhar só **quem escreveu o status ATUAL** protege contra o primeiro atropelo e
+ * libera todos os seguintes: depois que o agente escreveu por cima uma vez, o status atual passa a
+ * ser dele e a trava se abre — exatamente o que aconteceu no «SendApp», onde ele gravou Pendente
+ * **três vezes** (20:00, 20:09, 20:54) depois de o Bruno ter aprovado às 19:57.
+ *
+ * A régua: havendo decisão humana no histórico, o agente **só volta a agir se o autor reenviou
+ * depois dela** — e aí não é sobreposição, é fato novo (o reenvio reabre a avaliação, que é o
+ * desenho já aprovado do funil).
+ */
+export function decisaoDeAdminBloqueia(args: {
+  historico?: readonly EscritaDeStatus[] | null;
+  /** Carimbo do último reenvio do autor, se houve. */
+  ultimoReenvioEm?: string | null;
+}): boolean {
+  const hist = args.historico ?? [];
+  if (!hist.length) return false;
+  const humanas = hist
+    .filter((h) => ehAtorHumano(h.ator))
+    .map((h) => String(h.quando ?? '').trim())
+    .filter(Boolean)
+    .sort();
+  if (!humanas.length) {
+    // Há histórico, todo do agente, sem carimbo legível: nada a proteger aqui.
+    return hist.some((h) => ehAtorHumano(h.ator));
+  }
+  const ultimaHumana = humanas[humanas.length - 1];
+  const reenvio = String(args.ultimoReenvioEm ?? '').trim();
+  // ⚠️ Comparação de STRING é proposital: os dois carimbos vêm do mesmo formato do SQLite
+  // (`YYYY-MM-DD HH:MM:SS`), que é ordenável como texto. Converter para Date aqui só criaria uma
+  // chance de fuso trocado — e o empate protege a decisão humana.
+  if (reenvio && reenvio > ultimaHumana) return false;
+  return true;
+}
+
 /**
  * O agente pode gravar `alvo` neste projeto? PURA.
  *
@@ -67,6 +114,14 @@ export function podeAgenteGravarStatus(args: {
    * (ninguém decidiu) · string = o ator.
    */
   atorDoStatusAtual?: string | null;
+  /**
+   * O histórico de escritas de status do projeto (qualquer ordem). Com ele, a régua deixa de
+   * olhar só a última escrita e passa a respeitar QUALQUER decisão de admin ainda válida — ver
+   * `decisaoDeAdminBloqueia`.
+   */
+  historico?: readonly EscritaDeStatus[] | null;
+  /** Carimbo do último reenvio do autor: é o único fato que reabre a avaliação. */
+  ultimoReenvioEm?: string | null;
 }): { pode: boolean; motivo: MotivoDeNaoEncostar } {
   const atual = String(args.statusAtual ?? '').trim();
   const alvo = String(args.alvo ?? '').trim();
@@ -83,10 +138,14 @@ export function podeAgenteGravarStatus(args: {
   //   • `null` = **não há histórico**, ninguém decidiu este status → o agente pode agir;
   //   • string = ator conhecido; se for gente, o agente não encosta (e origem em branco dentro de
   //     um registro que EXISTE conta como gente, pelo default invertido de `ehAtorHumano`).
-  if (args.atorDoStatusAtual === undefined || args.atorDoStatusAtual === null) {
-    return { pode: true, motivo: null };
+  if (args.atorDoStatusAtual !== undefined && args.atorDoStatusAtual !== null && ehAtorHumano(args.atorDoStatusAtual)) {
+    return { pode: false, motivo: 'decisao_humana' };
   }
-  if (ehAtorHumano(args.atorDoStatusAtual)) return { pode: false, motivo: 'decisao_humana' };
+  // ⚠️ E a decisão de admin ANTERIOR também vale, mesmo que a última escrita tenha sido do
+  // agente: sem isto, o primeiro atropelo autoriza todos os próximos.
+  if (decisaoDeAdminBloqueia({ historico: args.historico, ultimoReenvioEm: args.ultimoReenvioEm })) {
+    return { pode: false, motivo: 'decisao_humana' };
+  }
   return { pode: true, motivo: null };
 }
 
@@ -98,7 +157,7 @@ export function porqueNaoEncostou(motivo: Exclude<MotivoDeNaoEncostar, null>, al
   if (motivo === 'descontinuado') {
     return `O projeto está marcado como Descontinuado pelo dono dele, o que não é um veredito de mérito: o agente não escreve por cima (concluiu ${alvo}).`;
   }
-  return `O status atual foi decidido por uma pessoa, então o agente não escreve por cima (concluiu ${alvo}).`;
+  return `A triagem já decidiu o status deste projeto, então o agente não escreve por cima (concluiu ${alvo}). A avaliação volta a valer quando o autor reenviar.`;
 }
 
 /**
