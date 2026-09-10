@@ -77,8 +77,33 @@ export function ReguaEstrela({ nota }: { nota: number | null }) {
   const [aberto, setAberto] = useState(false);
   const verbo = verboDaNota(nota);
   const escape = typeof nota === 'number' && nota >= FAIXA_ESCAPE.min;
+  const nivel = typeof nota === 'number' ? niveis().find((n) => n.nota === nota) : undefined;
   return (
     <div className="mt-1.5">
+      {/* ⚠️ **O CRITÉRIO FICA VISÍVEL, não atrás do clique** (pedido do dono do produto,
+          10/09/2026: *"em todo card deve aparecer a analise do time de agente deve aparecer com os
+          criterios de estrelas pra eu comparar"*). Sem o critério ao lado da nota, comparar dois
+          projetos exige abrir dois acordeões e guardar o texto de cabeça. */}
+      {nivel && (
+        <p className="text-[12px] leading-relaxed">
+          <span className="font-semibold" style={{ color: AZUL }}>
+            {nivel.nota} · {nivel.verbo}
+          </span>
+          <span className="text-muted-foreground"> — {nivel.criterio}</span>
+        </p>
+      )}
+      {escape && (
+        <p className="text-[12px] leading-relaxed">
+          <span className="font-semibold" style={{ color: AMBAR }}>
+            {FAIXA_ESCAPE.min} a {FAIXA_ESCAPE.max} · Muda o jogo
+          </span>
+          <span className="text-muted-foreground">
+            {' '}
+            — revoluciona como a área ou a empresa trabalha, com impacto direto nos KPIs. O agente
+            indica a faixa e não crava o número: a posição é do comitê.
+          </span>
+        </p>
+      )}
       <button
         type="button"
         onClick={() => setAberto((v) => !v)}
