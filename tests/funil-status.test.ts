@@ -8,6 +8,8 @@ import {
   entraNaFilaDoTime,
   statusDoFunil,
   statusFunilDeLegado,
+  justificativaDaReprovacao,
+  MOTIVO_REPROVADO_MAX,
 } from '@/lib/funil-status';
 
 describe('statusDoFunil — o desfecho do time vira status', () => {
@@ -72,5 +74,45 @@ describe('statusFunilDeLegado — os seis textos antigos', () => {
     expect(statusFunilDeLegado('APROVADO')).toBe('Aprovado');
     expect(statusFunilDeLegado(' reprovado ')).toBe('Reprovado');
     expect(statusFunilDeLegado('rejeitado')).toBe('Reprovado');
+  });
+});
+
+describe('justificativaDaReprovacao — a causa REAL, não um carimbo', () => {
+  it('⚠️ reenvio que não voltou é reprovado POR ISSO, e o texto não fala de impacto', () => {
+    const t = justificativaDaReprovacao({
+      porques: ['O ganho declarado é de R$ 18,16 por mês, abaixo do piso.'],
+      parecerDaMesa: 'Financeiro: a conta não fecha.',
+      statusAnterior: 'Reenvio Pendente',
+      motivoReenvio: 'Falta a evidência do contrato encerrado.',
+    });
+    expect(t).toMatch(/devolvido pela triagem/);
+    expect(t).toMatch(/Falta a evidência do contrato encerrado/);
+    expect(t).toMatch(/reenvie/i);
+    // não pode carimbar a régua do impacto em quem foi reprovado por não ter reenviado
+    expect(t).not.toMatch(/18,16|piso/);
+  });
+
+  it('sem o texto do pedido, ainda diz o que aconteceu e o que fazer', () => {
+    const t = justificativaDaReprovacao({ porques: [], statusAnterior: 'Reenvio Pendente', motivoReenvio: '—' });
+    expect(t).toMatch(/reenvio não chegou/);
+    expect(t).toMatch(/Para corrigir/);
+    expect(t).not.toMatch(/—/);
+  });
+
+  it('as outras causas seguem levando os porquês da junta e o parecer', () => {
+    const t = justificativaDaReprovacao({
+      porques: ['O ganho declarado é de R$ 18,16 por mês, abaixo do piso.'],
+      parecerDaMesa: 'Financeiro: a conta não fecha.',
+      statusAnterior: 'Pendente',
+    });
+    expect(t).toMatch(/18,16/);
+    expect(t).toMatch(/O que os especialistas apontaram/);
+    expect(t).not.toMatch(/devolvido pela triagem/);
+  });
+
+  it('respeita o teto da coluna', () => {
+    const t = justificativaDaReprovacao({ porques: ['x'.repeat(9000)], statusAnterior: 'Pendente' });
+    expect(t.length).toBeLessThanOrEqual(MOTIVO_REPROVADO_MAX);
+    expect(t.endsWith('…')).toBe(true);
   });
 });

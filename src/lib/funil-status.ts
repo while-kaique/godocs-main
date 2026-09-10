@@ -100,3 +100,57 @@ export function statusFunilDeLegado(bruto: string | null | undefined): StatusFun
 export function entraNaFilaDoTime(statusBruto: string | null | undefined): boolean {
   return statusFunilDeLegado(statusBruto) !== null;
 }
+
+// ─── A justificativa que o AUTOR lê ──────────────────────────────────────────────────────────────
+
+/** Teto da coluna `Motivo Reprovado` no schema. O corte é no fim, com reticência. */
+export const MOTIVO_REPROVADO_MAX = 4000;
+
+/**
+ * O texto da reprovação, montado pela CAUSA REAL. PURO.
+ *
+ * ⚠️ **Não é um carimbo.** Pedido do dono do produto (10/09/2026): *"é pra garantir que nem todo
+ * projeto reprovado vai receber a mensagem de experimentação. Se um projeto por exemplo que tem
+ * reenvio pendente e nao foi enviado pelo autor o reenvio, deve ser esclarecido pelo agente o
+ * motivo pelo qual ele ta sendo reprovado e aguarda resubmissao do autor"*.
+ *
+ * O caso do REENVIO é o que mais precisa disso, e é detectável sem LLM: o Status ainda é
+ * `Reenvio Pendente`, ou seja a triagem devolveu o projeto e **nenhum reenvio chegou** (um reenvio
+ * reescreve o Status). Dizer a esse autor que o projeto "é experimentação" ou que "o ganho é
+ * pequeno" é responder outra pergunta: o que aconteceu foi que o ajuste pedido nunca voltou.
+ *
+ * ⚠️ A justificativa do reenvio é **exortativa, não anuladora**: ela termina em "reenvie e o time
+ * reavalia", porque é literalmente o que acontece (o reenvio reabre a avaliação). As outras causas
+ * seguem levando os porquês da junta, que já vêm com o eixo nomeado.
+ */
+export function justificativaDaReprovacao(args: {
+  porques: readonly string[];
+  /** O parecer dos especialistas, quando houver. */
+  parecerDaMesa?: string | null;
+  /** O Status que a linha tinha ANTES desta decisão. */
+  statusAnterior?: string | null;
+  /** O que a triagem pediu na coluna `Motivo Reenvio`, quando pediu algo. */
+  motivoReenvio?: string | null;
+}): string {
+  const partes: string[] = [];
+  const anterior = String(args.statusAnterior ?? '').trim().toLowerCase();
+  const pedido = String(args.motivoReenvio ?? '').trim();
+  const temPedido = pedido !== '' && pedido !== '—' && pedido !== '-';
+
+  if (anterior === 'reenvio pendente' || anterior === 'rejeitado') {
+    partes.push(
+      'Este projeto foi devolvido pela triagem para ajuste e o reenvio não chegou. A reprovação é por isso, não por um julgamento do mérito do que você fez.',
+    );
+    if (temPedido) partes.push(`O que a triagem pediu: ${pedido}`);
+    partes.push(
+      'Para corrigir: edite o projeto com o ajuste e reenvie. O time reavalia o projeto no reenvio e a decisão pode mudar.',
+    );
+  } else {
+    partes.push(...args.porques);
+    const parecer = String(args.parecerDaMesa ?? '').trim();
+    if (parecer) partes.push('', 'O que os especialistas apontaram:', parecer);
+  }
+
+  const t = partes.join('\n').trim();
+  return t.length > MOTIVO_REPROVADO_MAX ? `${t.slice(0, MOTIVO_REPROVADO_MAX - 1)}…` : t;
+}

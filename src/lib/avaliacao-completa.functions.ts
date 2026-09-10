@@ -22,10 +22,12 @@ import { lerLinhaEspelho, espelharEscrita } from '@/lib/sheet-espelho';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { upsertAvaliacaoEspecial, getProjetoById } from '@/integrations/db/client.server';
 import { rotuloNotaAgente } from '@/lib/estrelas-regua';
+import { TIPOS_PROJETO, NIVEIS_PROJETO } from '@/lib/categorizacao-projeto';
 import { chaveProjeto } from '@/lib/projeto-chave';
 import { numero } from '@/lib/dashboard-resumo';
 import { ESTRELA_LIMITE_REPROVAVEL } from '@/lib/materialidade-piso';
 import { juntarAnalises, type Juncao } from '@/lib/avaliacao/junta';
+import { justificativaDaReprovacao } from '@/lib/funil-status';
 import { definirStatusProjeto } from '@/lib/dashboard-admin.functions';
 
 /**
@@ -44,6 +46,12 @@ export const ATOR_TIME_AGENTES = 'time-de-agentes@godocs';
  * é o momento em que a plataforma passa a ser gerenciada por agentes — e tem de ser um ato
  * explícito num ambiente por vez, não efeito colateral de um deploy.
  */
+/** A célula está vazia? `—`/`-` contam como vazio, como em todo o resto do repo. */
+function vazioNaPlanilha(v: string | undefined | null): boolean {
+  const t = String(v ?? '').trim();
+  return t === '' || t === '—' || t === '-';
+}
+
 export function agenteDecideFunil(): boolean {
   const v = String(process.env.AGENTE_DECIDE_FUNIL ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'sim' || v === 'on';
@@ -93,14 +101,27 @@ async function estrelaPeloTimeInteiro(
   // "falta uma metade", em projeto que gente já tinha avaliado. São 15 dos 90 do backlog.
   // Hoje o time roda igual (o veredito é dele), e o que a âncora bloqueia é a ESCRITA da nota.
   let ancoraHumana: number | null = null;
+  // ⚠️ UMA leitura da linha, reusada pela âncora E pelo preenchimento de lacuna abaixo: ler o
+  // espelho duas vezes no mesmo caminho seria round-trip de graça.
+  let linhaAtual: Record<string, string> | null = null;
+  try {
+    linhaAtual = (await lerLinhaEspelho(projetoId)) as Record<string, string> | null;
+  } catch {
+    // Não conseguir ler a linha não pode impedir a avaliação: segue e o time julga.
+  }
+  // ⚠️ **A âncora é a nota de GENTE, e a coluna deixou de dizer quem a escreveu** (10/09/2026): o
+  // agente passou a classificar de 0 a 5 na própria coluna `Estrelas`, então "tem número lá" não
+  // significa mais "um humano julgou". Sem esta distinção, a nota que o AGENTE escreveu viraria
+  // âncora contra ele mesmo na passada seguinte e congelaria para sempre.
+  //
+  // A régua: é do agente quando o número da célula é IGUAL ao que ele recomendou em
+  // `Estrela Agente`. ⚠️ Caso de borda declarado: humano que concorda e digita o mesmo número é
+  // tratado como agente — e o efeito é reescrever a célula com o MESMO valor, que é inofensivo.
   if (!opts.forcar) {
-    try {
-      const linha = await lerLinhaEspelho(projetoId);
-      const humana = numero((linha as Record<string, string> | null)?.['Estrelas']);
-      if (humana != null && humana >= ESTRELA_LIMITE_REPROVAVEL) ancoraHumana = humana;
-    } catch {
-      // Não conseguir ler a âncora não pode impedir a avaliação: segue e o time julga.
-    }
+    const naCelula = numero(linhaAtual?.['Estrelas']);
+    const recomendada = String(linhaAtual?.['Estrela Agente'] ?? '').trim();
+    const foiOAgente = naCelula != null && recomendada !== '' && String(naCelula) === recomendada;
+    if (naCelula != null && naCelula >= ESTRELA_LIMITE_REPROVAVEL && !foiOAgente) ancoraHumana = naCelula;
   }
 
   const r = await avaliarProjetoComTime(projetoId, { gatilho: 'time-completo' });
@@ -143,10 +164,26 @@ async function estrelaPeloTimeInteiro(
   try {
     // `rotuloNotaAgente` é a FONTE ÚNICA do rótulo (a mesma da tela): a faixa 6-10 vira "6-10",
     // porque `Estrela Agente` precisa carregá-la sem afirmar um número que a régua não afirma.
-    const celulas = {
+    // ⚠️ **O cérebro da estrela JÁ classifica tipo e nível, e isso era jogado fora.** Ele responde
+    // `tipo`/`nivel` no MESMO vocabulário da categorização (`categorizacao-projeto.ts`), e a
+    // gravação só levava a nota: em prod, 39 de 761 linhas estavam com `Tipo de Projeto` vazio (31
+    // delas no backlog dos 90) e a coluna "Tipo · Nível" do dashboard aparecia como travessão em
+    // projeto que o time acabou de ler inteiro.
+    //
+    // ⚠️ **Só preenche o que está VAZIO, nunca sobrescreve.** A categorização de 722 linhas foi
+    // feita numa rodada dedicada e a triagem pode ter corrigido à mão; a régua aqui é a mesma da
+    // âncora da nota — o agente completa lacuna, não reescreve julgamento que já existe.
+    // ⚠️ **`Complexidade` fica FORA**: ela é da alçada do analisador (que grava
+    // `automacao`/`inteligencia`/`autonomia`), e dois escritores na mesma célula é a briga que este
+    // repo já pagou em outras colunas. O nível do time vira `Tipo de Projeto` só pelo eixo TIPO.
+    const celulas: Record<string, string> = {
       'Estrela Agente': rotuloNotaAgente(c.estrela).rotulo,
       'Confiança Agente': c.confianca,
     };
+    const tipoDoTime = TIPOS_PROJETO.find((t) => t.chave === r.resultado.estrela.tipo)?.rotulo;
+    if (tipoDoTime && vazioNaPlanilha(linhaAtual?.['Tipo de Projeto'])) {
+      celulas['Tipo de Projeto'] = tipoDoTime;
+    }
     await updateRowByProjectId(projetoId, celulas);
     await espelharEscrita(projetoId, celulas);
   } catch (e) {
@@ -222,6 +259,14 @@ export async function avaliarProjetoComTimeCompleto(
   // ficava sendo o da mesa e a nota a do time, sem nenhuma peça olhando as duas. É a caixa "Junta
   // as duas análises" do grafo, que o desenho afirmava e o código não tinha.
   const especial = await ehEspecial(projetoId);
+  // A linha do espelho para o TEXTO da reprovação (Status anterior e o que a triagem pediu).
+  // ⚠️ Leitura do SQLite, nunca do Sheets — e uma só, aqui.
+  let linhaAtual: Record<string, string> | null = null;
+  try {
+    linhaAtual = (await lerLinhaEspelho(projetoId)) as Record<string, string> | null;
+  } catch {
+    // sem a linha, a justificativa cai nos porquês da junta (que já nomeiam o eixo)
+  }
   const junta = juntarAnalises({
     impacto: m.ok && m.veredito ? { veredito: m.veredito } : null,
     estrela: estrela.status === 'fulfilled' ? ladoEstrela(estrela.value) : null,
@@ -238,12 +283,37 @@ export async function avaliarProjetoComTimeCompleto(
       // ⚠️ A justificativa vai em `Motivo Reprovado` só na REPROVAÇÃO, que é a coluna que o AUTOR
       // lê no card dele. `Observações` NÃO é tocada: ela é o parecer do analisador e é o texto que
       // o disparo de e-mails manda.
-      const justificativa = motivoParaOAutor(junta, m.motivo);
+      // ⚠️ A justificativa sai da CAUSA REAL, não de um carimbo: projeto que ficou em
+      // `Reenvio Pendente` sem o autor reenviar é reprovado POR ISSO, e o texto tem de dizer
+      // exatamente isso (e que reenviar reabre), em vez de falar de impacto ou experimentação.
+      const justificativa = justificativaDaReprovacao({
+        porques: junta.porques,
+        parecerDaMesa: m.motivo,
+        statusAnterior: linhaAtual?.['Status'],
+        motivoReenvio: linhaAtual?.['Motivo Reenvio'],
+      });
+      // ⚠️ **O AGENTE CLASSIFICA de 0 a 5 na coluna `Estrelas`** (decisão do dono do produto,
+      // 10/09/2026: *"estrelas é preenchido por humano NO CASO DE 6-10, nos outros casos o AGENTE
+      // PODE SIM CLASSIFICAR. E ele deve"*). Isto REVERTE o invariante antigo de "Estrelas é 100%
+      // humana", e as três travas que sobram são:
+      //   (a) **a faixa 6-10 NÃO é escrita** — a régua se recusa a dizer se é 6 ou 10, e gravar 6
+      //       afirmaria uma posição que ninguém afirmou; ali fica a flag e o comitê crava;
+      //   (b) **nota de gente não é sobrescrita** (`ancoraHumana`, ver acima);
+      //   (c) quem escreveu segue rastreável fora da célula: `Estrela Agente` guarda o valor do
+      //       agente, `especial_avaliacao` guarda a origem `time-completo`, e a auditoria registra
+      //       a escrita com o ator `ATOR_TIME_AGENTES`.
+      // ⚠️ Vai por `definirStatusProjeto` porque ele é o ÚNICO ponto que grava essa coluna direito
+      // (numérica, sem `ouTraco`, com remendo do espelho e as 2 auditorias).
+      const notaParaCelula =
+        !junta.flag6a10 && e.ok && typeof e.estrelas === 'number' && e.estrelas >= 0 && e.estrelas <= 5
+          ? e.estrelas
+          : undefined;
       await definirStatusProjeto(
         {
           projeto_id: projetoId,
           status: junta.status,
           ...(junta.status === 'Reprovado' ? { motivo_reprovado: justificativa } : {}),
+          ...(notaParaCelula !== undefined ? { estrelas: notaParaCelula } : {}),
         },
         ATOR_TIME_AGENTES,
       );
