@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { rotuloNotaAgente } from '@/lib/estrelas-regua';
+import { ReguaEstrela, verboDaNota } from '@/components/dashboard/regua-estrela';
 import { StatusBadge } from '@/components/status-badge';
 import { ParecerLiderPainel } from '@/components/dashboard/parecer-lider';
 import { apiFetch } from '@/lib/api-client';
@@ -534,9 +535,9 @@ function EstrelaDoTime({ time }: { time: NonNullable<AvaliacaoSombra['time']> })
           <span className="inline-flex items-baseline gap-1 text-[13.5px] font-bold" style={{ color: '#0059A9' }}>
             {time.estrela}
             <Star className="h-3.5 w-3.5 self-center" aria-hidden />
-            <span className="text-[11px] font-semibold">
-              {time.estrela === 1 ? 'estrela sugerida' : 'estrelas sugeridas'}
-            </span>
+            {/* ⚠️ O VERBO ao lado do número: "2" sozinho não é revisável, "2 · Executa" é. Sai da
+                fonte única da régua, a mesma que o agente recebe. */}
+            <span className="text-[11px] font-semibold">{verboDaNota(time.estrela) ?? (time.estrela === 1 ? 'estrela' : 'estrelas')}</span>
           </span>
         )}
         {time.saida && (
@@ -569,6 +570,8 @@ function EstrelaDoTime({ time }: { time: NonNullable<AvaliacaoSombra['time']> })
       <p className="mt-1.5 text-[11px] text-muted-foreground">
         Esta é a nota que o time gravou. Para mudá-la, use o campo de estrelas acima.
       </p>
+      {/* A régua na tela: sem ela, discordar de um 2 é palpite contra palpite. */}
+      <ReguaEstrela nota={time.estrela ?? null} />
     </div>
   );
 }
