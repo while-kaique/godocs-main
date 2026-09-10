@@ -30,6 +30,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { rotuloNotaAgente } from '@/lib/estrelas-regua';
 import { StatusBadge } from '@/components/status-badge';
 import { ParecerLiderPainel } from '@/components/dashboard/parecer-lider';
 import { apiFetch } from '@/lib/api-client';
@@ -508,8 +509,11 @@ function EstrelaSugerida({ estrela }: { estrela: NonNullable<AvaliacaoSombra['es
       {estrela.leitura && (
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">{estrela.leitura}</p>
       )}
+      {/* ⚠️ Não diz mais "quem grava a nota é a triagem": desde 10/09/2026 o agente escreve a nota
+          de 0 a 5 na coluna, e só a faixa 6-10 fica para o comitê. A triagem CORRIGE, que é outra
+          coisa — e é o campo acima que serve para isso. */}
       <p className="mt-1.5 text-[11px] text-muted-foreground">
-        Sugestão do agente. Quem grava a nota é a triagem, no campo acima.
+        Nota do classificador de 1 agente (legado). O número que vale é o do time, abaixo.
       </p>
     </div>
   );
@@ -560,9 +564,10 @@ function EstrelaDoTime({ time }: { time: NonNullable<AvaliacaoSombra['time']> })
           {time.divergencias.join(' ')}
         </p>
       )}
-      {/* ⚠️ A nota NÃO tem botão de aplicar: quem escreve a coluna "Estrelas" é gente. */}
+      {/* ⚠️ Sem botão de aplicar: de 0 a 5 o agente já GRAVOU a nota na coluna, e na faixa 6-10 o
+          número é do comitê — não há o que aplicar em nenhum dos dois casos. */}
       <p className="mt-1.5 text-[11px] text-muted-foreground">
-        Sugestão do agente. Quem grava a nota é a triagem, no campo acima.
+        Esta é a nota que o time gravou. Para mudá-la, use o campo de estrelas acima.
       </p>
     </div>
   );
@@ -634,7 +639,10 @@ function AvaliacaoSombraPainel({
           className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.06em]"
           style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}
         >
-          <Bot className="h-3 w-3" aria-hidden /> Sombra
+          {/* ⚠️ Era "Sombra", e virou mentira em 10/09/2026: o agente passou a GRAVAR o Status
+              (Aprovado/Reprovado) e a nota de 0 a 5. Rótulo que descreve um modo que acabou é pior
+              que rótulo nenhum — quem tria lê "sombra" e ignora uma decisão que já valeu. */}
+          <Bot className="h-3 w-3" aria-hidden /> Time de agentes
         </span>
         {mesa ? (
           <>
@@ -652,18 +660,40 @@ function AvaliacaoSombraPainel({
                 Divergiram
               </span>
             )}
-            {/* A estrela vale no cabeçalho: é o número que a triagem procura. Prefere a do
-                classificador (o que o botão roda); o time completo é o fallback. */}
-            {(estrela?.estrelas ?? time?.estrela) != null && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
-                style={{ background: 'rgba(0,89,169,0.09)', border: '1px solid rgba(0,89,169,0.3)', color: '#0059A9' }}
-              >
-                {estrela?.estrelas ?? time?.estrela}
-                <Star className="h-3 w-3" aria-hidden />
-                <span className="font-semibold">sugeridas</span>
-              </span>
-            )}
+            {/* ⚠️ A ORDEM inverteu em 10/09/2026: mostrava a nota do classificador de 1 agente e
+                caía na do time só como fallback, então a mesma tela exibia 4 (classificador), 5
+                (time) e a faixa 6-10 em prosa — três respostas para "qual é a nota". Quem decide
+                é o TIME; o classificador virou legado aqui. */}
+            {(time?.estrela ?? estrela?.estrelas) != null &&
+              (() => {
+                const n = (time?.estrela ?? estrela?.estrelas) as number;
+                const { rotulo } = rotuloNotaAgente(n);
+                const escape = rotulo !== String(n);
+                // ⚠️ **A FAIXA 6-10 É DESTAQUE, não prosa** (pedido do Luis, 10/09/2026, olhando a
+                // ficha do «AVD Central v2»): ela estava escondida no 3º parágrafo do painel
+                // enquanto o cabeçalho mostrava "4 sugeridas", e a triagem tinha de ler o texto
+                // inteiro para descobrir que o desfecho real era "falta cravar de 6 a 10".
+                // O rótulo sai de `rotuloNotaAgente`, a MESMA fonte da planilha e do chip da lista.
+                // ⚠️ Estado nunca só por cor: a faixa vem com a palavra "faixa" e o que falta.
+                return escape ? (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
+                    style={{ background: 'rgba(138,90,0,0.12)', border: '1px solid rgba(138,90,0,0.45)', color: '#8a5a00' }}
+                  >
+                    <Star className="h-3 w-3" aria-hidden />
+                    faixa {rotulo} · falta o comitê cravar
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
+                    style={{ background: 'rgba(0,89,169,0.09)', border: '1px solid rgba(0,89,169,0.3)', color: '#0059A9' }}
+                  >
+                    {rotulo}
+                    <Star className="h-3 w-3" aria-hidden />
+                    <span className="font-semibold">do time</span>
+                  </span>
+                );
+              })()}
           </>
         ) : (
           <span className="text-[12.5px] text-muted-foreground">Sem recomendação ainda</span>
@@ -686,9 +716,13 @@ function AvaliacaoSombraPainel({
           className="space-y-3 border-t px-3.5 pb-3.5 pt-3"
           style={{ borderColor: 'rgba(71,85,105,0.18)' }}
         >
+          {/* ⚠️ Esta frase dizia "não muda o status. A decisão segue sendo da triagem" — verdade
+              até 10/09/2026, quando o time passou a decidir o funil e gravou Aprovado em 50
+              projetos e Reprovado em 15 no mesmo dia. Manter o texto antigo fazia a tela negar o
+              que a planilha mostrava. */}
           <p className="text-[11.5px] text-muted-foreground">
-            Recomendação do agente — <strong className="font-semibold">não muda o status</strong>. A
-            decisão segue sendo da triagem.
+            O time de agentes <strong className="font-semibold">decide o status</strong> deste
+            projeto. A triagem revisa e corrige quando discorda.
           </p>
 
           {/* O veredito dos QUATRO. Avaliação ANTIGA não tem os argumentos gravados: aí cai no
