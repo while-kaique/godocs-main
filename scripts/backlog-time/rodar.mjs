@@ -39,10 +39,15 @@ if (!COOKIE) throw new Error('E2E_COOKIE ausente no .env');
 // ⚠️ Descontinuado fica fora: o dono desligou a automação, e julgar mérito de algo desligado
 // gasta chamada num veredito que ninguém vai aplicar (ver `src/lib/funil-status.ts`).
 const rows = JSON.parse(fs.readFileSync(CORPUS, 'utf8'));
-const fila = rows.filter((r) => {
-  const s = String(r['Status'] ?? '').trim().toLowerCase();
-  return s !== 'aprovado' && s !== 'reprovado' && s !== 'descontinuado';
-});
+// Lista EXPLÍCITA de ids (`BACKLOG_IDS`): quando ela vem, é ela a fila, na ordem dada. Serve para
+// alvos cirúrgicos — "os que estão sem estrela", "os pré-aprovados" — sem reprocessar a base.
+const idsPedidos = String(process.env.BACKLOG_IDS ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+const fila = idsPedidos.length
+  ? idsPedidos.map((id) => rows.find((r) => String(r['ID Projeto']).trim() === id) ?? { 'ID Projeto': id, 'Nome do Projeto': '' })
+  : rows.filter((r) => {
+      const s = String(r['Status'] ?? '').trim().toLowerCase();
+      return s !== 'aprovado' && s !== 'reprovado' && s !== 'descontinuado';
+    });
 // ⚠️ **RETOMA de onde parou.** O run já morreu duas vezes em 10/09/2026 (um `timeout` meu e o
 // processo de fundo levando SIGKILL), e sem isto reiniciar significava re-rodar ~3 min por projeto
 // já decidido — em 90 projetos, mais de uma hora de chamada de LLM jogada fora. Só conta como

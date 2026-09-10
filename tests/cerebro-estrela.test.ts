@@ -207,26 +207,42 @@ describe('normalizarSaidaEstrela — coerência nota ↔ critério', () => {
 
 // ── 4. D14 — sem evidência, cai um nível ──────────────────────────────────────
 
-describe('normalizarSaidaEstrela — D14: sem evidência citada o critério não vale', () => {
+/**
+ * ⚠️ **ESTE BLOCO MUDOU DE SINAL em 10/09/2026, e o antigo estava errado.** Ele prendia a D14
+ * ("sem evidência citada o critério não vale → a nota CAI um nível"), e a intenção era certa:
+ * impedir que um projeto reivindicasse 5★ com auto-elogio. O efeito, porém, media a coisa errada —
+ * **a estrela responde o que o projeto FAZ**, e documentação incompleta do AUTOR passava a mudar a
+ * CAIXA do projeto. Decisão do dono do produto: *"as estrelas sejam dadas por nivel de complexidade
+ * do projeto e o quao impactante ele é independente de faltar informação do cliente ou nao"* e *"eu
+ * lembro dessa separação ser pra garantir que o projeto n suba nem desça em relação a caixinha"*.
+ *
+ * É o mesmo princípio que o repo já mediu nas lentes: a caixa sai do dossiê inteiro, um eixo fraco
+ * não a desmente, e para BAIXO existe só o piso, que exige citação nomeada.
+ *
+ * ⚠️ A marca `sem_evidencia` continua valendo — e continua bloqueando o que importa: confiança
+ * `alta` (`confiancaDe`), escape 6-10 (`escapeValido` recusa) e reprovação pelo piso (exige zero
+ * defendido com citação). Sem citação o projeto **não sobe nem desce de caixa**.
+ */
+describe('normalizarSaidaEstrela — sem evidência MARCA, não derruba a nota', () => {
   it.each([
     ['evidencias: []', { evidencias: [] }],
     ['evidencias ausente', { evidencias: undefined }],
     ['evidencias só com strings vazias', { evidencias: ['', '   '] }],
-  ])('nota 3 com %s → nota 2, executa, sem_evidencia', (_rotulo, over) => {
+  ])('nota 3 com %s FICA 3, marcada como sem_evidencia', (_rotulo, over) => {
     const b = bruto(over as Bruto);
     if (b.evidencias === undefined) delete b.evidencias;
     const s = normalizarSaidaEstrela(b, CTX);
     expect(s).not.toBeNull();
-    expect(s!.nota).toBe(2);
-    expect(s!.criterio_aplicado).toBe('executa');
+    expect(s!.nota).toBe(3);
+    expect(s!.criterio_aplicado).toBe('garante');
     expect(s!.sem_evidencia).toBe(true);
     expect(s!.sinais.temEvidenciaCitada).toBe(false);
   });
 
-  it('nota 1 sem evidência → 0 com "experimenta"', () => {
+  it('nota 1 sem evidência FICA 1 (antes caía para 0 e trocava o verbo)', () => {
     const s = normalizarSaidaEstrela(bruto({ nota: 1, criterio_aplicado: 'Informa', evidencias: [] }), CTX);
-    expect(s!.nota).toBe(0);
-    expect(s!.criterio_aplicado).toBe('experimenta');
+    expect(s!.nota).toBe(1);
+    expect(s!.criterio_aplicado).toBe('informa');
     expect(s!.sem_evidencia).toBe(true);
   });
 

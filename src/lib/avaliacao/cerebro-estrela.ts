@@ -250,11 +250,28 @@ export function normalizarSaidaEstrela(
   let nota = Math.max(0, Math.min(TETO_AGENTE, Math.round(n)));
 
   const evidencias = strings(o.evidencias);
-  let sem_evidencia = false;
-  if (nota > 0 && evidencias.length === 0) {
-    nota -= 1;
-    sem_evidencia = true;
-  }
+  // ⚠️ **FALTA DE CITAÇÃO MARCA, NÃO DERRUBA A NOTA** (10/09/2026, decisão do dono do produto).
+  //
+  // Aqui a nota caía **um nível inteiro** quando o agente não citava trecho do material. A
+  // intenção era certa — impedir que um projeto reivindicasse 5★ com auto-elogio —, mas o efeito
+  // media a coisa errada: **a estrela responde o que o projeto FAZ** (impacto e complexidade), e
+  // documentação incompleta do AUTOR passava a mudar a caixa do projeto. Palavras dele: *"devemos
+  // garantir de que as estrelas sejam dadas por nivel de complexidade do projeto e o quao
+  // impactante ele é independente de faltar informação do cliente ou nao"* e *"eu lembro dessa
+  // separação ser pra garantir que o projeto n suba nem desça em relação a caixinha (estrela) que
+  // deve pertencer"*.
+  //
+  // ⚠️ É o MESMO princípio que o repo já mediu nas lentes: *a base lê o dossiê inteiro e diz em
+  // que CAIXA o projeto está; um eixo fraco não desmente a caixa, e para BAIXO existe só o piso,
+  // que exige citação nomeada.* Sem citação, portanto: a nota FICA e a saída é MARCADA.
+  //
+  // ⚠️ O que a marca continua bloqueando, e é por isso que ela não é decorativa:
+  //   • **confiança** — `confiancaDe` exige `temEvidenciaCitada` nos dois cérebros para dar `alta`;
+  //   • **escape 6-10** — `escapeValido` recusa `sem_evidencia` (`consenso.ts`), então nada sobe
+  //     para a faixa sem citação;
+  //   • **reprovação pelo piso** — exige zero DEFENDIDO com citação, então nada desce por aqui.
+  // Ou seja: sem citação o projeto não sobe nem desce de caixa, que é exatamente o pedido.
+  const sem_evidencia = nota > 0 && evidencias.length === 0;
 
   // Promoção: só com dependente NOMEADO (não promessa) e nunca acima do teto.
   const depCru = typeof o.dependente_nomeado === 'string' ? o.dependente_nomeado.trim() : '';
