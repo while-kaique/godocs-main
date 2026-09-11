@@ -72,7 +72,9 @@ const feitos = new Set(
     .filter((f) => { try { return (JSON.parse(readFileSync(join(OUT, 'projetos', f), 'utf8')).http ?? 599) < 500; } catch { return false; } })
     .map((f) => f.replace(/\.json$/, '')),
 );
-fila = fila.filter((l) => !feitos.has(l.id.toLowerCase()));
+// CAL_IDS="id1,id2" → rerroda SÓ esses ids (mesmo já feitos): é a passada de correção depois de uma trava nova.
+const soIds = new Set((process.env.CAL_IDS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean));
+fila = soIds.size ? fila.filter((l) => soIds.has(l.id.toLowerCase())) : fila.filter((l) => !feitos.has(l.id.toLowerCase()));
 if (LIMITE > 0) fila = fila.slice(0, LIMITE);
 if (process.env.CAL_SO_FILA) { console.log(fila.slice(0, 12).map((l) => `${l.id} ${l.status}/${l.estrelas || '-'} ${l.nome.slice(0, 50)}`).join('\n')); console.log(`[noite] (só fila) total ${fila.length}`); process.exit(0); }
 console.log(`[noite] fila: ${fila.length} (canários ${antes.filter(eCanario).length}, pendentes ${antes.filter(ePendente).length}, com estrela ${antes.filter(temEstrela).length}) · já feitos ${feitos.size} · conc ${CONC}`);

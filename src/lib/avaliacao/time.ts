@@ -36,6 +36,7 @@ import {
   ceticoEstrelaFallback,
   travaEscapeSemCitacao,
   type ResultadoCeticoEstrela,
+  reconciliarReplicaEstrela,
 } from '@/lib/avaliacao/cetico-estrela';
 import { conciliar, type Consenso, type Liberacao } from '@/lib/avaliacao/consenso';
 import { impactoMensalDeclarado } from '@/lib/materialidade-piso';
@@ -457,7 +458,18 @@ export async function avaliarComTime(args: {
   // não convergem — eles alternam. Se o cético insistir depois da volta, quem decide é o consenso.
   let ceticoEstrela = await rodarCeticoEstrela(estrela, raizId, 1);
   if (ceticoEstrela.refuta && ceticoEstrela.motivo) {
-    estrela = await rodarEstrela(2, ceticoEstrela.motivo);
+    const primeira = estrela;
+    const replica = await rodarEstrela(2, ceticoEstrela.motivo);
+    // ⚠️ Trava depois do debate (11/09/2026): a réplica baixa no máximo 1 nível por volta, e um
+    // escape 6–10 válido só cai se o cético NOMEOU o gatilho derrubado. Medido: 21 de 96 réplicas
+    // desabavam ≥2 níveis e 10 de 15 escapes válidos sumiam por objeção genérica.
+    estrela = reconciliarReplicaEstrela(primeira, replica, ceticoEstrela);
+    if (estrela !== replica) {
+      await registrarSeguro(
+        { pai_id: raizId, agente: 'trava-replica-estrela', tipo: 'cetico', rodada: 2, entrada: `réplica ${replica.nota}★ (escape ${replica.escape.valido ? 'sim' : 'não'})`, saida: json({ nota: estrela.nota, escape: estrela.escape.valido, gatilho_refutado: ceticoEstrela.gatilho_refutado }), veredito: `${estrela.nota}`, duracao_ms: 0 },
+        true,
+      );
+    }
     ceticoEstrela = await rodarCeticoEstrela(estrela, raizId, 2);
   }
 

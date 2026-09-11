@@ -417,7 +417,7 @@ export const GATILHOS_ESCAPE = [
   {
     chave: 'nao_existiria',
     texto:
-      'Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria.',
+      'Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria. Ter existido uma versão MANUAL de parte do trabalho não nega o gatilho: ele pergunta pela atividade NOVA (volume, horário, alcance, produto) que só existe por causa dele.',
   },
   {
     chave: 'sem_volta',
