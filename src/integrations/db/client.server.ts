@@ -385,13 +385,37 @@ export function getProjetosParaSyncReverso() {
       | "tipos_projeto"
       | "tipo_projeto"
       | "descontinuado"
+      | "ganho_categorias"
+      | "saving_efetivado_valor_antes"
+      | "saving_efetivado_valor_agora"
+      | "saving_efetivado_frequencia"
+      | "saving_efetivado_evidencia"
+      | "custo_evitado_frequencia"
+      | "custo_evitado_horas_valor"
+      | "custo_evitado_nao_contratado"
+      | "custo_evitado_racional"
+      | "receita_incremental_valor"
+      | "receita_incremental_frequencia"
+      | "receita_incremental_racional"
+      | "ganho_imensuravel_racional"
+      | "custo_rodar_itens"
+      | "impacto_bruto"
+      | "impacto_liquido"
+      | "impacto_liquido_mensal"
     >
   >(
+    // ⚠️ As colunas v2 entraram em 11/09/2026: o sync reverso passou a copiá-las da planilha e a
+    // recalcular os 3 impactos (`sync-reverso-v2.ts`); sem elas aqui o diff gravaria tudo de novo a cada corrida.
     `SELECT id, nome, responsavel_email, responsavel_nome, area, descricao_breve, ferramenta,
             escopo, alguem_fazia, saving_horas, saving_reais, tipo_saving, memorial_calculo,
             custo_externo_mensal, ganho_total_mensal, complexidade, observacoes,
             custo_evitado_justificativa, contexto_especial, atualizado_em, membros,
-            membros_papeis, especial, tipos_projeto, tipo_projeto, descontinuado
+            membros_papeis, especial, tipos_projeto, tipo_projeto, descontinuado,
+            ganho_categorias, saving_efetivado_valor_antes, saving_efetivado_valor_agora,
+            saving_efetivado_frequencia, saving_efetivado_evidencia, custo_evitado_frequencia,
+            custo_evitado_horas_valor, custo_evitado_nao_contratado, custo_evitado_racional,
+            receita_incremental_valor, receita_incremental_frequencia, receita_incremental_racional,
+            ganho_imensuravel_racional, custo_rodar_itens, impacto_bruto, impacto_liquido, impacto_liquido_mensal
      FROM projetos`,
     [],
   );

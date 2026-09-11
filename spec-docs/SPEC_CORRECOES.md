@@ -3554,3 +3554,11 @@ a devolver `8844 → 8844` (antes, `→ 12621,74`) e reconverter é no-op (`linh
 **Testes.** `tests/converter-custo-evitado-puro.test.ts` — 6 casos sobre a função PURA
 `converterSavingParaCustoEvitado`, incluindo idempotência e **a regressão que motivou tudo**: com
 as `linhas` no lugar, o recálculo normal volta a somar horas + contrato (12.621,74).
+
+
+## Sync reverso não copiava os campos da v2 (11/09/2026)
+
+**Sintoma:** mudar `Freq. Custo Evitado` (mensal → pontual) da «Torre de Controle Supply Gogroup» na planilha não mudava nada no SQLite; o Impacto Líquido Mensal continuava R$ 7.464,05 e um reenvio do autor devolveria "mensal" à planilha.
+**Causa:** `SAFE_UPDATE_FIELDS` só cobria campos da v1; as colunas renomeadas eram puladas em linha v2 (`soV1`) e as colunas v2 de `projetos` não tinham leitor na volta.
+**Fix:** `src/lib/google/sync-reverso-v2.ts` (puro) lê os blocos v2 da linha e recalcula os 3 impactos pela fórmula de `impacto.ts`; `updatesV2DaLinha` aplica na atualização e na criação; divergência real regrava os 3 impactos na planilha. Recálculo ligado por default (`SYNC_REVERSO_RECALCULA_IMPACTO=0` desliga). Medição prévia: 771 linhas, 653 iguais, 62 só arredondamento, 1 real.
+**Onde aterrissou:** `sync-reverse.ts`, `sync-reverso-v2.ts`, `client.server.ts` (`getProjetosParaSyncReverso` com colunas v2). PR `feat/sync-reverso-v2`.
