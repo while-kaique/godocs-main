@@ -35,6 +35,7 @@ import { SECAO } from "@/lib/titulo-pagina";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
+import type { ResumoGanho } from "@/lib/notificacao-ganho";
 import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
 import { InfoTooltip } from "@/components/info-tooltip";
 import {
@@ -91,6 +92,12 @@ type ItemAprovacao = {
   criado_em: string | null;
   descricao_breve: string | null;
   participantes: Participante[];
+  /**
+   * O ganho como a PLANILHA o declara (fonte única com o card do Chat e a ficha do dashboard).
+   * ⚠️ Os campos v1 abaixo ficam como REDE: eles vêm do SQLite, que a v2 não escreve, e por isso
+   * a fila mostrava "63 h" sem nenhum R$ em projeto que tem R$ 1.406,63 na planilha.
+   */
+  ganho: ResumoGanho | null;
   saving_horas: number | null;
   saving_reais: number | null;
   tipo_saving: string | null;
@@ -888,21 +895,72 @@ function CardAprovacao({
         {/* Um card por número, todos no mesmo nível (o ganho total é o primeiro, com a
             barra lime). O resumo do projeto vem DEPOIS, ocupando o card inteiro, porque é
             texto corrido e não cabe numa coluna estreita. */}
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <CardNumero
-            rotulo="Ganho total"
-            valor={fmtReais(i.ganho_total) ?? fmtReais(i.saving_reais)}
-            destaque
-            vazio={i.especial ? "Projeto especial" : undefined}
-          />
-          <CardNumero rotulo="Horas economizadas" valor={horas} />
-          <CardNumero rotulo="Recorrência" valor={TIPO_SAVING_LABEL[i.tipo_saving ?? ""] ?? null} />
-          <CardNumero rotulo="Saving em R$" valor={reais} />
-          <CardNumero rotulo="Custo evitado" valor={fmtReais(i.custo_evitado_reais)} />
-          <CardNumero rotulo="Receita mensal" valor={fmtReais(i.receita_mensal)} />
-          {/* Custo externo é o que a solução CONSOME para rodar — subtrai do ganho. */}
-          <CardNumero rotulo="Custo externo" valor={fmtReais(i.custo_externo_mensal)} negativo />
-        </div>
+        {/* ⚠️ **Os números vêm da PLANILHA** (10/09/2026). Esta grade era montada dos campos v1
+            do SQLite, que a v2 não escreve — e a fila do líder era o último leitor deles. Medido
+            nos 23 cards que os líderes tinham na tela: «Vision Operação» mostrava 63 h e NENHUM
+            R$ (a planilha diz R$ 1.406,63), «Control Tower» 168 h sem valor, e 7 cards em branco.
+            Agora sai de `resumirGanhoDaPlanilha`, a MESMA função do card do Chat e da ficha: se
+            discordar da célula ao lado, é bug — e discordar dela foi o defeito de origem lá. */}
+        {i.ganho ? (
+          <>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <CardNumero
+                rotulo="Impacto líquido mensal"
+                valor={i.ganho.destaque?.valor ?? null}
+                destaque
+                vazio={
+                  i.ganho.semNumero
+                    ? i.especial
+                      ? "Projeto especial"
+                      : "Ganho sem valor financeiro"
+                    : undefined
+                }
+              />
+              {i.ganho.detalhe.map((d) => (
+                <CardNumero key={d.rotulo} rotulo={d.rotulo} valor={d.valor} />
+              ))}
+            </div>
+            {/* ⚠️ **Ganho sem número DIZ isso em palavras.** Sete cards da fila são "ganho
+                imensurável" e apareciam só em branco — e a 3ª pergunta do checklist é "o saving
+                está coerente?". Campo vazio ali não é resposta, é silêncio. */}
+            {i.ganho.semNumero && !i.especial && (
+              <p className="mt-2 text-[11.5px] leading-snug" style={{ color: "#6b7280" }}>
+                O autor declarou <strong>ganho sem valor financeiro</strong> ({i.ganho.categorias}).
+                Não há número a conferir: julgue o ganho pela descrição e pelo memorial.
+              </p>
+            )}
+            {/* A nota de cada parcela (ex.: "Saía R$ X · sai R$ Y") — o que sustenta o número. */}
+            {i.ganho.detalhe.some((d) => d.nota) && (
+              <ul className="mt-1.5 space-y-0.5">
+                {i.ganho.detalhe
+                  .filter((d) => d.nota)
+                  .map((d) => (
+                    <li key={d.rotulo} className="text-[11px]" style={{ color: "#6b7280" }}>
+                      <strong>{d.rotulo}:</strong> {d.nota}
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          /* Rede: sem linha na planilha (projeto recém-submetido, espelho ainda não sincronizou),
+             cai nos campos v1 do banco — que é o que existia antes desta correção. */
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <CardNumero
+              rotulo="Ganho total"
+              valor={fmtReais(i.ganho_total) ?? fmtReais(i.saving_reais)}
+              destaque
+              vazio={i.especial ? "Projeto especial" : undefined}
+            />
+            <CardNumero rotulo="Horas economizadas" valor={horas} />
+            <CardNumero rotulo="Recorrência" valor={TIPO_SAVING_LABEL[i.tipo_saving ?? ""] ?? null} />
+            <CardNumero rotulo="Saving em R$" valor={reais} />
+            <CardNumero rotulo="Custo evitado" valor={fmtReais(i.custo_evitado_reais)} />
+            <CardNumero rotulo="Receita mensal" valor={fmtReais(i.receita_mensal)} />
+            {/* Custo externo é o que a solução CONSOME para rodar — subtrai do ganho. */}
+            <CardNumero rotulo="Custo externo" valor={fmtReais(i.custo_externo_mensal)} negativo />
+          </div>
+        )}
 
         {i.resumo && (
           <div

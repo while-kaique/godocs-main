@@ -45,6 +45,12 @@ import {
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { notificarChatPreAprovacao } from '@/lib/notificacao-projeto.functions';
 import { notificarLiderDoProjetoPai } from '@/lib/gomoon-lideres.functions';
+import { lerLinhasEspelho } from '@/lib/sheet-espelho';
+import {
+  resumirGanhoDaPlanilha,
+  rotularCategoriasGanho,
+  type ResumoGanho,
+} from '@/lib/notificacao-ganho';
 import { deveNotificarDecisao } from '@/lib/notificacao-chat';
 import { espelharEscrita } from '@/lib/sheet-espelho';
 import { runBackground } from '@/lib/background';
@@ -691,7 +697,24 @@ export type ItemAprovacao = {
   descricao_breve: string | null;
   /** Participantes com o papel de cada um (o autor NÃO entra — ele é o dono). */
   participantes: ParticipanteAprovacao[];
-  /** Números do ganho, para a 3ª pergunta do checklist. Ver `extrairNumeros`. */
+  /**
+   * O ganho como a PLANILHA o declara — a mesma fonte e o mesmo resumo do card do Chat e da
+   * ficha do `/dashboard` (`resumirGanhoDaPlanilha`). `null` só quando a linha não existe.
+   *
+   * ⚠️ **Por que ele existe (10/09/2026).** Os campos v1 abaixo vinham do SQLite, que a v2 não
+   * escreve — e a fila do líder era o último leitor deles. Medido em produção, nos 23 cards que
+   * os líderes tinham na tela: **«Vision Operação» mostrava 63 h e NENHUM R$** (a planilha diz
+   * R$ 1.406,63), «Control Tower - PCP» 168 h sem valor (R$ 1.170,96), «Radar de Mercado AZ»
+   * 36 h sem valor (R$ 519,57), e **7 cards sem número nenhum** — esses últimos são ganho
+   * imensurável, onde o defeito não é o valor e sim o silêncio: a 3ª pergunta do checklist é
+   * *"o saving está coerente?"* e o líder decidia olhando campo vazio.
+   * ⚠️ É o MESMO bug do card do Google Chat (08/09), que anunciava R$ 0,00 em projeto com ganho
+   * correto na planilha. A correção é a mesma e reusa a mesma função — nada de segunda régua.
+   * ⚠️ Custa **uma** consulta por página da fila (`lerLinhasEspelho` por `IN`), nunca uma por
+   * projeto, e jamais lê o Sheets em request.
+   */
+  ganho: ResumoGanho | null;
+  /** Números do ganho pela v1, MANTIDOS como rede (ver `ganho`). Ver `extrairNumeros`. */
   saving_horas: number | null;
   saving_reais: number | null;
   tipo_saving: string | null;
@@ -864,6 +887,24 @@ function lerSnapshotVersao(v: VersaoParaComparacao | null | undefined): Snapshot
   return { projeto, doc: doc && typeof doc === 'object' ? doc : null };
 }
 
+/**
+ * O ganho da linha da planilha — e, quando ela não tem número NENHUM, o que ela AINDA diz.
+ *
+ * ⚠️ `resumirGanhoDaPlanilha` devolve `null` sem número e sem parcela ("o chamador decide", como
+ * está escrito lá), e aqui a decisão é NÃO ficar mudo: **7 dos 23 cards da fila são ganho
+ * imensurável**, onde o defeito nunca foi o valor — é o líder decidir a 3ª pergunta do checklist
+ * (*"o saving está coerente?"*) olhando campo em branco. Com as categorias em mãos, a tela diz
+ * "ganho sem valor financeiro (Ganho imensurável)" em vez de não dizer nada.
+ */
+function ganhoDoCard(linha: Record<string, string> | null): ResumoGanho | null {
+  if (!linha) return null;
+  const resumo = resumirGanhoDaPlanilha(linha);
+  if (resumo) return resumo;
+  const categorias = rotularCategoriasGanho(linha['Tipos de Ganho']);
+  if (!categorias) return null;
+  return { geracao: 'planilha', categorias, destaque: null, detalhe: [], textos: [], semNumero: true };
+}
+
 export async function listarAprovacoesPendentes(
   email: string,
 ): Promise<{ lidera: boolean; itens: ItemAprovacao[]; congelada: boolean }> {
@@ -889,6 +930,20 @@ export async function listarAprovacoesPendentes(
     }
   }
 
+  // O ganho como a planilha o declara, para TODOS os projetos da fila numa consulta só.
+  // ⚠️ Falha aqui não derruba a fila: cada card cai no `ganho: null` e a tela usa a rede v1.
+  const linhasPorId = new Map<string, Record<string, string>>();
+  try {
+    const ids = rows.map((r) => r.projeto_id).filter(Boolean);
+    if (ids.length) {
+      for (const [id, linha] of await lerLinhasEspelho(ids)) {
+        linhasPorId.set(String(id).toLowerCase(), linha as Record<string, string>);
+      }
+    }
+  } catch (e) {
+    console.error('[aprovacoes] falha ao ler o espelho para o ganho do card:', e);
+  }
+
   const itens: ItemAprovacao[] = rows.map((r) => {
     const memorial = r.memorial_calculo?.trim()
       ? normalizarMarcadoresMemorial(r.memorial_calculo)
@@ -906,6 +961,7 @@ export async function listarAprovacoesPendentes(
     // Projeto especial não tem memorial financeiro — o contexto ocupa esse lugar.
     descricao_breve: r.descricao_breve?.trim() || r.contexto_especial?.trim() || null,
     participantes: montarParticipantes(r.membros, r.membros_papeis, r.autor_email),
+    ganho: ganhoDoCard(linhasPorId.get(String(r.projeto_id).toLowerCase()) ?? null),
     saving_horas: r.saving_horas ?? null,
     saving_reais: r.saving_reais ?? null,
     tipo_saving: r.tipo_saving ?? null,

@@ -844,9 +844,16 @@ function AvaliacaoSombraPainel({
               existindo como ferramenta de auditoria em LOTE (a rota de admin), que é o que ele
               sempre foi; num clique, quem responde é o classificador. */}
           <div className="flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'rgba(71,85,105,0.18)' }}>
-            {/* O TIME agindo JUNTO é o botão PRINCIPAL: o veredito de impacto e a nota saem da
-                mesma passada, e é isso que a submissão dispara. Os dois abaixo ficam para rodar
-                uma metade só, quando é isso que se quer (pedido do Luis, 08/09/2026). */}
+            {/* ⚠️ **UM BOTÃO SÓ** (10/09/2026, pedido do dono do produto: *"eu acho que nao
+                deveria ter os outros 2 botoes, nao é?"* — e ele está certo).
+                Havia mais dois, e os dois contradiziam o desenho:
+                  • **"Só o parecer"** rodava a mesa sem passar pela JUNTA, então produzia um
+                    veredito que não decide nada — meia análise apresentada como resultado;
+                  • **"Só a nota"** chamava o CLASSIFICADOR DE 1 AGENTE, que é a régua VELHA (sem
+                    o painel do impacto e sem o eixo de tamanho) e grava na MESMA coluna do time:
+                    um clique ali desfazia a nota do time com um número de outra régua.
+                O que vale é *"é um TIME agindo JUNTO e classificando JUNTO"*, e a tela agora diz
+                isso. As duas rotas continuam existindo para o LOTE e o retroativo. */}
             <Button
               type="button"
               size="sm"
@@ -861,38 +868,8 @@ function AvaliacaoSombraPainel({
               )}
               Rodar o time
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={rodando !== null}
-              onClick={() => void onRodar('mesa')}
-              className="h-8 text-[12px]"
-            >
-              {rodando === 'mesa' ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
-              ) : (
-                <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-              )}
-              {mesa ? 'Só o parecer' : 'Só o parecer'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={rodando !== null}
-              onClick={() => void onRodar('estrela')}
-              className="h-8 text-[12px]"
-            >
-              {rodando === 'estrela' ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
-              ) : (
-                <Star className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-              )}
-              Só a nota
-            </Button>
             <span className="text-[11px] text-muted-foreground">
-              Respondem na hora. A nota vai para a coluna do agente, nunca para "Estrelas".
+              Responde na hora: parecer do impacto, estrela e decisão de funil na mesma passada.
             </span>
           </div>
 
@@ -985,7 +962,7 @@ export function ProjetoDetalheDialog({
   // servidor e é otimista: clicar reflete na hora e desfaz se o POST falhar.
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
   const [votando, setVotando] = useState(false);
-  /** Qual análise está rodando agora (`null` = nenhuma) — desabilita os dois botões. */
+  /** Qual análise está rodando agora (`null` = nenhuma) — desabilita o botão. */
   const [rodandoAnalise, setRodandoAnalise] = useState<'time' | 'mesa' | 'estrela' | null>(null);
   // Guarda o texto original da coluna "Observações": só mandamos a coluna quando o
   // validador realmente mexeu nela (evitar reescrever a célula com o mesmo conteúdo).
