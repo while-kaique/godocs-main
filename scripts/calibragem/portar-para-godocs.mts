@@ -17,6 +17,12 @@ const get = async (t: string, r: string) => { const res = await fetch(`https://s
 const col = (i: number) => { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
 
 const antes = new Map((JSON.parse(readFileSync(join(PASTA, 'antes.json'), 'utf8')).linhas as any[]).map((l) => [l.id.toLowerCase(), l]));
+// SÓ os ids que a rodada CORRIGIDA avaliou com sucesso (projetos/*.json com http 200 e ok): a cópia ainda carrega
+// restos da rodada-baseline (v348) em quem não foi reavaliado, e esses NÃO podem ir para a GoDocs.
+import { readdirSync } from 'node:fs';
+const rodada = new Map<string, any>();
+for (const f of readdirSync(join(PASTA, 'projetos'))) { const d = JSON.parse(readFileSync(join(PASTA, 'projetos', f), 'utf8')); if (d.http === 200 && d.resultado?.ok) rodada.set(String(d.id).toLowerCase(), d); }
+console.log(`ids avaliados pela rodada corrigida: ${rodada.size}`);
 const hC = (await get(COPIA, '1:1'))[0]; const rowsC = await get(COPIA, 'A2:BZ');
 const hP = (await get(PROD, '1:1'))[0]; const rowsP = await get(PROD, 'A2:BZ');
 if (hC.join('|') !== hP.join('|')) throw new Error('cabeçalhos da cópia e da GoDocs divergem — abortando');
@@ -31,7 +37,7 @@ const vazio = (v: string | undefined) => { const t = String(v ?? '').trim(); ret
 let semResultado = 0;
 rowsP.forEach((rp, idx) => {
   const id = (rp[I.id] ?? '').trim().toLowerCase(); if (!id) return;
-  const rc = copia.get(id); const a = antes.get(id); if (!rc || !a) { semResultado++; return; }
+  const rc = copia.get(id); const a = antes.get(id); const rd = rodada.get(id); if (!rc || !a || !rd) { semResultado++; return; }
   const nome = rp[I.nome] ?? id;
   const ea = rc[I.ea] ?? '', ca = rc[I.ca] ?? '';
   if (vazio(ea)) { semResultado++; return; } // o time não avaliou este id na rodada
@@ -42,7 +48,8 @@ rowsP.forEach((rp, idx) => {
   const estC = String(rc[I.est] ?? '').trim();
   if (!humOk && estC !== '' && /^\d+$/.test(estC) && Number(estC) <= 5 && (rp[I.est] ?? '').trim() !== estC) set(idx, I.est, estC, nome, 'Estrelas', rp[I.est] ?? '');
   // Status: só onde ANTES era Pendente e a cópia decidiu
-  const stAntes = String(a.status ?? '').trim().toLowerCase(); const stC = String(rc[I.status] ?? '').trim(); const stP = String(rp[I.status] ?? '').trim();
+  // o Status vem do que a rodada CORRIGIDA gravou (status_gravado), nunca da coluna da cópia (pode ser resto da baseline)
+  const stAntes = String(a.status ?? '').trim().toLowerCase(); const stC = String(rd.resultado?.status_gravado ?? '').trim(); const stP = String(rp[I.status] ?? '').trim();
   if (stAntes === 'pendente' && /^(Aprovado|Reprovado)$/.test(stC) && stP.toLowerCase() === 'pendente') {
     set(idx, I.status, stC, nome, 'Status', stP);
     if (stC === 'Reprovado' && !vazio(rc[I.mot])) set(idx, I.mot, rc[I.mot], nome, 'Motivo Reprovado', rp[I.mot] ?? '');
