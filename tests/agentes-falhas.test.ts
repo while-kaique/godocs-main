@@ -139,13 +139,17 @@ describe('o relator é um HOOK, e o caminho sem ele é idêntico', () => {
 describe('canários de fiação — onde o silêncio acontecia', () => {
   const ler = (p: string) => readFileSync(p, 'utf8');
 
-  it('os 3 caminhos de falha do `embeddings.ts` REPORTAM, não só logam', () => {
+  it('os caminhos de falha do `embeddings.ts` REPORTAM, não só logam — e o lote RETENTA antes de reportar', () => {
     // Antes: `console.warn`/`console.error` + `return null`. Em prod isso é um log que ninguém lê,
     // e a consequência (nota achatada) aparece como defeito de régua.
+    // 11/09/2026: HTTP-não-ok e erro de rede do LOTE convergem num ÚNICO report, DEPOIS das
+    // tentativas (um 500 transitório da OpenAI não pode custar a memória vetorial do julgamento).
     const src = ler('src/lib/embeddings.ts');
     expect(src).toContain("reportarFalhaDeAgente");
-    expect((src.match(/reportarFalhaDeAgente\(/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    expect((src.match(/reportarFalhaDeAgente\(/g) ?? []).length).toBeGreaterThanOrEqual(2);
     expect(src).toContain("classe: 'embedding_indisponivel'");
+    expect(src).toContain('TENTATIVAS_EMBEDDING');
+    expect(src).toMatch(/status === 429 \|\| status >= 500/);
   });
 
   it('`embeddings.ts` NÃO importa o gravador (nem SQLite, nem Chat)', () => {
