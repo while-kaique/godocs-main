@@ -38,6 +38,20 @@ em prod depois de a cópia nascer; revertido às 12:50 UTC e a régua da célula
 - **Ferramenta de comentar nos posts** 8★ humano × 1★ agente: a doc do Drive diz "o time comenta manualmente nos
   posts", contradizendo a descrição ("comenta direto neles pela marca"). O agente citou a doc.
 
+## Medição da trava da réplica (2 correções, o teto combinado) — 33 reavaliados às 13:10–13:40 UTC
+
+- Colapsos sumiram: Gocreators 2★ → 3★ (humano 6), GoHunter 1★ → 3★ (humano 5), Envio de Comprovante 0★ → 5★.
+- Faixa 6-10 humana (8 projetos): 2 saem 6-10 (PIAPP, Ferramenta de testes), 3 saem 5★ (Robô orçamento, SendApp,
+  GoBrands), 2 saem 3–4★ (Gocreators, Gopilot), 1 sai 1★ (Ferramenta de comentar, contradição na doc).
+- ⚠️ **A entrada na faixa é ESTOCÁSTICA no cérebro da estrela para especial sem número**: Robô orçamento e GoBrands
+  saíram 6-10 na 1ª passada da trava (12:49–12:53 UTC) e 5★ na 2ª (13:1x), com o mesmo código e o mesmo dossiê.
+  A trava impede a QUEDA; não força a SUBIDA (subir por trava seria inventar nota). Falsos 6-10 na passada: CTR Machine
+  Admaker (4★ humano) e BB Indústria QC (3★ humano) — vão para o comitê com flag, não gravam estrela.
+- Comparáveis com nota humana ≥1 nesta amostra: 28, dentro de ±1: 19 (68%).
+- **Decisão pendente do dono do produto**: para especiais cuja âncora de comitê mais próxima tem similaridade alta,
+  marcar "candidato ao comitê" (Pendente com flag) em vez de 5★ — é régua de VIZINHANÇA, não de prompt, e ainda não
+  foi codada porque esgotou o teto de 2 correções para este problema.
+
 ## Números finais
 
 Ver `divergencias.md` (canários no topo, faixas de impacto, tempo mediano por projeto, divergências humano × agente).
