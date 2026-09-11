@@ -61,6 +61,12 @@ let fila = [
 const soStatus = (process.env.CAL_SO_STATUS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
 if (soStatus.length) fila = fila.filter((l) => eCanario(l) || soStatus.includes(l.status.trim().toLowerCase()));
 // Só conta como FEITO quem tem resposta 2xx/4xx: falha 5xx fica para a próxima passada.
+// CAL_ORDEM=critico: dentro da fila, primeiro quem tem nota humana ≥ 4, depois impacto líquido desc.
+if (process.env.CAL_ORDEM === 'critico') {
+  const imp = (l: Linha) => { const n = Number(String(l.impacto ?? '').replace(/R\$/g, '').replace(/\./g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+  const crit = (l: Linha) => (eCanario(l) ? 3 : Number(l.estrelas) >= 4 ? 2 : imp(l) >= 1000 ? 1 : 0);
+  fila = [...fila].sort((a, b) => crit(b) - crit(a) || imp(b) - imp(a));
+}
 const feitos = new Set(
   readdirSync(join(OUT, 'projetos'))
     .filter((f) => { try { return (JSON.parse(readFileSync(join(OUT, 'projetos', f), 'utf8')).http ?? 599) < 500; } catch { return false; } })
