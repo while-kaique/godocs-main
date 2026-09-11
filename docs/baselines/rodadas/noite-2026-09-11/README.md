@@ -1,49 +1,43 @@
-# Rodada de calibragem — madrugada de 11/09/2026
+# Rodada de calibragem — noite de 10→11/09/2026 (staging edf400b4 · aba "Cópia de GoDocs 1")
 
-**Onde rodou:** app de STAGING (`edf400b4`) apontado para a aba **"Cópia de GoDocs 1"** da planilha de prod
-(770 ids, cabeçalho idêntico ao `GoDocs`), com ESCRITA REAL. A aba `GoDocs` e o app de prod não foram tocados.
-`antes.json` é o retrato da cópia antes da primeira escrita (backup célula a célula).
+Pasta da rodada CORRIGIDA (a baseline anterior, no worker v348, está em `../noite-2026-09-11-v348/`).
+`divergencias.md` e `resumo.json` saem de `scripts/calibragem/cruzar.mts`; `projetos/*.json` é a resposta do
+`POST /api/admin/avaliacao/time-completo` por projeto; `fichas/` é a ficha do dashboard depois da avaliação;
+`antes.json` é a cópia ANTES de qualquer escrita; `backup-godocs/` guarda a aba GoDocs antes de cada porte.
 
-**Código no ar durante a rodada:** worker **v348** = commit `99d4c4b` da branch `feat/calibragem-noite`
-(vizinhos por embedding da base inteira com tamanho no resumo, memorial v1 fora do vetor e do dossiê, `Impacto
-Líquido Mensal` como número único, `totalBase` real no 2º eixo, "6-10" na coluna quando há escape, confiança
-alta na decisão por régua, modelo leve nos especialistas). Secrets: `AVALIACAO_MODELO_LEVE=gpt-5.6-luna` +
-`low`, `AVALIACAO_MODELO_FORTE=gpt-5.6-sol`, `TIME_SEM_REPLICA=1`, `AGENTE_DECIDE_FUNIL=1`,
-`AGENTE_FECHA_PENDENTE=0`, `EMBEDDINGS_SOMENTE_LEITURA=1` (após o backfill).
+## O que mudou no código nesta rodada, e por quê (commits em `feat/calibragem-noite`)
 
-## O que os canários mostraram (03:44 UTC) e o que virou código
+| Problema medido | Correção (régua/trava, nunca só prompt) | Onde |
+|---|---|---|
+| Mesa lia "R$ 8.352" como horas | linha de impacto rotulada "valores em REAIS por mês, NÃO são horas" | `dossie.ts`, `avaliacao-normais.functions.ts` |
+| Mesa deixava 71% em validação só por "faltar material" | `aplicarTravaMaterialMesa`: preocupação só de material vira ressalva | `agents/mesa-especialistas.ts` |
+| 3 aprovados por humano reprovados por "fora de uso" sem citação | `VOCABULARIO_INVALIDEZ`: invalidez só com citação que a sustente | `avaliacao/consenso.ts` |
+| Memorial (v1) vazava no embedding e no prompt | memorial fora de `textoParaEmbedding` e do dossiê | `especial-corpus.ts`, `dossie.ts` |
+| Documentação compilada quase vazia | dossiê lê os `.md`/Docs do Drive (`lerTextoDocsDrive`, 3 arquivos, 9k chars) | `google/drive.ts`, `dossie.functions.ts` |
+| RAG do time era lexical | vizinhos por embedding sobre a base inteira (`vizinhosPorEmbedding`, K=8, piso 0,2) + cache por isolate | `avaliacao/time.functions.ts`, `avaliacao-normais.functions.ts` |
+| Denominador do eixo de impacto fixo | `totalBase` medido da própria aba | `avaliacao/time.ts`, `estrelas-regua.ts` |
+| Robô orçamento/GoBrands presos em 5★ (listados como exemplo de 5★) | exemplos de 5★ trocados (Ticket Creator, DIFAL); âncoras 6-10 vivas no prompt (`ancorasComite`) | `estrelas-regua.ts`, `cerebro-estrela.ts` |
+| Escape sem número na tela | `rotuloNotaAgente` devolve "6-10"; confiança alta quando é régua | `estrelas-regua.ts`, `consenso.ts` |
+| Estrela do time não gravada em projeto ancorado / Status Aprovado | grava `Estrela Agente`/`Confiança Agente` sempre; `Estrelas` só quando não ancorado | `avaliacao-completa.functions.ts` |
+| Réplica ao cético desabava ≥2 níveis (21 de 96) e levava o escape (10 de 15) | `reconciliarReplicaEstrela`: queda máx. 1 nível/volta; escape só cai por gatilho NOMEADO (`gatilho_refutado`) | `avaliacao/cetico-estrela.ts`, `time.ts` |
+| Réplica SUBIA a nota / inventava escape (AVD Central 3→5+escape) | regra "a réplica não sobe" + `derrubarEscapePorGatilho` na 2ª volta do cético | idem |
+| Worker estourava memória em concorrência ≥5 | embeddings decodificados uma vez por isolate (TTL 120 s) | `avaliacao-normais.functions.ts` |
 
-| Canário | Humano | Time (v348) | Achado | Correção (commit `0119ce0`, **não deployado**) |
-|---|---|---|---|---|
-| PIAPP | 10 | 6-10, conf alta | ✓ | — |
-| SendApp | 7 | 5 (2º eixo), mesa `em_validacao` | mesa pede "equipe e horas por rotina; conferir memória de cálculo" | `aplicarTravaMaterialMesa`: preocupação sem sinal concreto vira ressalva |
-| CX Hub | 3 (run 9) | 5, mesa `em_validacao` | mesa leu **R$ 31.604,82 como horas** | "R$" explícito + linha de horas no texto da mesa |
-| AVD Central v2 | 4 | 3, mesa `em_validacao` | mesa leu **R$ 8.352 como "8.352 horas ≈ 38 pessoas"** | idem |
-| Robô orçamento | 8 | 5, sem escape | estava como EXEMPLO de 5★ na régua | exemplos 6-10 saem do 5★ e viram `ESCAPE_MUDA_O_JOGO.exemplos`; cérebro recebe âncoras 6-10 vivas |
-| GoBrands | 7 | 5, sem escape | idem | idem |
+## Porte para a aba GoDocs (prod) — `scripts/calibragem/portar-para-godocs.mts`
 
-Outros dois achados da noite, também em `0119ce0`: projeto com estrela humana **não registrava** a recomendação
-do time (o `return` da âncora vinha antes de gravar) — agora grava `Estrela Agente`/`Confiança Agente` e
-devolve `estrelas_time`; e **OOM** com 8 avaliações em paralelo (`Worker exceeded memory limit` ×24: cada
-avaliação decodificava a tabela inteira de embeddings duas vezes) — cache por isolate com TTL de 120 s.
-Commit `d367c3a` (também não deployado): o dossiê passa a **ler o `.md` da documentação no Drive**
-(`lerTextoDocsDrive`; 757 das 770 linhas têm link na coluna URL e ninguém lia o conteúdo).
+Só ids de `projetos/*.json` com HTTP 200; `Estrela Agente` e `Confiança Agente` em todos; `Estrelas` 0–5 só onde a
+nota humana é 0/vazia na cópia E na célula atual da GoDocs; `Status` só de Pendente para o que a rodada gravou
+(`status_gravado`) + `Motivo Reprovado`. Backup JSON da aba antes de cada escrita; `portado-para-godocs.json` lista
+célula a célula. ⚠️ Incidente: o 1º porte (12:37 UTC) escreveu 1★ sobre o 2★ que o Bruno tinha dado ao «BID 2026»
+em prod depois de a cópia nascer; revertido às 12:50 UTC e a régua da célula atual entrou no script.
 
-⚠️ **Por que as correções não entraram na rodada:** o `updateApp` do MCP do GoDeploy falhou 14 vezes nesta
-sessão com "Anthropic proxy: upstream closed the stream" (só a 1ª chamada da noite passou). Não é o app.
-Qualquer janela do Claude com o MCP funcionando sobe a branch em um passo (`scripts/deploy-godeploy.sh` +
-`updateApp` no `edf400b4`). Enquanto isso a base rodou no v348 com **3 em paralelo** (acima disso, OOM).
+## O que NÃO virou trava (decisão do dono do produto)
 
-## Como ler `divergencias.md`
+- **SendApp** 7★ humano × 5★ agente: o eixo de tamanho sobe até 5★; uma "entrada na faixa por share ≥ 10% da base"
+  levaria o DIFAL (5★ humano, exemplo de 5★ da régua) junto.
+- **Ferramenta de comentar nos posts** 8★ humano × 1★ agente: a doc do Drive diz "o time comenta manualmente nos
+  posts", contradizendo a descrição ("comenta direto neles pela marca"). O agente citou a doc.
 
-Gerado por `scripts/calibragem/cruzar.mts <esta pasta>`: canários no topo; depois SÓ as linhas em que humano
-e agente discordam (estrela 2+ de distância, Aprovado→reprovaria, Reprovado→aprovaria); concordância por faixa
-de impacto; tempo mediano. A estrela HUMANA é `Estrelas ≥ 1` na cópia que não seja o valor gravado pelo agente
-na run 9 (05/09). Para projetos com âncora humana, a nota do TIME vem da ficha (`avaliacaoSombra.time`), porque
-o v348 devolve a âncora no lugar dela. `fichas/` guarda essas leituras; `projetos/` tem um JSON por projeto.
+## Números finais
 
-## Para reverter
-
-- Cópia: `antes.json` tem Status, Estrelas, Estrela Agente, Confiança Agente de cada linha antes da rodada.
-- Staging: voltar `GOOGLE_SHEETS_TAB` para `STAGING-V2`, apagar `EMBEDDINGS_SOMENTE_LEITURA`, religar os crons
-  `n2zkq1714fya`, `05xewgexkhjx`, `ncbmbt6trmfm`.
+Ver `divergencias.md` (canários no topo, faixas de impacto, tempo mediano por projeto, divergências humano × agente).
