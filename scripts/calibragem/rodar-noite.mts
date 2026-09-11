@@ -22,7 +22,20 @@ const CANARIOS = [/^sendapp$/i, /^cx hub/i, /avd central v2/i, /^piapp$/i, /rob[
 // ── snapshot ANTES (a régua da comparação) ──
 const sid = process.env.GOOGLE_SHEETS_ID || '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
 const tok = await getAccessToken();
-const vals = async (r: string) => ((await (await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sid}/values/${encodeURIComponent(`'${ABA}'!${r}`)}`, { headers: { Authorization: `Bearer ${tok}` } })).json()).values ?? []) as string[][];
+// Leitura com RETRY: a cota do Sheets (60 leituras/min, compartilhada com prod) devolve 429 depois de uma
+// rajada, e `values` vem vazio — o driver morria em `header.indexOf`. 4 tentativas com espera crescente.
+const vals = async (r: string): Promise<string[][]> => {
+  for (let t = 1; t <= 4; t++) {
+    try {
+      const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sid}/values/${encodeURIComponent(`'${ABA}'!${r}`)}`, { headers: { Authorization: `Bearer ${tok}` } });
+      const j = (await res.json()) as { values?: string[][]; error?: unknown };
+      if (res.ok && Array.isArray(j.values)) return j.values;
+      console.log(`[noite] leitura ${r} falhou (HTTP ${res.status}) — tentativa ${t}/4`);
+    } catch (e) { console.log(`[noite] leitura ${r} erro — tentativa ${t}/4: ${e instanceof Error ? e.message : String(e)}`); }
+    await new Promise((ok) => setTimeout(ok, 20_000 * t));
+  }
+  throw new Error(`Sheets não respondeu a leitura de ${r} após 4 tentativas`);
+};
 const header = (await vals('1:1'))[0];
 const rows = await vals('A2:BZ');
 const col = (n: string) => header.indexOf(n);
