@@ -257,6 +257,18 @@ export type DetalheDashboard = {
      */
     time: {
       estrela: number | null;
+      /**
+       * O time indicou a faixa 6-10 ("muda o jogo")?
+       *
+       * ⚠️ **Sem este campo a tela MENTE, e mentiu** (10/09/2026). Quando o escape é indicado, a
+       * régua trava a nota em `TETO_AGENTE` (5) — porque 5 é o teto do que o agente pode conceder
+       * sozinho — e a informação real fica NESTE sinal. O interpretador descartava o `escape` do
+       * JSON do consenso, então o «AVD Central v2» aparecia como **"5 · Assume"** quando o time
+       * havia dito, com os dois gatilhos citados, que ele é da faixa 6-10 e que o número é do
+       * comitê. Dono do produto, olhando a ficha: *"pq q ele fala q é escape, saida humano pois é
+       * um 6-10 e tem estrelas 5?"* — a pergunta certa.
+       */
+      escape: boolean;
       saida: string | null;
       confianca: string | null;
       quando: string | null;
@@ -470,6 +482,8 @@ export function interpretarConsensoDoTime(
     Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim() !== "") : [];
   return {
     estrela: typeof c.estrela === "number" && Number.isFinite(c.estrela) ? c.estrela : null,
+    // ⚠️ O `escape` vem do MESMO JSON e estava sendo descartado aqui — ver o campo no tipo.
+    escape: c.escape === true,
     saida: typeof c.saida === "string" ? c.saida : no.veredito,
     confianca: typeof c.confianca === "string" ? c.confianca : no.confianca,
     quando: no.created_at,

@@ -118,6 +118,8 @@ type AvaliacaoSombra = {
   /** Último veredito do TIME completo (auditoria em lote). `null` = nunca rodou aqui. */
   time?: {
     estrela: number | null;
+    /** Faixa 6-10 indicada: aí o número (travado em 5) NÃO é a nota. Ver o servidor. */
+    escape: boolean;
     saida: string | null;
     confianca: string | null;
     quando: string | null;
@@ -531,14 +533,27 @@ function EstrelaDoTime({ time }: { time: NonNullable<AvaliacaoSombra['time']> })
         <span className="text-[11px] font-bold uppercase tracking-[0.06em]" style={{ color: '#0059A9' }}>
           Time de agentes
         </span>
-        {time.estrela != null && (
+        {/* ⚠️ **Na faixa 6-10 o número NÃO é a nota** (10/09/2026): a régua trava a saída do agente
+            em 5 (o teto do que ele concede sozinho) e o que ele afirmou está no `escape`. Mostrar
+            "5 · Assume" para um projeto que o time mandou ao comitê é dizer o oposto do parecer —
+            foi o que aconteceu no «AVD Central v2». Aqui a faixa vem primeiro, e o verbo some:
+            dentro dela a régua se recusa a nomear o nível. */}
+        {time.escape ? (
           <span className="inline-flex items-baseline gap-1 text-[13.5px] font-bold" style={{ color: '#0059A9' }}>
-            {time.estrela}
+            faixa 6-10
             <Star className="h-3.5 w-3.5 self-center" aria-hidden />
-            {/* ⚠️ O VERBO ao lado do número: "2" sozinho não é revisável, "2 · Executa" é. Sai da
-                fonte única da régua, a mesma que o agente recebe. */}
-            <span className="text-[11px] font-semibold">{verboDaNota(time.estrela) ?? (time.estrela === 1 ? 'estrela' : 'estrelas')}</span>
+            <span className="text-[11px] font-semibold">muda o jogo · o comitê crava o número</span>
           </span>
+        ) : (
+          time.estrela != null && (
+            <span className="inline-flex items-baseline gap-1 text-[13.5px] font-bold" style={{ color: '#0059A9' }}>
+              {time.estrela}
+              <Star className="h-3.5 w-3.5 self-center" aria-hidden />
+              {/* ⚠️ O VERBO ao lado do número: "2" sozinho não é revisável, "2 · Executa" é. Sai da
+                  fonte única da régua, a mesma que o agente recebe. */}
+              <span className="text-[11px] font-semibold">{verboDaNota(time.estrela) ?? (time.estrela === 1 ? 'estrela' : 'estrelas')}</span>
+            </span>
+          )
         )}
         {time.saida && (
           <span className="text-[12px] font-semibold" style={{ color: '#475569' }}>
@@ -570,8 +585,9 @@ function EstrelaDoTime({ time }: { time: NonNullable<AvaliacaoSombra['time']> })
       <p className="mt-1.5 text-[11px] text-muted-foreground">
         Esta é a nota que o time gravou. Para mudá-la, use o campo de estrelas acima.
       </p>
-      {/* A régua na tela: sem ela, discordar de um 2 é palpite contra palpite. */}
-      <ReguaEstrela nota={time.estrela ?? null} />
+      {/* A régua na tela: sem ela, discordar de um 2 é palpite contra palpite.
+          ⚠️ Na faixa 6-10 não se passa o 5: o critério do 5★ não é o que o time aplicou. */}
+      <ReguaEstrela nota={time.escape ? null : (time.estrela ?? null)} />
     </div>
   );
 }
