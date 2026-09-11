@@ -71,56 +71,85 @@ export async function gerarEmbedding(texto: string): Promise<Embedding | null> {
  * Recorta cada texto num teto de caracteres — para agrupar por escopo não é preciso o memorial
  * inteiro, e textos longos só encarecem sem melhorar a vizinhança.
  */
+/**
+ * Quantas vezes o lote tenta antes de desistir, e a espera entre tentativas (400 ms · 1,2 s).
+ *
+ * ⚠️ Por que existe (11/09/2026): a OpenAI devolveu UM `HTTP 500 server_error` transitório, o lote
+ * inteiro virou `null`, e o time avaliou o projeto SEM vizinho — o sintoma medido em 09/09 (notas
+ * achatadas, 12 de 12 em 0★). O alerta do watchdog disparou, mas a avaliação já tinha saído sem
+ * memória. Um soluço de servidor não pode custar a memória vetorial de um julgamento: 5xx, 429 e
+ * erro de rede são RETENTADOS; 4xx (chave morta, payload inválido) não — repetir não conserta.
+ */
+export const TENTATIVAS_EMBEDDING = 3;
+export const ESPERA_EMBEDDING_MS = [400, 1200] as const;
+
+function retentavel(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
 export async function gerarEmbeddingsLote(
   textos: string[],
   cfgExplicita?: EmbeddingConfig,
+  opts: { tentativas?: number; dormir?: (ms: number) => Promise<void> } = {},
 ): Promise<(Embedding | null)[]> {
   const cfg = cfgExplicita ?? embeddingConfig();
   if (!cfg) return textos.map(() => null);
   if (textos.length === 0) return [];
 
   const input = textos.map((t) => recortarTexto(t));
-  try {
-    const resp = await fetch(OPENAI_EMBEDDINGS_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cfg.apiKey}`,
-      },
-      body: JSON.stringify({ model: cfg.modelo, input }),
-    });
-    if (!resp.ok) {
-      const corpo = await resp.text().catch(() => '');
-      // ⚠️ Foi ESTE ponto que falhou calado em 09/09/2026: 401 em série, 0 vetores, e o time
-      // julgando 12 projetos sem um único vizinho — com relatório completo saindo no fim.
-      reportarFalhaDeAgente({
-        classe: 'embedding_indisponivel',
-        onde: 'embeddings.gerarEmbeddingsLote',
-        detalhe: `HTTP ${resp.status} · ${corpo.slice(0, 200)}`,
+  const tentativas = Math.max(1, opts.tentativas ?? TENTATIVAS_EMBEDDING);
+  const dormir = opts.dormir ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  let ultimoDetalhe = '';
+  for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
+    try {
+      const resp = await fetch(OPENAI_EMBEDDINGS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cfg.apiKey}`,
+        },
+        body: JSON.stringify({ model: cfg.modelo, input }),
       });
-      return textos.map(() => null);
-    }
-    const json = (await resp.json()) as {
-      model?: string;
-      data?: { index: number; embedding: number[] }[];
-    };
-    const modelo = json.model || cfg.modelo;
-    const saida: (Embedding | null)[] = textos.map(() => null);
-    for (const item of json.data ?? []) {
-      const vetor = item.embedding;
-      if (Array.isArray(vetor) && vetor.length > 0) {
-        saida[item.index] = { vetor, modelo, dim: vetor.length };
+      if (!resp.ok) {
+        const corpo = await resp.text().catch(() => '');
+        ultimoDetalhe = `HTTP ${resp.status} · ${corpo.slice(0, 200)}`;
+        if (retentavel(resp.status) && tentativa < tentativas) {
+          console.warn(`[embeddings] ${ultimoDetalhe} — tentativa ${tentativa}/${tentativas}, repetindo`);
+          await dormir(ESPERA_EMBEDDING_MS[Math.min(tentativa - 1, ESPERA_EMBEDDING_MS.length - 1)]);
+          continue;
+        }
+        break; // 4xx, ou esgotou: não adianta insistir
+      }
+      const json = (await resp.json()) as {
+        model?: string;
+        data?: { index: number; embedding: number[] }[];
+      };
+      const modelo = json.model || cfg.modelo;
+      const saida: (Embedding | null)[] = textos.map(() => null);
+      for (const item of json.data ?? []) {
+        const vetor = item.embedding;
+        if (Array.isArray(vetor) && vetor.length > 0) {
+          saida[item.index] = { vetor, modelo, dim: vetor.length };
+        }
+      }
+      return saida;
+    } catch (e) {
+      ultimoDetalhe = e instanceof Error ? e.message : String(e);
+      if (tentativa < tentativas) {
+        console.warn(`[embeddings] erro de rede (${ultimoDetalhe}) — tentativa ${tentativa}/${tentativas}, repetindo`);
+        await dormir(ESPERA_EMBEDDING_MS[Math.min(tentativa - 1, ESPERA_EMBEDDING_MS.length - 1)]);
+        continue;
       }
     }
-    return saida;
-  } catch (e) {
-    reportarFalhaDeAgente({
-      classe: 'embedding_indisponivel',
-      onde: 'embeddings.gerarEmbeddingsLote',
-      detalhe: e instanceof Error ? e.message : String(e),
-    });
-    return textos.map(() => null);
   }
+  // ⚠️ Foi ESTE ponto que falhou calado em 09/09/2026: 401 em série, 0 vetores, e o time
+  // julgando 12 projetos sem um único vizinho — com relatório completo saindo no fim.
+  reportarFalhaDeAgente({
+    classe: 'embedding_indisponivel',
+    onde: 'embeddings.gerarEmbeddingsLote',
+    detalhe: `${ultimoDetalhe} (após ${tentativas} tentativa(s))`,
+  });
+  return textos.map(() => null);
 }
 
 /** Teto de caracteres do texto que vai para o embedding (evita gastar à toa em memoriais longos). */
