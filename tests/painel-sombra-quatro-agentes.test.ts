@@ -105,12 +105,29 @@ describe('interpretarConsensoDoTime — a ESTRELA vem do time, não da mesa', ()
     });
     expect(r).toEqual({
       estrela: 4,
+      // ⚠️ campo novo (10/09/2026): sem ele a ficha mostrava "5 · Assume" para projeto que o time
+      // mandou à faixa 6-10 — o 5 é o TETO do agente, não a nota. Ver `time.escape` no servidor.
+      escape: false,
       saida: 'aprovar',
       confianca: 'alta',
       quando: '2026-09-08T12:00:00Z',
       motivos: ['Mérito aprova e estrela 4.'],
       divergencias: [],
     });
+  });
+
+  it('⚠️ na faixa 6-10 o `escape` chega à tela, e o número travado em 5 não é a nota', () => {
+    // O caso «AVD Central v2»: o time indicou o escape com os dois gatilhos citados e a régua
+    // travou a saída em `TETO_AGENTE`. A ficha lia só o número e dizia "5 · Assume".
+    const r = interpretarConsensoDoTime({
+      saida: JSON.stringify({ estrela: 5, escape: true, saida: 'humano', confianca: 'media', motivos: [], divergencias: [] }),
+      confianca: 'media',
+      veredito: 'humano',
+      created_at: '2026-09-10T18:59:41Z',
+    });
+    expect(r?.escape).toBe(true);
+    expect(r?.estrela).toBe(5);
+    expect(r?.saida).toBe('humano');
   });
 
   it('o time nunca ter rodado é `null`, não erro — é o estado NORMAL', () => {

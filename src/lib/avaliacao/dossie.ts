@@ -334,12 +334,28 @@ function construir(f: FontesDossie, opts: { lacunaProjeto: boolean }): Dossie | 
       // ⚠️ EXPLÍCITO, sem alias (`Ganho Total` está em `SEM_ALIAS_DE_LEITURA`): v1 `Ganho Total`
       // é saving + receita ÷ 10 e v2 `Impacto Líquido Mensal` é 1,0·S + 0,5·CE + 0,1·R − C
       // normalizado no tempo. São fórmulas diferentes com o MESMO papel — "o ganho mensal do
-      // projeto" —, então a escolha é declarada aqui, na ordem: banco, v1, v2 mensal, v2.
+      // projeto" —, então a escolha é declarada aqui.
+      //
+      // ⚠️ **A PLANILHA VENCE; o v1 do SQLite é REDE** (corrigido 10/09/2026). A ordem nasceu ao
+      // contrário — `projetos.ganho_total_mensal` primeiro — e esse campo é a **fórmula da v1**
+      // (`saving + receita/10`, gravada na submissão por `chat.functions.ts`), enquanto a v2
+      // PONDERA as horas: 7,5h liberadas valem R$ 19,96 no `Impacto Líquido Mensal` e ~R$ 200 pelo
+      // valor cheio da v1, ou seja **~10× de diferença no mesmo projeto**.
+      //
+      // É o MESMO defeito que a MESA teve e que foi corrigido em 09/09 (`financeiroDoProjeto`) —
+      // o fix de lá nunca alcançou o dossiê do TIME, que é quem alimenta o cérebro da estrela.
+      // Ele contamina as duas réguas numéricas, em direções opostas e as duas erradas:
+      //   • o **piso de reprovação** (`0 < x < 100`) — número inflado ESCAPA do piso;
+      //   • o **eixo de impacto da estrela** (`pisoPorImpacto`) — número inflado dá piso 3★/4★/5★
+      //     a quem não tem, que é inflar nota por causa de uma coluna velha.
+      // Régua e número têm de sair da MESMA fonte, e a fonte da verdade do repo é a planilha (as
+      // 4 colunas financeiras da v2 estão 100% preenchidas em prod; `Ganho Total` está 100% VAZIO
+      // nas 770 linhas, então o degrau v1 da planilha é letra morta e fica só como rede).
       ganho_total_mensal:
-        numero(p?.ganho_total_mensal) ??
-        numero(g('Ganho Total')) ??
         numero(g('Impacto Líquido Mensal')) ??
-        numero(g('Impacto Líquido')),
+        numero(g('Impacto Líquido')) ??
+        numero(g('Ganho Total')) ??
+        numero(p?.ganho_total_mensal),
       // Os dois compostos da v2, como eles são (nunca traduzidos para nome v1).
       impacto_bruto: numero(g('Impacto Bruto')),
       impacto_liquido: numero(g('Impacto Líquido Mensal')) ?? numero(g('Impacto Líquido')),

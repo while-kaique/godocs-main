@@ -146,3 +146,37 @@ describe('o piso entra na normalização — determinístico, não pedido ao mod
     expect(system).toContain('TAMANHO DESTE PROJETO');
   });
 });
+
+describe('⚠️ o número do eixo vem da PLANILHA (v2), não do SQLite (v1)', () => {
+  it('o dossiê prefere `Impacto Líquido Mensal` a `projetos.ganho_total_mensal`', async () => {
+    // ⚠️ **Resquício da v1 achado em 10/09/2026, e no pior lugar.** A ordem nascera com o campo
+    // do SQLite primeiro — e ele é a fórmula da v1 (`saving + receita/10`, gravada na submissão),
+    // enquanto a v2 PONDERA as horas: 7,5h liberadas valem R$ 19,96 no `Impacto Líquido Mensal` e
+    // ~R$ 200 pelo valor cheio da v1, ~10× no mesmo projeto. É o mesmo defeito que a MESA teve
+    // (corrigido em 09/09); o fix nunca alcançou o dossiê do TIME.
+    //
+    // O estrago é nas DUAS réguas numéricas, em direções opostas: número inflado ESCAPA do piso
+    // de reprovação e GANHA piso de estrela que não merece.
+    const { montarDossie } = await import('@/lib/avaliacao/dossie');
+    const d = montarDossie({
+      projeto: { id: 'p1', nome: 'Projeto de teste', ganho_total_mensal: 200 } as never,
+      documentacao: null,
+      espelho: { 'ID Projeto': 'p1', Projeto: 'Projeto de teste', 'Impacto Líquido Mensal': '19,96', Status: 'Aprovado' },
+      versoes: [],
+      eventos: [],
+      cargoAutor: undefined,
+    } as never)!;
+    // a planilha (v2) manda; o 200 do SQLite (v1) é só rede
+    expect(d.financeiro.ganho_total_mensal).toBeCloseTo(19.96, 2);
+    // e sem a planilha, a rede funciona
+    const semPlanilha = montarDossie({
+      projeto: { id: 'p1', nome: 'Projeto de teste', ganho_total_mensal: 200 } as never,
+      documentacao: null,
+      espelho: { 'ID Projeto': 'p1', Projeto: 'Projeto de teste', Status: 'Aprovado' },
+      versoes: [],
+      eventos: [],
+      cargoAutor: undefined,
+    } as never)!;
+    expect(semPlanilha.financeiro.ganho_total_mensal).toBe(200);
+  });
+});

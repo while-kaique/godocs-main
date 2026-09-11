@@ -118,6 +118,8 @@ type AvaliacaoSombra = {
   /** Último veredito do TIME completo (auditoria em lote). `null` = nunca rodou aqui. */
   time?: {
     estrela: number | null;
+    /** Faixa 6-10 indicada: aí o número (travado em 5) NÃO é a nota. Ver o servidor. */
+    escape: boolean;
     saida: string | null;
     confianca: string | null;
     quando: string | null;
@@ -531,14 +533,27 @@ function EstrelaDoTime({ time }: { time: NonNullable<AvaliacaoSombra['time']> })
         <span className="text-[11px] font-bold uppercase tracking-[0.06em]" style={{ color: '#0059A9' }}>
           Time de agentes
         </span>
-        {time.estrela != null && (
+        {/* ⚠️ **Na faixa 6-10 o número NÃO é a nota** (10/09/2026): a régua trava a saída do agente
+            em 5 (o teto do que ele concede sozinho) e o que ele afirmou está no `escape`. Mostrar
+            "5 · Assume" para um projeto que o time mandou ao comitê é dizer o oposto do parecer —
+            foi o que aconteceu no «AVD Central v2». Aqui a faixa vem primeiro, e o verbo some:
+            dentro dela a régua se recusa a nomear o nível. */}
+        {time.escape ? (
           <span className="inline-flex items-baseline gap-1 text-[13.5px] font-bold" style={{ color: '#0059A9' }}>
-            {time.estrela}
+            faixa 6-10
             <Star className="h-3.5 w-3.5 self-center" aria-hidden />
-            {/* ⚠️ O VERBO ao lado do número: "2" sozinho não é revisável, "2 · Executa" é. Sai da
-                fonte única da régua, a mesma que o agente recebe. */}
-            <span className="text-[11px] font-semibold">{verboDaNota(time.estrela) ?? (time.estrela === 1 ? 'estrela' : 'estrelas')}</span>
+            <span className="text-[11px] font-semibold">muda o jogo · o comitê crava o número</span>
           </span>
+        ) : (
+          time.estrela != null && (
+            <span className="inline-flex items-baseline gap-1 text-[13.5px] font-bold" style={{ color: '#0059A9' }}>
+              {time.estrela}
+              <Star className="h-3.5 w-3.5 self-center" aria-hidden />
+              {/* ⚠️ O VERBO ao lado do número: "2" sozinho não é revisável, "2 · Executa" é. Sai da
+                  fonte única da régua, a mesma que o agente recebe. */}
+              <span className="text-[11px] font-semibold">{verboDaNota(time.estrela) ?? (time.estrela === 1 ? 'estrela' : 'estrelas')}</span>
+            </span>
+          )
         )}
         {time.saida && (
           <span className="text-[12px] font-semibold" style={{ color: '#475569' }}>
@@ -570,8 +585,9 @@ function EstrelaDoTime({ time }: { time: NonNullable<AvaliacaoSombra['time']> })
       <p className="mt-1.5 text-[11px] text-muted-foreground">
         Esta é a nota que o time gravou. Para mudá-la, use o campo de estrelas acima.
       </p>
-      {/* A régua na tela: sem ela, discordar de um 2 é palpite contra palpite. */}
-      <ReguaEstrela nota={time.estrela ?? null} />
+      {/* A régua na tela: sem ela, discordar de um 2 é palpite contra palpite.
+          ⚠️ Na faixa 6-10 não se passa o 5: o critério do 5★ não é o que o time aplicou. */}
+      <ReguaEstrela nota={time.escape ? null : (time.estrela ?? null)} />
     </div>
   );
 }
@@ -828,9 +844,16 @@ function AvaliacaoSombraPainel({
               existindo como ferramenta de auditoria em LOTE (a rota de admin), que é o que ele
               sempre foi; num clique, quem responde é o classificador. */}
           <div className="flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'rgba(71,85,105,0.18)' }}>
-            {/* O TIME agindo JUNTO é o botão PRINCIPAL: o veredito de impacto e a nota saem da
-                mesma passada, e é isso que a submissão dispara. Os dois abaixo ficam para rodar
-                uma metade só, quando é isso que se quer (pedido do Luis, 08/09/2026). */}
+            {/* ⚠️ **UM BOTÃO SÓ** (10/09/2026, pedido do dono do produto: *"eu acho que nao
+                deveria ter os outros 2 botoes, nao é?"* — e ele está certo).
+                Havia mais dois, e os dois contradiziam o desenho:
+                  • **"Só o parecer"** rodava a mesa sem passar pela JUNTA, então produzia um
+                    veredito que não decide nada — meia análise apresentada como resultado;
+                  • **"Só a nota"** chamava o CLASSIFICADOR DE 1 AGENTE, que é a régua VELHA (sem
+                    o painel do impacto e sem o eixo de tamanho) e grava na MESMA coluna do time:
+                    um clique ali desfazia a nota do time com um número de outra régua.
+                O que vale é *"é um TIME agindo JUNTO e classificando JUNTO"*, e a tela agora diz
+                isso. As duas rotas continuam existindo para o LOTE e o retroativo. */}
             <Button
               type="button"
               size="sm"
@@ -845,38 +868,8 @@ function AvaliacaoSombraPainel({
               )}
               Rodar o time
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={rodando !== null}
-              onClick={() => void onRodar('mesa')}
-              className="h-8 text-[12px]"
-            >
-              {rodando === 'mesa' ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
-              ) : (
-                <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-              )}
-              {mesa ? 'Só o parecer' : 'Só o parecer'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={rodando !== null}
-              onClick={() => void onRodar('estrela')}
-              className="h-8 text-[12px]"
-            >
-              {rodando === 'estrela' ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
-              ) : (
-                <Star className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-              )}
-              Só a nota
-            </Button>
             <span className="text-[11px] text-muted-foreground">
-              Respondem na hora. A nota vai para a coluna do agente, nunca para "Estrelas".
+              Responde na hora: parecer do impacto, estrela e decisão de funil na mesma passada.
             </span>
           </div>
 
@@ -969,7 +962,7 @@ export function ProjetoDetalheDialog({
   // servidor e é otimista: clicar reflete na hora e desfaz se o POST falhar.
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
   const [votando, setVotando] = useState(false);
-  /** Qual análise está rodando agora (`null` = nenhuma) — desabilita os dois botões. */
+  /** Qual análise está rodando agora (`null` = nenhuma) — desabilita o botão. */
   const [rodandoAnalise, setRodandoAnalise] = useState<'time' | 'mesa' | 'estrela' | null>(null);
   // Guarda o texto original da coluna "Observações": só mandamos a coluna quando o
   // validador realmente mexeu nela (evitar reescrever a célula com o mesmo conteúdo).
