@@ -598,9 +598,10 @@ export function dossieParaTexto(d: Dossie, opts: { comReais?: boolean } = {}): s
     fin.custo_externo_mensal !== null ? `Custo externo mensal: ${fmt(fin.custo_externo_mensal)}` : null,
     fin.custo_projeto_itens.length ? `Itens de custo do projeto: ${t(JSON.stringify(fin.custo_projeto_itens))}` : null,
     fin.receita_mensal !== null ? `Receita mensal: ${fmt(fin.receita_mensal)} (${fin.tipo_receita ?? '—'})` : null,
-    fin.memorial_saving ? (reais ? `Memorial de saving:\n${fin.memorial_saving}` : '[memorial com valores omitidos]') : null,
-    fin.memorial_receita ? `Memorial de receita:\n${t(fin.memorial_receita)}` : null,
-    fin.observacoes_analisador ? `Parecer do analisador:\n${t(fin.observacoes_analisador)}` : null,
+    // ⚠️ MEMORIAL (saving/receita) e PARECER DO ANALISADOR SAÍRAM do texto (11/09/2026, decisão do
+    // dono do produto: "memorial hoje em dia não conta mais; tudo referente à v1 deve ser
+    // desconsiderado"). Os campos seguem no `Dossie` para leitores que não são prompt; o que o
+    // time lê é nome, descrição, documentação, os números da v2 e as evidências.
   ];
   if (d.v2) {
     linhasFin.push(

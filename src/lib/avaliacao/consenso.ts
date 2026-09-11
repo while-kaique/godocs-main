@@ -287,6 +287,15 @@ export function conciliar(
   // constrangedor saía "confiança alta": dois cérebros satisfeitos, o mérito aprovando, e a régua
   // reprovando por cima, com cara de certeza absoluta. A decisão é mecânica sobre UMA nota, e
   // certeza mecânica não é certeza de julgamento.
+  // ⚠️ **Escape é decisão por RÉGUA, e a confiança é da DECISÃO** (11/09/2026). `confiancaDe` mede
+  // o processo (vizinhos, citação, concordância) e devolvia `baixa` num Pendente que a régua manda
+  // ao comitê com os dois gatilhos citados — o dono do produto leu "confiança baixa" e não sabia
+  // baixa em quê. Mandar ao comitê é o desfecho certo por construção: confiança alta.
+  if (saida === 'humano' && escape && confianca !== 'alta') {
+    confianca = 'alta';
+    motivos.push(frase('A confiança é alta porque a decisão de levar ao comitê vem da régua do escape, com os dois gatilhos citados'));
+  }
+
   const reprovouPeloPiso = saida === 'reprovar' && abaixoDoPiso;
   if (reprovouPeloPiso && confianca === 'alta') {
     confianca = 'media';

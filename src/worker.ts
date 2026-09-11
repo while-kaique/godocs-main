@@ -93,6 +93,7 @@ import {
   avaliarProjetoNormal,
   avaliarProjetosNormaisPendentes,
   avancarDeliberacoesPendentes,
+  backfillEmbeddingsBase,
 } from "@/lib/avaliacao-normais.functions";
 import { avaliarRetroativo } from "@/lib/avaliacao-retroativa.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
@@ -1159,6 +1160,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     }
     // Backfill: avalia os normais SEM recomendação + mantém os embeddings do corpus. `dry` é o
     // DEFAULT (gravar exige {"dry":false}); `limite` limita a corrida.
+    // Embeddings da BASE INTEIRA (fonte única de vizinhos do time e da mesa). `dry` é o DEFAULT;
+    // paginado por `cap`, quem chama repete até `pendentes` voltar 0.
+    if (pathname === "/api/admin/embeddings/backfill" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { dry?: boolean; cap?: number };
+      return json(await backfillEmbeddingsBase({ dry: body.dry, cap: body.cap }), 200, { "Cache-Control": "no-store" });
+    }
     if (pathname === "/api/admin/avaliar-normais-pendentes" && method === "POST") {
       await requireAdmin(request);
       const body = (await readBody(request)) as { dry?: boolean; limite?: number };

@@ -154,7 +154,9 @@ async function montarEntradaSemanticaNormal(
     o_que_faz: oQueFazDoc(docRow?.conteudo),
     area: ctx?.area_nome ?? ctx?.area ?? resumo?.area ?? null,
     descricao: ctx?.descricao_breve ?? null,
-    memorial: ctx?.memorial_calculo ?? null,
+    // ⚠️ `memorial_calculo` é v1 e NÃO entra mais (11/09/2026) — nem no texto da mesa, nem no
+    // embedding. Ver `textoParaEmbedding`.
+    memorial: null,
     doc: resumoDocParaTexto(docRow?.conteudo),
   };
 }
@@ -166,7 +168,7 @@ type MapaEmbedding = Map<
   { vetor: number[]; modelo: string; dim: number; hash: string | null }
 >;
 
-function decodificarEmbeddings(rows: ProjetoEmbeddingRow[]): MapaEmbedding {
+export function decodificarEmbeddings(rows: ProjetoEmbeddingRow[]): MapaEmbedding {
   const mapa: MapaEmbedding = new Map();
   for (const r of rows) {
     try {
@@ -188,7 +190,7 @@ function decodificarEmbeddings(rows: ProjetoEmbeddingRow[]): MapaEmbedding {
  * que falta ou mudou, grava em `projeto_embedding` e devolve o mapa atualizado. Bounded por
  * `capGeracao` (custo + tempo do cron). Nunca lança.
  */
-async function garantirEmbeddings(
+export async function garantirEmbeddings(
   ids: string[],
   resumoPorId: Map<string, ProjetoDashboardResumo>,
   embeddings: MapaEmbedding,
@@ -1137,4 +1139,44 @@ export async function avancarDeliberacoesPendentes(
   }
 
   return { ok: true, ligado: true, dry, abertas: abertas.length, avancadas, encerradas, resultados };
+}
+
+
+/**
+ * BACKFILL dos embeddings da BASE INTEIRA (aprovados, reprovados, pendentes, especiais) — a fonte
+ * única de vizinhos do time da estrela e da mesa (11/09/2026).
+ *
+ * ⚠️ Por que existe: `carregarContextoPainel` só embedda os APROVADOS e com cap de 60 por corrida
+ * do cron — 750 vetores levariam horas e reprovados/pendentes nunca entrariam. A visão PANORÂMICA
+ * que o dono do produto pede ("esse projeto faz isso e move X, comparado com toda a base") exige a
+ * base inteira no mesmo espaço vetorial. Paginado por `cap` (direto na OpenAI, ~1 min por 64) e
+ * dirigido por quem chama até `pendentes` voltar 0. `dry` (DEFAULT) só conta.
+ */
+export async function backfillEmbeddingsBase(
+  opts: { dry?: boolean; cap?: number } = {},
+): Promise<{ ok: boolean; dry: boolean; total: number; com_vetor_fresco: number; pendentes: number; gerados: number; motivo?: string }> {
+  const dry = opts.dry ?? true;
+  const cap = Math.max(1, Math.min(opts.cap ?? 64, 256));
+  try {
+    const { linhas } = await lerResumosEspelho();
+    const resumos = linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null);
+    const resumoPorId = new Map(resumos.map((p) => [p.id, p]));
+    const ids = resumos.map((p) => p.id);
+    const mapa = decodificarEmbeddings(await getEmbeddingsProjetos());
+    const modeloAlvo = embeddingConfig()?.modelo;
+    // Conta quem está fresco SEM gerar (mesma régua do `garantirEmbeddings`: hash do texto + modelo).
+    let frescos = 0;
+    for (const id of ids) {
+      const entrada = await montarEntradaSemanticaNormal(id, resumoPorId.get(id));
+      const texto = entrada ? textoParaEmbedding(entrada) : '';
+      const atual = mapa.get(id);
+      if (texto && atual && atual.hash === hashTexto(texto) && (!modeloAlvo || atual.modelo === modeloAlvo)) frescos++;
+    }
+    const pendentesAntes = ids.length - frescos;
+    if (dry) return { ok: true, dry, total: ids.length, com_vetor_fresco: frescos, pendentes: pendentesAntes, gerados: 0 };
+    const ger = await garantirEmbeddings(ids, resumoPorId, mapa, { capGeracao: cap });
+    return { ok: true, dry, total: ids.length, com_vetor_fresco: frescos + ger.gerados, pendentes: Math.max(0, pendentesAntes - ger.gerados), gerados: ger.gerados };
+  } catch (e) {
+    return { ok: false, dry, total: 0, com_vetor_fresco: 0, pendentes: 0, gerados: 0, motivo: e instanceof Error ? e.message : String(e) };
+  }
 }

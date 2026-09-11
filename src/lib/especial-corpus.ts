@@ -120,8 +120,12 @@ export function textoParaEmbedding(e: EntradaSemantica): string {
   if (e.o_que_faz) partes.push(`O que faz: ${e.o_que_faz}`);
   if (e.contexto_especial) partes.push(`Por que é especial: ${e.contexto_especial}`);
   if (e.descricao) partes.push(`Descrição: ${e.descricao}`);
-  if (e.memorial) partes.push(`Memorial:\n${e.memorial}`);
-  else if (e.doc) partes.push(`Documentação:\n${e.doc}`);
+  // ⚠️ O MEMORIAL NÃO ENTRA (11/09/2026, decisão do dono do produto: "memorial hoje em dia não
+  // conta mais"). Ele é texto v1 com R$ e fórmula de cálculo, e dominava o vetor: os vizinhos
+  // saíam "parecidos no memorial", não no que o projeto FAZ. O campo fica no tipo por
+  // compatibilidade, mas é ignorado aqui — e mudar isto muda o hash de todo projeto, o que força
+  // o re-embedding da base (é o efeito desejado).
+  if (e.doc) partes.push(`Documentação:\n${e.doc}`);
   return partes.join('\n').trim();
 }
 

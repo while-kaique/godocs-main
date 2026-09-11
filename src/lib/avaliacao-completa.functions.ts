@@ -219,7 +219,7 @@ async function estrelaPeloTimeInteiro(
     // `automacao`/`inteligencia`/`autonomia`), e dois escritores na mesma célula é a briga que este
     // repo já pagou em outras colunas. O nível do time vira `Tipo de Projeto` só pelo eixo TIPO.
     const celulas: Record<string, string> = {
-      'Estrela Agente': rotuloNotaAgente(c.estrela).rotulo,
+      'Estrela Agente': rotuloNotaAgente(c.estrela, c.escape).rotulo,
       'Confiança Agente': c.confianca,
     };
     const tipoDoTime = TIPOS_PROJETO.find((t) => t.chave === r.resultado.estrela.tipo)?.rotulo;

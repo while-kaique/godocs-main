@@ -221,6 +221,13 @@ export async function avaliarComTime(args: {
    * contribuição dele é a NOTA. A réplica existia para resolver o mérito — que deixou de ser dele.
    */
   maxRodadasDebate?: number;
+  /**
+   * Soma do `Impacto Líquido Mensal` dos APROVADOS da base, calculada por quem tem o espelho em
+   * mãos (11/09/2026). ⚠️ Sem isto o share do 2º eixo dividia por `BASE_IMPACTO_MENSAL_REFERENCIA`,
+   * um número FIXO medido em 10/09 — a base cresce, o share cai e o 5★ de hoje viraria 4★ sem
+   * ninguém mexer em nada. Ausente/inválido → cai na referência (comportamento antigo).
+   */
+  totalBaseImpacto?: number | null;
 }): Promise<ResultadoTime> {
   const { dossie, vizinhos } = args;
   const maxTools = args.ferramentasPorAgente ?? FERRAMENTAS_POR_AGENTE;
@@ -351,6 +358,7 @@ export async function avaliarComTime(args: {
       savingReais: dossie.financeiro.saving_reais,
       receitaMensal: dossie.financeiro.receita_mensal,
     }),
+    totalBase: args.totalBaseImpacto ?? null,
   });
 
   // ── rodada 1 ──

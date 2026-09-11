@@ -11,6 +11,7 @@
  * no resto da mesa. DEFAULT OFF — sem a flag, a mesa segue byte-idêntica à determinística de hoje.
  */
 import { llmChat } from "@/lib/llm";
+import { modelosDoTime } from "@/lib/avaliacao/modelos";
 import { extrairJson } from "@/lib/agents/especial-classificador";
 import {
   buildPromptEspecialista,
@@ -42,10 +43,17 @@ export async function julgarComEspecialista(
   entrada: EntradaEspecialista,
 ): Promise<JulgamentoEspecialista> {
   try {
+    // ⚠️ Roteamento de modelo por PAPEL, o MESMO do time da estrela (`modelosDoTime`, 11/09/2026):
+    // o especialista da mesa faz checagem estruturada com os dados na mão — é o papel "leve". Sem
+    // as envs (`AVALIACAO_MODELO_LEVE`/`AVALIACAO_REASONING_EFFORT_LEVE`) fica byte-idêntico: cai
+    // no `LLM_MODEL`. Uma chave só serve todos os modelos; o modelo é campo do body por chamada.
+    const m = modelosDoTime();
     const raw = await llmChat(buildPromptEspecialista(entrada), {
       jsonMode: true,
       temperature: 0.1,
       maxTokens: 600,
+      ...(m.especialista ? { model: m.especialista } : {}),
+      ...(m.effortEspecialista ? { reasoningEffort: m.effortEspecialista } : {}),
     });
     return normalizarJulgamento(extrairJson(raw), entrada);
   } catch {

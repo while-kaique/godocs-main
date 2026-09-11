@@ -624,8 +624,11 @@ export function escapeValido(ind: IndicacaoEscape): boolean {
  * comitê humano, comparando com quem já está lá. Mostrar "6★" na tela apaga essa diferença e
  * convida a triagem a aplicar o número com um clique, que é exatamente o que não pode acontecer.
  */
-export function rotuloNotaAgente(nota: number): { rotulo: string; sugestao: number | null } {
-  return ehEscape(nota)
+export function rotuloNotaAgente(nota: number, escape?: boolean | null): { rotulo: string; sugestao: number | null } {
+  // ⚠️ O time NUNCA produz nota ≥ 6: o cérebro é travado em `TETO_AGENTE` e o escape viaja num
+  // booleano à parte. Sem este parâmetro a coluna dizia "5" enquanto o funil dizia 6-10 para o
+  // MESMO projeto (caso AVD Central v2, 10/09/2026).
+  return escape === true || ehEscape(nota)
     ? { rotulo: `${FAIXA_ESCAPE.min}-${FAIXA_ESCAPE.max}`, sugestao: null }
     : { rotulo: String(nota), sugestao: null };
 }
