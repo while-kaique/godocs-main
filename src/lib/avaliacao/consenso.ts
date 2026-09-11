@@ -114,6 +114,30 @@ export const MOTIVOS_INVALIDEZ: readonly string[] = Object.keys(ROTULO_DESQ);
  * e ao menos uma citação do material. `sem_evidencia` (o agente declarou que não achou nada)
  * fecha a porta mesmo com o motivo nomeado.
  */
+/**
+ * A citação SUSTENTA o motivo de invalidez? PURA, régua declarada (11/09/2026).
+ *
+ * ⚠️ Medido na rodada de calibragem (staging, 274 projetos): a porta (ii) reprovou 3 projetos
+ * APROVADOS por gente com "fora de uso" citando frases que não dizem isso — *"Chatbot para
+ * responder mensagens no nosso instagram interno"* (uma descrição) e *"Este projeto tem como
+ * objetivo criar uma plataforma…"* (a frase-padrão de objetivo de todo projeto vivo). A citação
+ * existia, então `invalidezComprovada` aceitava. Exigir citação não basta: a citação tem de conter
+ * o VOCABULÁRIO do motivo. Só o «Sistema de memória de M&A» ("por design o sistema começa vazio…
+ * ainda não há") sustentava de fato — e continua passando.
+ */
+export const VOCABULARIO_INVALIDEZ: Record<string, RegExp> = {
+  fora_de_uso:
+    /(descontinuad|desativad|desligad|parad[oa]\b|fora de uso|deixou de (ser usad|rodar|funcionar)|n[ãa]o (est[áa]|esta|se encontra) (mais )?(em uso|em produ[çc][ãa]o|rodando|ativo|operando)|\bPOC\b|prova de conceito|\bpiloto\b|em (fase de )?teste|dados sint[ée]ticos|ainda n[ãa]o (h[áa]|foi|est[áa]|esta|tem|come[çc]ou|entrou)|em desenvolvimento|n[ãa]o foi (implantad|implementad|colocad)|come[çc]a vazio|sem uso)/i,
+  ressubmissao:
+    /(ressubmiss|resubmiss|duplicad|duplicat|mesmo escopo|j[áa] documentad|j[áa] (foi )?submetid|vers[ãa]o anterior|projeto anterior|repete o (escopo|projeto))/i,
+};
+
+export function citacaoSustentaInvalidez(chave: string, evidencias: readonly string[] | null | undefined): boolean {
+  const re = VOCABULARIO_INVALIDEZ[chave];
+  if (!re) return false;
+  return (evidencias ?? []).some((e) => typeof e === 'string' && re.test(e));
+}
+
 export function invalidezComprovada(b: {
   desqualificador?: string | null;
   evidencias?: string[] | null;
@@ -122,7 +146,10 @@ export function invalidezComprovada(b: {
   const chave = b.desqualificador ?? '';
   if (!MOTIVOS_INVALIDEZ.includes(chave)) return false;
   if (b.sem_evidencia === true) return false;
-  return (b.evidencias ?? []).some((e) => typeof e === 'string' && e.trim().length > 0);
+  const evidencias = (b.evidencias ?? []).filter((e) => typeof e === 'string' && e.trim().length > 0);
+  if (!evidencias.length) return false;
+  // ⚠️ A citação tem de DIZER o motivo, não só existir (ver `VOCABULARIO_INVALIDEZ`).
+  return citacaoSustentaInvalidez(chave, evidencias);
 }
 
 function frase(s: string): string {
@@ -280,6 +307,16 @@ export function conciliar(
   } else {
     saida = 'aprovar';
     motivos.push(frase(`Mérito aprova e estrela ${b.nota} (${b.criterio_aplicado}) com confiança ${confianca}`));
+  }
+
+  // Invalidez NOMEADA mas com citação que não a sustenta: NÃO reprovou (a cadeia acima decidiu
+  // pelo mérito/divergência). Fica registrado para a triagem ver o que a estrela alegou.
+  if (!invalido && b.desqualificador && ROTULO_DESQ[b.desqualificador] && b.evidencias.length) {
+    motivos.push(
+      frase(
+        `A estrela nomeou ${ROTULO_DESQ[b.desqualificador]}, mas a citação não diz isso ("${String(b.evidencias[0]).slice(0, 120)}"): não reprova por invalidez`,
+      ),
+    );
   }
 
   // ⚠️ **TETO da confiança na reprovação pelo piso.** `confiancaDe` mede concordância dos dois

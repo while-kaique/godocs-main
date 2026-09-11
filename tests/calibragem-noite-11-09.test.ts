@@ -66,3 +66,25 @@ describe('embedding — memorial v1 fora do vetor', () => {
     expect(textoParaEmbedding({ nome: 'X', descricao: 'faz Y', memorial: 'R$ 1.000 de saving' })).not.toMatch(/R\$|Memorial/);
   });
 });
+
+import { invalidezComprovada, conciliar } from '@/lib/avaliacao/consenso';
+
+describe('invalidez — a citação tem de DIZER o motivo (3 aprovados reprovados por "fora de uso" com descrição como prova)', () => {
+  it('descrição ou frase de objetivo NÃO sustenta fora_de_uso', () => {
+    expect(invalidezComprovada({ desqualificador: 'fora_de_uso', evidencias: ['Chatbot para responder mensagens no nosso instagram interno @universogogroup.'] })).toBe(false);
+    expect(invalidezComprovada({ desqualificador: 'fora_de_uso', evidencias: ['Este projeto tem como objetivo criar uma plataforma digital para automatizar e centralizar os processos.'] })).toBe(false);
+  });
+  it('vocabulário de fora de uso / POC / ainda não sustenta', () => {
+    expect(invalidezComprovada({ desqualificador: 'fora_de_uso', evidencias: ['Por design o sistema começa vazio: o valor só se materializa depois… ainda não há negociações registradas.'] })).toBe(true);
+    expect(invalidezComprovada({ desqualificador: 'fora_de_uso', evidencias: ['O bot foi descontinuado em julho e não está mais em uso.'] })).toBe(true);
+    expect(invalidezComprovada({ desqualificador: 'ressubmissao', evidencias: ['Mesmo escopo já documentado no projeto anterior.'] })).toBe(true);
+    expect(invalidezComprovada({ desqualificador: 'ressubmissao', evidencias: ['Automatiza o cadastro de fornecedores.'] })).toBe(false);
+  });
+  it('no consenso, invalidez sem citação que sustente NÃO vira reprovar', () => {
+    const merito: any = { veredito: 'aprovar', julgamentos: [], preocupacoes: [], perguntas_ao_autor: [], valor: null, ressalvas: [], sinais: { temEvidenciaCitada: true, temVizinhos: true } };
+    const estrela: any = { nota: 0, criterio_aplicado: 'experimenta', desqualificador: 'fora_de_uso', evidencias: ['Este projeto tem como objetivo criar uma plataforma digital.'], sem_evidencia: false, promocao: { aplicada: false, dependente: null }, escape: { indicado: false, valido: false, evidencias: {} }, tipo: null, nivel: null, racional: 'x', contestacao: null, ancora_congelada: false, sinais: { temEvidenciaCitada: true, temVizinhos: true }, avaliada: true, piso_impacto: null };
+    const c = conciliar(merito, estrela, { debateFechou: true, ceticoRefuta: false, liberacao: { aprovar: false, ajuste: false, motivos: [] }, impactoMensal: 502.6 });
+    expect(c.saida).not.toBe('reprovar');
+    expect(c.motivos.join(' ')).toMatch(/não reprova por invalidez/);
+  });
+});

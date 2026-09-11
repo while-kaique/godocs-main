@@ -332,7 +332,8 @@ describe('conciliar — divergência A×B', () => {
   it('A aprova e B desqualifica por fora_de_uso → divergência cita fora de uso/parado, saída reprovar', () => {
     const c = conciliar(
       merito(),
-      estrela({ nota: 0, criterio_aplicado: 'piso_zero', desqualificador: 'fora_de_uso', nivel: null }),
+      // 11/09/2026: a citação tem de DIZER o motivo (ver `VOCABULARIO_INVALIDEZ`).
+      estrela({ nota: 0, criterio_aplicado: 'piso_zero', desqualificador: 'fora_de_uso', nivel: null, evidencias: ['Doc §5: "o robô foi descontinuado em julho e está fora de uso".'] }),
       ctx(),
     );
     expect(contem(c.divergencias, /fora de uso|parad/i)).toBe(true);
@@ -344,7 +345,7 @@ describe('conciliar — divergência A×B', () => {
   it('A aprova e B desqualifica por ressubmissao → divergência cita ressubmissão/duplicado, saída reprovar', () => {
     const c = conciliar(
       merito(),
-      estrela({ nota: 0, criterio_aplicado: 'piso_zero', desqualificador: 'ressubmissao', nivel: null }),
+      estrela({ nota: 0, criterio_aplicado: 'piso_zero', desqualificador: 'ressubmissao', nivel: null, evidencias: ['Doc §1: "mesmo escopo já documentado no projeto anterior".'] }),
       ctx(),
     );
     expect(contem(c.divergencias, /ressubmiss[ãa]o|duplicad/i)).toBe(true);
