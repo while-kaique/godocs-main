@@ -138,7 +138,22 @@ export function podeAgenteGravarStatus(args: {
   //   • `null` = **não há histórico**, ninguém decidiu este status → o agente pode agir;
   //   • string = ator conhecido; se for gente, o agente não encosta (e origem em branco dentro de
   //     um registro que EXISTE conta como gente, pelo default invertido de `ehAtorHumano`).
-  if (args.atorDoStatusAtual !== undefined && args.atorDoStatusAtual !== null && ehAtorHumano(args.atorDoStatusAtual)) {
+  // ⚠️ **O REENVIO do autor reabre a avaliação — inclusive contra a última escrita humana**
+  // (11/09/2026, caso «Íris [Analista de review]»/Larissa): o Luis aprovou a v1 em 21/08, a autora
+  // reenviou a v2 em 11/09 (Status voltou a Pendente) e o time concluiu Aprovado — mas o último
+  // status_log era o do Luis, então esta checagem barrava com "a triagem já decidiu", e a régua do
+  // reenvio (`decisaoDeAdminBloqueia`) nunca era consultada. Quando o histórico mostra que houve
+  // reenvio DEPOIS da última decisão humana, o ator do status atual deixa de bloquear sozinho.
+  const reabertoPorReenvio =
+    !!args.historico?.length &&
+    !!String(args.ultimoReenvioEm ?? '').trim() &&
+    !decisaoDeAdminBloqueia({ historico: args.historico, ultimoReenvioEm: args.ultimoReenvioEm });
+  if (
+    !reabertoPorReenvio &&
+    args.atorDoStatusAtual !== undefined &&
+    args.atorDoStatusAtual !== null &&
+    ehAtorHumano(args.atorDoStatusAtual)
+  ) {
     return { pode: false, motivo: 'decisao_humana' };
   }
   // ⚠️ E a decisão de admin ANTERIOR também vale, mesmo que a última escrita tenha sido do
