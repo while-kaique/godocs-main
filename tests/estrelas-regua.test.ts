@@ -98,7 +98,10 @@ describe('estrutura da régua', () => {
   it('o CRITÉRIO não nomeia projeto da base — quem nomeia é o campo `exemplos`', () => {
     const tudo = TODOS_NIVEIS.map((n) => n.criterio).join(' ');
     expect(tudo).not.toMatch(/PIAPP|GoBrands|GoPrice|SAIBBI|Damidash|CTR Machine/i);
-    expect(CRITERIOS_ESTRELA[4].exemplos).toContain('GoBrands');
+    // 11/09/2026: GoBrands (7★ humano) saiu dos exemplos de 5★ e virou âncora do escape.
+    expect(CRITERIOS_ESTRELA[4].exemplos).toContain('CX - Ticket Creator');
+    expect(ESCAPE_MUDA_O_JOGO.exemplos).toContain('GoBrands');
+    expect(ESCAPE_MUDA_O_JOGO.exemplos).toContain('PIAPP');
   });
 
   it('nivelDe cobre 0–5 e para na fronteira do agente', () => {

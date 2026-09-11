@@ -89,6 +89,7 @@ import {
   conciliarJulgamentos,
   montarPareceresDaMesa,
   type VotosDeterministicos,
+  aplicarTravaMaterialMesa,
 } from '@/lib/agents/mesa-especialistas';
 import { carregarCorrecoesDaTriagem, licoesParaPrompt } from '@/lib/correcoes.functions';
 import { linhaDoQueSeCobra, linhaImpactoBrutoLiquido } from '@/lib/avaliacao/dossie';
@@ -167,6 +168,28 @@ type MapaEmbedding = Map<
   string,
   { vetor: number[]; modelo: string; dim: number; hash: string | null }
 >;
+
+/**
+ * Cache POR ISOLATE dos vetores decodificados da base (11/09/2026).
+ *
+ * ⚠️ Medido na staging com 8 avaliações em paralelo: `Worker exceeded memory limit` em 24 requests
+ * — cada avaliação carregava e decodificava a tabela INTEIRA (`projeto_embedding`, 770 × 3072
+ * floats ≈ 9,5 MB + o base64) DUAS vezes (mesa e time). Uma cópia compartilhada por isolate, com
+ * TTL curto, resolve sem mudar nenhuma régua. O backfill NÃO usa o cache (precisa ver o que acabou
+ * de gravar) e o invalida ao gerar.
+ */
+const EMBEDDINGS_CACHE_TTL_MS = 120_000;
+let embeddingsCache: { em: number; mapa: MapaEmbedding } | null = null;
+export async function carregarEmbeddingsBase(): Promise<MapaEmbedding> {
+  const agora = Date.now();
+  if (embeddingsCache && agora - embeddingsCache.em < EMBEDDINGS_CACHE_TTL_MS) return embeddingsCache.mapa;
+  const mapa = decodificarEmbeddings(await getEmbeddingsProjetos());
+  embeddingsCache = { em: agora, mapa };
+  return mapa;
+}
+export function invalidarEmbeddingsBase(): void {
+  embeddingsCache = null;
+}
 
 export function decodificarEmbeddings(rows: ProjetoEmbeddingRow[]): MapaEmbedding {
   const mapa: MapaEmbedding = new Map();
@@ -599,7 +622,14 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
       area: entrada?.area ?? '',
       descricao: entrada?.descricao ?? '',
       o_que_faz: entrada?.o_que_faz ?? '',
-      memorial: [entrada?.memorial ?? '', impactoLinha, exigivel].filter(Boolean).join('\n\n'),
+      // ⚠️ A linha de HORAS vem separada e com unidade (11/09/2026): sem ela, a única grandeza no
+      // texto era o impacto em R$, e o especialista de horas o tratou como horas (canários).
+      memorial: [
+        entrada?.memorial ?? '',
+        `Horas humanas liberadas declaradas: ${fin.horas > 0 ? `${fin.horas} h/mês` : 'nenhuma (categoria sem horas ou não informado)'}.`,
+        impactoLinha,
+        exigivel,
+      ].filter(Boolean).join('\n\n'),
       doc: entrada?.doc ?? '',
     };
     const vizinhosTexto = vizinhosArr.map((v) => [v.nome, v.area].filter(Boolean).join(', '));
@@ -614,7 +644,7 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
     const entradas = montarEntradasEspecialistas(votosDet, texto, vizinhosTexto, licoes);
     // `julgarComEspecialista` NUNCA lança (fail-safe → voto determinístico daquela dimensão), então
     // um agente que falhe não derruba a mesa nem o lote de background.
-    julgamentos = await Promise.all(entradas.map(julgarComEspecialista));
+    julgamentos = (await Promise.all(entradas.map(julgarComEspecialista))).map(aplicarTravaMaterialMesa);
     conciliado = conciliarJulgamentos(julgamentos, {
       especial: projeto.especial === 1,
       fluxoDireto: ehLider,
@@ -899,7 +929,7 @@ export async function carregarContextoPainel(
   const linhaPorId = mapaDeLinhas(linhas);
   const aprovados = selecionarAprovadosNormais(resumos);
 
-  let embeddings = decodificarEmbeddings(await getEmbeddingsProjetos());
+  let embeddings = await carregarEmbeddingsBase();
   const idsEmbeddar = Array.from(new Set([...idsAlvo, ...aprovados.map((a) => a.id)]));
   const ger = await garantirEmbeddings(idsEmbeddar, resumoPorId, embeddings, {
     capGeracao: opts.capGeracao ?? 60,
@@ -1188,6 +1218,7 @@ export async function backfillEmbeddingsBase(
     }
     // Sem dry: gera direto (o `garantirEmbeddings` já pula quem está fresco). `gerados < cap` = acabou.
     const ger = await garantirEmbeddings(ids, resumoPorId, mapa, { capGeracao: cap });
+    if (ger.gerados > 0) invalidarEmbeddingsBase();
     return { ok: true, dry, total: ids.length, com_vetor_fresco: -1, pendentes: ger.gerados < cap ? 0 : -1, gerados: ger.gerados };
   } catch (e) {
     return { ok: false, dry, total: 0, com_vetor_fresco: 0, pendentes: 0, gerados: 0, motivo: e instanceof Error ? e.message : String(e) };

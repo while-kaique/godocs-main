@@ -44,7 +44,12 @@ let fila = [
   ...antes.filter((l) => !eCanario(l) && !ePendente(l) && temEstrela(l)),
   ...antes.filter((l) => !eCanario(l) && !ePendente(l) && !temEstrela(l)),
 ].filter((l) => !fora(l));
-const feitos = new Set(readdirSync(join(OUT, 'projetos')).map((f) => f.replace(/\.json$/, '')));
+// Só conta como FEITO quem tem resposta 2xx/4xx: falha 5xx fica para a próxima passada.
+const feitos = new Set(
+  readdirSync(join(OUT, 'projetos'))
+    .filter((f) => { try { return (JSON.parse(readFileSync(join(OUT, 'projetos', f), 'utf8')).http ?? 599) < 500; } catch { return false; } })
+    .map((f) => f.replace(/\.json$/, '')),
+);
 fila = fila.filter((l) => !feitos.has(l.id.toLowerCase()));
 if (LIMITE > 0) fila = fila.slice(0, LIMITE);
 if (process.env.CAL_SO_FILA) { console.log(fila.slice(0, 12).map((l) => `${l.id} ${l.status}/${l.estrelas || '-'} ${l.nome.slice(0, 50)}`).join('\n')); console.log(`[noite] (só fila) total ${fila.length}`); process.exit(0); }
@@ -64,7 +69,8 @@ async function avaliar(l: Linha) {
       let body: unknown = null; try { body = JSON.parse(txt); } catch { body = { raw: txt.slice(0, 500) }; }
       const ms = Date.now() - t0;
       const out = { id: l.id, nome: l.nome, antes: l, http: r.status, ms, tentativa: tent, resultado: body };
-      writeFileSync(join(OUT, 'projetos', `${l.id.toLowerCase()}.json`), JSON.stringify(out, null, 2));
+      // 5xx só é persistido na 2ª tentativa (registro da falha); a 1ª tenta de novo.
+      if (r.status < 500 || tent === 2) writeFileSync(join(OUT, 'projetos', `${l.id.toLowerCase()}.json`), JSON.stringify(out, null, 2));
       const j = (body as any)?.junta; const e = (body as any)?.estrela; const m = (body as any)?.mesa;
       log(`${r.status} ${Math.round(ms / 1000)}s ${l.id} «${l.nome.slice(0, 40)}» antes=${l.status}/${l.estrelas || '-'} → junta=${j?.status ?? '?'} 6-10=${j?.flag6a10 ? 'S' : 'N'} estrela=${e?.estrelas ?? e?.motivo ?? '?'} mesa=${m?.veredito ?? m?.motivo ?? '?'} conf=${j?.confianca ?? '?'} gravado=${(body as any)?.status_gravado ?? '-'}`);
       if (r.status < 500) return;

@@ -16,9 +16,8 @@ import { carregarAcuraciaMedida } from '@/lib/avaliacao-calibragem.functions';
 import { buscarDuplicataNaLista, checarPlausibilidadeHoras, calcularImpactoBasico } from '@/lib/avaliacao/ferramentas';
 import { numero, texto, type Dossie } from '@/lib/avaliacao/dossie';
 import type { Mensagem } from '@/lib/avaliacao/ferramentas';
-import { getEmbeddingsProjetos } from '@/integrations/db/client.server';
 import { cosseno } from '@/lib/embeddings';
-import { garantirEmbeddings, decodificarEmbeddings } from '@/lib/avaliacao-normais.functions';
+import { garantirEmbeddings, carregarEmbeddingsBase } from '@/lib/avaliacao-normais.functions';
 import { mapResumo, type ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
 import { chaveProjeto } from '@/lib/projeto-chave';
 
@@ -174,7 +173,7 @@ export async function vizinhosPorEmbedding(dossie: Dossie, linhas: LinhaEsp[]): 
     const resumos = linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null);
     const resumoPorId = new Map(resumos.map((p) => [chaveProjeto(p.id), p]));
     const alvoId = chaveProjeto(dossie.id);
-    let mapa = decodificarEmbeddings(await getEmbeddingsProjetos());
+    let mapa = await carregarEmbeddingsBase();
     // Só o ALVO é garantido aqui (cap 1); a base é papel do backfill (`backfillEmbeddingsBase`).
     mapa = (await garantirEmbeddings([alvoId], resumoPorId, mapa, { capGeracao: 1 })).mapa;
     const alvo = mapa.get(alvoId)?.vetor ?? mapa.get(dossie.id)?.vetor;

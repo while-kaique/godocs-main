@@ -167,6 +167,13 @@ export function buildPromptEstrela(args: {
    * repo). Ausente: o prompt fica byte-idêntico ao de antes na parte do segundo eixo.
    */
   pisoDeImpacto?: PisoDeImpacto | null;
+  /**
+   * As âncoras da faixa 6-10 com nota HUMANA na base (`paresDeComite`), para o PASSO 1 ser uma
+   * COMPARAÇÃO e não um checklist abstrato (11/09/2026). Pedido do dono do produto: o agente tem
+   * de olhar o projeto contra os que o comitê já pôs em 6-10 e dizer se ele "foi além em algum
+   * ponto". Ausente → o prompt fica como antes.
+   */
+  ancorasComite?: readonly { nome: string; nota: number; resumo: string }[] | null;
 }): Mensagem[] {
   const system = [
     // ⚠️ **A ORDEM aqui é o conserto de um defeito MEDIDO** (03/09/2026, 65 especiais de
@@ -209,7 +216,18 @@ export function buildPromptEstrela(args: {
         .join('\n')
     : 'Nenhum vizinho com nota humana foi encontrado para este projeto (sem vizinhos). Ancore só na régua e nos exemplos reais dela.';
 
+  const ancorasTxt = (args.ancorasComite ?? [])
+    .slice(0, 8)
+    .map((a) => `- ${a.nome} (comitê: ${a.nota}★): ${a.resumo}`)
+    .join('\n');
   const user = [
+    ...(ancorasTxt
+      ? [
+          'PROJETOS QUE O COMITÊ HUMANO JÁ COLOCOU NA FAIXA 6–10 (a régua viva do PASSO 1 — o projeto em análise se compara a ELES: faz o que eles fazem, com o alcance e a irreversibilidade deles? Diga em que ponto ele fica aquém ou vai além):',
+          ancorasTxt,
+          '',
+        ]
+      : []),
     'PROJETOS PARECIDOS JÁ AVALIADOS POR HUMANOS (âncoras de comparação — posicione o projeto RELATIVO a eles, justificando a diferença):',
     vizinhosTxt,
     '',

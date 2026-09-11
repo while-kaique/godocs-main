@@ -377,6 +377,7 @@ export async function avaliarComTime(args: {
       objecaoDoCetico,
       painelDoImpacto: julgamentos,
       pisoDeImpacto,
+      ancorasComite: paresDeComite(vizinhos, args.ancoras ?? []),
     });
     const loop = await loopComFerramentas({ chamarLlm: chamar('estrela'), mensagensIniciais: prompt, executar: args.executar, maxChamadas: maxTools });
     const ctx = { temVizinhos, notaHumana: args.notaHumana, pisoDeImpacto };

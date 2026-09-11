@@ -467,7 +467,11 @@ export function linhaImpactoBrutoLiquido(bruto: number | null, liquido: number |
   if (bruto === null && liquido === null) return null;
   // ⚠️ Usa o MESMO `fmt` do resto do dossiê: número com outra formatação para o mesmo campo é
   // ruído que o agente pode ler como duas grandezas diferentes.
-  return `Impacto bruto: ${fmt(bruto)} · impacto líquido MENSAL: ${fmt(liquido)} — os dois estão CORRETOS e diferem por construção (no líquido as horas entram ponderadas), e o número que vale para a régua é o LÍQUIDO MENSAL. A diferença entre eles NÃO é contradição nem erro de cálculo do autor.`;
+  // ⚠️ "R$" EXPLÍCITO (11/09/2026): sem a unidade, o especialista de horas da mesa leu o impacto
+  // líquido como HORAS — canários AVD Central v2 ("saving de 8.352 horas por mês equivale a 38
+  // pessoas") e CX Hub ("31.604,82 horas por mês"). Número sem unidade é convite ao erro de grandeza.
+  const r = (n: number | null) => (n === null ? '—' : `R$ ${fmt(n)}`);
+  return `Impacto bruto: ${r(bruto)} · impacto líquido MENSAL: ${r(liquido)} (valores em REAIS por mês, NÃO são horas) — os dois estão CORRETOS e diferem por construção (no líquido as horas entram ponderadas), e o número que vale para a régua é o LÍQUIDO MENSAL. A diferença entre eles NÃO é contradição nem erro de cálculo do autor.`;
 }
 
 export function linhaDoQueSeCobra(
