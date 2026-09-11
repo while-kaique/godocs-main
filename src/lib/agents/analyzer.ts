@@ -784,7 +784,15 @@ export function decidirStatusSubmissao(input: {
   materialidade: number;
   vereditoAprovado: boolean;
   tetoMaterialidade?: number;
+  /**
+   * O TIME de agentes decide o funil (`AGENTE_DECIDE_FUNIL`, 11/09/2026): o analisador da v1 NUNCA
+   * reprova nem manda para "Reenvio Pendente" — todo projeto nasce em validação / "Pendente" e o
+   * time, pela régua composta e com citação, grava Aprovado/Pendente/Reprovado em seguida.
+   * Precede TODAS as regras abaixo, inclusive `claro_nao`.
+   */
+  timeDecideFunil?: boolean;
 }): { status: 'aprovado' | 'rejeitado' | 'em_validacao'; statusSheet: StatusSheet } {
+  if (input.timeDecideFunil) return { status: 'em_validacao', statusSheet: 'Pendente' };
   const teto = input.tetoMaterialidade ?? TETO_MATERIALIDADE_CLASSIFICACAO;
   const classificacao = (input.classificacao ?? '').toString().trim().toLowerCase();
 

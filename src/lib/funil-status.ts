@@ -14,6 +14,21 @@
 
 /** Os três, e só estes três. */
 export const STATUS_FUNIL = ['Aprovado', 'Pendente', 'Reprovado'] as const;
+
+/**
+ * O TIME de agentes decide o funil (Aprovado/Pendente/Reprovado)? Env `AGENTE_DECIDE_FUNIL`, lida em
+ * RUNTIME (nunca em escopo de módulo). Default OFF = byte-idêntico ao de antes.
+ *
+ * ⚠️ Fonte ÚNICA (11/09/2026): quando ligada, o analisador da v1 (`analisarProjetoFn`) deixa de
+ * decidir status e de escrever `Classificação`/`Motivo Reprovado` — ele fica só com Complexidade e o
+ * parecer em Observações. Dois decisores no mesmo funil era o "resquício de agente v1" que o dono do
+ * produto pediu para tirar: o analisador gravava Reprovado/Pendente na submissão e o time, minutos
+ * depois, decidia por régua — e a reprovação da v1, sem citação, é justamente o que a v2 proíbe.
+ */
+export function agenteDecideFunil(): boolean {
+  const v = String(process.env.AGENTE_DECIDE_FUNIL ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'sim' || v === 'on';
+}
 export type StatusFunil = (typeof STATUS_FUNIL)[number];
 
 /** Fora do funil: existe na coluna, não é etapa. */
