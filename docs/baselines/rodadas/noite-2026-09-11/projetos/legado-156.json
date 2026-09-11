@@ -1,0 +1,44 @@
+{
+  "id": "legado-156",
+  "nome": "CX Hub — Plataforma Central de Operações de Backoffice CX",
+  "antes": {
+    "id": "legado-156",
+    "nome": "CX Hub — Plataforma Central de Operações de Backoffice CX",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "31604,82",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 172232,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-156",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 31.604,82 horas por mês exige uma equipe muito grande, mas o projeto não informa quantas agentes faziam esse trabalho. É preciso conferir o tamanho da equipe e registros de tempo ou despesa antes e depois da automação.\nFinanceiro: O valor de R$ 31.605 por mês é alto, mas o projeto descreve ganho de tempo e não mostra despesa que deixou de existir. Precisa conferir registros de reembolsos, horas ou contratos realmente reduzidos, evitando contar a mesma economia duas vezes.\nCético: O valor de R$ 31.604,82 parece projetado, pois o texto fala em resultado esperado e não mostra despesa que deixou de existir. É preciso conferir registros de horas ou custos antes e depois, além de evidência de pagamento evitado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 5
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

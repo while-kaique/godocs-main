@@ -1,0 +1,126 @@
+{
+  "total": 381,
+  "http_erros": 0,
+  "tempo_mediano_s": 77,
+  "por_faixa": {
+    "< 100": {
+      "n": 142,
+      "junta": {
+        "Pendente": 88,
+        "Aprovado": 27,
+        "Reprovado": 27
+      }
+    },
+    "100–1k": {
+      "n": 164,
+      "junta": {
+        "Reprovado": 1,
+        "Pendente": 155,
+        "Aprovado": 8
+      }
+    },
+    "1k–10k": {
+      "n": 67,
+      "junta": {
+        "Pendente": 67
+      }
+    },
+    "≥ 10k": {
+      "n": 8,
+      "junta": {
+        "Pendente": 8
+      }
+    }
+  },
+  "estrela": {
+    "comparaveis": 196,
+    "exatas": 104,
+    "dentro_de_1": 159,
+    "agente_menor_2plus": 23,
+    "agente_maior_2plus": 14
+  },
+  "status": {
+    "aprovado_humano_reprovado_agente": 5,
+    "reprovado_humano_aprovado_agente": 0,
+    "pendente_decidido": {
+      "Pendente": 29,
+      "Aprovado": 6,
+      "Reprovado": 6
+    }
+  },
+  "canarios": [
+    {
+      "nome": "SendApp",
+      "imp": 97135.01,
+      "humano": 7,
+      "agente": "5",
+      "junta": "Pendente",
+      "flag6a10": false,
+      "conf": "media",
+      "mesa": "em_validacao",
+      "porque": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    {
+      "nome": "PIAPP",
+      "imp": 0,
+      "humano": 10,
+      "agente": "6-10",
+      "junta": "Pendente",
+      "flag6a10": true,
+      "conf": "alta",
+      "mesa": "especial, NO-OP",
+      "porque": [
+        "O time avaliou e o projeto se sustenta, mas caiu na faixa 6 a 10: fica pendente até o comitê humano cravar a estrela (6, 7, 8, 9 ou 10) e aprovar.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    {
+      "nome": "AVD Central v2",
+      "imp": 8352.239167,
+      "humano": 4,
+      "agente": "3",
+      "junta": "Pendente",
+      "flag6a10": false,
+      "conf": "media",
+      "mesa": "em_validacao",
+      "porque": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir."
+      ]
+    },
+    {
+      "nome": "[VERSTA] Robo orçamento - {Marca}",
+      "imp": 0,
+      "humano": 8,
+      "agente": "5",
+      "junta": "Pendente",
+      "flag6a10": false,
+      "conf": "alta",
+      "mesa": "especial, NO-OP",
+      "porque": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    {
+      "nome": "CX Hub — Plataforma Central de Operações de Backoffice CX",
+      "imp": 31604.82,
+      "humano": null,
+      "agente": "5",
+      "junta": "Pendente",
+      "flag6a10": false,
+      "conf": "alta",
+      "mesa": "em_validacao",
+      "porque": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    }
+  ]
+}

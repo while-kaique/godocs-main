@@ -1,0 +1,43 @@
+{
+  "id": "LEGADO-057",
+  "nome": "Meta Base - Estoque",
+  "antes": {
+    "id": "LEGADO-057",
+    "nome": "Meta Base - Estoque",
+    "status": "Reprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "18,16",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 86150,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-057",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho informado é baixo e não mostra uma despesa que deixou de existir. É preciso conferir o registro do custo evitado e como as horas foram convertidas em dinheiro.\nCético: O ganho de 18,16 não prova que uma despesa deixou de existir; pode ser apenas tempo poupado. Falta o registro da despesa interrompida e sua conferência antes da aprovação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Reprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes reprovou o projeto por régua declarada.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time de agentes reprovou o projeto por régua declarada.",
+        "A análise do impacto ficou em Pendente e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar."
+      ]
+    },
+    "status_gravado": "Reprovado"
+  }
+}

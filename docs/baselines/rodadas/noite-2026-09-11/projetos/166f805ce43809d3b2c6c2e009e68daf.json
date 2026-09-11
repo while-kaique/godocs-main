@@ -1,0 +1,44 @@
+{
+  "id": "166f805ce43809d3b2c6c2e009e68daf",
+  "nome": "LIA DM - universo Gogroup",
+  "antes": {
+    "id": "166f805ce43809d3b2c6c2e009e68daf",
+    "nome": "LIA DM - universo Gogroup",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "media",
+    "impacto": "16,31",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 61186,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "166f805ce43809d3b2c6c2e009e68daf",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho estimado é baixo e parece vir apenas de tempo interno, sem mostrar despesa que deixou de existir. Precisa conferir o custo da hora e se houve redução real de gasto.\nCético: O ganho foi estimado, mas não há registro do tempo realmente gasto nem das respostas que o bot passou a assumir. Precisa conferir os atendimentos antes e depois e a redução efetiva de horas.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Reprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes reprovou o projeto por régua declarada.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time de agentes reprovou o projeto por régua declarada.",
+        "A análise do impacto ficou em Pendente e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Reprovado e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

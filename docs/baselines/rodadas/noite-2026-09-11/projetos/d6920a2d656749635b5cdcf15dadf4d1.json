@@ -1,0 +1,44 @@
+{
+  "id": "d6920a2d656749635b5cdcf15dadf4d1",
+  "nome": "Gestão de Consumíveis",
+  "antes": {
+    "id": "d6920a2d656749635b5cdcf15dadf4d1",
+    "nome": "Gestão de Consumíveis",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "757,525",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 74763,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d6920a2d656749635b5cdcf15dadf4d1",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving equivale a cerca de 3,4 pessoas em tempo integral e não há registro de quantas pessoas faziam essas tarefas. Precisa conferir a equipe envolvida e os registros de horas antes da automação.\nFinanceiro: Preocupa porque o impacto líquido mensal de 757,52 não mostra quais despesas deixaram de existir. Precisa conferir compras antes e depois, contratos ou notas, separando savings já obtidos de oportunidades futuras.\nCético: O saving mensal de 757,52 não tem registro da despesa que deixou de existir, e parte do ganho parece ser apenas oportunidade ou previsão. É preciso conferir contratos, compras antes e depois e pagamentos efetivamente reduzidos.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

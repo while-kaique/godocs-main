@@ -1,0 +1,44 @@
+{
+  "id": "c417fe024caf2b48b5701b82070b34b9",
+  "nome": "Agente de Waitlists",
+  "antes": {
+    "id": "c417fe024caf2b48b5701b82070b34b9",
+    "nome": "Agente de Waitlists",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "67,755",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 81914,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "c417fe024caf2b48b5701b82070b34b9",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido informado é baixo e não mostra uma despesa que deixou de existir. Precisa conferir o registro das horas antes gastas e sua redução efetiva, sem contar a mesma economia como receita.\nCético: O saving líquido mensal de 67,75 não mostra qual despesa deixou de existir, e a operação ainda depende de confirmação manual. Precisa do registro das horas ou custo antes e depois, além da prova de que esse gasto foi realmente encerrado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

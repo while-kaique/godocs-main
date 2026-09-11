@@ -1,0 +1,45 @@
+{
+  "id": "legado-139",
+  "nome": "RPA Portal Comprovantes",
+  "antes": {
+    "id": "legado-139",
+    "nome": "RPA Portal Comprovantes",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "393,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 65087,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-139",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 393,75 horas por mês parece exigir mais de uma pessoa, mas não há registro de quantas pessoas faziam esse trabalho antes. Precisa conferir a equipe envolvida e os registros de tempo ou despesa antes da automação.\nFinanceiro: O saving parece plausível, mas não há registro mostrando qual despesa deixou de existir. Precisa conferir essa despesa e evitar contar as mesmas horas como saving e como receita.\nCético: O saving líquido mensal de 393,75 não vem acompanhado de prova de que uma despesa deixou de existir. Falta o registro financeiro antes e depois da automação para conferir essa redução.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

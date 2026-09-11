@@ -1,0 +1,45 @@
+{
+  "id": "legado-131",
+  "nome": "Torre de Controle Gobeaute",
+  "antes": {
+    "id": "legado-131",
+    "nome": "Torre de Controle Gobeaute",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "739,29",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 96178,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-131",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 739,29 horas/mês não parece compatível com a descrição de apenas 12 horas semanais de trabalho manual. Precisa conferir quantas pessoas faziam essa tarefa e registros que comprovem o tempo e a despesa realmente eliminados.\nFinanceiro: O valor depende de horas liberadas, mas não há prova de uma despesa que deixou de existir. Confira o custo da equipe e o registro da redução efetiva.\nCético: O ganho ainda é uma previsão de redução de trabalho, não uma despesa que deixou de existir. Precisa conferir registros antes e depois da implantação e provar que houve redução real de custo, não apenas tempo liberado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

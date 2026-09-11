@@ -1,0 +1,45 @@
+{
+  "id": "legado-058",
+  "nome": "B2B DW",
+  "antes": {
+    "id": "legado-058",
+    "nome": "B2B DW",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "4274,205",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 163787,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-058",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 4.274 horas/mês equivale a quase 20 pessoas em dedicação integral, mas não informa quantas pessoas faziam o trabalho. É preciso conferir registros de equipe e horas gastas antes da automação.\nFinanceiro: O impacto líquido mensal de R$ 4.274,20 depende de uma despesa que teria parado, mas não há registro que comprove isso. Precisa conferir a despesa anterior e se o valor não foi contado também como horas ou receita.\nCético: Falta o registro das horas antes e depois e da despesa que deixou de existir. Sem isso, o impacto mensal parece estimado, não saving efetivado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

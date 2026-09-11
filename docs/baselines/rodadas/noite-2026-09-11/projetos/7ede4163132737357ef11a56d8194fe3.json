@@ -1,0 +1,44 @@
+{
+  "id": "7ede4163132737357ef11a56d8194fe3",
+  "nome": "Alertas de correções do Contas a Pagar e Intercompany",
+  "antes": {
+    "id": "7ede4163132737357ef11a56d8194fe3",
+    "nome": "Alertas de correções do Contas a Pagar e Intercompany",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "165,45",
+    "categorias": "Custo evitado, Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 62413,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "7ede4163132737357ef11a56d8194fe3",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho líquido mensal de 165,45 não vem acompanhado de registros que mostrem como foi medido, e as 6 h liberadas não têm prova de uso ou custo evitado. Precisa conferir os históricos processados, os itens corrigidos e a validação do time de Contas a Pagar.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "As duas metades do time divergiram: a análise do impacto aponta Aprovado e a da estrela aponta Reprovado. Fica pendente para gente decidir.",
+      "concordam": false,
+      "confianca": "baixa",
+      "porques": [
+        "As duas metades do time divergiram: a análise do impacto aponta Aprovado e a da estrela aponta Reprovado. Fica pendente para gente decidir.",
+        "Pela estrela: O time de agentes reprovou o projeto por régua declarada.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

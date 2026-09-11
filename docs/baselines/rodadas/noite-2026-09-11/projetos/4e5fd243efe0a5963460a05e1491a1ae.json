@@ -1,0 +1,45 @@
+{
+  "id": "4e5fd243efe0a5963460a05e1491a1ae",
+  "nome": "Análise de convergência  - premissas de AVD",
+  "antes": {
+    "id": "4e5fd243efe0a5963460a05e1491a1ae",
+    "nome": "Análise de convergência  - premissas de AVD",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "196,4725",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 96364,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "4e5fd243efe0a5963460a05e1491a1ae",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O impacto líquido mensal de 196,47 não está ligado a uma despesa que deixou de existir. Falta o registro da despesa evitada e da conferência do valor.\nCético: Os impactos estão declarados, mas não há documentação nem registro que mostre como foram calculados ou se o ganho aconteceu de fato. É preciso conferir a origem do valor líquido mensal de 196,47 e os registros das decisões de calibração.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

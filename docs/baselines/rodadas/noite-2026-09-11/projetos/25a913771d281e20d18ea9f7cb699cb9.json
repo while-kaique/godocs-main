@@ -1,0 +1,43 @@
+{
+  "id": "25a913771d281e20d18ea9f7cb699cb9",
+  "nome": "Automação na Criação de Chamados de Pagamentos de Fornecedores (Gobeaute)",
+  "antes": {
+    "id": "25a913771d281e20d18ea9f7cb699cb9",
+    "nome": "Automação na Criação de Chamados de Pagamentos de Fornecedores (Gobeaute)",
+    "status": "Aprovado",
+    "estrelas": "4",
+    "estrelaAgente": "4",
+    "confiancaAgente": "baixa",
+    "impacto": "177,87",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 125752,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "25a913771d281e20d18ea9f7cb699cb9",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: Os impactos de 355,74 e 177,87 não vêm acompanhados de volume de notas, tempo gasto antes ou registro de redução já ocorrida. Precisa conferir esses dados e provar que a despesa deixou de existir, não apenas que a tarefa foi automatizada.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,5474 @@
+{
+  "exportado_em": "2026-09-11T02:07:44.315Z",
+  "total": 392,
+  "itens": [
+    {
+      "id": "e60dd737b7551f3ff9ea8e03cfe5bc41",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "e4b1dcc3e07f56a7f576c672fcc78824",
+      "projeto_nome": "AVD Central v2",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 01:35:11"
+    },
+    {
+      "id": "adc7d8a716d5238e197a87f63bd9bcb5",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "e4b1dcc3e07f56a7f576c672fcc78824",
+      "projeto_nome": "AVD Central v2",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 01:27:40"
+    },
+    {
+      "id": "88d77ad106ae3ca9a0e66fc2af06c161",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "e4b1dcc3e07f56a7f576c672fcc78824",
+      "projeto_nome": "AVD Central v2",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 01:07:49"
+    },
+    {
+      "id": "16d1f6a8a0963df0398796b8377bb8cd",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "4f452f2a1ef198a4d672c78485581da8",
+      "projeto_nome": "Ressarcimento CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 22:14:50"
+    },
+    {
+      "id": "b3b229279725c16511637622fe9ec1b0",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "75490b6b4fb70711102de90b0d24bd9c",
+      "projeto_nome": "V.I.S.I.O.N. — Visão Integrada de Supervisão Inteligente,  Operacional e de Negócios",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 22:13:31"
+    },
+    {
+      "id": "4b3d16e66a49519d5b19e61270a15b8b",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "a67f634cea0431c3d312481d6bfedcac",
+      "projeto_nome": "CX Self-Service",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 22:13:15"
+    },
+    {
+      "id": "79b2f29e7926a1aa3cae0a8be80453d6",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "4c0b4e19ac8316415208f764d25ebe7e",
+      "projeto_nome": "Fast Track",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 22:12:00"
+    },
+    {
+      "id": "89732ac22cd52bfdc1d47e38162b7e16",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "41a684e613aa95e58e8881de6d608049",
+      "projeto_nome": "Alerta de Pedidos Travados por Responsável",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:41:31"
+    },
+    {
+      "id": "6df416c910c2de7248fe26b1c1af48c8",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "dba1cc1c23ebb528d6ad4c852ad32b64",
+      "projeto_nome": "Plataforma SmartOnline - Captura de XMLs e Recolhimento de DIFAL",
+      "detalhe": "Descontinuado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Descontinuado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:38:25"
+    },
+    {
+      "id": "585f5d6f42e2c18e98e9ebf5432cecce",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "78d2a1d95f831aa612c3d3fff68b6a67",
+      "projeto_nome": "GoDocs",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado pela triagem em 26/08/2026. O time de agentes aprovou por engano em 10/09 e a decisão humana foi restaurada."
+      },
+      "created_at": "2026-09-10 21:38:22"
+    },
+    {
+      "id": "05d236982e1645c34ede42e4fab9d325",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "77f1e31e19c9bc2558928c127d21b317",
+      "projeto_nome": "Headcount Gogroup",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:35:11"
+    },
+    {
+      "id": "c842bc298e542928c8757733a7328f6f",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "33bc7b75f2e86f725f06d700b76a8ff7",
+      "projeto_nome": "Teste",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:28:26"
+    },
+    {
+      "id": "ed1d92dc1bb6c00a8b1dc27d1a3508de",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "33bc7b75f2e86f725f06d700b76a8ff7",
+      "projeto_nome": "Teste",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:27:38"
+    },
+    {
+      "id": "90f1815ce3d285d5be50fdffe03ccbe6",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "97383cf6dc7a636fc614c726895d2aef",
+      "projeto_nome": "Alerta de pedidos com erro de integração entre Yampi e Clearsale",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:27:17"
+    },
+    {
+      "id": "21689d71d78384c871919c90d918d1ed",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "89301661235d7ed7aa90f8afe8f5295e",
+      "projeto_nome": "Seo Gocase",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:27:12"
+    },
+    {
+      "id": "8a148f60955ff7eea7b07caece55118e",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-141",
+      "projeto_nome": "Portal da Qualidade",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:27:09"
+    },
+    {
+      "id": "8abefa704f1c88f330113d3b22a27642",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "ab5fbb9ba69a2b51a3628e43e461d599",
+      "projeto_nome": "People Analytics — Gocase Extrema",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:27:06"
+    },
+    {
+      "id": "db4bb112c0b34759f2e775c8c8219cee",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "LEGADO-219",
+      "projeto_nome": "Feel Nutrition — Criação de Marca com IA (Naming + Visual + Estratégia)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:27:04"
+    },
+    {
+      "id": "4ab14c870e0e5a41af382062780efb71",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "729cf164f793ec9972af21989e1e18de",
+      "projeto_nome": "GoCaixa",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:26:40"
+    },
+    {
+      "id": "26d46bf1c18f6ec00c5bdc333515f06b",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "61685a97cf63321fe90e057ebb12d2ba",
+      "projeto_nome": "Acompanhamento de Despesa com Frete Real",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:26:16"
+    },
+    {
+      "id": "8cccfbf5435432dec6c16311d35ab189",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "589938ae32f3e9c2b59c9abf8c23edb5",
+      "projeto_nome": "Plataforma Smartonline - Pagamento de DIFAL e captura de xmls",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:26:13"
+    },
+    {
+      "id": "1df51cbb8d41218561683b1bf4d60ce4",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "4b386621693f2af77f7a803460d47b53",
+      "projeto_nome": "DRE de lançamentos — fechamento mensal",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:26:11"
+    },
+    {
+      "id": "658f95cdf6b47b501245ae8afad91418",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "28715f65eafa29a0815d339d74e2964f",
+      "projeto_nome": "PWA de Manutenção",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:26:06"
+    },
+    {
+      "id": "b5e7571a471796d185eac01d7fd7e777",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "225df21bd2f971ac7b12e00caa2cf805",
+      "projeto_nome": "Painel de descritivos de cargo",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:25:42"
+    },
+    {
+      "id": "7854d751cebf79d2174aa74df06b5964",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "d2a99df9f529f064b722ee0b947853a2",
+      "projeto_nome": "Portal de devoluções de CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:25:38"
+    },
+    {
+      "id": "73c8ce3c5b9e2137ae104f89447806bc",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "71f8c78816d6a3dd9088f1d2a39ffc5a",
+      "projeto_nome": "Portal de Reembolsos (Gobeaute)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:24:48"
+    },
+    {
+      "id": "ade0f30db8fb53cacf88a7acd8e90659",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "110f199139399ccd797af95aee10f165",
+      "projeto_nome": "Sucesso.AI",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:20:25"
+    },
+    {
+      "id": "9b76930cf115e701ee9605e0f938bcd3",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "120b729da7b5eee7ab883bc6a14b4dd0",
+      "projeto_nome": "Mapeamento de prazo ecomerce de nossas marcas e concorrentes",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:04:02"
+    },
+    {
+      "id": "6f6fc3a14f1aef79b08cf44ab8d9b2c2",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-156",
+      "projeto_nome": "CX Hub — Plataforma Central de Operações de Backoffice CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 21:00:34"
+    },
+    {
+      "id": "bbceb0cba3cdcc7d7b8877df072c319a",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-156",
+      "projeto_nome": "CX Hub — Plataforma Central de Operações de Backoffice CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 20:56:42"
+    },
+    {
+      "id": "9c565a643676751ff112a729a1f5075b",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 20:56:28"
+    },
+    {
+      "id": "78ddfa4b279ad10d667a9f755543f8f2",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 20:55:30"
+    },
+    {
+      "id": "820d72ed08e13b58e3f375adf1b1dbf7",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 20:54:49"
+    },
+    {
+      "id": "a582c4413b424f3ea03e64cbc5484760",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 20:09:07"
+    },
+    {
+      "id": "2d4c5ece6d3dc577013553acf64fc768",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "4f5fbf89f658883cacc5facf80b708a7",
+      "projeto_nome": "Relatório Transportador",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 20:02:36"
+    },
+    {
+      "id": "84a27db6a25315bfd566cbebdcb8f8b3",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 20:01:40"
+    },
+    {
+      "id": "99ecb81aeabc5753b5e4d49ec9397e70",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "4f5fbf89f658883cacc5facf80b708a7",
+      "projeto_nome": "Relatório Transportador",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 20:01:26"
+    },
+    {
+      "id": "2fd344f70144c28bcd9e9dc23f6c5393",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 20:00:44"
+    },
+    {
+      "id": "de4e3b138795bdff8d1798018d87f0c1",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:57:15"
+    },
+    {
+      "id": "e8421199588607457009b225a3563628",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:57:08"
+    },
+    {
+      "id": "e0314ecc9263f23862648ccdc8a3734f",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "c3de05afe937e1818b8a41261d37ba53",
+      "projeto_nome": "Shipping hub",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:52:32"
+    },
+    {
+      "id": "873ea26b22c32cfcd23cc2652e7cc147",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "d1f00a69b3a113d2c9121450533f978b",
+      "projeto_nome": "Godash",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:51:11"
+    },
+    {
+      "id": "3ef36a07d2082471333befae8ba83c29",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:50:22"
+    },
+    {
+      "id": "aa17e4a41ad396507d0c966808e439e2",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "f482fa39fbab042409249c96ee0b5bc4",
+      "projeto_nome": "Gopilot – playson de Google Ads",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:50:16"
+    },
+    {
+      "id": "59dc07ff7452b5d30e8126c07c579ec1",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "f42a5563a94b384937b0ad39bfb8ff4d",
+      "projeto_nome": "Gocreators",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:48:31"
+    },
+    {
+      "id": "941a8c314349229c298b879156b08272",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:46:39"
+    },
+    {
+      "id": "54dd16ea0b22dbbb093d224cdc36a81e",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "3ab58cbbea1557ff111d5de3a73c1a15",
+      "projeto_nome": "Report Semanal CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:45:46"
+    },
+    {
+      "id": "e44bd3e923c4355c245c6d0f80ce600a",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "legado-156",
+      "projeto_nome": "CX Hub — Plataforma Central de Operações de Backoffice CX",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: o total de cerca de 836 horas por mês exige quase 4 pessoas em dedicação integral, mas o número real de agentes não foi informado; o total de R$ 31.605 por mês mistura redução de contrato com horas liberadas, e o bloco de R$ 5.422 parece contado duas vezes; o total mensal de R$ 31.604,82 não fecha com os três ganhos d…\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 19:44:12"
+    },
+    {
+      "id": "66220c233093a24b569d6aac9b9fd75d",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "2b34a66d7c0f693a425f56ee50406e59",
+      "projeto_nome": "SendApp",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: o impacto mensal de R$ 97.135 é alto e não há base que mostre quanto da receita veio de fato do app; o impacto líquido mensal de R$ 97.135 não é explicado pelo memorial, que só demonstra R$ 2.034 em horas e cita a receita do canal sem separar o efeito do app.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 19:41:23"
+    },
+    {
+      "id": "7e9ae07119e48c3f88b45d3c2a7320cd",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "4d1e0abf61a2e18d7fd3ef261a7f90ae",
+      "projeto_nome": "Gestor de Crises",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:40:29"
+    },
+    {
+      "id": "5cc594f36599a90bc59e5d9b2ce5ae3c",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "legado-254",
+      "projeto_nome": "Sortimento Gobeuate",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Em validação",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 19:00:15"
+    },
+    {
+      "id": "7b8b529c23d48ee7d930b481915fdf66",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "28715f65eafa29a0815d339d74e2964f",
+      "projeto_nome": "PWA de Manutenção",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: o ganho de 1.982,5 h/mês equivale a cerca de 9 pessoas em tempo integral, mas o texto não informa quantas faziam essas tarefas; o ganho líquido mensal de R$ 1.982,50 aparece sem memória de cálculo nem registro de antes e depois, então pode ser projeção tratada como resultado.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 18:59:49"
+    },
+    {
+      "id": "73a6fc447702ca70fe95a7ca8cf64b77",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "e4b1dcc3e07f56a7f576c672fcc78824",
+      "projeto_nome": "AVD Central v2",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:59:44"
+    },
+    {
+      "id": "456726715e0da2888e2b250b06c01165",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "589938ae32f3e9c2b59c9abf8c23edb5",
+      "projeto_nome": "Plataforma Smartonline - Pagamento de DIFAL e captura de xmls",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: o valor líquido de R$ 117.475 por mês é alto e depende quase todo da estimativa de multas e juros evitados; o custo evitado de R$ 244.989,52 por mês está tratado como ganho, mas não há memória de cálculo nem registros dos débitos e atrasos que sustentem a estimativa.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 18:58:57"
+    },
+    {
+      "id": "d32f3b46a061c15f5636a061ad8b227f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "99dd0ab0ecb3503a6a61e75e71e7fc8a",
+      "projeto_nome": "Matriz de Habilidades — Produção",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:58:16"
+    },
+    {
+      "id": "194284b9b072367c871936485a11ee1c",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "legado-141",
+      "projeto_nome": "Portal da Qualidade",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: preocupa contar R$ 20.800 por mês como economia, pois não há prova de que esse serviço era pago e foi cancelado; os R$ 20.800 mensais parecem uma cotação de serviço não contratado, e não uma despesa que existia e parou.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 18:58:05"
+    },
+    {
+      "id": "bb487585bf3380a40f7e02535355a1ca",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "c18a94a9c1de74ae12514a1b1c099c5c",
+      "projeto_nome": "Alerta de oportunidades",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:57:42"
+    },
+    {
+      "id": "4594c7f5c8d75c5b29e6498cebde70a0",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "cc816ac0206a13823480da275dbc2420",
+      "projeto_nome": "Hub de Playbooks de Marca — Gobeaute",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:57:31"
+    },
+    {
+      "id": "01bbbd4eafe4bab2ee6989e79eb2c590",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "225df21bd2f971ac7b12e00caa2cf805",
+      "projeto_nome": "Painel de descritivos de cargo",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: a economia de 17h por mês não está comprovada, pois a integração com a Inhire ainda não existe e a revisão humana continua; o saving de 17h por mês é tratado como realizado, mas a integração com a Inhire ainda não foi construída e há etapas que podem exigir trabalho manual.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 18:57:08"
+    },
+    {
+      "id": "65beaa7dd2cd6de08a723cdd25b1665e",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "f5c81026b1a5bc34f778e7a0ca1011d5",
+      "projeto_nome": "SYNAPSE",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:56:51"
+    },
+    {
+      "id": "438dd224c08d7a1873cfddf15097c423",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4b386621693f2af77f7a803460d47b53",
+      "projeto_nome": "DRE de lançamentos — fechamento mensal",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: o ganho de R$ 96,52 por mês está abaixo do piso e precisa de outro ganho comprovado para sustentar o projeto, sem contar as mesmas horas duas vezes; a economia de 3h30 foi calculada contra um trabalho manual estimado que, segundo o memorial, não era feito antes.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 18:56:35"
+    },
+    {
+      "id": "84e2e5dc589fbd103a5406f2bca85fad",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "729cf164f793ec9972af21989e1e18de",
+      "projeto_nome": "GoCaixa",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: zerar o trabalho mensal não combina com o envio manual do fechamento; o ganho de 1h por mês não está comprovado, pois o fechamento ainda depende de envio manual e não há registro de horas.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 18:56:14"
+    },
+    {
+      "id": "3a33bc6a4b68fb325d6dc3e96739060a",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "ab5fbb9ba69a2b51a3628e43e461d599",
+      "projeto_nome": "People Analytics — Gocase Extrema",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: as 26h/mês são uma estimativa de um trabalho que não era feito antes, então não comprovam uma despesa que deixou de existir; as 26h/mês estimam um trabalho que não existia antes, então não comprovam economia realizada; além disso, declarar 0h depois não combina com o envio, tratamento e publicação manuais.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 18:56:08"
+    },
+    {
+      "id": "00810a44a29f8087139b9b2ba324a048",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "120b729da7b5eee7ab883bc6a14b4dd0",
+      "projeto_nome": "Mapeamento de prazo ecomerce de nossas marcas e concorrentes",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: o custo evitado de R$ 5 mil por mês não tem memória de cálculo nem prova de que a despesa parou; os R$ 5.000 mensais parecem uma estimativa de fretes mais caros, não uma despesa que existia e parou.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 18:55:45"
+    },
+    {
+      "id": "d5c96ba14b7f551669d5d301dc5c5854",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "bacc1f4f28420174fdb8d124dca80edf",
+      "projeto_nome": "BB UNIFORMES E EPIS",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:55:30"
+    },
+    {
+      "id": "3e0f06ae8a4ce960b141abcf1a2ed19f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "226e9d6f963d79d897724011f23b3e54",
+      "projeto_nome": "BB CONTROLE DE ARMARIOS",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:54:51"
+    },
+    {
+      "id": "08586d4c7e4251e92546e0ec36334821",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "61685a97cf63321fe90e057ebb12d2ba",
+      "projeto_nome": "Acompanhamento de Despesa com Frete Real",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: o ganho sem valor financeiro está coerente, mas o uso de inclusão contínua pode duplicar despesas e distorcer a margem diária; o fluxo apenas acrescenta linhas, sem controle de duplicidade, e o horário configurado não bate com o nome do agendamento.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 18:54:36"
+    },
+    {
+      "id": "1a1198dbb6c96a22af83e1feda999e01",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "120b729da7b5eee7ab883bc6a14b4dd0",
+      "projeto_nome": "Mapeamento de prazo ecomerce de nossas marcas e concorrentes",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "Reprovado por faltar informação que sustente o ganho declarado. Não é um juízo sobre o valor do trabalho.\nFalta: o custo evitado de R$ 5.000 por mês não tem base nem registro que mostre que a despesa existia e parou; o custo evitado de R$ 5.000 por mês é só declarado; o texto diz que erros ainda são achados e ajustados, não que a despesa parou.\nResponda esses pontos e reenvie: o reenvio reabre a avaliação."
+      },
+      "created_at": "2026-09-10 18:51:08"
+    },
+    {
+      "id": "0aded8384b8a2d958704e7608b5e50f8",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "bacc1f4f28420174fdb8d124dca80edf",
+      "projeto_nome": "BB UNIFORMES E EPIS",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:50:33"
+    },
+    {
+      "id": "d1fe215dbcb80c8b0712cc3432dc2d33",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "2afc53e51f6935703b474988d0840a4a",
+      "projeto_nome": "Ferramenta de comentar nos posts",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:49:22"
+    },
+    {
+      "id": "212d1c83a9052a44d76392ebaa0c2def",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "61685a97cf63321fe90e057ebb12d2ba",
+      "projeto_nome": "Acompanhamento de Despesa com Frete Real",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:49:20"
+    },
+    {
+      "id": "d9c8e4b01ca013fc0f1b8dd74465d88b",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "e4b1dcc3e07f56a7f576c672fcc78824",
+      "projeto_nome": "AVD Central v2",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:16:23"
+    },
+    {
+      "id": "d3f44f898a85a1b4e4c8308d0e8c7b6d",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "589938ae32f3e9c2b59c9abf8c23edb5",
+      "projeto_nome": "Plataforma Smartonline - Pagamento de DIFAL e captura de xmls",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:15:35"
+    },
+    {
+      "id": "5ba6feb5b84af8dc4688431a6f900fec",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4c1ca5a0a03de674093bbf821cdee9f3",
+      "projeto_nome": "GoIA vendas Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:15:33"
+    },
+    {
+      "id": "e682079a217450cec7e5d75063f10f76",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "7ede4163132737357ef11a56d8194fe3",
+      "projeto_nome": "Alertas de correções do Contas a Pagar e Intercompany",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:15:13"
+    },
+    {
+      "id": "ea61ad5393b1feaba0d85d407e118a3d",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "legado-141",
+      "projeto_nome": "Portal da Qualidade",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:14:16"
+    },
+    {
+      "id": "c06bc2658bb9555e290f129565f14b20",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "225df21bd2f971ac7b12e00caa2cf805",
+      "projeto_nome": "Painel de descritivos de cargo",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:13:16"
+    },
+    {
+      "id": "ac9e453479477ae768d8b01fdd0e31af",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4b386621693f2af77f7a803460d47b53",
+      "projeto_nome": "DRE de lançamentos — fechamento mensal",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:13:14"
+    },
+    {
+      "id": "37f3601846cdd5f4b58994552ea16004",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4b4bef4823da584b3d52c8943a6cc3d6",
+      "projeto_nome": "Fluxo de Caixa FIP Gobeauty",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:13:01"
+    },
+    {
+      "id": "3a98da4ff324f971fb5eea940a0d63ac",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "ab5fbb9ba69a2b51a3628e43e461d599",
+      "projeto_nome": "People Analytics — Gocase Extrema",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:12:45"
+    },
+    {
+      "id": "449a8305a8f2655b82a3b87d4d39f354",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "120b729da7b5eee7ab883bc6a14b4dd0",
+      "projeto_nome": "Mapeamento de prazo ecomerce de nossas marcas e concorrentes",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:12:31"
+    },
+    {
+      "id": "2f4cf993e57e5c181614c7a41c4b6a04",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "729cf164f793ec9972af21989e1e18de",
+      "projeto_nome": "GoCaixa",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:11:30"
+    },
+    {
+      "id": "58efef13f3c41c1e7104aac0d3b17225",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "49027830aba42878561fdca11cabfb5a",
+      "projeto_nome": "Reconhecimento dos Mantras",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:10:41"
+    },
+    {
+      "id": "76171897b737f9d40bcf6d71520a1c77",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "0cee6e8af3c5a912bd4908ca0882df54",
+      "projeto_nome": "Upgrade Dash Dados Planejamento",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:07:57"
+    },
+    {
+      "id": "12b7cd0e301c8bd67b8480606cbe9c0b",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "f5c81026b1a5bc34f778e7a0ca1011d5",
+      "projeto_nome": "SYNAPSE",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:06:12"
+    },
+    {
+      "id": "5c0c63f62b46158bc67b8f4c6ecc945e",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "cc816ac0206a13823480da275dbc2420",
+      "projeto_nome": "Hub de Playbooks de Marca — Gobeaute",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:06:04"
+    },
+    {
+      "id": "eff3f8c85060dd175411e0e877d84bb3",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "a550095c01aecfb2680b025f881beb18",
+      "projeto_nome": "Nomeador de Estampas",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:05:40"
+    },
+    {
+      "id": "021cd31948be45430e079efac7a9446f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "589938ae32f3e9c2b59c9abf8c23edb5",
+      "projeto_nome": "Plataforma Smartonline - Pagamento de DIFAL e captura de xmls",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:05:07"
+    },
+    {
+      "id": "82d68fba2b6320859993da9a3928d689",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "99dd0ab0ecb3503a6a61e75e71e7fc8a",
+      "projeto_nome": "Matriz de Habilidades — Produção",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:04:50"
+    },
+    {
+      "id": "e4c32359ce2dce40bb283958bc7360b9",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "28715f65eafa29a0815d339d74e2964f",
+      "projeto_nome": "PWA de Manutenção",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:04:39"
+    },
+    {
+      "id": "ae24fb6d723ebac94d0ee23a6b8d243f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4c1ca5a0a03de674093bbf821cdee9f3",
+      "projeto_nome": "GoIA vendas Gocase",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:03:54"
+    },
+    {
+      "id": "5d5393ccec0589562222e1fb166c26b8",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "d06945d06eab9574c5da11e9f6dd24b7",
+      "projeto_nome": "Dados Orgânicos Social - Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:03:04"
+    },
+    {
+      "id": "e11269f33bc34486b57e57b99d4c1124",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "c18a94a9c1de74ae12514a1b1c099c5c",
+      "projeto_nome": "Alerta de oportunidades",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:03:01"
+    },
+    {
+      "id": "d484d552388c9d01a182e057eb290fff",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "7ede4163132737357ef11a56d8194fe3",
+      "projeto_nome": "Alertas de correções do Contas a Pagar e Intercompany",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:02:35"
+    },
+    {
+      "id": "5c7260c3f6cd2b04c5e624ae12923cb2",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "dd2e0b33c8f120d1422a835e257a8a10",
+      "projeto_nome": "App programa de estágio (Expedição Gogroup)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:02:31"
+    },
+    {
+      "id": "e079a8f764208eb7ef25f26beb00a3e0",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "e4b1dcc3e07f56a7f576c672fcc78824",
+      "projeto_nome": "AVD Central v2",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:02:20"
+    },
+    {
+      "id": "75b3956a1d80a934c4ca59cb0fbeac42",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "legado-141",
+      "projeto_nome": "Portal da Qualidade",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:01:31"
+    },
+    {
+      "id": "0d86d7548b9cf725294a83d7a6c309fe",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "1201f1b825c691c3e463efc27aa3fc57",
+      "projeto_nome": "Automação de Antifraude Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 18:00:36"
+    },
+    {
+      "id": "5f07c3db475f6d43342d8310c6ddaf83",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "dd804126e9677a45ffa1b232383ba552",
+      "projeto_nome": "CONTROLE PEDIDOS B2B",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:59:42"
+    },
+    {
+      "id": "84324c6efca76a7bf1f67ded324972a7",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-185",
+      "projeto_nome": "Alerta de Rupturas",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:59:40"
+    },
+    {
+      "id": "98846f3768bf5401966674f216ab7b17",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "225df21bd2f971ac7b12e00caa2cf805",
+      "projeto_nome": "Painel de descritivos de cargo",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:59:29"
+    },
+    {
+      "id": "4af34bcd7cca94f0e191935b4a98e9c3",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4b386621693f2af77f7a803460d47b53",
+      "projeto_nome": "DRE de lançamentos — fechamento mensal",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:58:44"
+    },
+    {
+      "id": "83f1c65ab8df5a7d547883e3196edc12",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "01fa5be5ad6793e0c6de30aa158b4cd4",
+      "projeto_nome": "Rateios automáticos",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "As duas metades do time chegaram ao mesmo lugar: Reprovado.\nO time de agentes reprovou o projeto por régua declarada.\n\nO que os especialistas apontaram:\nImpacto declarado de R$ 8,28/mês, abaixo do piso de R$ 100,00/mês. Um ganho desta ordem não sustenta o projeto como projeto documentado. E a nota do projeto é 0, ou seja, o ganho pequeno não vem acompanhado de altura em nenhum outro eixo."
+      },
+      "created_at": "2026-09-10 17:58:23"
+    },
+    {
+      "id": "c654ed6014fdebede79697d7af7685cd",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "ab5fbb9ba69a2b51a3628e43e461d599",
+      "projeto_nome": "People Analytics — Gocase Extrema",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:58:12"
+    },
+    {
+      "id": "af61fa438c835987c023023830cd219d",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4b4bef4823da584b3d52c8943a6cc3d6",
+      "projeto_nome": "Fluxo de Caixa FIP Gobeauty",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:58:08"
+    },
+    {
+      "id": "4ea55e7112db08ba05c6558aff5787f1",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "120b729da7b5eee7ab883bc6a14b4dd0",
+      "projeto_nome": "Mapeamento de prazo ecomerce de nossas marcas e concorrentes",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:58:00"
+    },
+    {
+      "id": "173520b334a6746e782d24224d4a43b7",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "729cf164f793ec9972af21989e1e18de",
+      "projeto_nome": "GoCaixa",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:57:42"
+    },
+    {
+      "id": "77d0f5458f7ff5754a39081a1cf33b52",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "7a507c09a6ef6c2697ff3be4ebe85d7b",
+      "projeto_nome": "Monitoramento PJs",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:57:00"
+    },
+    {
+      "id": "eb49a2a58f6cb6dd90e78b65c6c43ec1",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "bacc1f4f28420174fdb8d124dca80edf",
+      "projeto_nome": "BB UNIFORMES E EPIS",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:56:42"
+    },
+    {
+      "id": "e61c0ec1238f3618362881f8d71daf49",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "226e9d6f963d79d897724011f23b3e54",
+      "projeto_nome": "BB CONTROLE DE ARMARIOS",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:56:35"
+    },
+    {
+      "id": "7aa7fb3e65a6c89a880fc2efdcf473cb",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "61685a97cf63321fe90e057ebb12d2ba",
+      "projeto_nome": "Acompanhamento de Despesa com Frete Real",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:56:03"
+    },
+    {
+      "id": "30be0dc4e56483f771f663412a7a3aa8",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "3139d7671f1681d9401d5eb2be24add9",
+      "projeto_nome": "Bazar Gogroup Extrema — Sistema de Troca por Kg",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:55:32"
+    },
+    {
+      "id": "6fc681521687ba4bec8f01ee00925ab6",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "49027830aba42878561fdca11cabfb5a",
+      "projeto_nome": "Reconhecimento dos Mantras",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:54:45"
+    },
+    {
+      "id": "2072ac619b7af4b8396a43680ccd2177",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "565f9051fb251bee5d0b0b1bfac3061a",
+      "projeto_nome": "EXProjects",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:52:39"
+    },
+    {
+      "id": "b1bd8702bc446d5c048ba7596e40f84f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "565f9051fb251bee5d0b0b1bfac3061a",
+      "projeto_nome": "EXProjects",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:47:16"
+    },
+    {
+      "id": "76aac622660c066a7820c4df9f2b2c40",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "b46066870c015db1e374c7e557ef3488",
+      "projeto_nome": "LP Skill Creator para Jump",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:38:20"
+    },
+    {
+      "id": "4de518a8e3ea05d8ded0c47bc5d21048",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "cc816ac0206a13823480da275dbc2420",
+      "projeto_nome": "Hub de Playbooks de Marca — Gobeaute",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:37:11"
+    },
+    {
+      "id": "a1a65ec2aa649828885969a3bd5cb626",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "ce7988188125f17d37f14cbcd0946f58",
+      "projeto_nome": "Automação para slides de perfil executivo de M&A",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Descontinuado",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:37:04"
+    },
+    {
+      "id": "939cab2e08449a7daa1311f6ca48d839",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "89301661235d7ed7aa90f8afe8f5295e",
+      "projeto_nome": "Seo Gocase",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Descontinuado",
+        "status_novo": "Reprovado",
+        "motivo": "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.\nO time de agentes reprovou o projeto por régua declarada.\n\nO que os especialistas apontaram:\nespecial, NO-OP"
+      },
+      "created_at": "2026-09-10 17:36:19"
+    },
+    {
+      "id": "1c0b72a83665d3103f1919e0e65231b7",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "33bc7b75f2e86f725f06d700b76a8ff7",
+      "projeto_nome": "Teste",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Descontinuado",
+        "status_novo": "Reprovado",
+        "motivo": "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.\nO time de agentes reprovou o projeto por régua declarada.\n\nO que os especialistas apontaram:\nespecial, NO-OP"
+      },
+      "created_at": "2026-09-10 17:34:52"
+    },
+    {
+      "id": "87b95a715f61c301c76b8a9a1ae4bf60",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4fd5a48560371e00ba47ff9ca7ad0c68",
+      "projeto_nome": "Vision Board - Licenciados",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:34:23"
+    },
+    {
+      "id": "8b5e3a82a8a4d6c97d98ed4ba7a0a5e3",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "dba1cc1c23ebb528d6ad4c852ad32b64",
+      "projeto_nome": "Plataforma SmartOnline - Captura de XMLs e Recolhimento de DIFAL",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Descontinuado",
+        "status_novo": "Reprovado",
+        "motivo": "O time de agentes reprovou o projeto por régua declarada.\nA análise do impacto ficou em Pendente e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar.\n\nO que os especialistas apontaram:\nFinanceiro: O custo evitado de R$ 324 mil por mês em juros e multas é muito alto e não está demonstrado no memorial. Precisa conferir pagamentos e notificações históricas, separando os encargos evitados do DIFAL que continuaria devido.\nCético: O custo evitado de R$ 324 mil por mês não tem memória, período-base nem comprovantes e parece tratar redução de risco como ganho realizado. É preciso conferir o histórico de multas e juros pagos e os registros após a implantação.\nOs especialistas divergiram, então vai para a triagem."
+      },
+      "created_at": "2026-09-10 17:33:58"
+    },
+    {
+      "id": "34b98963a37335d4a2e6a24db880400b",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "78d2a1d95f831aa612c3d3fff68b6a67",
+      "projeto_nome": "GoDocs",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:32:45"
+    },
+    {
+      "id": "fbbe7696a1a5b24a544ed704bf346071",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "55907590ea78bf1f72441c3236dfb4b5",
+      "projeto_nome": "Color Drop Machine",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Descontinuado",
+        "status_novo": "Reprovado",
+        "motivo": "O time de agentes reprovou o projeto por régua declarada.\nA análise do impacto ficou em Pendente e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar.\n\nO que os especialistas apontaram:\nFinanceiro: O custo evitado de R$ 1.300 pode repetir o trabalho já contado nas 95 horas da equipe, pois faltam escopo e comprovante do freelancer. Também é preciso conferir o custo de uso do gpt-image-2.\nCético: As 95h mensais dependem de tempos declarados, mas o agentlog guarda só 100 rodadas e não prova volume, revisões e tentativas. É preciso conferir registros duráveis com horários e também o comprovante do freelancer realmente evitado.\nOs especialistas divergiram, então vai para a triagem."
+      },
+      "created_at": "2026-09-10 17:32:08"
+    },
+    {
+      "id": "ee1a4f372b73464baeeb4352f9262f2e",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "648836b5e1fdcf592c9396a25e3739e5",
+      "projeto_nome": "Painel DP",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:31:38"
+    },
+    {
+      "id": "ae09af77e098895d7c101d08c018109b",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "c7595ee19eb31ab68412a617a1be6001",
+      "projeto_nome": "Report Diario/Semanal Apice Influenciadores",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:30:11"
+    },
+    {
+      "id": "2d29ef9b96032b0da599fc29fb225b6d",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "a03e1e4c752bfcd298354283d8958bd2",
+      "projeto_nome": "[feature de Creators Hub] Creators Hub Completo",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:29:41"
+    },
+    {
+      "id": "e0b5b53301ad153a39cc6cd993b28732",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "1f0ab4fadc6f934fee9c101e2f190d8c",
+      "projeto_nome": "Automação - Cobranças Apice Asaas",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:27:55"
+    },
+    {
+      "id": "33ab4c6ae390c31af1db7c9eecc6755d",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "3139d7671f1681d9401d5eb2be24add9",
+      "projeto_nome": "Bazar Gogroup Extrema — Sistema de Troca por Kg",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:27:05"
+    },
+    {
+      "id": "dfa12bf93a65ed418160adbc1ed74d6d",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "a550095c01aecfb2680b025f881beb18",
+      "projeto_nome": "Nomeador de Estampas",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:19:10"
+    },
+    {
+      "id": "c2215de81c94dd092ada13a96b0d509f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "b820492cfd48c75be8abfa66a456217c",
+      "projeto_nome": "Vision Operação (VOP)",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:16:52"
+    },
+    {
+      "id": "4335ac8dd0c2c8139339a749097beeea",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "99dd0ab0ecb3503a6a61e75e71e7fc8a",
+      "projeto_nome": "Matriz de Habilidades — Produção",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:14:57"
+    },
+    {
+      "id": "f434b18ca2d26d52c091c6fe0ee3de51",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "c18a94a9c1de74ae12514a1b1c099c5c",
+      "projeto_nome": "Alerta de oportunidades",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:14:18"
+    },
+    {
+      "id": "8cc3952dc0fbf19eaa7401e950a41ba5",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "0cee6e8af3c5a912bd4908ca0882df54",
+      "projeto_nome": "Upgrade Dash Dados Planejamento",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:12:21"
+    },
+    {
+      "id": "a621f61b584a56dbe7c170452d1c17c8",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "6a93373382510154e90645c0aaeef605",
+      "projeto_nome": "Robô Extrato bancário Asaas - Apice",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:10:34"
+    },
+    {
+      "id": "7ea248c5cc85aa821589a11c078325a1",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "61685a97cf63321fe90e057ebb12d2ba",
+      "projeto_nome": "Acompanhamento de Despesa com Frete Real",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:07:37"
+    },
+    {
+      "id": "55304c9e246050d5908a22f511668143",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "3fc2ff2403b80d6113c6362ffcb3bf67",
+      "projeto_nome": "Board de Coleções / MKT - ILUSTRA",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 17:04:35"
+    },
+    {
+      "id": "16cc5edd70d27803d148ce6f4bc51ec7",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "3f74f22405a1016b2e4c696d4d15e546",
+      "projeto_nome": "Automação sinalização de erro do carrinho",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:58:07"
+    },
+    {
+      "id": "867e6a0b18baa6321fa2797f9758b591",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "d3cc220e120532ac9012425b6c6b79ea",
+      "projeto_nome": "Control Tower - PCP",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:57:19"
+    },
+    {
+      "id": "477d1a53bbd26229a7ee48eb09a13206",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "9857bb1e9cd8daddf972b185d6da97b0",
+      "projeto_nome": "Controle de Paradas",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:57:14"
+    },
+    {
+      "id": "20f8ac3e413042bec98b659b38bc4fb2",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "f5c81026b1a5bc34f778e7a0ca1011d5",
+      "projeto_nome": "SYNAPSE",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:55:23"
+    },
+    {
+      "id": "99b16c58f87652e514e96532ad4421bf",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "28715f65eafa29a0815d339d74e2964f",
+      "projeto_nome": "PWA de Manutenção",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:53:02"
+    },
+    {
+      "id": "730061ca6cd16c1e1d2fa09de9ca419f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "dd2e0b33c8f120d1422a835e257a8a10",
+      "projeto_nome": "App programa de estágio (Expedição Gogroup)",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:51:54"
+    },
+    {
+      "id": "f0af4d653758465a7e3dc093e5b63a3f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "d06945d06eab9574c5da11e9f6dd24b7",
+      "projeto_nome": "Dados Orgânicos Social - Gocase",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:51:17"
+    },
+    {
+      "id": "66632f61177727eefc6fb2b59d46108a",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "a4ecae3fadb4119f9e826d9c3d2f47be",
+      "projeto_nome": "RPA cadastro de estampas Destra",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "O time de agentes reprovou o projeto por régua declarada.\nA análise do impacto ficou em Pendente e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar.\n\nO que os especialistas apontaram:\nHoras: O ganho em horas e o número de pessoas que faziam o cadastro não foram informados. Precisa conferir o volume mensal e o tempo manual por produto.\nCético: O ganho é apenas esperado, sem memorial, medição antes e depois ou registro de lotes concluídos sem erro. Precisa conferir os logs e uma amostra no Destra, principalmente SKUs duplicados e envios corretos para aprovação.\nOs especialistas divergiram, então vai para a triagem."
+      },
+      "created_at": "2026-09-10 16:50:10"
+    },
+    {
+      "id": "9a10cfd4bb22ed7aa6e863a8a2f6dcba",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "589938ae32f3e9c2b59c9abf8c23edb5",
+      "projeto_nome": "Plataforma Smartonline - Pagamento de DIFAL e captura de xmls",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:50:05"
+    },
+    {
+      "id": "eeb296b9a8291db9c2eb22f9c3482262",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4c1ca5a0a03de674093bbf821cdee9f3",
+      "projeto_nome": "GoIA vendas Gocase",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:48:55"
+    },
+    {
+      "id": "cd0030f32171899c421beb0e7f69974e",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "565f9051fb251bee5d0b0b1bfac3061a",
+      "projeto_nome": "EXProjects",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:48:15"
+    },
+    {
+      "id": "06de0dc19de6b6072abc012a949e9169",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "7ede4163132737357ef11a56d8194fe3",
+      "projeto_nome": "Alertas de correções do Contas a Pagar e Intercompany",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:47:32"
+    },
+    {
+      "id": "ad306cd433cd951c8db1c8ab8205eac3",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "86bc64f00ff69355b2250a604bdb8bfe",
+      "projeto_nome": "Sistema DISC gogroup",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:47:04"
+    },
+    {
+      "id": "ff9ce0c94ea022b81f0f9eac9addc021",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "120b729da7b5eee7ab883bc6a14b4dd0",
+      "projeto_nome": "Mapeamento de prazo ecomerce de nossas marcas e concorrentes",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:46:45"
+    },
+    {
+      "id": "f4ad04302b0688d23177b34fbc0127aa",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "aeaad0c428140a18d43263302e128382",
+      "projeto_nome": "Análise Inteligente de Contratos",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:45:26"
+    },
+    {
+      "id": "cf49ec80bab7230d6cf83028fe45cea9",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "ac6d4ee0f278d9c153dc3f493cbaa171",
+      "projeto_nome": "Jornada Inbound",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:44:45"
+    },
+    {
+      "id": "526a8248b945e4c6d243149d81cbab6f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "185d2b3f9b29c05ee128c31d24def550",
+      "projeto_nome": "Godownload",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:42:39"
+    },
+    {
+      "id": "90da9df36f741169b48c245c43cc215b",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "729cf164f793ec9972af21989e1e18de",
+      "projeto_nome": "GoCaixa",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:42:14"
+    },
+    {
+      "id": "c7e2c63feb6324f384a6d6636279ef19",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "c601f88f9a578c799292de784440e629",
+      "projeto_nome": "Agente PPT de fechamento",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:41:58"
+    },
+    {
+      "id": "f931c045487e91f94969f5b5967b1d29",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "01fa5be5ad6793e0c6de30aa158b4cd4",
+      "projeto_nome": "Rateios automáticos",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:40:57"
+    },
+    {
+      "id": "751efa87c2ed94e06cdcc7bea888e25d",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "2cd9384a2e22ae4eb0d0889229295ad8",
+      "projeto_nome": "Sentinela Prazo Produção",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:40:32"
+    },
+    {
+      "id": "21a341fbca2e77b9cc042c88f3c06be6",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "0f0621e107917da6d2d1e3120b3b3e5e",
+      "projeto_nome": "Painel SLA com Agentes",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:39:58"
+    },
+    {
+      "id": "d60ad5d1147e347a17b03b5e6d7e8f14",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "892cd8959b348f5d30628773655affed",
+      "projeto_nome": "Promoção no Modo Go",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:38:37"
+    },
+    {
+      "id": "b418a520886d32ee2930ff659a9e3f8f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4b4bef4823da584b3d52c8943a6cc3d6",
+      "projeto_nome": "Fluxo de Caixa FIP Gobeauty",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:37:59"
+    },
+    {
+      "id": "c8dfbc03e167d4b03648d79b11fb3a22",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "7166c713fabc8950e4d47512ddf9c201",
+      "projeto_nome": "Triagem Automática de E-mail — \"Precisa Ver\"",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:37:53"
+    },
+    {
+      "id": "c99ee59a27450088da2da44366186836",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "f37f21334575c03d0f2fa50d24aee75a",
+      "projeto_nome": "Report Diário de Vendas da Live Instagram — Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:37:37"
+    },
+    {
+      "id": "eeb526443bbe4d05692e9ccbdc66bb9e",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "b47e99290af5830176858b492ad799cc",
+      "projeto_nome": "RPA - Detecção de Obrigações Acessórias",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:36:27"
+    },
+    {
+      "id": "b9ccfe2607a0ec147e729c7d6919fd25",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "ddd015f93f4a84666a4e3e9e4fe8b003",
+      "projeto_nome": "Governança tecnologia Gobeaute",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:35:10"
+    },
+    {
+      "id": "6103110b8f2a91cfcb663c2afcf62c03",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "2b368f5396dc079f277493f8b84b698e",
+      "projeto_nome": "Gocase Internacional - Projeto Remessa Conforme",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:34:48"
+    },
+    {
+      "id": "2b584401b7b23caa192bcd58c3ea2404",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "226e9d6f963d79d897724011f23b3e54",
+      "projeto_nome": "BB CONTROLE DE ARMARIOS",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:34:44"
+    },
+    {
+      "id": "4cd4fd26e4d9f07784e8f68ae761cb81",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "2dae95f8312550644ff1d2ae26e3c52c",
+      "projeto_nome": "Debug-skill",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:34:31"
+    },
+    {
+      "id": "557f539724049ae85eb3492a276de6d9",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "ab5fbb9ba69a2b51a3628e43e461d599",
+      "projeto_nome": "People Analytics — Gocase Extrema",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:33:38"
+    },
+    {
+      "id": "f8fc89c1bcd61ba291ca45998f24bb64",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "bacc1f4f28420174fdb8d124dca80edf",
+      "projeto_nome": "BB UNIFORMES E EPIS",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:32:02"
+    },
+    {
+      "id": "9075a9ebd0b7374c6d2f743fe983dea1",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "7a507c09a6ef6c2697ff3be4ebe85d7b",
+      "projeto_nome": "Monitoramento PJs",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:31:12"
+    },
+    {
+      "id": "790dda8bf1e998c50b9c1d1762def997",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "225df21bd2f971ac7b12e00caa2cf805",
+      "projeto_nome": "Painel de descritivos de cargo",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:30:53"
+    },
+    {
+      "id": "dacb89182eccc02c40faa49b12333b98",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4b386621693f2af77f7a803460d47b53",
+      "projeto_nome": "DRE de lançamentos — fechamento mensal",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:30:36"
+    },
+    {
+      "id": "b84aa6c70ee079487480487480f40c32",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "cd15c14acd0e08b5d65a6225abe7fd26",
+      "projeto_nome": "GoProspect Creators",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:30:23"
+    },
+    {
+      "id": "acd5158c9d43d1753b874d25204c5b0c",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "779661eca64473a8bf15626667490fb8",
+      "projeto_nome": "Job-Fit Scoring",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:28:56"
+    },
+    {
+      "id": "b10e7590c48aece296c1012be48d0737",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "e75a5acabe1055d5020466eb30e40824",
+      "projeto_nome": "Bot de gestão",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:22:44"
+    },
+    {
+      "id": "49b58570b492d98c6627e083fe584ca0",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "5071c7c3b92bf98fb2e50e8e987ae091",
+      "projeto_nome": "HireFlow",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:20:06"
+    },
+    {
+      "id": "736ee468fcd15117a27e8cad0732a8ad",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "f8a36de2b9e39587114dbeb98c41797e",
+      "projeto_nome": "Agente Protheus",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:18:50"
+    },
+    {
+      "id": "bfc2d5ae0248f162a5cc3dd59f26fcce",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "546988880104067db81665f63481eca1",
+      "projeto_nome": "Haileydash",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:12:53"
+    },
+    {
+      "id": "000e13dc4472b2e64d3a08c0e895c401",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "a557f78db43bb57038d6d694038ac029",
+      "projeto_nome": "Torre de Controle Supply Gogroup",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:08:23"
+    },
+    {
+      "id": "0665817d04f53c29f6bab217e3bf9968",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "legado-141",
+      "projeto_nome": "Portal da Qualidade",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:07:26"
+    },
+    {
+      "id": "f875258147bd9b4dc91d7026b279c87a",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "c6aa8db232c4d1ab796de245a713a466",
+      "projeto_nome": "Sistema de Alertas de Infra de Dados",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:01:38"
+    },
+    {
+      "id": "a595b7d41f8d0f3abbec4dc39a98b8db",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "452ee30f320161450960537cf1594cb1",
+      "projeto_nome": "Painel de Acuracidade - B2C",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 16:01:20"
+    },
+    {
+      "id": "19f607a175c1db70e6b25dfb7f521c6f",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "ebc8d37eca84c66f4c0579f4253f9590",
+      "projeto_nome": "Reembolsos x Onfly",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "O time de agentes reprovou o projeto por régua declarada.\nA análise do impacto ficou em Pendente e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar.\n\nO que os especialistas apontaram:\nFinanceiro: O total interno de R$ 33,63 não bate com o cálculo recebido de R$ 16,81, e o custo da IA foi lançado sem medição. Precisa conferir o valor líquido e registrar o consumo do AI Proxy.\nCético: A economia de 1,58 h/mês se apoia só na cronometragem do responsável, sem relatório formal, e o custo de R$ 0,01 contradiz a falta de medição por aplicativo. Precisa conferir os registros dos fechamentos e o consumo do AI Proxy.\nOs especialistas divergiram, então vai para a triagem."
+      },
+      "created_at": "2026-09-10 15:57:23"
+    },
+    {
+      "id": "3cfa9a09cab13157c5e09bc0644bc024",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "d8980d2591eba0efa9d0cccb13cf0972",
+      "projeto_nome": "Automação — Resumo Semanal de Produto Gocase · Gestão de Portfólio de Térmicos · 2026",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:53:45"
+    },
+    {
+      "id": "f073e3fe09b6fc4706dfa2b5d299c4c9",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "dd804126e9677a45ffa1b232383ba552",
+      "projeto_nome": "CONTROLE PEDIDOS B2B",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:49:44"
+    },
+    {
+      "id": "b3d64fc5f73a1538d5316be1975145a4",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "fd40aab38a81793e733273e9bb684597",
+      "projeto_nome": "Programa de Indicação | Gogroup",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:47:17"
+    },
+    {
+      "id": "26d485124128e2751c51b8ec15d8c47b",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "4808022d3cefd3215c5ae44dd57e5187",
+      "projeto_nome": "Automação — Daily de Produto Gocase · Gestão de Portfólio de Térmicos · 2026",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:37:39"
+    },
+    {
+      "id": "aa26b48e9f3f8625f3d06a261e0ec3b4",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "f075deb74219cab44640b44ef71d486c",
+      "projeto_nome": "Dashboard de Orçamento de Operações (Orçamento Ops H2) com IA embarcada",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:37:05"
+    },
+    {
+      "id": "0cf8b44b07c4bf8a0d9106e68d05c374",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "cccccfd86433071aa5c310bef548c022",
+      "projeto_nome": "Robô de Notas de Débito (Ressarcimento)",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:35:54"
+    },
+    {
+      "id": "35f54de1d92f6ac74088896d2b6b2114",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "a2172a9ff26a6a26cdd073b91efdb86d",
+      "projeto_nome": "Automação cadastro de novos cliente",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "Este projeto foi devolvido pela triagem para ajuste e o reenvio não chegou. A reprovação é por isso, não por um julgamento do mérito do que você fez.\nO que a triagem pediu: A parte de memorial financeiro precisa ser baseada em dados de ganhos reais, e não de projeções. Precisa reenviar a parte do memorial financeiro focando nos dados já validados.\nPara corrigir: edite o projeto com o ajuste e reenvie. O time reavalia o projeto no reenvio e a decisão pode mudar."
+      },
+      "created_at": "2026-09-10 15:35:21"
+    },
+    {
+      "id": "52d994dcdba2cb1899de6e1a49e54c43",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "7bdf437fa8b64f44c7f148514844ffa8",
+      "projeto_nome": "Formulário de Inscrição — Recrutamento Interno (Vaga Almoxarife)",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:33:42"
+    },
+    {
+      "id": "cc1e5944760d32c8a72d3b0ce89252e8",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "1201f1b825c691c3e463efc27aa3fc57",
+      "projeto_nome": "Automação de Antifraude Gocase",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:31:54"
+    },
+    {
+      "id": "a019fa79c057138a080ed687e5b5f1ac",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "e57b287a0fa5c3abfb815d13d5f3c556",
+      "projeto_nome": "Conferencia por bipagem Charlie",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:30:38"
+    },
+    {
+      "id": "97d555b8550f75429d53f1517a8b2a63",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "51e9e6688c428027257542b7f71f666b",
+      "projeto_nome": "Gobeaute - Acompanhamento de NPS/Review",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:26:21"
+    },
+    {
+      "id": "60ead8bd5335ca4282c7ced7c6653eb6",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "cddae49aba75b90af7f210ac5a2c4073",
+      "projeto_nome": "N8N Audit",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:23:11"
+    },
+    {
+      "id": "bb456e42b8b5c33cd6aeb513eb710c19",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "legado-221",
+      "projeto_nome": "Lab Gobeaute · Indexação de Documentos Técnicos + Enriquecimento de MPs",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Em validação",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:19:34"
+    },
+    {
+      "id": "4d49644a1123404964794f62b4db894d",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-193",
+      "projeto_nome": "Notas Qualitativa treble",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:18:43"
+    },
+    {
+      "id": "332c83df320bad080c7525c8cb2ee6eb",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "legado-229",
+      "projeto_nome": "CX Transporte BI",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:18:06"
+    },
+    {
+      "id": "88e5d990937b8688613275e39326aa40",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-192",
+      "projeto_nome": "Dados de entrega",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:15:29"
+    },
+    {
+      "id": "631e4e47d60216f0295bd29cfb4547a6",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-185",
+      "projeto_nome": "Alerta de Rupturas",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:15:12"
+    },
+    {
+      "id": "1e276ec785518b8dc6612e7ee49dda7a",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-164",
+      "projeto_nome": "SPG · Agente Revisão de Carteira v2",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:13:17"
+    },
+    {
+      "id": "58cc449b0713d0595348cb89a8f15b43",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-187",
+      "projeto_nome": "Alerta de Downloads",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:13:04"
+    },
+    {
+      "id": "d54cac0a1137b8fc9403d02930262e2a",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-100B",
+      "projeto_nome": "Automação de análise - Personalização/Modelo errado",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:10:16"
+    },
+    {
+      "id": "d13cbd08e86b8eb727871177583c306a",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-100A",
+      "projeto_nome": "Automação Reunião por área",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:10:15"
+    },
+    {
+      "id": "9005f44229c53e727c94bc941f95760a",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-118",
+      "projeto_nome": "Automatização de relatórios CX",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:09:55"
+    },
+    {
+      "id": "148c5e15f53c4768c9189af24f3af4f2",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-103",
+      "projeto_nome": "Resposta Pública de RA - AI Agent (GoCase & GoBeaute)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:08:07"
+    },
+    {
+      "id": "337fe379a251c704ca19acab48e6b77e",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-104",
+      "projeto_nome": "Guard Rails",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:07:11"
+    },
+    {
+      "id": "7f9b7abebef65bb56884173aced350cf",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-095",
+      "projeto_nome": "[GUSTAVO] Damiano 2.0",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:05:55"
+    },
+    {
+      "id": "4456a9fbf1499aea1e7228401e5cb033",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-102",
+      "projeto_nome": "Acompanhamento Chat CX<>Logística",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:05:06"
+    },
+    {
+      "id": "f49cec12a66ef510eeefcc4c8eb83501",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-098",
+      "projeto_nome": "Automação disputas",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 15:03:29"
+    },
+    {
+      "id": "0f102f6c9487493ddd52adaaedc61626",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-192",
+      "projeto_nome": "Dados de entrega",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:58:37"
+    },
+    {
+      "id": "66286af5f40476f07477ebec2d12022c",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-185",
+      "projeto_nome": "Alerta de Rupturas",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:57:19"
+    },
+    {
+      "id": "adb5c464e0e892c1a4a9d4f2703edb13",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-187",
+      "projeto_nome": "Alerta de Downloads",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:55:37"
+    },
+    {
+      "id": "05eb556c1d68c219e4ad8236159cb5c6",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-164",
+      "projeto_nome": "SPG · Agente Revisão de Carteira v2",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:52:02"
+    },
+    {
+      "id": "16f200a0c36759cbf5aaca56d99391b2",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-118",
+      "projeto_nome": "Automatização de relatórios CX",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:49:18"
+    },
+    {
+      "id": "b2368db6acf7a48f86244fd39b3ebac8",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-100A",
+      "projeto_nome": "Automação Reunião por área",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:49:02"
+    },
+    {
+      "id": "ac2eea4aa70b5f8995bcf94ee4d9a636",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-100B",
+      "projeto_nome": "Automação de análise - Personalização/Modelo errado",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:47:29"
+    },
+    {
+      "id": "86d1f698eae243719323825b9049f66a",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-103",
+      "projeto_nome": "Resposta Pública de RA - AI Agent (GoCase & GoBeaute)",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:44:58"
+    },
+    {
+      "id": "cc38e9eb4e44505a31c37f35c7e98119",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-104",
+      "projeto_nome": "Guard Rails",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:44:18"
+    },
+    {
+      "id": "5b82c2579e5cacc41a517367d32ca8d3",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-102",
+      "projeto_nome": "Acompanhamento Chat CX<>Logística",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:42:14"
+    },
+    {
+      "id": "e9f6a233d3fec6e9e3b8ac98f586e846",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-095",
+      "projeto_nome": "[GUSTAVO] Damiano 2.0",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:41:04"
+    },
+    {
+      "id": "7e27e3c9bcf55f054630c48d6769b85c",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-098",
+      "projeto_nome": "Automação disputas",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:39:26"
+    },
+    {
+      "id": "e12118c82cb6e8bd9b4d6b95ef64e2ef",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-104",
+      "projeto_nome": "Guard Rails",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:35:25"
+    },
+    {
+      "id": "167f1a07cc0d27640a2b335ab7cb47d9",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-103",
+      "projeto_nome": "Resposta Pública de RA - AI Agent (GoCase & GoBeaute)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:35:13"
+    },
+    {
+      "id": "4cc3b84b843503e25f48f4ad96421e70",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-102",
+      "projeto_nome": "Acompanhamento Chat CX<>Logística",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:32:45"
+    },
+    {
+      "id": "a289749fbb642e82bf80c1ecd7eed547",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-095",
+      "projeto_nome": "[GUSTAVO] Damiano 2.0",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:31:33"
+    },
+    {
+      "id": "9eb5e0493e6bbe3fc1d7e9d853369a17",
+      "ator_email": "time-de-agentes@godocs",
+      "acao": "status",
+      "projeto_id": "LEGADO-098",
+      "projeto_nome": "Automação disputas",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-09-10 14:30:31"
+    },
+    {
+      "id": "1be1187a5acd2db8e5fd8dabe179969b",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "dba1cc1c23ebb528d6ad4c852ad32b64",
+      "projeto_nome": "Plataforma SmartOnline - Captura de XMLs e Recolhimento de DIFAL",
+      "detalhe": "Descontinuado",
+      "meta": {
+        "status_anterior": "Em validação",
+        "status_novo": "Descontinuado",
+        "motivo": null
+      },
+      "created_at": "2026-09-08 18:40:43"
+    },
+    {
+      "id": "127b7c2b5fec8f49e70bfd71d783fe47",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-180",
+      "projeto_nome": "Awin Auto-Validator — Validação automática de pedidos de afiliados",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-08 16:06:25"
+    },
+    {
+      "id": "d02741b6a899ba18d2f09603d334e75c",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "648836b5e1fdcf592c9396a25e3739e5",
+      "projeto_nome": "Painel DP",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-04 19:02:52"
+    },
+    {
+      "id": "d91905e88be72437c06558c9ba5a1f49",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-256",
+      "projeto_nome": "Automacao do Plano de Sortimento Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-28 20:58:33"
+    },
+    {
+      "id": "47be4b491c1150fecf361f587100fd60",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "status",
+      "projeto_id": "141a54f898a2a2bc781eb150d280ca98",
+      "projeto_nome": "Impacto de Ruptura — Análise Real, Projetada e Histórico Auditável",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Reprovado",
+        "status_novo": "Reprovado",
+        "motivo": "O projeto é uma feature referente ao Torre Supply. Os ganhos da feature devem adicionadas ao projeto de origem, editando o envio"
+      },
+      "created_at": "2026-08-28 20:53:59"
+    },
+    {
+      "id": "143b3d6124ab5ba06c39ac25ded51609",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "status",
+      "projeto_id": "141a54f898a2a2bc781eb150d280ca98",
+      "projeto_nome": "Impacto de Ruptura — Análise Real, Projetada e Histórico Auditável",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-28 20:53:02"
+    },
+    {
+      "id": "ce3d1c066fc1baa9cd7b5a2f063298be",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "4790ee41286dffa0b9ff13117596295f",
+      "projeto_nome": "Quiz de Vendas Apice",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-28 19:48:18"
+    },
+    {
+      "id": "92cbeb5565439b02d9c6d8b51cc61d5a",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-203",
+      "projeto_nome": "Dashboard - Gocase Performance Produtos",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-28 19:40:59"
+    },
+    {
+      "id": "66fde63cfdb856df3f3ff6027c7b9846",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "a0be9dd2308bb3491a70e27dd5a54d10",
+      "projeto_nome": "Automação de Report de CRO - Diário e Semanal",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-28 19:36:19"
+    },
+    {
+      "id": "15b659da24fd7856b567fcf41343dafc",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "ab2290a4b13e89edb3a95ab12fa76b11",
+      "projeto_nome": "Envio de e-mails para aprovação de ajustes dos líderes",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-28 19:35:11"
+    },
+    {
+      "id": "7020cddf15280fa31fb0c640967a47c4",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "546988880104067db81665f63481eca1",
+      "projeto_nome": "Haileydash",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Reenvio Pendente",
+        "motivo": "Alinhado com o João Victor o que deve ser ajustado."
+      },
+      "created_at": "2026-08-28 13:38:07"
+    },
+    {
+      "id": "f6e7143faf493b47894019492e590e7c",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "e8c8254f604e22c03ffe36b3e1b2eb19",
+      "projeto_nome": "Automação de Mockups de Cases",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-28 12:35:39"
+    },
+    {
+      "id": "82c313cf068245c960599acd43ad932c",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d3ef50ed277bc1877fa2f3461f0007ca",
+      "projeto_nome": "Simulador de Custos - GoBeauty",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Em validação",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-27 18:33:16"
+    },
+    {
+      "id": "f223e8fef4b100648bc06387386d8d8e",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "c0c69dcd5df93f5378160e1b49bf2f8d",
+      "projeto_nome": "Sistema de memória de M&A",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-27 18:04:49"
+    },
+    {
+      "id": "e5ade84544f9f83814ce530c53940d9d",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "c0c69dcd5df93f5378160e1b49bf2f8d",
+      "projeto_nome": "Sistema de memória de M&A",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-08-27 18:04:42"
+    },
+    {
+      "id": "6da76202c89b2c77703d6f0778247826",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-254",
+      "projeto_nome": "Sortimento Gobeuate",
+      "detalhe": "Em validação",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Em validação",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 22:16:08"
+    },
+    {
+      "id": "4279fd1a51a30bb0283dca0ed1e91398",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-221",
+      "projeto_nome": "Lab Gobeaute · Indexação de Documentos Técnicos + Enriquecimento de MPs",
+      "detalhe": "Em validação",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Em validação",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 22:15:06"
+    },
+    {
+      "id": "0c323a1eeb3c58a8589eab4f36f52dfb",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "a557f78db43bb57038d6d694038ac029",
+      "projeto_nome": "Torre de Controle Supply Gogroup",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Reenvio Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 22:13:08"
+    },
+    {
+      "id": "83c99fcc2939b56c8ab845fbb6667037",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "LEGADO-219",
+      "projeto_nome": "Feel Nutrition — Criação de Marca com IA (Naming + Visual + Estratégia)",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Reprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 22:11:10"
+    },
+    {
+      "id": "99fccbd4b91ef80c929805510091d4d0",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "reabrir_fila",
+      "projeto_id": "a0be9dd2308bb3491a70e27dd5a54d10",
+      "projeto_nome": "Automação de Report de CRO - Diário e Semanal",
+      "detalhe": "Fila de pré-aprovação reaberta",
+      "meta": {
+        "aprovadores": [
+          "eughenio.constantino@gocase.com"
+        ]
+      },
+      "created_at": "2026-08-26 21:47:10"
+    },
+    {
+      "id": "c547f4b8c611db9b3c4b0360bda4a6f0",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "d3ef50ed277bc1877fa2f3461f0007ca",
+      "projeto_nome": "Simulador de Custos - GoBeauty",
+      "detalhe": "Em validação",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Em validação",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 21:36:28"
+    },
+    {
+      "id": "7ece84ade5d08fcf8af67a5e80ade3f7",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "dba1cc1c23ebb528d6ad4c852ad32b64",
+      "projeto_nome": "Plataforma SmartOnline - Captura de XMLs e Recolhimento de DIFAL",
+      "detalhe": "Em validação",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Em validação",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 21:27:49"
+    },
+    {
+      "id": "5b61257e4d41a425f6f8dfd90dff286f",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "7a3ef686723282015de5b5e20b4a43f1",
+      "projeto_nome": "Dashboard Analytics Gerencial Gobeaute",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 19:22:34"
+    },
+    {
+      "id": "74b0e28fc565d75942a3fba37ba66deb",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "a016d911ab714cb2fb7d0f4478b7025d",
+      "projeto_nome": "Radar Preventivo de SLA",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 19:21:12"
+    },
+    {
+      "id": "82b51b1aa9b335385073e63de2858053",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "ae6af3b0bcfcff0bc47322c0a37547f4",
+      "projeto_nome": "Database Importações Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 19:18:01"
+    },
+    {
+      "id": "c0e346b878469aaeb61bf1745e1bc20c",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "25a913771d281e20d18ea9f7cb699cb9",
+      "projeto_nome": "Automação na Criação de Chamados de Pagamentos de Fornecedores (Gobeaute)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 19:08:42"
+    },
+    {
+      "id": "c907814032917e6eaef75d226d865f90",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "7cc5e99cdc78654b7baa2717ac9eb6ca",
+      "projeto_nome": "Catálogos - House of beauty",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 19:08:06"
+    },
+    {
+      "id": "ac4f50c35b6a49d25d3cafc64f5575b3",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "546988880104067db81665f63481eca1",
+      "projeto_nome": "Haileydash",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 19:05:24"
+    },
+    {
+      "id": "640fecdc0fc3ecfe6eecfd01e915b951",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "4f452f2a1ef198a4d672c78485581da8",
+      "projeto_nome": "Ressarcimento CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 18:17:56"
+    },
+    {
+      "id": "bf7a0a1563521e52a54e6e007473c655",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "4f452f2a1ef198a4d672c78485581da8",
+      "projeto_nome": "Ressarcimento CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 18:17:19"
+    },
+    {
+      "id": "58234ec6e9b3285fa9013430559df327",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "4f452f2a1ef198a4d672c78485581da8",
+      "projeto_nome": "Ressarcimento CX",
+      "detalhe": "1 estrela",
+      "meta": {
+        "estrelas": 1,
+        "estrelas_anterior": 0
+      },
+      "created_at": "2026-08-26 18:16:54"
+    },
+    {
+      "id": "e529dde6610af388506b6f1b89d321fe",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "e8c8254f604e22c03ffe36b3e1b2eb19",
+      "projeto_nome": "Automação de Mockups de Cases",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Reenvio Pendente",
+        "motivo": "Reenviar corrigindo as Horas Evitadas:\n\n1. As 105 horas economizadas são justificadas como semestrais, mas foram cadastradas como mensais, o que superestima o total financeiro mensal."
+      },
+      "created_at": "2026-08-26 18:13:28"
+    },
+    {
+      "id": "50717d5419a7f09405c32b78fc7cec64",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "e8c8254f604e22c03ffe36b3e1b2eb19",
+      "projeto_nome": "Automação de Mockups de Cases",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Reenvio Pendente",
+        "motivo": "Reenviar corrigindo o CUSTO EVITADO:\n\n1. As 105 horas economizadas são justificadas como semestrais, mas foram cadastradas como mensais, o que superestima o total financeiro mensal."
+      },
+      "created_at": "2026-08-26 18:13:18"
+    },
+    {
+      "id": "ac98b7dcef29d0e2304dd1f9af408c7a",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "a5c53437050d4a5405d36ce86b594b1c",
+      "projeto_nome": "Smart Replan",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 18:12:37"
+    },
+    {
+      "id": "96170ab688c72ee31d10302c10d403a2",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "e8c8254f604e22c03ffe36b3e1b2eb19",
+      "projeto_nome": "Automação de Mockups de Cases",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reenvio Pendente",
+        "motivo": "Reenviar corrigindo o CUSTO EVITADO:\n\n1. O valor do custo evitado foi lançado como MENSAL (R$ 5.166,66), mas o saving deste projeto é SEMESTRAL. Por isso, o ganho \"mensal\" ficou inflado por um valor semestral. Reenvie corrigindo esse ponto (você pode calcular o mensal para ser mais intuitivo, ou descrever os ganhos de forma semestral mesmo no chat pra ficar claro pro agente)"
+      },
+      "created_at": "2026-08-26 18:12:21"
+    },
+    {
+      "id": "2202902ba59cfc5359c7c7dbff3a4c8f",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "a5c53437050d4a5405d36ce86b594b1c",
+      "projeto_nome": "Smart Replan",
+      "detalhe": "1 estrela",
+      "meta": {
+        "estrelas": 1,
+        "estrelas_anterior": 0
+      },
+      "created_at": "2026-08-26 18:07:56"
+    },
+    {
+      "id": "01401a0e147863239e4d7bcad6c9a3e4",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "b2b498d0117b47548f7e8a140d87d79f",
+      "projeto_nome": "Agente de Geração e Teste A/B de GIFs de CRM | Spectrum",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 16:14:37"
+    },
+    {
+      "id": "4ca39be8835352e3bb2a273a82fae248",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "78d2a1d95f831aa612c3d3fff68b6a67",
+      "projeto_nome": "GoDocs",
+      "detalhe": "Reprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reprovado",
+        "motivo": "ansoidasd"
+      },
+      "created_at": "2026-08-26 14:48:01"
+    },
+    {
+      "id": "7c4a382e4a4b100bc64d85787909c8fd",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "05c4b3690bb33ff8f9bc0c039790d971",
+      "projeto_nome": "BB Indústria QC",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 14:45:45"
+    },
+    {
+      "id": "cf729edf00191a772803135079743a71",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "84145328d7589246ece6f3782a729b28",
+      "projeto_nome": "Abastecimento de tinta",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 14:39:23"
+    },
+    {
+      "id": "e6b532719dc1c680a6be2338b0e74395",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "84145328d7589246ece6f3782a729b28",
+      "projeto_nome": "Abastecimento de tinta",
+      "detalhe": "1 estrela",
+      "meta": {
+        "estrelas": 1,
+        "estrelas_anterior": 0
+      },
+      "created_at": "2026-08-26 14:39:18"
+    },
+    {
+      "id": "d5616909aea570722019f92d3b4fd838",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-250",
+      "projeto_nome": "Slowmoving B2B n Overview Sales",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 14:05:24"
+    },
+    {
+      "id": "5de22c27ac7d1c35682970ca88f93c02",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "7e7df436c826e1fc69dbc6843b47898d",
+      "projeto_nome": "Estoque ao vivo Gobeaute",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 13:41:30"
+    },
+    {
+      "id": "db34bcc512c6c7035f36ac9b2682c278",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "29c4f7971afa4ae46aaca20725070bb6",
+      "projeto_nome": "Painel Stock Flow - Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 13:37:44"
+    },
+    {
+      "id": "33e34a0153c6ad0254084d8462e0960b",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "2d53ff57f03b678a31610d3e1f270848",
+      "projeto_nome": "Plano de Industrialização",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 13:25:57"
+    },
+    {
+      "id": "ba8d67be3ad38c32fe0f88f30856f843",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "2eb2d07e4e3a807a714786a672ab4f85",
+      "projeto_nome": "Agente SDR Gobeaute — Qualificação e Roteamento Automático de Leads",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reenvio Pendente",
+        "motivo": "Reenviar como \"Custo Eliminado\" ao invés de \"Horas Reduzidas\". Marque que \"Ninguém fazia\", depois marque o Custo Eliminado e descreva que uma pessoa do time foi reduzida. \n\n*(E marque \"Não\" para \"há trabalho manual ADICIONAL que o contrato não cobria?\")"
+      },
+      "created_at": "2026-08-26 13:24:37"
+    },
+    {
+      "id": "2a5674862269beb5f797283f3194649b",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "755005cfb07365d01d96f23ece1209d3",
+      "projeto_nome": "Dash de Custos Freedom Cosméticos",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 12:44:54"
+    },
+    {
+      "id": "881288bc347c2857c1fa7d24e61c4d25",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "fda50921fe1966bb788145852124152d",
+      "projeto_nome": "Comparativo de Produto Acabado",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 12:44:43"
+    },
+    {
+      "id": "d9a61957a76c0b17ea8afe7daf7c1a75",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "e6a51663752df75d476215e469f3faf2",
+      "projeto_nome": "Agente de Compras Gobeaute",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 12:44:04"
+    },
+    {
+      "id": "efd7685ad642d9d46dc8804801c6f81d",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "5a71877fd167b37e304cba46f4db3c39",
+      "projeto_nome": "Onboarding Tech Gogroup",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 11:43:10"
+    },
+    {
+      "id": "fe53a7a2928476b8dcaf71aaf3cb1b22",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "5a2d3692e5198bc5a16fae2ee2d37de9",
+      "projeto_nome": "Confere.AI - Acuracidade CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 01:26:45"
+    },
+    {
+      "id": "448bf093ecc03d8e1cffcccb5916c4ad",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "c505295adf95ea26865e6032d8517856",
+      "projeto_nome": "Semanal Gomagics",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 01:26:16"
+    },
+    {
+      "id": "c3cab43ede698c39f2580ef5f830dead",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "a67f634cea0431c3d312481d6bfedcac",
+      "projeto_nome": "CX Self-Service",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 01:25:25"
+    },
+    {
+      "id": "c5d3e5b8e9231e870ee663555a3d7df6",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "8adc7e24da8543aa6aae7222b95607c7",
+      "projeto_nome": "GoHunter",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-26 00:59:45"
+    },
+    {
+      "id": "5d2521324641f0737b4cfb4b320965c8",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "d8d29d071c46320a17bdfacc67d74701",
+      "projeto_nome": "Análise de Cotação",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 23:22:17"
+    },
+    {
+      "id": "6e2407d58080f43293cbadd93b50833f",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "4ba2aef7949b875da62009490e3e5258",
+      "projeto_nome": "Automação de Despesas Fiscais <> Webgex",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 22:07:26"
+    },
+    {
+      "id": "59f163f74403ac5bea2c3aca9a1f7e13",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "a604a6d939cb6c9597c61770549c2a57",
+      "projeto_nome": "Radar Pix",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 22:06:41"
+    },
+    {
+      "id": "e45e57d181e445d9f07d6925ea536747",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "4c1b13c1d3ddd9096ec04498e17e4d40",
+      "projeto_nome": "Automação da Conciliação Asaas <> Reseller <> Factory",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 22:01:03"
+    },
+    {
+      "id": "f984f7142c7c317ae5f8dbcf7568ce2a",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "02c3d43be8c6010839b18b311825747c",
+      "projeto_nome": "BID Financeiro",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 21:59:46"
+    },
+    {
+      "id": "617a0e06f33e9831fa59f83a132b3ae9",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "e024186694625bfcbbda64b93020beaa",
+      "projeto_nome": "GoBrands",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 21:17:51"
+    },
+    {
+      "id": "4aed3fbf617d33d78eda17ed5fdefb9b",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "5cb3fae21e905218094c037d44f06ebf",
+      "projeto_nome": "GoEvidências",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 19:53:53"
+    },
+    {
+      "id": "4b873d716c506384ed65e5826c22f45d",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "88b8e4e3a64454dfe4fcfa50fc3d92ee",
+      "projeto_nome": "GoPrice",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 19:51:04"
+    },
+    {
+      "id": "81257b7b457084451d1916171fd18fbb",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "88b8e4e3a64454dfe4fcfa50fc3d92ee",
+      "projeto_nome": "GoPrice",
+      "detalhe": "4 estrelas",
+      "meta": {
+        "estrelas": 4,
+        "estrelas_anterior": 2
+      },
+      "created_at": "2026-08-25 19:51:00"
+    },
+    {
+      "id": "b51a51719cd8b92bb7af193993a22b65",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "88b8e4e3a64454dfe4fcfa50fc3d92ee",
+      "projeto_nome": "GoPrice",
+      "detalhe": "3 estrelas",
+      "meta": {
+        "estrelas": 3,
+        "estrelas_anterior": 1
+      },
+      "created_at": "2026-08-25 19:50:58"
+    },
+    {
+      "id": "6069b84fa84a3a1bd7a2c67c8a1518a8",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "88b8e4e3a64454dfe4fcfa50fc3d92ee",
+      "projeto_nome": "GoPrice",
+      "detalhe": "2 estrelas",
+      "meta": {
+        "estrelas": 2,
+        "estrelas_anterior": 0
+      },
+      "created_at": "2026-08-25 19:50:58"
+    },
+    {
+      "id": "106aa60fe83f8dfcb074df90e42910f0",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "88b8e4e3a64454dfe4fcfa50fc3d92ee",
+      "projeto_nome": "GoPrice",
+      "detalhe": "1 estrela",
+      "meta": {
+        "estrelas": 1,
+        "estrelas_anterior": 0
+      },
+      "created_at": "2026-08-25 19:50:55"
+    },
+    {
+      "id": "35d5c738a51c1e8298dcf52e52902cb0",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "e3a60b2e6cc89938ba4bfe31c51c8804",
+      "projeto_nome": "Cases IA | Lógica",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 19:50:05"
+    },
+    {
+      "id": "0278bc15570a8b614009c15456a488c9",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "e3a60b2e6cc89938ba4bfe31c51c8804",
+      "projeto_nome": "Cases IA | Lógica",
+      "detalhe": "3 estrelas",
+      "meta": {
+        "estrelas": 3,
+        "estrelas_anterior": 1
+      },
+      "created_at": "2026-08-25 19:49:57"
+    },
+    {
+      "id": "7305449e4652b993197d894852f87d2c",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "e3a60b2e6cc89938ba4bfe31c51c8804",
+      "projeto_nome": "Cases IA | Lógica",
+      "detalhe": "2 estrelas",
+      "meta": {
+        "estrelas": 2,
+        "estrelas_anterior": 0
+      },
+      "created_at": "2026-08-25 19:49:55"
+    },
+    {
+      "id": "4adfa1aec1232f4d916da1c93f7f30da",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "e3a60b2e6cc89938ba4bfe31c51c8804",
+      "projeto_nome": "Cases IA | Lógica",
+      "detalhe": "1 estrela",
+      "meta": {
+        "estrelas": 1,
+        "estrelas_anterior": 0
+      },
+      "created_at": "2026-08-25 19:49:54"
+    },
+    {
+      "id": "46d708812ec616d27324cf233f5eca35",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "2c23b6650cf58226cf7414867764fcae",
+      "projeto_nome": "Teste de Descascamento (térmicos)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 19:17:00"
+    },
+    {
+      "id": "dd0c48339ff3a1eca7e7d7d165a0c88d",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "2c23b6650cf58226cf7414867764fcae",
+      "projeto_nome": "Teste de Descascamento (térmicos)",
+      "detalhe": "2 estrelas",
+      "meta": {
+        "estrelas": 2,
+        "estrelas_anterior": 1
+      },
+      "created_at": "2026-08-25 19:16:50"
+    },
+    {
+      "id": "9d85ed7b56398e30944c9bb1da6175f7",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "2c23b6650cf58226cf7414867764fcae",
+      "projeto_nome": "Teste de Descascamento (térmicos)",
+      "detalhe": "1 estrela",
+      "meta": {
+        "estrelas": 1,
+        "estrelas_anterior": 0
+      },
+      "created_at": "2026-08-25 19:16:47"
+    },
+    {
+      "id": "72388a71fb6dc0c9268accb5b397ce0f",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "166f805ce43809d3b2c6c2e009e68daf",
+      "projeto_nome": "LIA DM - universo Gogroup",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 19:05:43"
+    },
+    {
+      "id": "362fd27da17c8745e54133fe9f493431",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "5fa4f6433d0a3306208238da7797e20b",
+      "projeto_nome": "Direcionador de Fórum (CX Gogroup)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pré-aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 18:30:25"
+    },
+    {
+      "id": "a1f43bf13511f36ebd87968a640bc073",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d3ef50ed277bc1877fa2f3461f0007ca",
+      "projeto_nome": "Simulador de Custos - GoBeauty",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 18:29:36"
+    },
+    {
+      "id": "e61fd1de40163e7c0237ea5e956c6306",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+      "projeto_nome": "Sab.IÁ — Analista de IA para geração de FAQs",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 17:26:29"
+    },
+    {
+      "id": "d2ff6317e4f17f727d0789a2e4884121",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+      "projeto_nome": "Sab.IÁ — Analista de IA para geração de FAQs",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 17:25:46"
+    },
+    {
+      "id": "7ae0a60987570e30ff7b5db2cb636177",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+      "projeto_nome": "Sab.IÁ — Analista de IA para geração de FAQs",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 17:25:26"
+    },
+    {
+      "id": "d85786e5bd9607be8f2472e97954123f",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+      "projeto_nome": "Sab.IÁ — Analista de IA para geração de FAQs",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 17:25:17"
+    },
+    {
+      "id": "c852e35aa0d158b9e8df4f580492bc13",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+      "projeto_nome": "Sab.IÁ — Analista de IA para geração de FAQs",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 17:25:02"
+    },
+    {
+      "id": "989c3327fb43034143dc77d59c3bf7b6",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "77f1e31e19c9bc2558928c127d21b317",
+      "projeto_nome": "Headcount Gogroup",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 17:09:50"
+    },
+    {
+      "id": "ab1371409f70536c5ba31eac5a0bd296",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "c508f9083c801d5b6fbc982339599c27",
+      "projeto_nome": "Dashboard Analytics Gerencial Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 17:07:43"
+    },
+    {
+      "id": "7556a4ae81dece4fe9c8717bfbe11934",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "5111622254c3de7a6a2394f0443d917a",
+      "projeto_nome": "Inventario-ti",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 17:04:27"
+    },
+    {
+      "id": "c7f5772ad497797d8de36701e2a94de2",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "3fc2ff2403b80d6113c6362ffcb3bf67",
+      "projeto_nome": "Board de Coleções / MKT - ILUSTR",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 17:02:20"
+    },
+    {
+      "id": "a2cc7bc84c45197e9355c5e61632b9ac",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "reabrir_fila",
+      "projeto_id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+      "projeto_nome": "Sab.IÁ — Analista de IA para geração de FAQs",
+      "detalhe": "Fila de pré-aprovação reaberta",
+      "meta": {
+        "aprovadores": [
+          "giovanna.sabrina@gocase.com"
+        ]
+      },
+      "created_at": "2026-08-25 16:11:31"
+    },
+    {
+      "id": "b550ef9b68b8d85dc0a001926d8642e5",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "9597d4f444954baa017e00af1e51404a",
+      "projeto_nome": "Agente de Oportunidades B2B - Supply",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:59:37"
+    },
+    {
+      "id": "9eeef6e84bc1e370c126367f74630d17",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d8d29d071c46320a17bdfacc67d74701",
+      "projeto_nome": "Análise de Cotação",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:57:07"
+    },
+    {
+      "id": "c8ef01aad48334dd6de2a217afb8bfba",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "fadb57be2e09a39b9929646a1127db3c",
+      "projeto_nome": "Retro S&P — automação dos pontos da retrospectiva mensal",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:54:54"
+    },
+    {
+      "id": "cd81e6c0baf9fe5414b8a44332134455",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "768f4f6f8e858e06b9590991604f0428",
+      "projeto_nome": "Esteira de Hits - Google",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:53:41"
+    },
+    {
+      "id": "91c6323c9f4c02de5232ce65dbf5a27a",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "8d200fc05d9267f7c820d97e5f732f67",
+      "projeto_nome": "Agente de Projetos",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:49:54"
+    },
+    {
+      "id": "d55077a09c144b09697ac5c2299a1594",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "6f58d8ab4b3c894d6800a158505e8538",
+      "projeto_nome": "Launch Intelligence",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:48:51"
+    },
+    {
+      "id": "0c0f53b58afa44c6db5cd43578af5ac1",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "12d5f2bcbd0cefad63af4a76d7f2dae9",
+      "projeto_nome": "Central de Estampas",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:45:40"
+    },
+    {
+      "id": "757ae28d131726c6ffd19c83ab16300f",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "bc1e03767138c5480b5a5adfbbd5ef5f",
+      "projeto_nome": "Baixador de Reels",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:44:10"
+    },
+    {
+      "id": "f779606cbbf7ab51673818ec0769a299",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "9defc320532d4c35371e672aa4ee1396",
+      "projeto_nome": "Agendamento Beauty Fair 2026",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:40:24"
+    },
+    {
+      "id": "013599fca19f8480a8414432af575d6a",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "f9f0000b601d81a3e508cb9beae503ca",
+      "projeto_nome": "Freight Cost Intelligence (CFI)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:32:46"
+    },
+    {
+      "id": "897c8f38c28a04fa5c7231f331b5b8aa",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "f9f0000b601d81a3e508cb9beae503ca",
+      "projeto_nome": "Freight Cost Intelligence (CFI)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:32:39"
+    },
+    {
+      "id": "cacf906383869a0fb5a6930f3c9f0ffb",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "71f8c78816d6a3dd9088f1d2a39ffc5a",
+      "projeto_nome": "Portal de Reembolsos (Gobeaute)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:30:46"
+    },
+    {
+      "id": "2bc4c597ac79ebb668382ab9ef067b7d",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "8f315702b9f3ea3f20e9d1fc104a1d1f",
+      "projeto_nome": "Checklist de Inicio de turno",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:05:20"
+    },
+    {
+      "id": "59865b23d24050038a52100a6da04684",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "8f315702b9f3ea3f20e9d1fc104a1d1f",
+      "projeto_nome": "Checklist de Inicio de turno",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 14:05:15"
+    },
+    {
+      "id": "cb173429621f1ac766ff6d52638b83d9",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d9574be54d6bee5f91fbe401e05d188a",
+      "projeto_nome": "Cérebro de trocas Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 13:38:24"
+    },
+    {
+      "id": "b91aad31cb5138d176d8bf934612b9e4",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "0c708b3d696c121e7644393209235860",
+      "projeto_nome": "Conexão MCP-GTI",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 13:30:43"
+    },
+    {
+      "id": "1242e38642c5d121621ebde68579cdcb",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "7dfe2daef081604d61457288b615aa89",
+      "projeto_nome": "Skill - Supabase Dados CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 13:15:12"
+    },
+    {
+      "id": "186a540da589242571cb7428685604b3",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d9574be54d6bee5f91fbe401e05d188a",
+      "projeto_nome": "Cérebro de trocas Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 13:12:02"
+    },
+    {
+      "id": "24503ae3c227bf3cb310beab5c97a73b",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "9cede95b8da4fbbaf68e75e84491ea29",
+      "projeto_nome": "Pesquisa Satisfação Prima Vida",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 12:36:08"
+    },
+    {
+      "id": "a54f613446822b455aa53eb268c76b65",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "a79b9029e7ea2f7dbec12793baf53712",
+      "projeto_nome": "Monitoramento de Background Check - Compliance",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 12:35:44"
+    },
+    {
+      "id": "65ffba8bda1da8d507eeff6c00a07048",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "a4d59efee3ccdcc5e81a414576d58650",
+      "projeto_nome": "Trilha de Carreira Operacional",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 12:35:19"
+    },
+    {
+      "id": "5bdf156e1e4a181a974bacef48562d51",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "f8c9e95980b86a7ab3f7ab2a6ecde82f",
+      "projeto_nome": "Gobeaute Prompt Studio",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 12:25:02"
+    },
+    {
+      "id": "8d87106aa0fedac615c3ce26d6c1e550",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "d2a99df9f529f064b722ee0b947853a2",
+      "projeto_nome": "Portal de devoluções de CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 12:20:28"
+    },
+    {
+      "id": "dc1b15eb09ff0cddbddb061908fa7177",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "420621fb38bd761ddaed5ccd4cc61fcb",
+      "projeto_nome": "Painel de eficiência operacional de CX",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 11:31:15"
+    },
+    {
+      "id": "66f02ad8b56f2843c3c6bc78ca227201",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "97383cf6dc7a636fc614c726895d2aef",
+      "projeto_nome": "Alerta de pedidos com erro de integração entre Yampi e Clearsale",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 11:26:35"
+    },
+    {
+      "id": "a29b7140c552b3df1d80b2ad61ab0cb8",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "c19b41ebd28f92560f5c8c826aaa4389",
+      "projeto_nome": "Gohelp - Influenciadores Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 11:02:57"
+    },
+    {
+      "id": "7fb9ed0cad608c49d3194fed929c8504",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "8743590ad9c54710a71d607e433b64c6",
+      "projeto_nome": "Gohelp - Influenciadores Gobeauty",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 11:02:45"
+    },
+    {
+      "id": "f5a41217d9199eeb6977fe055811d636",
+      "ator_email": "kaique.breno@gocase.com",
+      "acao": "status",
+      "projeto_id": "b2efc76ad706b68fe7745477a5f5bf49",
+      "projeto_nome": "Typebot - Cadastro Afiliados",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-25 11:02:29"
+    },
+    {
+      "id": "087692178176d748d627046282e782c5",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "902e766c772ae08634e031d51ab56923",
+      "projeto_nome": "Onboarding & Integração — Gente & Gestão",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-24 12:04:31"
+    },
+    {
+      "id": "dda9c30d9ff377860ff170baf76ea747",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "aaebdc509aa007231f95299186b83c51",
+      "projeto_nome": "Funil R&S",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-24 12:02:32"
+    },
+    {
+      "id": "a33d375fb99b6c726a2371422819d607",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "71e424e3a27c24db04289c5834292b0e",
+      "projeto_nome": "Reembolso GoGroup — automação de comprovantes → GoService",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-24 11:59:52"
+    },
+    {
+      "id": "42ea45cecf0e87f450e8890bb0bcc871",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "bb24d1b523b325d2d97a37f4c7bd1c0f",
+      "projeto_nome": "Gocontent Machine",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 20:26:11"
+    },
+    {
+      "id": "4b2b467a84388e150158540f81d4df49",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "0769139235f84f76040a35d78107d0fc",
+      "projeto_nome": "GoShoot Batch",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 20:06:07"
+    },
+    {
+      "id": "acae049853186791841293fb737d8eec",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "4d669d9a11b96cb96393a735c30677dd",
+      "projeto_nome": "Automação dos Câmbios Internacionais",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 19:33:15"
+    },
+    {
+      "id": "ce700d4f26a96504501bab62ae420cbf",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "9fd7215a71459337322b52d45510d0c5",
+      "projeto_nome": "Automação da Comissões de Itens Licenciados",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 19:32:51"
+    },
+    {
+      "id": "251db6b1d0b957aea975afb030c8d22a",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "7a94c4d4fffe1eee52b51bb6cd5a88ad",
+      "projeto_nome": "Integração com Operador Logístico - Life of Colour",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 19:27:39"
+    },
+    {
+      "id": "3004e1ad9c25301453c1c33091ecba0d",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "bb24d1b523b325d2d97a37f4c7bd1c0f",
+      "projeto_nome": "Gocontent Machine",
+      "detalhe": "Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 19:27:14"
+    },
+    {
+      "id": "6d1f695b2052a6c98252fabdba653c46",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "4d1e0abf61a2e18d7fd3ef261a7f90ae",
+      "projeto_nome": "Gestor de Crises",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 19:22:49"
+    },
+    {
+      "id": "f0ebf34b737c196a24bc0df5a734e311",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "status",
+      "projeto_id": "95cbd504a32e6f29cf5549ad1a16ae53",
+      "projeto_nome": "CTR Machine Gocase - Admaker",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 18:37:14"
+    },
+    {
+      "id": "cb6983e855c1d8d3802ab812ac54177b",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "95cbd504a32e6f29cf5549ad1a16ae53",
+      "projeto_nome": "CTR Machine Gocase - Admaker",
+      "detalhe": "4 estrelas",
+      "meta": {
+        "estrelas": 4,
+        "estrelas_anterior": 3
+      },
+      "created_at": "2026-08-21 18:37:13"
+    },
+    {
+      "id": "b6c179c6d9767c3b64391eabebfa13de",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "95cbd504a32e6f29cf5549ad1a16ae53",
+      "projeto_nome": "CTR Machine Gocase - Admaker",
+      "detalhe": "3 estrelas",
+      "meta": {
+        "estrelas": 3,
+        "estrelas_anterior": 2
+      },
+      "created_at": "2026-08-21 18:36:55"
+    },
+    {
+      "id": "794d381f52c0f017d4698bb7a8965d58",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "4f76f2758b1e666d5589c7df4327c7f0",
+      "projeto_nome": "Hub de Cases",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 18:34:23"
+    },
+    {
+      "id": "f8367852418fc0cf9367102f19266263",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "9512d433f168a6eb0804e5b543cdb5fe",
+      "projeto_nome": "Painel S&OE - Gobeaute",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 18:32:30"
+    },
+    {
+      "id": "31a5079d61fa1f8c7be014bf66ab09a1",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "bf86663c3634c88e2ccf9f0375218474",
+      "projeto_nome": "Íris [Analista de review]",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 18:24:10"
+    },
+    {
+      "id": "708d589f528d4b61557cd471b5b9d8e8",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "bf86663c3634c88e2ccf9f0375218474",
+      "projeto_nome": "Íris [Analista de review]",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 18:24:05"
+    },
+    {
+      "id": "617b194fe760b8f2358922f3b2caf4d4",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "b299eaa87a2bd3d8a25168d98301cbc6",
+      "projeto_nome": "News Hunter - futebol",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 18:17:40"
+    },
+    {
+      "id": "75645b68687a4c06d137966b1213a67d",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "5769995f5cd1e87a35ff2616fdb400fe",
+      "projeto_nome": "Farol de insucessos",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 18:12:19"
+    },
+    {
+      "id": "a58eb81d8d45db88efdbee798e32cbf8",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "0769139235f84f76040a35d78107d0fc",
+      "projeto_nome": "GoShoot Batch",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Reenvio Pendente",
+        "status_novo": "Reenvio Pendente",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 18:09:53"
+    },
+    {
+      "id": "539063dd71da960fcb2d0f591a76aac7",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "0769139235f84f76040a35d78107d0fc",
+      "projeto_nome": "GoShoot Batch",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reenvio Pendente",
+        "motivo": "Entendemos que o Custo Evitado relatado foi uma projeção e não custo evitado real."
+      },
+      "created_at": "2026-08-21 18:09:06"
+    },
+    {
+      "id": "16a3bb866a070d63b706cd370954d05a",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "281ad23db21bb0fcefc976ccf38acabf",
+      "projeto_nome": "Painel de Controle CRO Gobeaute",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 17:24:11"
+    },
+    {
+      "id": "b459ac9bb8274b69daf75d3d352db522",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "status",
+      "projeto_id": "b681ad58983f8a6f4ce64977d369a27b",
+      "projeto_nome": "Seeyu - Plataforma para gestão de redes sociais",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 16:58:13"
+    },
+    {
+      "id": "14fb5ad33fda933e81f39dee9dc00a7c",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "3ed3db78fa3465c4d6fe88f2ee44e113",
+      "projeto_nome": "Fórum de melhoria continua",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 16:43:41"
+    },
+    {
+      "id": "feb438d53b2239171c7ce52f8950b7c0",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-141",
+      "projeto_nome": "Portal da Qualidade",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reenvio Pendente",
+        "motivo": "Alinhado com o Luís."
+      },
+      "created_at": "2026-08-21 13:28:04"
+    },
+    {
+      "id": "27189d3a7f1cac04cc8774af9295968a",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "7dfe2daef081604d61457288b615aa89",
+      "projeto_nome": "Skill - Supabase Dados CX",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reenvio Pendente",
+        "motivo": "O saving de horas não me parece condizente, acho que está muito alto, principalmente considerando o oráculo já funcionante. Consideraria agregar a solução em outro projeto."
+      },
+      "created_at": "2026-08-21 13:25:38"
+    },
+    {
+      "id": "f3064b181f6e6efccaaea9f5e3288c69",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "7d07cb6b44fb75c9b25562bcfb205a70",
+      "projeto_nome": "Hub Criativo v2",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 13:22:01"
+    },
+    {
+      "id": "44f722f1efbfcd40135cb437a5a7a7b0",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "78cab6ebfceed6820926743bcc658e62",
+      "projeto_nome": "Carga diária de chargeback nos antifraudes (Konduto + ClearSale)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 13:14:56"
+    },
+    {
+      "id": "bc917b0aaa485eca57bcebf3be020d13",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "1d45f9dd9966de3d6ac5716b9f7a7455",
+      "projeto_nome": "Pacote de Gestão de Dados",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 13:14:27"
+    },
+    {
+      "id": "48acb9202c909064d42d90efc439a596",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "664437f3b5981fbabf24ca51e82fe436",
+      "projeto_nome": "Avaliação de Desempenho 90° Lojas Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 13:11:34"
+    },
+    {
+      "id": "633f385970421cd6530bcc91d5de1a48",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "312330b0d164b011e1dfe8c897eb5b69",
+      "projeto_nome": "GocaLives",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 13:10:08"
+    },
+    {
+      "id": "a65da376e9280fb4b98c870640f34c8b",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "c417fe024caf2b48b5701b82070b34b9",
+      "projeto_nome": "Agente de Waitlists",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 13:09:39"
+    },
+    {
+      "id": "93b0f388dd7ce5851c4e72dc8d9a2be8",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "LEGADO-185",
+      "projeto_nome": "Alerta de Rupturas",
+      "detalhe": "Reenvio Pendente",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Reenvio Pendente",
+        "motivo": "Ta passando os fluxos para godeploy."
+      },
+      "created_at": "2026-08-21 13:07:45"
+    },
+    {
+      "id": "44e683e53add69e1f2b7f42ab6de04b6",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "status",
+      "projeto_id": "ae06cf9cbd5f27797016e031658989f7",
+      "projeto_nome": "Portal de Ocorrências B2B",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 12:03:36"
+    },
+    {
+      "id": "53259246388b650c4d9777327fd12ca8",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "ae06cf9cbd5f27797016e031658989f7",
+      "projeto_nome": "Portal de Ocorrências B2B",
+      "detalhe": "2 estrelas",
+      "meta": {
+        "estrelas": 2,
+        "estrelas_anterior": 1
+      },
+      "created_at": "2026-08-21 12:03:33"
+    },
+    {
+      "id": "fe80f8059c4cb358c87ca2bfbe0bcd79",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "ae06cf9cbd5f27797016e031658989f7",
+      "projeto_nome": "Portal de Ocorrências B2B",
+      "detalhe": "1 estrela",
+      "meta": {
+        "estrelas": 1,
+        "estrelas_anterior": 0
+      },
+      "created_at": "2026-08-21 12:03:31"
+    },
+    {
+      "id": "9016a79c06f22916a9fee8b7423820df",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "eef2ba7414d5ed3540b017063f804add",
+      "projeto_nome": "RA Monitor",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-21 01:54:06"
+    },
+    {
+      "id": "6238196a83ea4fb83dd6c3fad8ffb402",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "588227dfbc8720338573c7982f206009",
+      "projeto_nome": "GoQuote",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-20 19:18:06"
+    },
+    {
+      "id": "05175057e2b9225a90884ea95fd70bcb",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "7363ac724047eaba4b2de065f171ec82",
+      "projeto_nome": "Cockpit Contábil",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-20 19:17:29"
+    },
+    {
+      "id": "b856d59a8b3a165649c3c3f5ff0dce1b",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "a8d2545f3072c88da9c8d2681f71a231",
+      "projeto_nome": "Calculadora de Preço Mínimo B2B",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-20 19:16:44"
+    },
+    {
+      "id": "be30dd76c13f29855d37d4441ce2c4b5",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "47048111d82a03b727c832e673673ea6",
+      "projeto_nome": "Automação atualização IPCA",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-20 19:16:16"
+    },
+    {
+      "id": "691da61a1278a335c122e20f7436ef6d",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "65601548187c5228fc6004ad9f8e047d",
+      "projeto_nome": "GERADOR DE SPED FISCAL (CTES)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-20 19:15:35"
+    },
+    {
+      "id": "eaa41450e469fd66edb5b1ec5063da28",
+      "ator_email": "joaovictor.esteves@gocase.com",
+      "acao": "status",
+      "projeto_id": "5afa214f38acc42a1a5a377bc15650d1",
+      "projeto_nome": "Processador de XML NFe",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-20 19:14:56"
+    },
+    {
+      "id": "cda8fe351803a59fab7ad45df49e9788",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "afee09014dfd72a2ac8cc6e1cf820d1c",
+      "projeto_nome": "Gestão de Faturamento B2b - Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-20 16:36:53"
+    },
+    {
+      "id": "73b10d21b743f735edeb8e9f2cc1473e",
+      "ator_email": "luis.albuquerque@gocase.com",
+      "acao": "status",
+      "projeto_id": "39553b210705e924902ed6eb95cb320a",
+      "projeto_nome": "Universo Gocoins",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-20 12:52:25"
+    },
+    {
+      "id": "5b2d09b5283b125344820a419f9dcfbc",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "625248d60d3858b8d808da3089d83544",
+      "projeto_nome": "Benchmark de Estampas",
+      "detalhe": "4 estrelas",
+      "meta": {
+        "estrelas": 4,
+        "estrelas_anterior": 3
+      },
+      "created_at": "2026-08-19 18:35:47"
+    },
+    {
+      "id": "9e05d8b80fb05e21f422685c30215d64",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "95cbd504a32e6f29cf5549ad1a16ae53",
+      "projeto_nome": "CTR Machine Gocase - Admaker",
+      "detalhe": "2 estrelas",
+      "meta": {
+        "estrelas": 2,
+        "estrelas_anterior": 2
+      },
+      "created_at": "2026-08-19 18:35:46"
+    },
+    {
+      "id": "6e4d814b1bd972ef4ae59d8dd74b240e",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "status",
+      "projeto_id": "625248d60d3858b8d808da3089d83544",
+      "projeto_nome": "Benchmark de Estampas",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Pendente",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-08-19 18:35:46"
+    },
+    {
+      "id": "017752e06caaf05ff9ac10cbbafbccc5",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "95cbd504a32e6f29cf5549ad1a16ae53",
+      "projeto_nome": "CTR Machine Gocase - Admaker",
+      "detalhe": "3 estrelas",
+      "meta": {
+        "estrelas": 3,
+        "estrelas_anterior": 2
+      },
+      "created_at": "2026-08-19 18:35:45"
+    },
+    {
+      "id": "72e440cd93dda5e818ed08adc9b87f37",
+      "ator_email": "joao.gabriel@gocase.com",
+      "acao": "estrelas",
+      "projeto_id": "625248d60d3858b8d808da3089d83544",
+      "projeto_nome": "Benchmark de Estampas",
+      "detalhe": "3 estrelas",
+      "meta": {
+        "estrelas": 3,
+        "estrelas_anterior": 2
+      },
+      "created_at": "2026-08-19 18:35:43"
+    }
+  ]
+}

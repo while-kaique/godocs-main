@@ -1,0 +1,44 @@
+{
+  "id": "legado-087",
+  "nome": "Fluxo de Auditoria Interna de Jornada (Ponto x Folha)",
+  "antes": {
+    "id": "legado-087",
+    "nome": "Fluxo de Auditoria Interna de Jornada (Ponto x Folha)",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "136,54",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 83500,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-087",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor informado parece coerente com uma economia mensal de pequeno porte e não indica dupla contagem. Como o ganho é tratado como despesa que deixou de existir, falta indicar o registro que confirme essa redução.\nCético: O valor líquido mensal de 136,54 não vem acompanhado de prova de despesa que existia e deixou de ocorrer. Para aprovar, falta conferir registros da folha antes e depois da automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

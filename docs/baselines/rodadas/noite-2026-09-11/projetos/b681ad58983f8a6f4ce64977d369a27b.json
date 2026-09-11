@@ -1,0 +1,44 @@
+{
+  "id": "b681ad58983f8a6f4ce64977d369a27b",
+  "nome": "Seeyu - Plataforma para gestão de redes sociais",
+  "antes": {
+    "id": "b681ad58983f8a6f4ce64977d369a27b",
+    "nome": "Seeyu - Plataforma para gestão de redes sociais",
+    "status": "Aprovado",
+    "estrelas": "4",
+    "estrelaAgente": "4",
+    "confiancaAgente": "media",
+    "impacto": "17331,77",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 127910,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "b681ad58983f8a6f4ce64977d369a27b",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving declarado é muito alto, equivalente a cerca de 79 pessoas em tempo integral, mas o projeto cita apenas o time de CX e não informa quantas pessoas faziam essa triagem. Precisa conferir registros de volume de comentários e das horas realmente gastas antes da automação.\nFinanceiro: O ganho de R$ 17.332 por mês é alto e parece vir de horas liberadas, não de uma despesa que deixou de existir. Precisa conferir registros de custo antes e depois e provar que houve redução real de gasto, sem contar as mesmas horas como saving e contrato.\nCético: O impacto mensal de 17.331,77 parece ganho de tempo, não despesa que deixou de existir; falta provar qual custo foi efetivamente eliminado. É preciso conferir registros de horas antes e depois e a despesa que parou.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 5
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

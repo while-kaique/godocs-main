@@ -1,0 +1,44 @@
+{
+  "id": "c601f88f9a578c799292de784440e629",
+  "nome": "Agente PPT de fechamento",
+  "antes": {
+    "id": "c601f88f9a578c799292de784440e629",
+    "nome": "Agente PPT de fechamento",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "269,81",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 81952,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "c601f88f9a578c799292de784440e629",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O volume parece possível para um deck de 75 slides feito por várias pessoas, mas não há registro de quantas pessoas gastavam essas horas. Precisa conferir timesheets ou histórico do fechamento e mostrar que o trabalho deixou de ser despesa.\nFinanceiro: O ganho descrito é tempo liberado, mas não mostra despesa que deixou de existir. Precisa conferir o custo anterior e se houve redução real de pagamento ou uso comprovado desse tempo em outra entrega.\nCético: O impacto líquido mensal de 269,81 não mostra uma despesa que realmente deixou de existir. Falta conferir registros das horas e do custo antes e depois, além da prova de que esse gasto foi eliminado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

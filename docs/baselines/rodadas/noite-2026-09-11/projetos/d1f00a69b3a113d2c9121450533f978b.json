@@ -1,0 +1,44 @@
+{
+  "id": "d1f00a69b3a113d2c9121450533f978b",
+  "nome": "Godash",
+  "antes": {
+    "id": "d1f00a69b3a113d2c9121450533f978b",
+    "nome": "Godash",
+    "status": "Aprovado",
+    "estrelas": "5",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 64379,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d1f00a69b3a113d2c9121450533f978b",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 5 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 5
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes aprovou o projeto.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time de agentes aprovou o projeto."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

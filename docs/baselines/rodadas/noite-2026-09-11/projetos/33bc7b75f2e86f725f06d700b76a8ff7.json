@@ -1,0 +1,43 @@
+{
+  "id": "33bc7b75f2e86f725f06d700b76a8ff7",
+  "nome": "Teste",
+  "antes": {
+    "id": "33bc7b75f2e86f725f06d700b76a8ff7",
+    "nome": "Teste",
+    "status": "Pendente",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 87991,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "33bc7b75f2e86f725f06d700b76a8ff7",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Reprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes reprovou o projeto por régua declarada.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time de agentes reprovou o projeto por régua declarada."
+      ]
+    },
+    "status_gravado": "Reprovado"
+  }
+}

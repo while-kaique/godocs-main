@@ -1,0 +1,45 @@
+{
+  "id": "legado-100",
+  "nome": "Disparos de comunicação de Reenvio na Rituária",
+  "antes": {
+    "id": "legado-100",
+    "nome": "Disparos de comunicação de Reenvio na Rituária",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "792,99",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 79179,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-100",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido mensal de R$ 792,99 depende de provar que os contatos evitados geravam despesa que realmente deixou de existir. Precisa conferir registros de custo ou horas antes e depois, sem contar essas horas também como outro ganho.\nCético: O saving não está comprovado como despesa que existia e parou, e a queda de contatos de 10% para 2% não mostra sozinha economia realizada. Precisa do registro da despesa antes e depois e da fonte que confirme os contatos reduzidos.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

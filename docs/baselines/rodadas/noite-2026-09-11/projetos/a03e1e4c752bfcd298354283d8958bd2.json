@@ -1,0 +1,43 @@
+{
+  "id": "a03e1e4c752bfcd298354283d8958bd2",
+  "nome": "[feature de Creators Hub] Creators Hub Completo",
+  "antes": {
+    "id": "a03e1e4c752bfcd298354283d8958bd2",
+    "nome": "[feature de Creators Hub] Creators Hub Completo",
+    "status": "Pendente",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 210822,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "a03e1e4c752bfcd298354283d8958bd2",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: A descrição é ampla e não mostra qual processo mudou nem onde o efeito será verificado. Precisa do fluxo antes e depois e de registros de uso ou entrega para confirmar o ganho imensurável.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

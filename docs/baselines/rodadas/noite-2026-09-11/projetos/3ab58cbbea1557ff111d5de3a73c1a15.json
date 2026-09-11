@@ -1,0 +1,45 @@
+{
+  "id": "3ab58cbbea1557ff111d5de3a73c1a15",
+  "nome": "Report Semanal CX",
+  "antes": {
+    "id": "3ab58cbbea1557ff111d5de3a73c1a15",
+    "nome": "Report Semanal CX",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "169,035",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 56400,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "3ab58cbbea1557ff111d5de3a73c1a15",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 169 horas por mês parece alto para uma atividade semanal que cai de 2h25 para 1h. Falta informar quantas pessoas participavam do fechamento e quantas horas de cada uma foram realmente eliminadas.\nFinanceiro: A redução de tempo parece coerente com o processo descrito, mas não prova economia financeira efetiva. Precisa conferir o custo das horas e se a despesa realmente deixou de existir.\nCético: A redução do tempo de fechamento não prova que uma despesa deixou de existir, então o impacto líquido pode ser apenas capacidade liberada. Falta conferir registros do tempo antes e depois e qual custo foi realmente interrompido.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

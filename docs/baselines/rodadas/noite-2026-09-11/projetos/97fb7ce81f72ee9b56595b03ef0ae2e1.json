@@ -1,0 +1,44 @@
+{
+  "id": "97fb7ce81f72ee9b56595b03ef0ae2e1",
+  "nome": "Automação de Inputs de Saída",
+  "antes": {
+    "id": "97fb7ce81f72ee9b56595b03ef0ae2e1",
+    "nome": "Automação de Inputs de Saída",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "951,825",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 65919,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "97fb7ce81f72ee9b56595b03ef0ae2e1",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 951,83 horas por mês equivale a cerca de 4,3 pessoas em tempo integral, mas não há registro de quantas pessoas faziam esse trabalho. Precisa conferir a equipe envolvida e os apontamentos de tempo antes de aceitar o valor.\nFinanceiro: O valor informado não mostra qual despesa existia e deixou de ocorrer, nem como o saving foi conferido. Precisa apresentar o registro da despesa anterior e a prova do custo após a automação.\nCético: O impacto líquido mensal de 951,83 não vem acompanhado de prova do gasto que deixou de existir. É preciso conferir registros de horas, custo anterior e uso efetivo da automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "0cee6e8af3c5a912bd4908ca0882df54",
+  "nome": "Upgrade Dash Dados Planejamento",
+  "antes": {
+    "id": "0cee6e8af3c5a912bd4908ca0882df54",
+    "nome": "Upgrade Dash Dados Planejamento",
+    "status": "Aprovado",
+    "estrelas": "4",
+    "estrelaAgente": "4",
+    "confiancaAgente": "media",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 177524,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "0cee6e8af3c5a912bd4908ca0882df54",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto descreve muitas funções, mas não mostra qual processo mudou nem onde o efeito será conferido. Para aprovar, falta o painel ou registro das decisões de meta e orçamento antes e depois do uso.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 4
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

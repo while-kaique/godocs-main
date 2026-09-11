@@ -1,0 +1,45 @@
+{
+  "id": "33c884049f5fa0c017c684ec9f353a10",
+  "nome": "Resumo Executivo - Diretoria, Head/Gerente e Gerentes de Loja",
+  "antes": {
+    "id": "33c884049f5fa0c017c684ec9f353a10",
+    "nome": "Resumo Executivo - Diretoria, Head/Gerente e Gerentes de Loja",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "—",
+    "confiancaAgente": "—",
+    "impacto": "1390,375",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 56261,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "33c884049f5fa0c017c684ec9f353a10",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido mensal de 1.390,38 horas é alto e não informa quantas pessoas realmente faziam os relatórios. Precisa conferir a lista de cargos envolvidos e os registros do tempo gasto antes da automação.\nFinanceiro: O valor líquido mensal está baseado em horas poupadas, mas não mostra despesa que deixou de existir. Precisa conferir o custo antes da automação e se houve redução efetiva de gasto.\nPrecedente: O projeto se parece com os resumos e relatórios já aprovados, pois organiza indicadores e envia visões diferentes por público. A dúvida é o saving informado, que precisa de registro da despesa que existia e deixou de existir.\nCético: O impacto líquido mensal de 1.390,38 é apresentado, mas não há prova de uma despesa que deixou de existir com a automação. Precisa do registro da despesa anterior e da evidência de que ela foi realmente encerrada.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

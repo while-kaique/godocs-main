@@ -1,0 +1,44 @@
+{
+  "id": "165b6c6fa396ad88cc4f33be32513061",
+  "nome": "Sistema de Gestão de Riscos",
+  "antes": {
+    "id": "165b6c6fa396ad88cc4f33be32513061",
+    "nome": "Sistema de Gestão de Riscos",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "7357,87",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 162185,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "165b6c6fa396ad88cc4f33be32513061",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 7357,87 horas por mês equivale a mais de 33 pessoas em tempo integral, mas o projeto não informa quantas pessoas faziam essas rotinas. Precisa conferir a lista de envolvidos e os registros de horas manuais antes e depois da automação.\nFinanceiro: O valor mensal é alto e precisa de conferência humana, pois o texto não mostra qual despesa deixou de existir. Solicite registros da despesa interrompida e confirme que horas economizadas não foram contadas também como saving em dinheiro.\nCético: O impacto líquido mensal de 7.357,87 aparece sem documentação e não prova que uma despesa existente deixou de ocorrer. Precisa conferir os registros da despesa anterior e a base usada no cálculo.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

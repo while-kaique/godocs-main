@@ -1,0 +1,45 @@
+{
+  "id": "legado-270",
+  "nome": "HRBP Workspace",
+  "antes": {
+    "id": "legado-270",
+    "nome": "HRBP Workspace",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "1020,275",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 55567,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-270",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 1.020 horas/mês é alto e não informa quantas pessoas faziam esse trabalho. É preciso conferir os registros de horas por pessoa e a despesa que deixou de existir.\nFinanceiro: O valor líquido mensal só pode ser tratado como saving se houver uma despesa que realmente deixou de existir. Falta o registro dessa despesa e da redução após o workspace.\nCético: O saving mensal de 1020,27 não mostra qual despesa existia e deixou de existir, e a documentação está vazia. Precisa conferir a despesa anterior, o registro da redução e como o Workspace gerou esse valor.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "5fa4f6433d0a3306208238da7797e20b",
+  "nome": "Direcionador de Fórum (CX Gogroup)",
+  "antes": {
+    "id": "5fa4f6433d0a3306208238da7797e20b",
+    "nome": "Direcionador de Fórum (CX Gogroup)",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "42,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 78644,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "5fa4f6433d0a3306208238da7797e20b",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho informado é de R$ 42,75 por mês, abaixo do piso de R$ 100,00, e o projeto não mostra uma despesa que deixou de existir. Precisa apresentar o registro da despesa economizada e como o valor foi medido.\nCético: Os impactos de 85,50 e 42,75 aparecem sem fonte nem prova de que uma despesa deixou de existir. Precisa conferir os registros dos custos antes e depois e o cálculo que liga o fórum ao valor economizado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

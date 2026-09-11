@@ -1,0 +1,44 @@
+{
+  "id": "49027830aba42878561fdca11cabfb5a",
+  "nome": "Reconhecimento dos Mantras",
+  "antes": {
+    "id": "49027830aba42878561fdca11cabfb5a",
+    "nome": "Reconhecimento dos Mantras",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "48,79",
+    "categorias": "Custo evitado",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 53942,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "49027830aba42878561fdca11cabfb5a",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido informado é baixo e não sustenta sozinho um projeto documentado. É preciso conferir o registro das 7 horas poupadas e o custo usado para chegar a R$ 48,79 por mês.\nCético: O impacto informado não tem registros das horas antes e depois nem prova de uso do aplicativo. É preciso conferir a base de cálculo e os registros de indicações e aprovações para confirmar as 7 horas liberadas.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

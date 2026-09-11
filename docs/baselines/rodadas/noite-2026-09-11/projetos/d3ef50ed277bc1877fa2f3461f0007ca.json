@@ -1,0 +1,44 @@
+{
+  "id": "d3ef50ed277bc1877fa2f3461f0007ca",
+  "nome": "Simulador de Custos - GoBeauty",
+  "antes": {
+    "id": "d3ef50ed277bc1877fa2f3461f0007ca",
+    "nome": "Simulador de Custos - GoBeauty",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "70537,55",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 146019,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d3ef50ed277bc1877fa2f3461f0007ca",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: A redução de uma semana para minutos parece ligada ao trabalho de uma pessoa, mas não informa horas mensais nem quantas pessoas faziam a tarefa. É preciso conferir registros de tempo e a equipe envolvida para sustentar o saving mensal de R$ 70.537,55.\nFinanceiro: O ganho informado é alto, mas a descrição mostra principalmente economia de horas, sem provar que uma despesa deixou de existir. Para aprovar, é preciso conferir o registro da despesa reduzida e separar esse saving de qualquer valor já contado como horas ou receita.\nCético: O saving mensal de 70537.55 não tem registro de horas antes e depois nem prova de despesa que deixou de existir, então pode ser apenas tempo projetado. Precisa conferir os relatórios do operador, os registros de execução e a redução real de custo.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 5
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

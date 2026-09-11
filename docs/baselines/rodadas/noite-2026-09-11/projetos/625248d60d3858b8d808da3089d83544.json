@@ -1,0 +1,45 @@
+{
+  "id": "625248d60d3858b8d808da3089d83544",
+  "nome": "Benchmark de Estampas",
+  "antes": {
+    "id": "625248d60d3858b8d808da3089d83544",
+    "nome": "Benchmark de Estampas",
+    "status": "Aprovado",
+    "estrelas": "4",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "2300",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 70347,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "625248d60d3858b8d808da3089d83544",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 4 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 4
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

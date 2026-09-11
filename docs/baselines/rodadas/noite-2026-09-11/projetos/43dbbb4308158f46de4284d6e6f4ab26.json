@@ -1,0 +1,44 @@
+{
+  "id": "43dbbb4308158f46de4284d6e6f4ab26",
+  "nome": "GoProspect",
+  "antes": {
+    "id": "43dbbb4308158f46de4284d6e6f4ab26",
+    "nome": "GoProspect",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "212,9",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 111163,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "43dbbb4308158f46de4284d6e6f4ab26",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 212,9 horas por mês é alto e não há registro de quantas pessoas faziam a prospecção nem de que despesa parou. Precisa conferir a divisão do trabalho antes da automação e os registros de tempo ou custo reduzido.\nFinanceiro: O ganho mensal de 212,90 parece compatível com uma ferramenta de acompanhamento, mas a descrição fala em esforço reduzido, não em despesa que deixou de existir. É preciso conferir o registro do custo manual anterior e sua eliminação.\nCético: O impacto líquido mensal de 212,90 não mostra se havia uma despesa paga que deixou de existir, nem se o ganho em vendas foi causado pela ferramenta. Falta o registro das horas ou custos antes e depois e a forma de ligar as vendas aos creators prospectados.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

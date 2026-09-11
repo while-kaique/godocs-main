@@ -1,0 +1,45 @@
+{
+  "id": "legado-069",
+  "nome": "Automação de farol do goLab.Ai",
+  "antes": {
+    "id": "legado-069",
+    "nome": "Automação de farol do goLab.Ai",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "246,595",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 85924,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-069",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving mensal passa de uma pessoa em tempo integral, mas o projeto não informa quantas pessoas faziam esse acompanhamento. Precisa conferir registros do tempo gasto por cada responsável antes de aceitar o total.\nFinanceiro: O valor líquido mensal de 246,59 depende de horas economizadas, mas não há prova de que uma despesa existente deixou de ocorrer. É preciso conferir registros de custo ou horas pagas antes e depois da automação.\nCético: O valor informado parece estimativa de horas, não despesa que deixou de existir, e não há registro para confirmar o saving efetivado. Precisa mostrar a despesa anterior e a evidência de que ela parou após a automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

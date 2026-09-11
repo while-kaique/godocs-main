@@ -1,0 +1,42 @@
+{
+  "id": "ce7988188125f17d37f14cbcd0946f58",
+  "nome": "Automação para slides de perfil executivo de M&A",
+  "antes": {
+    "id": "ce7988188125f17d37f14cbcd0946f58",
+    "nome": "Automação para slides de perfil executivo de M&A",
+    "status": "Pendente",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "3,7375",
+    "categorias": "Custo evitado",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 67597,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "ce7988188125f17d37f14cbcd0946f58",
+    "mesa": {
+      "ok": true,
+      "motivo": "Impacto declarado de R$ 3,74/mês, abaixo do piso de R$ 100,00/mês. Um ganho desta ordem não sustenta o projeto como projeto documentado. E a nota do projeto é 0, ou seja, o ganho pequeno não vem acompanhado de altura em nenhum outro eixo.",
+      "veredito": "reprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Reprovado",
+      "flag6a10": false,
+      "porque": "A análise do impacto reprovou por régua declarada e a estrela não sustenta o contrário.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "A análise do impacto reprovou o projeto por régua declarada."
+      ]
+    },
+    "status_gravado": "Reprovado"
+  }
+}

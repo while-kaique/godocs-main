@@ -1,0 +1,45 @@
+{
+  "id": "85d3a9d728fdb909f0b2b290d37b7d88",
+  "nome": "GoProduct",
+  "antes": {
+    "id": "85d3a9d728fdb909f0b2b290d37b7d88",
+    "nome": "GoProduct",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 91315,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "85d3a9d728fdb909f0b2b290d37b7d88",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

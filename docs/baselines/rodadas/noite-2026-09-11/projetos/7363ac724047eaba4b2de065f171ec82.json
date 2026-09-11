@@ -1,0 +1,44 @@
+{
+  "id": "7363ac724047eaba4b2de065f171ec82",
+  "nome": "Cockpit Contábil",
+  "antes": {
+    "id": "7363ac724047eaba4b2de065f171ec82",
+    "nome": "Cockpit Contábil",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "364,025",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 98759,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "7363ac724047eaba4b2de065f171ec82",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho de 364 horas por mês exige mais de uma pessoa dedicada ao trabalho, mas o texto não informa o tamanho do time nem como o tempo era gasto antes. Precisa conferir a equipe envolvida e registros de uso ou de horas para validar esse volume.\nFinanceiro: Preocupa porque o saving depende de uma despesa paga que teria sido encerrada, mas o projeto não informa qual ferramenta deixou de ser paga nem traz comprovante. Precisa conferir a cobrança cancelada e separar esse saving do valor atribuído às horas poupadas.\nCético: O saving de 364,02 por mês não mostra qual despesa paga deixou de existir, e a descrição só afirma custo zero. É preciso conferir o cancelamento ou a redução de uma licença antes de aprovar.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -7,7 +7,7 @@ const OUT = process.argv[2] || 'docs/baselines/rodadas/gabarito-atividades.json'
 const itens: unknown[] = [];
 let cursor: string | null = null; let paginas = 0;
 do {
-  const u = new URL(`${BASE}/api/admin/atividades`); u.searchParams.set('limit', '200'); if (cursor) u.searchParams.set('cursor', cursor);
+  const u = new URL(`${BASE}/api/admin/atividades`); u.searchParams.set('limit', '100'); if (cursor) u.searchParams.set('cursor', cursor);
   const r = await fetch(u, { headers: { Cookie: COOKIE } });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const j = (await r.json()) as { itens?: unknown[]; items?: unknown[]; proximoCursor?: string | null; cursor?: string | null };

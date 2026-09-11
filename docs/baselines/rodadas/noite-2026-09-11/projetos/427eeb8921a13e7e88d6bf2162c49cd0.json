@@ -1,0 +1,44 @@
+{
+  "id": "427eeb8921a13e7e88d6bf2162c49cd0",
+  "nome": "Geração e Envio Automático de Boleto na Emissão de NF",
+  "antes": {
+    "id": "427eeb8921a13e7e88d6bf2162c49cd0",
+    "nome": "Geração e Envio Automático de Boleto na Emissão de NF",
+    "status": "Aprovado",
+    "estrelas": "5",
+    "estrelaAgente": "5",
+    "confiancaAgente": "baixa",
+    "impacto": "292,27",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 70220,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "427eeb8921a13e7e88d6bf2162c49cd0",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O impacto líquido mensal de 292,27 parece vir principalmente de horas poupadas e pedidos evitados, mas não há prova de uma despesa que deixou de existir. Precisa conferir o registro contábil ou de pessoal que mostre esse gasto antes e depois da automação.\nCético: O impacto líquido mensal de 292,27 não vem acompanhado de registros que mostrem uma despesa ou horas pagas que realmente deixaram de existir. É preciso conferir chamados anteriores, tempo gasto e evidência após a automação para separar redução de trabalho de economia efetiva.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 5
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

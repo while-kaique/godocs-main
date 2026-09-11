@@ -1,0 +1,44 @@
+{
+  "id": "2cd9384a2e22ae4eb0d0889229295ad8",
+  "nome": "Sentinela Prazo Produção",
+  "antes": {
+    "id": "2cd9384a2e22ae4eb0d0889229295ad8",
+    "nome": "Sentinela Prazo Produção",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "197,9",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 98267,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "2cd9384a2e22ae4eb0d0889229295ad8",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido mensal de 197,90 horas é próximo de um FTE e pode ser plausível para uma rotina diária, mas não há registro de quantas pessoas faziam essa decisão. Precisa conferir a equipe envolvida e o tempo gasto antes da automação.\nCético: O impacto líquido mensal de 197,90 está declarado, mas não há registro de despesa que tenha parado nem prova de uso da decisão no prazo. Precisa conferir os casos atendidos e os custos evitados.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

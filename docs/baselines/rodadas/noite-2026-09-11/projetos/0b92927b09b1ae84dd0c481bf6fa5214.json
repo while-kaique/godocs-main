@@ -1,0 +1,45 @@
+{
+  "id": "0b92927b09b1ae84dd0c481bf6fa5214",
+  "nome": "RPA - Ajuste de inventário",
+  "antes": {
+    "id": "0b92927b09b1ae84dd0c481bf6fa5214",
+    "nome": "RPA - Ajuste de inventário",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "182,685",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 79580,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "0b92927b09b1ae84dd0c481bf6fa5214",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho descrito é de tempo, mas não há prova de uma despesa que deixou de existir. Precisa conferir se houve redução real de custo, e não apenas horas liberadas.\nCético: O ganho líquido mensal de 182,69 não tem documentação mostrando qual despesa existia e deixou de ocorrer. É preciso conferir registros do tempo gasto antes e depois, além dos lançamentos efetivos no WebGex.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

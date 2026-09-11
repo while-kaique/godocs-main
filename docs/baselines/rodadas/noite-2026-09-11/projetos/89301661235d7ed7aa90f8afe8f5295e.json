@@ -1,0 +1,43 @@
+{
+  "id": "89301661235d7ed7aa90f8afe8f5295e",
+  "nome": "Seo Gocase",
+  "antes": {
+    "id": "89301661235d7ed7aa90f8afe8f5295e",
+    "nome": "Seo Gocase",
+    "status": "Pendente",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 54709,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "89301661235d7ed7aa90f8afe8f5295e",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir."
+      ]
+    },
+    "status_gravado": "Pendente"
+  }
+}

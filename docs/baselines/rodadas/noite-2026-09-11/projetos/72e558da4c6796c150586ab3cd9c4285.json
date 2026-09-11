@@ -1,0 +1,44 @@
+{
+  "id": "72e558da4c6796c150586ab3cd9c4285",
+  "nome": "Bot de Faturamento V2",
+  "antes": {
+    "id": "72e558da4c6796c150586ab3cd9c4285",
+    "nome": "Bot de Faturamento V2",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "3813,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 73224,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "72e558da4c6796c150586ab3cd9c4285",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 3813.75 horas por mês equivale a cerca de 17 FTE, mas o projeto não informa quantas pessoas faziam o faturamento nem o volume de pedidos. É preciso conferir registros de tempo ou volume processado e a equipe envolvida.\nFinanceiro: O ganho mensal de R$ 3.813,75 parece depender de horas liberadas, mas não há registro de despesa que deixou de existir. Precisa conferir o custo real da equipe e se o tempo poupado virou redução de gasto, não apenas capacidade para outras tarefas.\nCético: O saving está declarado, mas não há registro do tempo manual antes da automação nem prova de que essa despesa deixou de existir. É preciso conferir folhas ou apontamentos de horas e evidência de operação diária do bot.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

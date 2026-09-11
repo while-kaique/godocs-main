@@ -1,0 +1,44 @@
+{
+  "id": "a016d911ab714cb2fb7d0f4478b7025d",
+  "nome": "Radar Preventivo de SLA",
+  "antes": {
+    "id": "a016d911ab714cb2fb7d0f4478b7025d",
+    "nome": "Radar Preventivo de SLA",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "725,695",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 68262,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "a016d911ab714cb2fb7d0f4478b7025d",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho mensal de R$725,70 parece baseado em horas poupadas, mas o projeto não mostra despesa que deixou de existir. Precisa conferir o registro dessas horas e se a redução de atrasos trouxe economia real, sem contar o mesmo esforço como saving e como resultado operacional.\nCético: O impacto parece ser uma economia de horas projetada, não uma despesa que deixou de existir, e não há prova de redução real das vagas fora do SLA. Precisa conferir o registro das vagas antes e depois e qual gasto foi efetivamente eliminado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

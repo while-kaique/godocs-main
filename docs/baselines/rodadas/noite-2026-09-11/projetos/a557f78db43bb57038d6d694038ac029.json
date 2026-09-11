@@ -1,0 +1,43 @@
+{
+  "id": "a557f78db43bb57038d6d694038ac029",
+  "nome": "Torre de Controle Supply Gogroup",
+  "antes": {
+    "id": "a557f78db43bb57038d6d694038ac029",
+    "nome": "Torre de Controle Supply Gogroup",
+    "status": "Pendente",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "7464,05",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 193704,
+  "tentativa": 2,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "a557f78db43bb57038d6d694038ac029",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 7.464 horas por mês exigiria muitas pessoas fazendo esse trabalho manual, mas o projeto não informa quantas eram nem quanto tempo gastavam. Precisa conferir registros das equipes e das rotinas antes da automação, além de evidência de despesa que realmente deixou de existir.\nFinanceiro: O valor líquido de R$ 7.464 por mês passa do limite e precisa de conferência humana. Falta o registro da despesa que deixou de existir e a prova de que o ganho desta tela não foi contado nos projetos de dados anteriores.\nCético: O ganho mensal de 7464.05 não mostra qual despesa existia e deixou de ocorrer, e pode repetir ganhos dos projetos de dados já aprovados. É preciso conferir registros do custo anterior, sua interrupção e a separação deste painel dos demais projetos.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir."
+      ]
+    },
+    "status_gravado": "Pendente"
+  }
+}

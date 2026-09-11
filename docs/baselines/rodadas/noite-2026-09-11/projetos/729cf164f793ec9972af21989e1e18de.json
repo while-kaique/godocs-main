@@ -1,0 +1,44 @@
+{
+  "id": "729cf164f793ec9972af21989e1e18de",
+  "nome": "GoCaixa",
+  "antes": {
+    "id": "729cf164f793ec9972af21989e1e18de",
+    "nome": "GoCaixa",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "16,55",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 98172,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "729cf164f793ec9972af21989e1e18de",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho declarado é baixo e parece vir de horas poupadas, sem mostrar uma despesa que deixou de existir. Precisa conferir o registro do custo eliminado ou tratar o benefício como eficiência, não como saving financeiro.\nCético: O impacto líquido de 16,55 não vem acompanhado do registro do tempo e do custo do fechamento antes e depois. Para aprovar, é preciso conferir a despesa que existia e deixou de existir, não apenas a redução esperada.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

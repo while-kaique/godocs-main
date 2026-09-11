@@ -1,0 +1,44 @@
+{
+  "id": "legado-114",
+  "nome": "CTR - Gobeaute",
+  "antes": {
+    "id": "legado-114",
+    "nome": "CTR - Gobeaute",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "551,5",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 86753,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-114",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 551,5 horas por mês equivale a cerca de 2,5 pessoas em tempo integral, mas não há registro de quem fazia essa coleta. Precisa conferir as pessoas envolvidas e os registros de trabalho antes de aceitar o total.\nFinanceiro: O impacto mensal de 551,50 não mostra qual despesa deixou de existir com a automação. É preciso conferir o registro das horas ou custo anterior e como esse valor foi calculado.\nCético: O impacto líquido de 551,50 não tem memória de cálculo nem prova de uma despesa que existia e deixou de existir. Precisa conferir os registros do Facebook Ads e a despesa economizada.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

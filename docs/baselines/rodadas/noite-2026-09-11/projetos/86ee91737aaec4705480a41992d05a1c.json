@@ -1,0 +1,44 @@
+{
+  "id": "86ee91737aaec4705480a41992d05a1c",
+  "nome": "Facilities Hub",
+  "antes": {
+    "id": "86ee91737aaec4705480a41992d05a1c",
+    "nome": "Facilities Hub",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "169,445",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 81144,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "86ee91737aaec4705480a41992d05a1c",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho mensal de 169,44 não mostra qual despesa deixou de existir, pois o projeto descreve principalmente controle e visibilidade. É preciso conferir registros de notas, multas ou custos antes e depois da implantação.\nCético: O impacto líquido mensal de 169,44 parece ser uma projeção de horas poupadas, não uma despesa que deixou de existir. Falta o registro do custo anterior e a prova de que ele parou após o sistema entrar em uso.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

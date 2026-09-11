@@ -1,0 +1,44 @@
+{
+  "id": "legado-055",
+  "nome": "RPA Download XML — MeuDanfe",
+  "antes": {
+    "id": "legado-055",
+    "nome": "RPA Download XML — MeuDanfe",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "1245,785",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 98558,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-055",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 1.245,79 horas/mês equivale a cerca de 5,7 pessoas em tempo integral, mas o projeto não informa quantas pessoas faziam essa rotina. Precisa conferir a equipe envolvida e registros de horas ou volume antes de aceitar o total.\nFinanceiro: O valor líquido mensal não mostra qual despesa deixou de existir após a automação. Precisa conferir o custo anterior e o registro de que ele foi efetivamente reduzido, sem contar as mesmas horas como saving e contrato.\nCético: O saving mensal de 1.245,79 não tem registro da despesa ou das horas que deixaram de ocorrer, e o fluxo é descrito apenas como tentativa de consulta e baixa. É preciso conferir evidência de uso real e do custo que parou.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

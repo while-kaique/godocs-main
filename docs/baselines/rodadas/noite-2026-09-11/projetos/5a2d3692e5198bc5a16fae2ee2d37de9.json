@@ -1,0 +1,44 @@
+{
+  "id": "5a2d3692e5198bc5a16fae2ee2d37de9",
+  "nome": "Confere.AI - Acuracidade CX",
+  "antes": {
+    "id": "5a2d3692e5198bc5a16fae2ee2d37de9",
+    "nome": "Confere.AI - Acuracidade CX",
+    "status": "Aprovado",
+    "estrelas": "4",
+    "estrelaAgente": "4",
+    "confiancaAgente": "baixa",
+    "impacto": "327,59",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 74821,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "5a2d3692e5198bc5a16fae2ee2d37de9",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 327,59 horas por mês exige mais de uma pessoa dedicada, mas o projeto não informa quem fazia essa auditoria nem quanto tempo gastava. Precisa conferir registros de horas e a equipe envolvida antes de aceitar o valor.\nFinanceiro: O valor mensal é baixo e parece coerente com uma melhoria de rotina, mas não há registro mostrando qual despesa deixou de existir. Para aprovar como saving, é preciso conferir a despesa anterior e sua interrupção.\nCético: O impacto líquido é informado, mas não há registro de qual despesa existia e deixou de ocorrer. Precisa conferir a fonte das horas e o comprovante de economia efetiva antes da aprovação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "fc990e190c5bba2cef976af6f4b5f3a7",
+  "nome": "Ferramenta de testes de novos produtos ctr com agente autonomo (CTR machine)",
+  "antes": {
+    "id": "fc990e190c5bba2cef976af6f4b5f3a7",
+    "nome": "Ferramenta de testes de novos produtos ctr com agente autonomo (CTR machine)",
+    "status": "Aprovado",
+    "estrelas": "7",
+    "estrelaAgente": "4",
+    "confiancaAgente": "media",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 66265,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "fc990e190c5bba2cef976af6f4b5f3a7",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 7 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 7
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes aprovou o projeto.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time de agentes aprovou o projeto."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

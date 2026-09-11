@@ -1,0 +1,44 @@
+{
+  "id": "ab5fbb9ba69a2b51a3628e43e461d599",
+  "nome": "People Analytics — Gocase Extrema",
+  "antes": {
+    "id": "ab5fbb9ba69a2b51a3628e43e461d599",
+    "nome": "People Analytics — Gocase Extrema",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "458,27",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 69803,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "ab5fbb9ba69a2b51a3628e43e461d599",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho de 458 horas por mês equivale a mais de 2 pessoas em tempo integral, mas o projeto não informa quem fazia esse trabalho nem quanto tempo gastava. É preciso conferir registros de horas ou rotinas do RH que comprovem esse volume.\nFinanceiro: O painel pode apoiar decisões, mas o ganho de 458,27 por mês não prova uma despesa que deixou de existir. Precisa conferir registros de horas, afastamentos ou contratos antes de tratar isso como saving efetivado.\nCético: O impacto líquido mensal de 458,27 não mostra qual despesa deixou de existir nem traz registro de conferência. É preciso apresentar a origem dos dados e comprovar a economia efetivamente realizada.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

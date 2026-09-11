@@ -1,0 +1,44 @@
+{
+  "id": "3139d7671f1681d9401d5eb2be24add9",
+  "nome": "Bazar Gogroup Extrema — Sistema de Troca por Kg",
+  "antes": {
+    "id": "3139d7671f1681d9401d5eb2be24add9",
+    "nome": "Bazar Gogroup Extrema — Sistema de Troca por Kg",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "312,125",
+    "categorias": "Custo evitado, Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 74140,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "3139d7671f1681d9401d5eb2be24add9",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho líquido de 312 horas por mês parece alto para um bazar, e não há registro de quantas pessoas gastavam esse tempo. É preciso conferir a frequência dos eventos, o número de participantes e as horas de cada envolvido.\nCético: O ganho líquido mensal de 312,13 não tem registros que mostrem o tempo antes e depois da troca. Precisa conferir inscrições, histórico de trocas e as 50 horas liberadas para validar o cálculo.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

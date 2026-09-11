@@ -1,0 +1,45 @@
+{
+  "id": "legado-062",
+  "nome": "[PROJETOS DE IA/RPA] DASH",
+  "antes": {
+    "id": "legado-062",
+    "nome": "[PROJETOS DE IA/RPA] DASH",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "16,55",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 69813,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-062",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho informado é baixo para sustentar o projeto e não há prova de despesa que deixou de existir. Precisa conferir os registros da despesa anterior e sua baixa após a implantação.\nCético: O impacto líquido mensal de 16.55 aparece sem explicar qual despesa existia e deixou de existir. Falta o registro que comprove essa economia e a fonte dos dados do painel.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Reprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes reprovou o projeto por régua declarada.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time de agentes reprovou o projeto por régua declarada.",
+        "A análise do impacto ficou em Pendente e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Reprovado e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

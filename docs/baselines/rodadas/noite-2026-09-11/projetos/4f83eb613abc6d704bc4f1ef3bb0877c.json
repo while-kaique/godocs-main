@@ -1,0 +1,45 @@
+{
+  "id": "4f83eb613abc6d704bc4f1ef3bb0877c",
+  "nome": "Portal de Jornada do Cliente B2B",
+  "antes": {
+    "id": "4f83eb613abc6d704bc4f1ef3bb0877c",
+    "nome": "Portal de Jornada do Cliente B2B",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "4669,115",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 143921,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "4f83eb613abc6d704bc4f1ef3bb0877c",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 4669 horas por mês equivale a mais de 21 pessoas, enquanto o projeto só informa 7 áreas envolvidas. Precisa conferir quantas pessoas atuavam no processo e registros de horas ou despesa que deixaram de existir.\nFinanceiro: Preocupa porque o valor líquido mensal parece vir principalmente de horas poupadas, mas não há registro de despesa que deixou de existir. É preciso conferir a folha de horas e os gastos efetivamente reduzidos para validar o ganho.\nCético: O saving não prova que uma despesa deixou de existir, e o uso de cerca de 1,2 FTE por pessoa precisa ser conferido. Para aprovar, falta o registro das horas antes e depois e da despesa realmente eliminada.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

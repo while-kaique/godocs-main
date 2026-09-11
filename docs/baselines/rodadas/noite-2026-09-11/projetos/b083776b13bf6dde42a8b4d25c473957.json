@@ -1,0 +1,43 @@
+{
+  "id": "b083776b13bf6dde42a8b4d25c473957",
+  "nome": "Catalogo agencias",
+  "antes": {
+    "id": "b083776b13bf6dde42a8b4d25c473957",
+    "nome": "Catalogo agencias",
+    "status": "Pendente",
+    "estrelas": "",
+    "estrelaAgente": "",
+    "confiancaAgente": "",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 86561,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "b083776b13bf6dde42a8b4d25c473957",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: A descrição é vaga e não mostra o processo alterado nem onde o efeito será conferido. Falta registro do orçamento no catálogo e da notificação no Chat para validar a entrega.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

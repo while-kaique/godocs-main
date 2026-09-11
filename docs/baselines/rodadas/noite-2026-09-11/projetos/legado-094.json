@@ -1,0 +1,44 @@
+{
+  "id": "LEGADO-094",
+  "nome": "Farol Diário Completo - Gocase",
+  "antes": {
+    "id": "LEGADO-094",
+    "nome": "Farol Diário Completo - Gocase",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "808,85",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 81250,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-094",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 808,85 horas por mês equivale ao trabalho de várias pessoas, mas o projeto não informa quem fazia essa rotina nem traz registro da despesa interrompida. Precisa conferir a equipe envolvida e a evidência de que esse custo deixou de existir.\nFinanceiro: O impacto mensal de 808,85 parece coerente com o tipo de projeto, mas não há registro para confirmar que a despesa realmente deixou de existir. É preciso conferir a despesa anterior e sua redução após o Farol.\nCético: O saving de 808,85 não tem registro mostrando qual despesa existia e deixou de ocorrer. Precisa apresentar a fonte do cálculo e comprovar essa redução na operação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

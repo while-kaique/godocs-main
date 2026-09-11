@@ -1,0 +1,44 @@
+{
+  "id": "6f58d8ab4b3c894d6800a158505e8538",
+  "nome": "Launch Intelligence",
+  "antes": {
+    "id": "6f58d8ab4b3c894d6800a158505e8538",
+    "nome": "Launch Intelligence",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "47,905",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 74599,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "6f58d8ab4b3c894d6800a158505e8538",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho informado é baixo, e não há registro mostrando qual despesa deixou de existir. Para aprovar, é preciso conferir essa despesa e provar que a automação realmente a eliminou.\nCético: O impacto líquido mensal de 47,91 não vem acompanhado de prova de que uma despesa existente deixou de ocorrer. É preciso conferir registros de horas, custo e operação antes e depois da automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

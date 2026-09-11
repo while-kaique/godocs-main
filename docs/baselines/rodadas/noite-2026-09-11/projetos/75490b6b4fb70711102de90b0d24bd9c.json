@@ -1,0 +1,44 @@
+{
+  "id": "75490b6b4fb70711102de90b0d24bd9c",
+  "nome": "V.I.S.I.O.N. — Visão Integrada de Supervisão Inteligente,  Operacional e de Negócios",
+  "antes": {
+    "id": "75490b6b4fb70711102de90b0d24bd9c",
+    "nome": "V.I.S.I.O.N. — Visão Integrada de Supervisão Inteligente,  Operacional e de Negócios",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "1177,92",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 73145,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "75490b6b4fb70711102de90b0d24bd9c",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 1177,92 horas por mês equivale a mais de 5 pessoas em tempo integral, mas a descrição só sustenta 8 horas por dia de trabalho manual. É preciso conferir quantas pessoas faziam essa rotina e os registros de horas antes da automação.\nFinanceiro: O ganho parece baseado em horas liberadas, mas não há prova de que uma despesa realmente parou. Precisa conferir o custo do trabalho antes e depois e se houve redução de contrato, horas pagas ou outra despesa.\nCético: O ganho depende de provar que as 8 horas por dia eram uma despesa real que deixou de existir, mas não há registro disso. É preciso conferir quem fazia esse trabalho, seu custo e evidências do tempo antes e depois.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

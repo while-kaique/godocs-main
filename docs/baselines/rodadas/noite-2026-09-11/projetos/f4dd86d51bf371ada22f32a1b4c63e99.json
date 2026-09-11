@@ -1,0 +1,45 @@
+{
+  "id": "f4dd86d51bf371ada22f32a1b4c63e99",
+  "nome": "Gobeaute · Acompanhamentos",
+  "antes": {
+    "id": "f4dd86d51bf371ada22f32a1b4c63e99",
+    "nome": "Gobeaute · Acompanhamentos",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "622,01",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 61187,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "f4dd86d51bf371ada22f32a1b4c63e99",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido mensal de 622,01 não mostra qual despesa deixou de existir, e o projeto descreve mais controle operacional do que economia comprovada. Precisa conferir registros de custos evitados ou pagamentos que deixaram de ocorrer.\nCético: O impacto mensal de 622,01 não mostra qual despesa existia e deixou de existir com o dashboard. Falta o registro das horas ou custos antes e depois, além da fonte no ERP para conferir o saving efetivado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "d9574be54d6bee5f91fbe401e05d188a",
+  "nome": "Cérebro de trocas Gocase",
+  "antes": {
+    "id": "d9574be54d6bee5f91fbe401e05d188a",
+    "nome": "Cérebro de trocas Gocase",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "4",
+    "confiancaAgente": "media",
+    "impacto": "2774,06",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 125799,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d9574be54d6bee5f91fbe401e05d188a",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 2.774 horas/mês é muito maior que o trabalho de 3 pessoas retiradas da operação. Precisa conferir registros de folha e evidência de que esse custo realmente deixou de existir.\nFinanceiro: O ganho depende de provar que três custos de pessoal deixaram de existir, e não apenas foram realocados. Precisa conferir a folha e os registros de desligamento ou redução de custo para validar os R$ 2.774,06 mensais.\nCético: A redução de 10 para 7 pessoas não prova que uma despesa parou, pois elas podem ter sido realocadas. Falta o registro de desligamento ou da economia na folha e a comprovação do throughput mantido.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

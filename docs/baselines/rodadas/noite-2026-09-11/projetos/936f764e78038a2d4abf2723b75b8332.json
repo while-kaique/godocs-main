@@ -1,0 +1,44 @@
+{
+  "id": "936f764e78038a2d4abf2723b75b8332",
+  "nome": "Automação no Download e Encaminhamento de XML's",
+  "antes": {
+    "id": "936f764e78038a2d4abf2723b75b8332",
+    "nome": "Automação no Download e Encaminhamento de XML's",
+    "status": "Aprovado",
+    "estrelas": "5",
+    "estrelaAgente": "5",
+    "confiancaAgente": "alta",
+    "impacto": "2716",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 86031,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "936f764e78038a2d4abf2723b75b8332",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 2.716 h/mês equivale a cerca de 12 pessoas em tempo integral, mas o projeto não informa quantas pessoas faziam esse trabalho. É preciso conferir a equipe envolvida e registros das horas ou despesas que deixaram de existir.\nFinanceiro: O ganho mensal parece vir de horas liberadas, mas isso não prova que uma despesa deixou de existir. Precisa conferir o registro da despesa evitada ou explicar por que as horas viraram economia financeira.\nCético: O ganho líquido mensal de 2716 depende de cerca de 1,8 FTE por pessoa, mas não há documentação para mostrar que esse trabalho era uma despesa existente e deixou de ocorrer. É preciso conferir os registros de horas, pessoas envolvidas e a despesa antes da automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 5
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}
