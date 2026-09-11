@@ -14,7 +14,9 @@
 // resultado. Match por "ID Projeto" (coluna B), case-insensitive (ids do SQLite
 // são minúsculos; legados na planilha às vezes em MAIÚSCULAS).
 
-import { readAllRows, type SheetColumn, type SheetRow } from './sheets';
+import { readAllRows, updateRowByProjectId, type SheetColumn, type SheetRow } from './sheets';
+import { lerGanhosV2DaLinha, recalcularImpactos, impactosDaLinha, impactosDivergem } from './sync-reverso-v2';
+import { espelharEscrita } from '@/lib/sheet-espelho';
 import { toIsoOrNull, parseDataFlexivel } from '@/lib/format-date';
 import {
   getAllProjetoIds,
@@ -249,6 +251,11 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
     // Espelha "Atualizado Em": vazio nos legados → fica null → projeto pendente.
     atualizado_em: txt(row['Atualizado Em']),
   });
+  // Linha v2: os blocos de ganho e os 3 impactos entram no ato (11/09/2026).
+  if (txt(row['Impacto Líquido Mensal']) != null) {
+    const v2 = await updatesV2DaLinha(id, row, {});
+    if (Object.keys(v2).length) await updateProjeto(id, v2);
+  }
 }
 
 // ─── Atualização de projeto existente (somente campos seguros, diff-aware) ────
@@ -311,6 +318,62 @@ function jaConvertidoParaFinanceiro(current: ProjetoRow): boolean {
  */
 type ProjetoParaDiff = Partial<ProjetoRow> & { id: string };
 
+
+/**
+ * Patch das colunas v2 + os 3 impactos a partir da LINHA da planilha (ver `sync-reverso-v2.ts`).
+ * Usado na ATUALIZAÇÃO e na CRIAÇÃO (legado que só existe na planilha nasce com os blocos v2).
+ * Efeito colateral declarado: quando o recálculo diverge da célula, regrava os 3 impactos na planilha.
+ */
+async function updatesV2DaLinha(id: string, row: SheetRow, current: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const updates: Record<string, unknown> = {};
+  // ── v2: a planilha é a fonte da verdade TAMBÉM dos blocos de ganho (11/09/2026) ──
+  // Copia saving efetivado / custo evitado / receita / imensurável / custo para rodar para as
+  // colunas v2 e RECALCULA os 3 impactos pela fórmula da submissão (`impacto.ts`). É o que faz
+  // "mudar a frequência na planilha" mover o Impacto Líquido Mensal sozinho (caso Torre de Controle
+  // Supply: mensal → pontual). Célula vazia nunca apaga; frequência fora do enum não recalcula.
+  // ⚠️ Medido em 11/09 sobre as 771 linhas v2 de prod: 653 batem com a fórmula, 62 divergem só por
+  // arredondamento de centavos (a planilha guarda 3+ casas), 1 diverge de verdade — por isso o
+  // recálculo nasce LIGADO; `SYNC_REVERSO_RECALCULA_IMPACTO=0` desliga (env em RUNTIME).
+    const v2 = lerGanhosV2DaLinha(row as Record<string, string | undefined>, {
+      ganho_categorias: current.ganho_categorias as string | null,
+      custo_rodar_itens: current.custo_rodar_itens as string | null,
+    });
+    for (const [campo, novo] of Object.entries(v2.colunas)) {
+      const cur = current[campo];
+      if (typeof novo === 'number') {
+        const curNum = cur == null || cur === '' ? null : Number(cur);
+        if (curNum != null && Math.abs(curNum - novo) < 0.005) continue;
+      } else if (cur != null && String(cur).trim() === String(novo).trim()) continue;
+      updates[campo] = novo;
+    }
+    const daPlanilha = impactosDaLinha(row as Record<string, string | undefined>);
+    const recalculado = v2.ganhos && recalculaImpactoLigado() ? recalcularImpactos(v2.ganhos) : null;
+    const alvo = recalculado ?? daPlanilha;
+    if (alvo) {
+      const pares: [string, number][] = [['impacto_bruto', alvo.bruto], ['impacto_liquido', alvo.liquido], ['impacto_liquido_mensal', alvo.liquidoMensal]];
+      // tudo-ou-nada (contrato do schema): só grava se os 3 mudarem juntos ou nenhum precisar
+      const mudou = pares.some(([campo, valor]) => { const cur = current[campo]; const n = cur == null || cur === '' ? null : Number(cur); return n == null || Math.abs(n - valor) >= 0.005; });
+      if (mudou) for (const [campo, valor] of pares) updates[campo] = valor;
+    }
+    // A planilha também recebe o recálculo (é ela que todo mundo lê): só quando diverge de VERDADE.
+    if (recalculado && daPlanilha && impactosDivergem(recalculado, daPlanilha)) {
+      const celulas = { 'Impacto Bruto': recalculado.bruto, 'Impacto Líquido': recalculado.liquido, 'Impacto Líquido Mensal': recalculado.liquidoMensal } as Partial<Record<SheetColumn, number>>;
+      try {
+        if (typeof updateRowByProjectId === 'function') { await updateRowByProjectId(id, celulas); await espelharEscrita(id, celulas as Record<string, number>); }
+        console.log(`[sync-reverso v2] impacto recalculado e regravado na planilha: ${id}`, celulas);
+      } catch (e) {
+        console.warn(`[sync-reverso v2] não consegui regravar o impacto na planilha (${id}):`, e instanceof Error ? e.message : e);
+      }
+    }
+  return updates;
+}
+
+/** `SYNC_REVERSO_RECALCULA_IMPACTO=0` desliga o recálculo v2 (default LIGADO). Lida em runtime. */
+function recalculaImpactoLigado(): boolean {
+  const v = String(process.env.SYNC_REVERSO_RECALCULA_IMPACTO ?? '1').trim().toLowerCase();
+  return !(v === '0' || v === 'false' || v === 'off' || v === 'nao' || v === 'não');
+}
+
 async function atualizarExistente(
   id: string,
   row: SheetRow,
@@ -342,6 +405,8 @@ async function atualizarExistente(
     }
     updates[field as string] = newVal;
   }
+
+  if (linhaV2) Object.assign(updates, await updatesV2DaLinha(id, row, current as Record<string, unknown>));
 
   // Participantes + papéis → membros (lista plana) + membros_papeis (mapa). As 3
   // colunas de papel (Participantes=Coautor + Participantes 2=Participante + Contribuidor)

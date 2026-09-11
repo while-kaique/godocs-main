@@ -769,4 +769,30 @@ describe('leitura da planilha com retry + registro da corrida', () => {
 
     await setDb(real);
   });
+
+  it('⚠️ linha v2: copia os blocos de ganho para as colunas v2 e RECALCULA os 3 impactos (Torre de Controle mensal → pontual)', async () => {
+    const base = {
+      'ID Projeto': 'V2-TORRE', Projeto: 'Torre de Controle Supply', Email: 'kevyn@gocase.com', 'Nome Completo': 'Kevyn', Status: 'Aprovado',
+      'Tipos de Ganho': 'saving', 'Custo Evitado Horas': '451', 'Custo Evitado Horas Reais': '14.928,10', 'Custo Evitado Não Contratado': '0,00',
+      'Freq. Custo Evitado': 'mensal', 'Racional Custo Evitado': 'contrafactual', 'Custo para Rodar': '0,00',
+      'Impacto Bruto': '14928,1', 'Impacto Líquido': '7464,05', 'Impacto Líquido Mensal': '7464,05',
+    };
+    mockedRead.mockResolvedValue([base]);
+    await syncSheetsToSqlite();
+    let p = (await getProjetoById('v2-torre')) as Record<string, unknown>;
+    expect(p.custo_evitado_frequencia).toBe('mensal');
+    expect(Number(p.custo_evitado_horas_valor)).toBe(14928.1);
+    expect(Number(p.impacto_liquido_mensal)).toBeCloseTo(7464.05, 2);
+    // a triagem muda a frequência na planilha: o banco acompanha e o mensal é recalculado (÷4)
+    mockedRead.mockResolvedValue([{ ...base, 'Freq. Custo Evitado': 'pontual' }]);
+    const r = await syncSheetsToSqlite();
+    expect(r.atualizados).toBe(1);
+    p = (await getProjetoById('v2-torre')) as Record<string, unknown>;
+    expect(p.custo_evitado_frequencia).toBe('pontual');
+    expect(Number(p.impacto_liquido_mensal)).toBeCloseTo(1866.01, 2);
+    expect(Number(p.impacto_liquido)).toBeCloseTo(7464.05, 2);
+    // idempotente: a corrida seguinte com a mesma linha não grava nada
+    const r2 = await syncSheetsToSqlite();
+    expect(r2.atualizados).toBe(0);
+  });
 });
