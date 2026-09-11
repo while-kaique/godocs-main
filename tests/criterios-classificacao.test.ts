@@ -173,6 +173,14 @@ describe('normalizarClassificacao — valor inválido e justificativa vazia', ()
 describe('decidirStatusSubmissao', () => {
   const base = { ehEspecial: false, materialidade: 0, vereditoAprovado: true };
 
+  it('⚠️ com o TIME decidindo o funil (AGENTE_DECIDE_FUNIL), a v1 nunca reprova: tudo nasce em validação / "Pendente"', () => {
+    // 11/09/2026: o analisador da v1 gravava Reprovado/Reenvio Pendente na submissão e o time decidia
+    // minutos depois por régua — dois decisores no mesmo funil. Precede TODAS as regras, inclusive claro_nao.
+    expect(decidirStatusSubmissao({ ...base, classificacao: 'claro_nao', timeDecideFunil: true })).toEqual({ status: 'em_validacao', statusSheet: 'Pendente' });
+    expect(decidirStatusSubmissao({ ...base, vereditoAprovado: false, timeDecideFunil: true })).toEqual({ status: 'em_validacao', statusSheet: 'Pendente' });
+    expect(decidirStatusSubmissao({ ...base, classificacao: 'claro_sim', timeDecideFunil: true })).toEqual({ status: 'em_validacao', statusSheet: 'Pendente' });
+  });
+
   it('AC1 — claro_nao vira rejeitado + "Reprovado" na planilha, mesmo com veredito aprovado', () => {
     expect(decidirStatusSubmissao({ ...base, classificacao: 'claro_nao' })).toEqual({
       status: 'rejeitado',

@@ -2,6 +2,7 @@
  * O funil do GoDocs tem TRÊS status (decisão do dono do produto, 09/09/2026), e a flag 6-10 é
  * aviso, não status.
  */
+import { agenteDecideFunil } from '@/lib/funil-status';
 import { describe, it, expect } from 'vitest';
 import {
   STATUS_FUNIL,
@@ -235,5 +236,16 @@ describe('resumirEmUmaFrase — o autor não vê agente por agente', () => {
 
   it('sem parecer devolve vazio', () => {
     expect(resumirEmUmaFrase(null)).toBe('');
+  });
+});
+
+describe('agenteDecideFunil — env em runtime', () => {
+  it('default OFF; 1/true/sim/on ligam; 0 desliga', () => {
+    const antes = process.env.AGENTE_DECIDE_FUNIL;
+    try {
+      delete process.env.AGENTE_DECIDE_FUNIL; expect(agenteDecideFunil()).toBe(false);
+      for (const v of ['1', 'true', 'sim', 'on', ' ON ']) { process.env.AGENTE_DECIDE_FUNIL = v; expect(agenteDecideFunil()).toBe(true); }
+      process.env.AGENTE_DECIDE_FUNIL = '0'; expect(agenteDecideFunil()).toBe(false);
+    } finally { if (antes === undefined) delete process.env.AGENTE_DECIDE_FUNIL; else process.env.AGENTE_DECIDE_FUNIL = antes; }
   });
 });

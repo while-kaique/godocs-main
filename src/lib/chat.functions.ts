@@ -5,6 +5,7 @@
 const log = (fn: string, ...args: unknown[]) => console.log(`[chat.functions/${fn}]`, ...args);
 const err = (fn: string, ...args: unknown[]) => console.error(`[chat.functions/${fn}]`, ...args);
 
+import { agenteDecideFunil } from "@/lib/funil-status";
 import { z } from "zod";
 import {
   insertProjeto,
@@ -3303,6 +3304,9 @@ export async function analisarProjetoFn(rawData: unknown) {
   // motivo, especial nunca reprova, materialidade alta → humana) já foram aplicadas por
   // normalizarClassificacao dentro do analisador.
   const classificacao = resultado.classificacao_avaliacao ?? null;
+  // ⚠️ Com o TIME decidindo o funil (11/09/2026), o analisador da v1 vira só Complexidade + parecer:
+  // não decide status, não escreve Classificação/Motivo Reprovado e não dispensa a fila do líder.
+  const timeDecide = agenteDecideFunil();
   let { status: statusFinal, statusSheet } = decidirStatusSubmissao({
     classificacao,
     ehEspecial,
@@ -3310,6 +3314,7 @@ export async function analisarProjetoFn(rawData: unknown) {
     materialidade: materialidadeProjeto,
     vereditoAprovado: resultado.resultado === "aprovado",
     tetoMaterialidade: TETO_MATERIALIDADE_ANALISE,
+    timeDecideFunil: timeDecide,
   });
 
   // Gate determinístico de FTE (defesa em profundidade, ao lado do de materialidade): um
@@ -3368,12 +3373,12 @@ export async function analisarProjetoFn(rawData: unknown) {
     // Espelho da classificação de elegibilidade (padrão complexidade/observacoes): serve
     // ao resync, à reconciliação e à ficha do /dashboard. `motivo_reprovacao` volta a
     // null quando o reenvio deixa de ser reprovado.
-    classificacao_avaliacao: resultado.classificacao_avaliacao ?? null,
-    classificacao_justificativa: resultado.classificacao_justificativa ?? null,
-    motivo_reprovacao: resultado.motivo_reprovacao ?? null,
+    classificacao_avaliacao: timeDecide ? null : (resultado.classificacao_avaliacao ?? null),
+    classificacao_justificativa: timeDecide ? null : (resultado.classificacao_justificativa ?? null),
+    motivo_reprovacao: timeDecide ? null : (resultado.motivo_reprovacao ?? null),
     // Especial e fluxo direto de liderança não são "validados" pelo analisador — quem
-    // valida é o humano; não carimba validated_at.
-    ...(ehEspecial || ehLiderAnalise ? {} : { validated_at: new Date().toISOString() }),
+    // valida é o humano; não carimba validated_at. Com o TIME decidindo, idem.
+    ...(ehEspecial || ehLiderAnalise || timeDecide ? {} : { validated_at: new Date().toISOString() }),
   });
 
   log(
@@ -3429,9 +3434,11 @@ export async function analisarProjetoFn(rawData: unknown) {
       status: statusLabel,
       // Colunas "Classificação" (sempre com texto) e "Motivo Reprovado". A
       // "Motivo Reenvio" é MANUAL — o sistema nunca a escreve.
-      classificacao: resultado.classificacao_avaliacao ?? null,
-      classificacaoJustificativa: resultado.classificacao_justificativa ?? null,
-      motivoReprovacao: resultado.motivo_reprovacao ?? null,
+      // `undefined` = coluna OMITIDA do update (≠ null, que grava "—"): com o TIME decidindo o
+      // funil, a v1 não toca Classificação nem Motivo Reprovado — a coluna que o AUTOR lê é do time.
+      classificacao: timeDecide ? undefined : (resultado.classificacao_avaliacao ?? null),
+      classificacaoJustificativa: timeDecide ? undefined : (resultado.classificacao_justificativa ?? null),
+      motivoReprovacao: timeDecide ? undefined : (resultado.motivo_reprovacao ?? null),
       // D29 — só definidas quando a fila foi realmente dispensada.
       aprovacaoLider: aprovacaoLiderSheet,
       justificativaAprovacaoLider: justificativaAprovacaoLiderSheet,

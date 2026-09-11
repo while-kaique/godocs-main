@@ -27,7 +27,7 @@ import { chaveProjeto } from '@/lib/projeto-chave';
 import { numero } from '@/lib/dashboard-resumo';
 import { ESTRELA_LIMITE_REPROVAVEL } from '@/lib/materialidade-piso';
 import { juntarAnalises, type Juncao } from '@/lib/avaliacao/junta';
-import { justificativaDaReprovacao } from '@/lib/funil-status';
+import { justificativaDaReprovacao, agenteDecideFunil } from '@/lib/funil-status';
 import { definirStatusProjeto } from '@/lib/dashboard-admin.functions';
 import {
   podeAgenteGravarStatus,
@@ -74,10 +74,7 @@ export function agenteFechaPendente(): boolean {
   return v === '1' || v === 'true' || v === 'sim' || v === 'on';
 }
 
-export function agenteDecideFunil(): boolean {
-  const v = String(process.env.AGENTE_DECIDE_FUNIL ?? '').trim().toLowerCase();
-  return v === '1' || v === 'true' || v === 'sim' || v === 'on';
-}
+export { agenteDecideFunil };
 
 /**
  * Origem da nota quando quem a produziu foi o TIME INTEIRO (≠ `agente-classificador`, o de 1
