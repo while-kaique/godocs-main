@@ -200,18 +200,26 @@ export async function garantirEmbeddings(
   const modeloAlvo = embeddingConfig()?.modelo;
   const pendentes: { id: string; texto: string; hash: string }[] = [];
 
-  for (const id of ids) {
-    if (pendentes.length >= cap) break;
-    const entrada = await montarEntradaSemanticaNormal(id, resumoPorId.get(id));
-    if (!entrada) continue;
-    const texto = textoParaEmbedding(entrada);
-    if (!texto) continue;
-    const hash = hashTexto(texto);
-    const atual = embeddings.get(id);
-    const frescoTexto = atual != null && atual.hash === hash;
-    const frescoModelo = atual != null && (!modeloAlvo || atual.modelo === modeloAlvo);
-    if (frescoTexto && frescoModelo) continue;
-    pendentes.push({ id, texto, hash });
+  // ⚠️ Entradas carregadas em PARALELO (lotes de 16): cada `montarEntradaSemanticaNormal` são 2
+  // consultas por RPC (~150 ms), e em série 770 ids davam ~3 min só de leitura — medido em
+  // 11/09/2026 na staging (173 s num `dry`), encostando no corte de 300 s do edge.
+  const LOTE_LEITURA = 16;
+  for (let i = 0; i < ids.length && pendentes.length < cap; i += LOTE_LEITURA) {
+    const lote = ids.slice(i, i + LOTE_LEITURA);
+    const entradas = await Promise.all(lote.map((id) => montarEntradaSemanticaNormal(id, resumoPorId.get(id))));
+    for (let j = 0; j < lote.length && pendentes.length < cap; j++) {
+      const id = lote[j];
+      const entrada = entradas[j];
+      if (!entrada) continue;
+      const texto = textoParaEmbedding(entrada);
+      if (!texto) continue;
+      const hash = hashTexto(texto);
+      const atual = embeddings.get(id);
+      const frescoTexto = atual != null && atual.hash === hash;
+      const frescoModelo = atual != null && (!modeloAlvo || atual.modelo === modeloAlvo);
+      if (frescoTexto && frescoModelo) continue;
+      pendentes.push({ id, texto, hash });
+    }
   }
 
   let gerados = 0;
@@ -1164,18 +1172,23 @@ export async function backfillEmbeddingsBase(
     const ids = resumos.map((p) => p.id);
     const mapa = decodificarEmbeddings(await getEmbeddingsProjetos());
     const modeloAlvo = embeddingConfig()?.modelo;
-    // Conta quem está fresco SEM gerar (mesma régua do `garantirEmbeddings`: hash do texto + modelo).
-    let frescos = 0;
-    for (const id of ids) {
-      const entrada = await montarEntradaSemanticaNormal(id, resumoPorId.get(id));
-      const texto = entrada ? textoParaEmbedding(entrada) : '';
-      const atual = mapa.get(id);
-      if (texto && atual && atual.hash === hashTexto(texto) && (!modeloAlvo || atual.modelo === modeloAlvo)) frescos++;
+    if (dry) {
+      // Conta quem está fresco SEM gerar (mesma régua do `garantirEmbeddings`), em lotes paralelos.
+      let frescos = 0;
+      for (let i = 0; i < ids.length; i += 16) {
+        const lote = ids.slice(i, i + 16);
+        const entradas = await Promise.all(lote.map((id) => montarEntradaSemanticaNormal(id, resumoPorId.get(id))));
+        for (let j = 0; j < lote.length; j++) {
+          const texto = entradas[j] ? textoParaEmbedding(entradas[j]!) : '';
+          const atual = mapa.get(lote[j]);
+          if (texto && atual && atual.hash === hashTexto(texto) && (!modeloAlvo || atual.modelo === modeloAlvo)) frescos++;
+        }
+      }
+      return { ok: true, dry, total: ids.length, com_vetor_fresco: frescos, pendentes: ids.length - frescos, gerados: 0 };
     }
-    const pendentesAntes = ids.length - frescos;
-    if (dry) return { ok: true, dry, total: ids.length, com_vetor_fresco: frescos, pendentes: pendentesAntes, gerados: 0 };
+    // Sem dry: gera direto (o `garantirEmbeddings` já pula quem está fresco). `gerados < cap` = acabou.
     const ger = await garantirEmbeddings(ids, resumoPorId, mapa, { capGeracao: cap });
-    return { ok: true, dry, total: ids.length, com_vetor_fresco: frescos + ger.gerados, pendentes: Math.max(0, pendentesAntes - ger.gerados), gerados: ger.gerados };
+    return { ok: true, dry, total: ids.length, com_vetor_fresco: -1, pendentes: ger.gerados < cap ? 0 : -1, gerados: ger.gerados };
   } catch (e) {
     return { ok: false, dry, total: 0, com_vetor_fresco: 0, pendentes: 0, gerados: 0, motivo: e instanceof Error ? e.message : String(e) };
   }
