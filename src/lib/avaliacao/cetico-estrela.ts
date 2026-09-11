@@ -156,21 +156,53 @@ export function normalizarCeticoEstrela(bruto: unknown, notaProposta: number): R
  */
 export function reconciliarReplicaEstrela(r1: SaidaEstrela, r2: SaidaEstrela, cetico: ResultadoCeticoEstrela): SaidaEstrela {
   if (!r1.avaliada || !r2.avaliada) return r2;
+  // 3. **A réplica NÃO sobe.** O cético só rebaixa; responder a uma objeção subindo a nota ou
+  //    inventando um escape que a 1ª avaliação não tinha é contradição, não convencimento. Medido
+  //    na 2ª passada de 11/09: «AVD Central v2» (4★ humano) foi 3★ → 5★+escape na réplica e o
+  //    «CTR Machine Admaker» (4★ humano) 5★ → 5★+escape. O escape só existe se a 1ª volta o trouxe.
+  const semSubida: SaidaEstrela =
+    r2.nota > r1.nota || (r2.escape.valido && !r1.escape.valido)
+      ? {
+          ...r2,
+          nota: Math.min(r2.nota, r1.nota),
+          escape: r1.escape.valido ? r2.escape : { indicado: false, valido: false, evidencias: r2.escape.evidencias },
+          racional: `${r2.racional} [Trava: a réplica não sobe — a 1ª avaliação deu ${r1.nota}★${r1.escape.valido ? ' com escape' : ' sem escape'} e o cético só rebaixa.]`,
+        }
+      : r2;
   const escapeFica = r1.escape.valido && escapeValido({ sugestao: TETO_AGENTE + 1, evidencias: r1.escape.evidencias }) && !cetico.gatilho_refutado;
   if (escapeFica) {
     return {
-      ...r2,
-      nota: Math.max(r2.nota, TETO_AGENTE),
+      ...semSubida,
+      nota: Math.max(semSubida.nota, TETO_AGENTE),
       escape: r1.escape,
-      racional: `${r2.racional} [Trava: o escape 6–10 da 1ª avaliação fica de pé — o cético não refutou nenhum dos dois gatilhos citados.]`,
+      racional: `${semSubida.racional} [Trava: o escape 6–10 da 1ª avaliação fica de pé — o cético não refutou nenhum dos dois gatilhos citados.]`,
     };
   }
   const piso = r1.nota - QUEDA_MAX_POR_VOLTA_ESTRELA;
-  if (r2.nota >= piso) return r2;
+  if (semSubida.nota >= piso) return semSubida;
   return {
-    ...r2,
+    ...semSubida,
     nota: piso,
-    racional: `${r2.racional} [Trava: a réplica desceu de ${r1.nota}★ para ${r2.nota}★; uma volta do debate baixa no máximo ${QUEDA_MAX_POR_VOLTA_ESTRELA} nível, então fica ${piso}★.]`,
+    racional: `${semSubida.racional} [Trava: a réplica desceu de ${r1.nota}★ para ${r2.nota}★; uma volta do debate baixa no máximo ${QUEDA_MAX_POR_VOLTA_ESTRELA} nível, então fica ${piso}★.]`,
+  };
+}
+
+/**
+ * Depois da 2ª volta do cético: se ele NOMEOU o gatilho derrubado (com citação) contra um escape
+ * que a trava manteve de pé, o escape cai e a nota volta ao teto do agente. PURA.
+ *
+ * ⚠️ É o complemento da regra 2 acima — o escape só cai por gatilho nomeado, mas o cético tem
+ * DUAS chances de nomeá-lo. Medido: no «Boletos Itaú via Proxy Bancária» (2★ humano) o cético da
+ * 1ª volta não nomeou e o da 2ª nomeou `nao_existiria` com a citação "a automação não ampliou um
+ * volume novo".
+ */
+export function derrubarEscapePorGatilho(estrela: SaidaEstrela, cetico: ResultadoCeticoEstrela): SaidaEstrela {
+  if (!estrela.escape.valido || !cetico.refuta || !cetico.gatilho_refutado) return estrela;
+  return {
+    ...estrela,
+    nota: Math.min(estrela.nota, TETO_AGENTE),
+    escape: { indicado: false, valido: false, evidencias: estrela.escape.evidencias },
+    racional: `${estrela.racional} [Trava: o cético derrubou o gatilho "${cetico.gatilho_refutado}" com citação — o escape cai e a nota fica em ${TETO_AGENTE}★.]`,
   };
 }
 

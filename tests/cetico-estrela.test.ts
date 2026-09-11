@@ -5,6 +5,7 @@ import {
   ceticoEstrelaFallback,
   travaEscapeSemCitacao,
   reconciliarReplicaEstrela,
+  derrubarEscapePorGatilho,
   QUEDA_MAX_POR_VOLTA_ESTRELA,
 } from '@/lib/avaliacao/cetico-estrela';
 import { conservarSugestaoDeValor, MOTIVO_SUGESTAO_RECUSADA } from '@/lib/avaliacao/cerebro-merito';
@@ -199,5 +200,35 @@ describe('⚠️ trava da RÉPLICA (11/09/2026) — queda máx. 1 nível e escap
     const txt = buildPromptCeticoEstrela({ dossieTexto: 'd', estrela: estrela({ nota: 5, escape: ESC }), vizinhos: [] }).map((m) => m.content).join('\n');
     expect(txt).toContain('gatilho_refutado');
     expect(txt).toMatch(/versão MANUAL de parte do trabalho/);
+  });
+});
+
+describe('⚠️ trava da RÉPLICA (2ª passada) — a réplica não sobe e o cético da 2ª volta pode derrubar o escape', () => {
+  const cetico = (over: Record<string, unknown> = {}) => ({ refuta: true, nota_sugerida: 2, motivo: 'objeção', sinais: [], fallback: false, gatilho_refutado: null as any, ...over });
+  const ESC = { indicado: true, valido: true, evidencias: { nao_existiria: 'atividade nova citada', sem_volta: 'o manual foi desligado' } };
+
+  it('réplica que SOBE (3★ → 5★ com escape) volta para 3★ sem escape (caso AVD Central v2, 4★ humano)', () => {
+    const r = reconciliarReplicaEstrela(estrela({ nota: 3 }), estrela({ nota: 5, escape: ESC }), cetico());
+    expect(r.nota).toBe(3);
+    expect(r.escape.valido).toBe(false);
+    expect(r.racional).toMatch(/não sobe/);
+  });
+
+  it('réplica que inventa escape no mesmo 5★ perde o escape (caso CTR Machine Admaker, 4★ humano)', () => {
+    const r = reconciliarReplicaEstrela(estrela({ nota: 5 }), estrela({ nota: 5, escape: ESC }), cetico());
+    expect(r.nota).toBe(5);
+    expect(r.escape.valido).toBe(false);
+  });
+
+  it('cético da 2ª volta que NOMEIA o gatilho derruba o escape mantido pela trava (caso Boletos Itaú, 2★ humano)', () => {
+    const mantido = estrela({ nota: 5, escape: ESC });
+    const r = derrubarEscapePorGatilho(mantido, cetico({ gatilho_refutado: 'nao_existiria', motivo: 'a automação não ampliou um volume novo' }));
+    expect(r.escape.valido).toBe(false);
+    expect(r.nota).toBe(5);
+  });
+
+  it('cético da 2ª volta SEM gatilho nomeado não mexe no escape', () => {
+    const mantido = estrela({ nota: 5, escape: ESC });
+    expect(derrubarEscapePorGatilho(mantido, cetico())).toBe(mantido);
   });
 });

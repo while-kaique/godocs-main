@@ -37,6 +37,7 @@ import {
   travaEscapeSemCitacao,
   type ResultadoCeticoEstrela,
   reconciliarReplicaEstrela,
+  derrubarEscapePorGatilho,
 } from '@/lib/avaliacao/cetico-estrela';
 import { conciliar, type Consenso, type Liberacao } from '@/lib/avaliacao/consenso';
 import { impactoMensalDeclarado } from '@/lib/materialidade-piso';
@@ -471,6 +472,14 @@ export async function avaliarComTime(args: {
       );
     }
     ceticoEstrela = await rodarCeticoEstrela(estrela, raizId, 2);
+    const semEscape = derrubarEscapePorGatilho(estrela, ceticoEstrela);
+    if (semEscape !== estrela) {
+      await registrarSeguro(
+        { pai_id: raizId, agente: 'trava-replica-estrela', tipo: 'cetico', rodada: 3, entrada: `cético da 2ª volta nomeou "${ceticoEstrela.gatilho_refutado}"`, saida: json({ nota: semEscape.nota, escape: false }), veredito: `${semEscape.nota}`, duracao_ms: 0 },
+        true,
+      );
+      estrela = semEscape;
+    }
   }
 
   // ── consolida + cético (+ réplica com teto) ──
