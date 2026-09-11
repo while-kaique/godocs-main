@@ -81,8 +81,13 @@ export function executorPadrao(
           receita_mensal: n(a.receita_mensal, dossie.financeiro.receita_mensal),
         });
       }
-      case 'ler_evidencia':
-        return { link: a.link ?? null, texto: null, aviso: 'o texto do anexo não é persistido pelo sistema; só o link existe' };
+      case 'ler_evidencia': {
+        // O texto dos docs do Drive já está no dossiê (11/09/2026); a ferramenta devolve o que há.
+        const link = typeof a.link === 'string' ? a.link : null;
+        const doc = dossie.docs_drive.find((d) => !link || d.link === link || d.link.includes(link)) ?? dossie.docs_drive[0] ?? null;
+        if (doc?.texto) return { link: doc.link, nome: doc.nome, texto: doc.texto, aviso: doc.aviso };
+        return { link: link ?? null, texto: null, aviso: doc?.aviso ?? 'nenhum documento de texto legível no Drive para este projeto' };
+      }
       default:
         throw new Error(`ferramenta desconhecida: ${String(nome)}`);
     }

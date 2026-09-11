@@ -180,3 +180,71 @@ export async function upsertResumoDoc(
     return null;
   }
 }
+
+
+// ─── LEITURA do texto dos documentos do Drive (11/09/2026) ─────────────────────────────────────
+//
+// ⚠️ Por que existe: a documentação compilada de cada projeto vive num `.md` no Drive (a coluna
+// "URL" da planilha tem link em 757 das 770 linhas), e até aqui NINGUÉM a lia — o dossiê do time
+// carregava só o link e a ferramenta `ler_evidencia` devolvia "texto não persistido". O agente
+// julgava evidência que não podia abrir. Decisão do dono do produto: "veja os dados de evidências".
+//
+// Best-effort e bounded: falha em um arquivo vira aviso, nunca exceção; teto de caracteres total
+// para o prompt não estourar; só tipos de TEXTO (markdown, txt, json, csv) e Google Docs (export
+// text/plain). PDF/imagem ficam de fora (o texto deles nunca foi persistido) e são listados.
+export const TETO_TEXTO_DRIVE = 9000;
+const TETO_POR_ARQUIVO = 6000;
+const MAX_ARQUIVOS_DRIVE = 3;
+
+export type DocDrive = { link: string; nome: string | null; mime: string | null; texto: string | null; aviso: string | null };
+
+export function extrairFileId(link: string): string | null {
+  return fileIdFromLink(link);
+}
+
+export async function lerTextoDocsDrive(
+  links: readonly string[],
+  opts: { max?: number; teto?: number } = {},
+): Promise<DocDrive[]> {
+  const max = opts.max ?? MAX_ARQUIVOS_DRIVE;
+  const teto = opts.teto ?? TETO_TEXTO_DRIVE;
+  const out: DocDrive[] = [];
+  let usado = 0;
+  let token: string;
+  try {
+    token = await getDriveAccessToken();
+  } catch (e) {
+    return links.slice(0, max).map((link) => ({ link, nome: null, mime: null, texto: null, aviso: `sem token do Drive: ${e instanceof Error ? e.message : String(e)}` }));
+  }
+  for (const link of links.slice(0, max)) {
+    const id = fileIdFromLink(link);
+    if (!id) { out.push({ link, nome: null, mime: null, texto: null, aviso: 'link sem id de arquivo do Drive' }); continue; }
+    try {
+      const meta = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=name,mimeType,size&supportsAllDrives=true`, {
+        headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(DRIVE_TIMEOUT_MS),
+      });
+      if (!meta.ok) { out.push({ link, nome: null, mime: null, texto: null, aviso: `metadados HTTP ${meta.status}` }); continue; }
+      const m = (await meta.json()) as { name?: string; mimeType?: string; size?: string };
+      const mime = m.mimeType ?? null;
+      const ehTexto = !!mime && /^(text\/|application\/json|application\/x-yaml)/.test(mime);
+      const ehGoogleDoc = mime === 'application/vnd.google-apps.document';
+      if (!ehTexto && !ehGoogleDoc) { out.push({ link, nome: m.name ?? null, mime, texto: null, aviso: 'tipo sem texto extraível (não é markdown/texto/Google Docs)' }); continue; }
+      const url = ehGoogleDoc
+        ? `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/plain`
+        : `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`;
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(DRIVE_TIMEOUT_MS) });
+      if (!r.ok) { out.push({ link, nome: m.name ?? null, mime, texto: null, aviso: `conteúdo HTTP ${r.status}` }); continue; }
+      let texto = (await r.text()).replace(/\r\n/g, '\n').trim();
+      const restante = teto - usado;
+      const limite = Math.min(TETO_POR_ARQUIVO, restante);
+      if (limite <= 0) { out.push({ link, nome: m.name ?? null, mime, texto: null, aviso: 'teto de texto do dossiê atingido' }); continue; }
+      const cortado = texto.length > limite;
+      if (cortado) texto = `${texto.slice(0, limite - 1)}…`;
+      usado += texto.length;
+      out.push({ link, nome: m.name ?? null, mime, texto, aviso: cortado ? `texto cortado em ${limite} caracteres` : null });
+    } catch (e) {
+      out.push({ link, nome: null, mime: null, texto: null, aviso: `falha ao ler: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  }
+  return out;
+}

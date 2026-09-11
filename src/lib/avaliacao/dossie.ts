@@ -23,6 +23,12 @@ export type FontesDossie = {
   versoes: { versao_num: number; acao: string; snapshot_projeto: string | null; created_at: string | null }[];
   eventos: { tipo: string; fase: string | null; dados: string | null; created_at: string | null }[];
   cargoAutor: string | null | undefined;
+  /**
+   * O TEXTO dos documentos do Drive (o `.md` da documentação compilada e anexos de texto), já lido
+   * por `lerTextoDocsDrive` (11/09/2026). `undefined` = não buscado (lacuna `texto_anexos`);
+   * `[]` = buscado e nada legível.
+   */
+  docsDrive?: { link: string; nome: string | null; mime: string | null; texto: string | null; aviso: string | null }[];
 };
 
 export type Lacuna = 'projeto' | 'documentacao' | 'espelho' | 'versoes' | 'texto_anexos' | 'v2' | 'teamguide';
@@ -89,6 +95,8 @@ export type Dossie = {
     justificativa_lider: string | null;
   };
   contexto: { contrafactual_afetados: string[]; membros: string[]; anexos_links: string[]; contexto_especial: string | null };
+  /** Documentos do Drive com texto lido (o `.md` da doc e anexos de texto). Vazio quando nada legível. */
+  docs_drive: { link: string; nome: string | null; mime: string | null; texto: string | null; aviso: string | null }[];
   historico: {
     versoes: { versao_num: number; acao: string; created_at: string | null }[];
     mudancas_ultimo_reenvio: { campo: string; antes: unknown; depois: unknown }[] | null;
@@ -259,7 +267,9 @@ function construir(f: FontesDossie, opts: { lacunaProjeto: boolean }): Dossie | 
   const lacunas = new Set<Lacuna>();
   if (!p && opts.lacunaProjeto) lacunas.add('projeto');
   if (!f.espelho) lacunas.add('espelho');
-  lacunas.add('texto_anexos');
+  // ⚠️ `texto_anexos` só é lacuna quando o texto do Drive NÃO foi buscado. Antes era permanente —
+  // e o dossiê afirmava ao agente que a evidência não existia, com 757 de 770 projetos com `.md`.
+  if (f.docsDrive === undefined) lacunas.add('texto_anexos');
 
   const id = texto(p?.id) ?? g('ID Projeto');
   if (!id) return null;
@@ -382,6 +392,7 @@ function construir(f: FontesDossie, opts: { lacunaProjeto: boolean }): Dossie | 
       anexos_links: p ? listaStrings(p.arquivos_links) : separarLinks(g('URL')),
       contexto_especial: texto(p?.contexto_especial) ?? g('Contexto do Projeto Especial'),
     },
+    docs_drive: (f.docsDrive ?? []).map((x) => ({ ...x })),
     historico: {
       versoes: versoesOrd.map((v) => ({ versao_num: v.versao_num, acao: v.acao, created_at: v.created_at })),
       mudancas_ultimo_reenvio: compararSnapshots(f.versoes),
@@ -423,7 +434,7 @@ const DESCRICAO_LACUNA: Record<Lacuna, string> = {
   documentacao: 'documentação compilada não encontrada',
   espelho: 'linha da planilha (espelho) não encontrada',
   versoes: 'sem versões registradas (submissão única ou legado)',
-  texto_anexos: 'texto dos anexos não é persistido (só os links)',
+  texto_anexos: 'texto dos documentos do Drive não foi lido nesta passada (só os links)',
   v2: 'campos do formulário v2 ausentes',
   teamguide: 'cargo do autor não consultado na TeamGuide',
 };
@@ -502,6 +513,16 @@ export function dossieParaTexto(d: Dossie, opts: { comReais?: boolean } = {}): s
     ]),
   );
   partes.push(bloco('Descrição', [t(d.descricao)]));
+  // ⚠️ A DOCUMENTAÇÃO REAL do projeto: o `.md` no Drive (11/09/2026). Entra ANTES da doc do banco,
+  // que na maioria da base não existe. Com R$ omitidos quando `comReais` está desligado.
+  if (d.docs_drive.length) {
+    const linhas: (string | null)[] = [];
+    for (const x of d.docs_drive) {
+      if (x.texto) linhas.push(`### ${x.nome ?? x.link}\n${t(x.texto)}`);
+      else linhas.push(`(${x.nome ?? x.link}: ${x.aviso ?? 'sem texto'})`);
+    }
+    partes.push(bloco('Documentação do projeto (Drive)', linhas));
+  }
   partes.push(
     bloco('Documentação', d.documentacao.presente
       ? [

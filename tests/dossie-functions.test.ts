@@ -146,7 +146,9 @@ describe('carregarDossie — caminho feliz', () => {
     ]);
     expect(d!.historico.eventos).toHaveLength(1);
     // Nenhuma lacuna além das inevitáveis.
-    expect([...d!.lacunas].sort()).toEqual(['texto_anexos', 'v2']);
+    // 11/09/2026: sem link de anexo não há texto a ler, então `texto_anexos` deixou de ser lacuna
+    // permanente — ela só aparece quando há links e a leitura do Drive não aconteceu.
+    expect([...d!.lacunas].sort()).toEqual(['v2']);
   });
 
   it('projeto inexistente no banco E fora do espelho → null', async () => {
