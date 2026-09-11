@@ -179,4 +179,22 @@ describe('⚠️ decisaoDeAdminBloqueia — o buraco que a 1ª trava deixou', ()
     expect(decisaoDeAdminBloqueia({ historico: [] })).toBe(false);
     expect(decisaoDeAdminBloqueia({ historico: null })).toBe(false);
   });
+
+  it('⚠️ REENVIO do autor depois da decisão humana REABRE a avaliação (caso Íris, 11/09/2026)', () => {
+    // Luis aprovou a v1 em 21/08; a autora reenviou em 11/09 (Status → Pendente); o time concluiu Aprovado.
+    const historico = [
+      { ator: 'luis.albuquerque@gocase.com', quando: '2026-08-21 18:24:05' },
+      { ator: 'luis.albuquerque@gocase.com', quando: '2026-08-21 18:24:10' },
+    ];
+    expect(
+      podeAgenteGravarStatus({ statusAtual: 'Pendente', alvo: 'Aprovado', atorDoStatusAtual: 'luis.albuquerque@gocase.com', historico, ultimoReenvioEm: '2026-09-11 19:22:56' }),
+    ).toEqual({ pode: true, motivo: null });
+    // sem reenvio depois, a decisão humana continua valendo
+    expect(
+      podeAgenteGravarStatus({ statusAtual: 'Pendente', alvo: 'Aprovado', atorDoStatusAtual: 'luis.albuquerque@gocase.com', historico, ultimoReenvioEm: '2026-08-01 10:00:00' }).pode,
+    ).toBe(false);
+    expect(
+      podeAgenteGravarStatus({ statusAtual: 'Pendente', alvo: 'Aprovado', atorDoStatusAtual: 'luis.albuquerque@gocase.com', historico, ultimoReenvioEm: null }).pode,
+    ).toBe(false);
+  });
 });
