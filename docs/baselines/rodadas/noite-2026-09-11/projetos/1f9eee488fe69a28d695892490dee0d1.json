@@ -1,0 +1,45 @@
+{
+  "id": "1f9eee488fe69a28d695892490dee0d1",
+  "nome": "Plataforma Goseller",
+  "antes": {
+    "id": "1f9eee488fe69a28d695892490dee0d1",
+    "nome": "Plataforma Goseller",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "323,81",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 183347,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "1f9eee488fe69a28d695892490dee0d1",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto declara 17,8 h/mês e R$ 323,81 de ganho, mas não traz prova de que esse gasto ou trabalho realmente deixou de existir. Precisa apresentar os registros do processo antes e depois da automação, incluindo onde o custo era lançado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

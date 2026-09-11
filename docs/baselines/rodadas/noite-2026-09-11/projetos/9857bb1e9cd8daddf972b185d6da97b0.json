@@ -1,0 +1,44 @@
+{
+  "id": "9857bb1e9cd8daddf972b185d6da97b0",
+  "nome": "Controle de Paradas",
+  "antes": {
+    "id": "9857bb1e9cd8daddf972b185d6da97b0",
+    "nome": "Controle de Paradas",
+    "status": "Pendente",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "448,5",
+    "categorias": "Custo evitado",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 67042,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "9857bb1e9cd8daddf972b185d6da97b0",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho de 30 h/mês e o valor líquido de R$ 448,50 não têm registro de uso antes e depois nem memória de cálculo apresentada. Precisa conferir quem fazia o levantamento, quanto tempo gastava e se o painel é usado pelos três turnos.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

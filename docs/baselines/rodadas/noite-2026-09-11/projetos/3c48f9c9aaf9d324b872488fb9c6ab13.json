@@ -1,0 +1,45 @@
+{
+  "id": "3c48f9c9aaf9d324b872488fb9c6ab13",
+  "nome": "Filemaker - Gerador de Documentos",
+  "antes": {
+    "id": "3c48f9c9aaf9d324b872488fb9c6ab13",
+    "nome": "Filemaker - Gerador de Documentos",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "748,28",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 73919,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "3c48f9c9aaf9d324b872488fb9c6ab13",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho mensal de R$ 748,28 não vem acompanhado de registro que mostre uma despesa existente que deixou de ocorrer. É preciso conferir a medição das 47,61 horas e a redução efetiva de custo.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 0 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

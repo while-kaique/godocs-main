@@ -1,0 +1,45 @@
+{
+  "id": "452ee30f320161450960537cf1594cb1",
+  "nome": "Painel de Acuracidade - B2C",
+  "antes": {
+    "id": "452ee30f320161450960537cf1594cb1",
+    "nome": "Painel de Acuracidade - B2C",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "52,275",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 87833,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "452ee30f320161450960537cf1594cb1",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho é baixo e não há prova de que as 7,5 horas liberadas viraram despesa evitada. Precisa conferir o custo antes gasto e como o painel gerou R$ 52,27 por mês.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 2,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

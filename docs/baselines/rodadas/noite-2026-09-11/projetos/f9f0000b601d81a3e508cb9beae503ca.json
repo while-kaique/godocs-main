@@ -1,0 +1,45 @@
+{
+  "id": "f9f0000b601d81a3e508cb9beae503ca",
+  "nome": "Freight Cost Intelligence (CFI)",
+  "antes": {
+    "id": "f9f0000b601d81a3e508cb9beae503ca",
+    "nome": "Freight Cost Intelligence (CFI)",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "1092,3",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 82842,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "f9f0000b601d81a3e508cb9beae503ca",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O impacto de R$ 1092,30 por mês parece depender de redução de fretes ainda não comprovada, enquanto o projeto descreve principalmente monitoramento e identificação de oportunidades. Precisa conferir nas despesas e CT-e que houve queda efetiva após as ações, sem contar as horas liberadas como saving e redução de frete ao mesmo tempo.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "4f452f2a1ef198a4d672c78485581da8",
+  "nome": "Ressarcimento CX",
+  "antes": {
+    "id": "4f452f2a1ef198a4d672c78485581da8",
+    "nome": "Ressarcimento CX",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 72097,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "4f452f2a1ef198a4d672c78485581da8",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes aprovou o projeto.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time de agentes aprovou o projeto."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

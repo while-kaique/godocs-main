@@ -1,0 +1,45 @@
+{
+  "id": "legado-117",
+  "nome": "Estoque Unificado - ERP + WMS + Alertas Críticos",
+  "antes": {
+    "id": "legado-117",
+    "nome": "Estoque Unificado - ERP + WMS + Alertas Críticos",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "209,795",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 81324,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-117",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho é baixo, mas está descrito apenas como horas liberadas, não como despesa que deixou de existir. Precisa conferir se houve redução comprovada de horas extras, contrato ou outro custo.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

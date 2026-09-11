@@ -1,0 +1,46 @@
+{
+  "id": "af34e6b392a80cd8790f6fde17b78d61",
+  "nome": "Proxy AI",
+  "antes": {
+    "id": "af34e6b392a80cd8790f6fde17b78d61",
+    "nome": "Proxy AI",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "3",
+    "confiancaAgente": "media",
+    "impacto": "4000",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 137293,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "af34e6b392a80cd8790f6fde17b78d61",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O saving mensal de R$ 4000 precisa comprovar que havia despesa de API e que ela parou, sem contar também o custo do Codex Max. Conferir faturas antes e depois e o valor da assinatura.\nCético: O saving de R$ 4.000 por mês não tem documento que mostre qual despesa existia e deixou de existir. É preciso conferir as faturas anteriores, o plano do Codex e o uso real das chaves.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

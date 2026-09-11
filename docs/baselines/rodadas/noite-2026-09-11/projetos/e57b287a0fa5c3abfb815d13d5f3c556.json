@@ -1,0 +1,44 @@
+{
+  "id": "e57b287a0fa5c3abfb815d13d5f3c556",
+  "nome": "Conferencia por bipagem Charlie",
+  "antes": {
+    "id": "e57b287a0fa5c3abfb815d13d5f3c556",
+    "nome": "Conferencia por bipagem Charlie",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "6736,56",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 103763,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "e57b287a0fa5c3abfb815d13d5f3c556",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

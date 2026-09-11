@@ -1,0 +1,45 @@
+{
+  "id": "legado-100",
+  "nome": "Disparos de comunicação de Reenvio na Rituária",
+  "antes": {
+    "id": "legado-100",
+    "nome": "Disparos de comunicação de Reenvio na Rituária",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "792,99",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 85891,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-100",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho de R$ 792,99 por mês parece coerente com a queda dos contatos de rastreio de 10% para 2%, sem dupla contagem aparente. Falta comprovar o volume de contatos, o custo por contato e que essa despesa realmente deixou de ocorrer.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

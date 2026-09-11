@@ -1,0 +1,46 @@
+{
+  "id": "bd39a9d631e79f119322595cde43d1b3",
+  "nome": "Documento Semanal do Squad de Malas",
+  "antes": {
+    "id": "bd39a9d631e79f119322595cde43d1b3",
+    "nome": "Documento Semanal do Squad de Malas",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "182,05",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 69864,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "bd39a9d631e79f119322595cde43d1b3",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: A redução descrita de 8 para 4 horas por semana não bate com as 11 horas mensais declaradas. Precisa conferir o registro do tempo gasto e se essas horas representam despesa paga que deixou de existir.\nCético: A redução pela metade do preparo semanal não bate com as 11 h/mês declaradas. Também não há registro de despesa que deixou de existir, nem documentação para conferir o ganho.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação.",
+        "A estrela 1 do time foi gravada; o Status Aprovado não foi tocado."
+      ]
+    },
+    "status_gravado": null
+  }
+}

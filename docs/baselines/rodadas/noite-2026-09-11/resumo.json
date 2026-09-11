@@ -1,13 +1,28 @@
 {
-  "total": 173,
+  "total": 603,
   "http_erros": 0,
-  "tempo_mediano_s": 104,
+  "tempo_mediano_s": 86,
   "por_faixa": {
-    "< 100": {
-      "n": 48,
+    "100–1k": {
+      "n": 343,
       "junta": {
-        "Aprovado": 17,
-        "Pendente": 31
+        "Aprovado": 325,
+        "Pendente": 18
+      }
+    },
+    "1k–10k": {
+      "n": 103,
+      "junta": {
+        "Aprovado": 86,
+        "Pendente": 17
+      }
+    },
+    "< 100": {
+      "n": 147,
+      "junta": {
+        "Aprovado": 74,
+        "Pendente": 67,
+        "Reprovado": 6
       }
     },
     "≥ 10k": {
@@ -16,34 +31,20 @@
         "Aprovado": 8,
         "Pendente": 2
       }
-    },
-    "100–1k": {
-      "n": 52,
-      "junta": {
-        "Pendente": 6,
-        "Aprovado": 46
-      }
-    },
-    "1k–10k": {
-      "n": 63,
-      "junta": {
-        "Pendente": 15,
-        "Aprovado": 48
-      }
     }
   },
   "estrela": {
-    "comparaveis": 111,
-    "exatas": 55,
-    "dentro_de_1": 84,
-    "agente_menor_2plus": 15,
-    "agente_maior_2plus": 12
+    "comparaveis": 196,
+    "exatas": 109,
+    "dentro_de_1": 157,
+    "agente_menor_2plus": 21,
+    "agente_maior_2plus": 18
   },
   "status": {
-    "aprovado_humano_reprovado_agente": 0,
+    "aprovado_humano_reprovado_agente": 3,
     "reprovado_humano_aprovado_agente": 1,
     "pendente_decidido": {
-      "Aprovado": 11
+      "Aprovado": 34
     }
   },
   "canarios": [
@@ -80,14 +81,13 @@
       "imp": 8352.239167,
       "humano": 4,
       "agente": "3",
-      "junta": "Pendente",
+      "junta": "Aprovado",
       "flag6a10": false,
       "conf": "media",
-      "mesa": "em_validacao",
+      "mesa": "aprovar",
       "porque": [
-        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
-        "O time pede ajuste ao autor antes de decidir.",
-        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
       ]
     },
     {

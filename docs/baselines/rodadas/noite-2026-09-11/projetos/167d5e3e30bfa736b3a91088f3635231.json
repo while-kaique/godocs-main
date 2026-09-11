@@ -1,0 +1,44 @@
+{
+  "id": "167d5e3e30bfa736b3a91088f3635231",
+  "nome": "ASO Demissional + Homologação",
+  "antes": {
+    "id": "167d5e3e30bfa736b3a91088f3635231",
+    "nome": "ASO Demissional + Homologação",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "128,265",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 84311,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "167d5e3e30bfa736b3a91088f3635231",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho de 7,75 h/mês é declarado, mas não há registro de volume, tempo antes e tempo depois para mostrar que a economia aconteceu. Precisa conferir esses registros e se a automação eliminou uma despesa existente, não apenas uma estimativa.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

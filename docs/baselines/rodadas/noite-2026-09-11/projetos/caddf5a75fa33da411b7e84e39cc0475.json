@@ -1,0 +1,46 @@
+{
+  "id": "caddf5a75fa33da411b7e84e39cc0475",
+  "nome": "Fluxo de carrinho abandonado e checkout",
+  "antes": {
+    "id": "caddf5a75fa33da411b7e84e39cc0475",
+    "nome": "Fluxo de carrinho abandonado e checkout",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 159325,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "caddf5a75fa33da411b7e84e39cc0475",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 3 é âncora — o time recomendou 4 e não reescreveu a nota",
+      "estrelas": 3,
+      "estrelas_time": 4
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time não fechou sozinho e a decisão é de gente.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time não fechou sozinho e a decisão é de gente.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

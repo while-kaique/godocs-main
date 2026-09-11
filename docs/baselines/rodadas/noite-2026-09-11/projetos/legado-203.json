@@ -1,0 +1,45 @@
+{
+  "id": "legado-203",
+  "nome": "Dashboard - Gocase Performance Produtos",
+  "antes": {
+    "id": "legado-203",
+    "nome": "Dashboard - Gocase Performance Produtos",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "3",
+    "confiancaAgente": "media",
+    "impacto": "1889,05",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 72642,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-203",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: Preocupa a falta de prova de que as 74 h/mês viraram despesa realmente evitada, e não apenas tempo liberado para outras tarefas. É preciso conferir o custo anterior e onde o pagamento deixou de ocorrer para validar os R$ 1.889,05 mensais.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

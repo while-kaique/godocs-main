@@ -1,0 +1,44 @@
+{
+  "id": "85520a8a41ab404678b2770ba8b1f91c",
+  "nome": "Automação na Criação de Chamados de Pagamento de Comissões do Time B2B",
+  "antes": {
+    "id": "85520a8a41ab404678b2770ba8b1f91c",
+    "nome": "Automação na Criação de Chamados de Pagamento de Comissões do Time B2B",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "164,45",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 132399,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "85520a8a41ab404678b2770ba8b1f91c",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor é baixo e combina com a liberação de 11 h/mês, sem sinal de dupla contagem. Falta confirmar se houve redução de despesa ou apenas tempo liberado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

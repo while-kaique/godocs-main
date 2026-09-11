@@ -1,0 +1,45 @@
+{
+  "id": "legado-075",
+  "nome": "Automação da geração de guias de ASO utilizando apps scripts.",
+  "antes": {
+    "id": "legado-075",
+    "nome": "Automação da geração de guias de ASO utilizando apps scripts.",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "90,61",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 71184,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-075",
+    "mesa": {
+      "ok": true,
+      "motivo": "Impacto declarado de R$ 90,61/mês, abaixo do piso de R$ 100,00/mês. Um ganho desta ordem não sustenta o projeto como projeto documentado. E a nota do projeto é 0, ou seja, o ganho pequeno não vem acompanhado de altura em nenhum outro eixo.",
+      "veredito": "reprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Reprovado",
+      "flag6a10": false,
+      "porque": "A análise do impacto reprovou por régua declarada e a estrela não sustenta o contrário.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "A análise do impacto reprovou o projeto por régua declarada.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Reprovado e fica registrada como recomendação.",
+        "A estrela 0 do time foi gravada; o Status Aprovado não foi tocado."
+      ]
+    },
+    "status_gravado": null
+  }
+}

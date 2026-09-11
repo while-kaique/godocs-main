@@ -1,0 +1,45 @@
+{
+  "id": "LEGADO-151",
+  "nome": "Automação - Consulta de Análise de Crédito",
+  "antes": {
+    "id": "LEGADO-151",
+    "nome": "Automação - Consulta de Análise de Crédito",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "717,6",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 72243,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-151",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto declara 24 h/mês liberadas e R$ 717,60 por mês, mas não mostra qual despesa existia e deixou de ocorrer. Precisa apresentar registros da despesa anterior e confirmar o saving efetivado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

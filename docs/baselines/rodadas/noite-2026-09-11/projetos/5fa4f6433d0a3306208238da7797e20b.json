@@ -1,0 +1,46 @@
+{
+  "id": "5fa4f6433d0a3306208238da7797e20b",
+  "nome": "Direcionador de Fórum (CX Gogroup)",
+  "antes": {
+    "id": "5fa4f6433d0a3306208238da7797e20b",
+    "nome": "Direcionador de Fórum (CX Gogroup)",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "42,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 66404,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "5fa4f6433d0a3306208238da7797e20b",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho declarado de R$ 42,75 por mês é baixo para sustentar o projeto sozinho. Falta comprovar que as 2 horas por mês correspondem a uma despesa realmente eliminada, e não apenas a tempo realocado.\nCético: O projeto descreve apoio à decisão, mas não mostra uma despesa que deixou de existir; R$ 42,75 por mês parece apenas estimativa. Precisa do registro da despesa anterior e da prova de que as 2 h/mês foram realmente liberadas.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação.",
+        "A estrela 1 do time foi gravada; o Status Aprovado não foi tocado."
+      ]
+    },
+    "status_gravado": null
+  }
+}

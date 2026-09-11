@@ -1,0 +1,45 @@
+{
+  "id": "6f58d8ab4b3c894d6800a158505e8538",
+  "nome": "Launch Intelligence",
+  "antes": {
+    "id": "6f58d8ab4b3c894d6800a158505e8538",
+    "nome": "Launch Intelligence",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "47,905",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 71665,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "6f58d8ab4b3c894d6800a158505e8538",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 3 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 3,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

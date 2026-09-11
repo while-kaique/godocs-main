@@ -1,0 +1,44 @@
+{
+  "id": "c601f88f9a578c799292de784440e629",
+  "nome": "Agente PPT de fechamento",
+  "antes": {
+    "id": "c601f88f9a578c799292de784440e629",
+    "nome": "Agente PPT de fechamento",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "269,81",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 67211,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "c601f88f9a578c799292de784440e629",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho parece ser tempo liberado, não uma despesa que deixou de existir. Falta confirmar se houve redução real de custo ou apenas mais tempo para análise.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

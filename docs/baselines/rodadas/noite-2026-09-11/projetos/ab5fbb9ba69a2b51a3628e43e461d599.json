@@ -1,0 +1,44 @@
+{
+  "id": "ab5fbb9ba69a2b51a3628e43e461d599",
+  "nome": "People Analytics — Gocase Extrema",
+  "antes": {
+    "id": "ab5fbb9ba69a2b51a3628e43e461d599",
+    "nome": "People Analytics — Gocase Extrema",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "458,27",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 65086,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "ab5fbb9ba69a2b51a3628e43e461d599",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

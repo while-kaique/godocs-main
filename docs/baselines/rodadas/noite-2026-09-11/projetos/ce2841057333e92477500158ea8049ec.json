@@ -1,0 +1,45 @@
+{
+  "id": "ce2841057333e92477500158ea8049ec",
+  "nome": "DRE · acompanhamento real x orçado",
+  "antes": {
+    "id": "ce2841057333e92477500158ea8049ec",
+    "nome": "DRE · acompanhamento real x orçado",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "275,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 69011,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "ce2841057333e92477500158ea8049ec",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 10 horas mensais declaradas não batem claramente com as 2 horas por semana descritas. Falta o registro de que esse tempo deixou de ser despesa, como folha, custo do time ou demanda encerrada.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

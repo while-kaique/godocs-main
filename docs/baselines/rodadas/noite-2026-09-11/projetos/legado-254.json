@@ -1,0 +1,46 @@
+{
+  "id": "legado-254",
+  "nome": "Sortimento Gobeuate",
+  "antes": {
+    "id": "legado-254",
+    "nome": "Sortimento Gobeuate",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "5",
+    "confiancaAgente": "media",
+    "impacto": "12011,34",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 162905,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-254",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho mensal de R$ 12.011 é alto e precisa de conferência humana. Falta comprovar que a consultoria deixou de ser paga, com contrato ou notas antes e depois, sem contar as horas liberadas como despesa evitada.\nCético: O ganho estimado de ~440 horas por mês não bate com as 302,8 horas liberadas registradas no memorial. Falta comprovar o custo da consultoria e que essa despesa realmente parou, com contrato, notas e registros de cancelamento.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

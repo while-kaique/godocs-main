@@ -1,0 +1,46 @@
+{
+  "id": "8f315702b9f3ea3f20e9d1fc104a1d1f",
+  "nome": "Checklist de Inicio de turno",
+  "antes": {
+    "id": "8f315702b9f3ea3f20e9d1fc104a1d1f",
+    "nome": "Checklist de Inicio de turno",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "4",
+    "confiancaAgente": "baixa",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 113886,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "8f315702b9f3ea3f20e9d1fc104a1d1f",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 2,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

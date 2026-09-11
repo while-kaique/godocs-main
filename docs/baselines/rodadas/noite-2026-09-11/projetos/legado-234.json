@@ -1,0 +1,45 @@
+{
+  "id": "LEGADO-234",
+  "nome": "Gosales - Propostas <> Hubspot",
+  "antes": {
+    "id": "LEGADO-234",
+    "nome": "Gosales - Propostas <> Hubspot",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "7475",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 145309,
+  "tentativa": 2,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-234",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O impacto líquido de R$ 7.475/mês passa o teto de aprovação e merece conferência humana. As 250 horas liberadas não provam economia em caixa; falta registro da despesa que deixou de existir e da conta do valor.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "LEGADO-093",
+  "nome": "Farol Overview D-1 Produtividade",
+  "antes": {
+    "id": "LEGADO-093",
+    "nome": "Farol Overview D-1 Produtividade",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "808,85",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 54709,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-093",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O saving de R$ 808,85 por mês não tem registro de uma despesa que deixou de existir, e as 14,67 horas liberadas também não estão documentadas. É preciso conferir a despesa anterior, a interrupção do gasto e a origem das horas.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

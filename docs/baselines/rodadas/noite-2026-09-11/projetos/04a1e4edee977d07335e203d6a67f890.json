@@ -1,0 +1,45 @@
+{
+  "id": "04a1e4edee977d07335e203d6a67f890",
+  "nome": "Integrações multi-plataforma de CRM",
+  "antes": {
+    "id": "04a1e4edee977d07335e203d6a67f890",
+    "nome": "Integrações multi-plataforma de CRM",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 128796,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "04a1e4edee977d07335e203d6a67f890",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 3 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 3,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes aprovou o projeto.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time de agentes aprovou o projeto."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

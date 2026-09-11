@@ -1,0 +1,44 @@
+{
+  "id": "b1b47044a5244921df55a0ec0bd0857c",
+  "nome": "Entradas de Estoque | Metabase -> Chat",
+  "antes": {
+    "id": "b1b47044a5244921df55a0ec0bd0857c",
+    "nome": "Entradas de Estoque | Metabase -> Chat",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "104,55",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 73068,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "b1b47044a5244921df55a0ec0bd0857c",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor é baixo e não sugere dupla contagem, mas as 15 h/mês parecem tempo liberado, não despesa comprovadamente eliminada. Falta o registro do custo que deixou de existir.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

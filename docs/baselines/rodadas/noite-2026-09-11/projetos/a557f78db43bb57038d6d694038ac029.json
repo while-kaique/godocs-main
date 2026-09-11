@@ -1,0 +1,44 @@
+{
+  "id": "a557f78db43bb57038d6d694038ac029",
+  "nome": "Torre de Controle Supply Gogroup",
+  "antes": {
+    "id": "a557f78db43bb57038d6d694038ac029",
+    "nome": "Torre de Controle Supply Gogroup",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "media",
+    "impacto": "7464,05",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 148658,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "a557f78db43bb57038d6d694038ac029",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O impacto líquido de R$ 7.464/mês supera o limite e precisa de conferência humana. Falta comprovar que as 451 h/mês viraram despesa realmente eliminada, sem contar ganhos dos projetos de dados já aprovados.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

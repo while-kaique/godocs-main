@@ -1,0 +1,44 @@
+{
+  "id": "1337c147f90a0a73c54f40526422453a",
+  "nome": "Go Select IA",
+  "antes": {
+    "id": "1337c147f90a0a73c54f40526422453a",
+    "nome": "Go Select IA",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "2313,95",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 144155,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "1337c147f90a0a73c54f40526422453a",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho parece vir de horas liberadas, mas não há prova de que uma despesa realmente parou. Precisa conferir o custo antes da ferramenta e como essas horas serão convertidas em economia, sem contar o mesmo ganho duas vezes.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

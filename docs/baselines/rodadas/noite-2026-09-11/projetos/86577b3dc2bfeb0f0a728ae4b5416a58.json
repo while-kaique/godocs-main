@@ -1,0 +1,45 @@
+{
+  "id": "86577b3dc2bfeb0f0a728ae4b5416a58",
+  "nome": "Radar de Conexão - internet escritório de Fortaleza",
+  "antes": {
+    "id": "86577b3dc2bfeb0f0a728ae4b5416a58",
+    "nome": "Radar de Conexão - internet escritório de Fortaleza",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "43,565",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 73926,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "86577b3dc2bfeb0f0a728ae4b5416a58",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

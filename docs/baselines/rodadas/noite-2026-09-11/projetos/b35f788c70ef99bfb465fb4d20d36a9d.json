@@ -1,0 +1,45 @@
+{
+  "id": "b35f788c70ef99bfb465fb4d20d36a9d",
+  "nome": "Resumo NFS | Trello → Chat",
+  "antes": {
+    "id": "b35f788c70ef99bfb465fb4d20d36a9d",
+    "nome": "Resumo NFS | Trello → Chat",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "209,1",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 77064,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "b35f788c70ef99bfb465fb4d20d36a9d",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

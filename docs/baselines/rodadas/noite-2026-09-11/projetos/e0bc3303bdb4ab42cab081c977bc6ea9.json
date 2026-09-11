@@ -1,0 +1,46 @@
+{
+  "id": "e0bc3303bdb4ab42cab081c977bc6ea9",
+  "nome": "FÉRIAS · PJs (TECNOLOGIA)",
+  "antes": {
+    "id": "e0bc3303bdb4ab42cab081c977bc6ea9",
+    "nome": "FÉRIAS · PJs (TECNOLOGIA)",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "13,94",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 82884,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "e0bc3303bdb4ab42cab081c977bc6ea9",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho financeiro é muito baixo, de R$ 13,94 por mês, e não sustenta a aprovação sozinho. Falta comprovar qual despesa existente deixou de ocorrer e onde esse saving pode ser conferido.\nCético: As 2 h/mês liberadas parecem uma estimativa, sem registro do tempo antes e depois da ferramenta. Falta comprovar uso real e que esse tempo virou economia efetiva, não apenas capacidade liberada.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

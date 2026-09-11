@@ -1,0 +1,45 @@
+{
+  "id": "e4b1dcc3e07f56a7f576c672fcc78824",
+  "nome": "AVD Central v2",
+  "antes": {
+    "id": "e4b1dcc3e07f56a7f576c672fcc78824",
+    "nome": "AVD Central v2",
+    "status": "Aprovado",
+    "estrelas": "4",
+    "estrelaAgente": "6-10",
+    "confiancaAgente": "alta",
+    "impacto": "8352,239167",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 173082,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "e4b1dcc3e07f56a7f576c672fcc78824",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido de R$ 8.352 por mês é alto e precisa de conferência humana. Falta comprovar quais despesas realmente deixaram de existir e garantir que as horas liberadas não foram contadas também como receita ou contrato.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 4 é âncora — o time recomendou 5 e não reescreveu a nota",
+      "estrelas": 4,
+      "estrelas_time": 5
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

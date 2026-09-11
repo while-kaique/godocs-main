@@ -1,0 +1,45 @@
+{
+  "id": "legado-233",
+  "nome": "Envio Automático de Comprovante de Reembolso",
+  "antes": {
+    "id": "legado-233",
+    "nome": "Envio Automático de Comprovante de Reembolso",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "5",
+    "confiancaAgente": "alta",
+    "impacto": "787,54",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 152682,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-233",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho de R$ 787,54 por mês não tem registro de despesa que deixou de existir, nem documentação de apoio. É preciso conferir a despesa antes do envio automático e provar que ela parou.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 5 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 5
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

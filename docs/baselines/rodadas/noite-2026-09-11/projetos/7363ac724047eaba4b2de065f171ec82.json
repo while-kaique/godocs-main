@@ -1,0 +1,45 @@
+{
+  "id": "7363ac724047eaba4b2de065f171ec82",
+  "nome": "Cockpit Contábil",
+  "antes": {
+    "id": "7363ac724047eaba4b2de065f171ec82",
+    "nome": "Cockpit Contábil",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "3",
+    "confiancaAgente": "media",
+    "impacto": "364,025",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 138712,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "7363ac724047eaba4b2de065f171ec82",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: Preocupa a economia de licenças, pois o projeto não mostra que uma despesa foi realmente cancelada. Conferir contratos ou faturas antes de aceitar o impacto líquido de R$ 364,02 por mês.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 2,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

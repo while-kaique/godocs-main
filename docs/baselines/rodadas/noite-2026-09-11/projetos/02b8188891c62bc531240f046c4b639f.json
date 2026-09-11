@@ -1,0 +1,45 @@
+{
+  "id": "02b8188891c62bc531240f046c4b639f",
+  "nome": "FAQ dos Agentes",
+  "antes": {
+    "id": "02b8188891c62bc531240f046c4b639f",
+    "nome": "FAQ dos Agentes",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "1727,165",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 71205,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "02b8188891c62bc531240f046c4b639f",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 247,8 horas liberadas são apenas uma estimativa, sem registro de tempo antes e depois nem prova de despesa que deixou de existir. Precisa conferir os atendimentos afetados e a redução real de custo na operação.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

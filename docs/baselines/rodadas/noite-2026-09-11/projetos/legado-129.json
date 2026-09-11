@@ -1,0 +1,45 @@
+{
+  "id": "legado-129",
+  "nome": "Contestação Automática",
+  "antes": {
+    "id": "legado-129",
+    "nome": "Contestação Automática",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "567,355",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 74407,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-129",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor líquido de R$ 567,36 por mês parece compatível com as 37,95 horas liberadas, sem sinal de contar o mesmo ganho duas vezes. Falta comprovar que a despesa de transporte existia e deixou de ocorrer, com faturas antes e depois.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

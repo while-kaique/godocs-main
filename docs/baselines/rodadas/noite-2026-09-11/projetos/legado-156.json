@@ -1,0 +1,45 @@
+{
+  "id": "legado-156",
+  "nome": "CX Hub — Plataforma Central de Operações de Backoffice CX",
+  "antes": {
+    "id": "legado-156",
+    "nome": "CX Hub — Plataforma Central de Operações de Backoffice CX",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "31604,82",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 173375,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-156",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: Não há horas liberadas declaradas, então não dá para conferir se o impacto mensal de R$ 31.604,82 corresponde ao trabalho de uma equipe real. Para resolver, apresentar as horas antes e depois e quantas agentes executavam esses fluxos.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 3 é âncora — o time recomendou 5 e não reescreveu a nota",
+      "estrelas": 3,
+      "estrelas_time": 5
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

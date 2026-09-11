@@ -1,0 +1,45 @@
+{
+  "id": "85443676002563cbdfb4ae8b85a605ba",
+  "nome": "Pesquisa pulso - Gogroup",
+  "antes": {
+    "id": "85443676002563cbdfb4ae8b85a605ba",
+    "nome": "Pesquisa pulso - Gogroup",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "397,78",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 94831,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "85443676002563cbdfb4ae8b85a605ba",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor mensal é baixo e combina com a troca de trabalho manual por automação, sem sinal claro de dupla contagem. Falta comprovar as horas liberadas e se havia despesa externa que deixou de existir, com registro do custo anterior.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

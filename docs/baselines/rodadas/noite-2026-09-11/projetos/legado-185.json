@@ -1,0 +1,44 @@
+{
+  "id": "LEGADO-185",
+  "nome": "Alerta de Rupturas",
+  "antes": {
+    "id": "LEGADO-185",
+    "nome": "Alerta de Rupturas",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "0",
+    "categorias": "saving, receita_incremental",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 71043,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-185",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O cálculo aponta R$ 7.300/mês, enquanto o projeto declara impacto líquido mensal de R$ 0; é preciso conferir a origem desse valor. Falta comprovar que o saving era uma despesa real que deixou de ocorrer.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

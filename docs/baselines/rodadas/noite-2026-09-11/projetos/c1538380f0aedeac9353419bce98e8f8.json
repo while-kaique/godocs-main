@@ -1,0 +1,45 @@
+{
+  "id": "c1538380f0aedeac9353419bce98e8f8",
+  "nome": "PIAPP",
+  "antes": {
+    "id": "c1538380f0aedeac9353419bce98e8f8",
+    "nome": "PIAPP",
+    "status": "Aprovado",
+    "estrelas": "10",
+    "estrelaAgente": "6-10",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 166542,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "c1538380f0aedeac9353419bce98e8f8",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 10 é âncora — o time recomendou 5 (6-10) e não reescreveu a nota",
+      "estrelas": 10,
+      "estrelas_time": 5
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": true,
+      "porque": "O time avaliou e o projeto se sustenta, mas caiu na faixa 6 a 10: fica pendente até o comitê humano cravar a estrela (6, 7, 8, 9 ou 10) e aprovar.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time avaliou e o projeto se sustenta, mas caiu na faixa 6 a 10: fica pendente até o comitê humano cravar a estrela (6, 7, 8, 9 ou 10) e aprovar.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

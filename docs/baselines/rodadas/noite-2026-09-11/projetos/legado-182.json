@@ -1,0 +1,45 @@
+{
+  "id": "legado-182",
+  "nome": "Painel TV / War Room · Venda Atacado Gobeaute",
+  "antes": {
+    "id": "legado-182",
+    "nome": "Painel TV / War Room · Venda Atacado Gobeaute",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "110,3",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 72107,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-182",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 16 horas parecem ser uma estimativa única de construção, mas foram apresentadas como liberadas todo mês. Falta o registro do trabalho manual recorrente que deixou de existir e a prova de uso do painel no evento.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 0 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

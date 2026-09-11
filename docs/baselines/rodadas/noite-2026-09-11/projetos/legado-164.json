@@ -1,0 +1,45 @@
+{
+  "id": "LEGADO-164",
+  "nome": "SPG · Agente Revisão de Carteira v2",
+  "antes": {
+    "id": "LEGADO-164",
+    "nome": "SPG · Agente Revisão de Carteira v2",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "441,2",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 165026,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-164",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor financeiro depende de transformar 8 h/mês liberadas em despesa realmente evitada; sem isso, R$ 441,20 é só valor do tempo, não saving efetivado. Precisa conferir o custo registrado e onde a despesa deixou de ocorrer.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

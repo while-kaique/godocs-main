@@ -1,0 +1,44 @@
+{
+  "id": "3139d7671f1681d9401d5eb2be24add9",
+  "nome": "Bazar Gogroup Extrema — Sistema de Troca por Kg",
+  "antes": {
+    "id": "3139d7671f1681d9401d5eb2be24add9",
+    "nome": "Bazar Gogroup Extrema — Sistema de Troca por Kg",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "312,125",
+    "categorias": "Custo evitado, Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 80110,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "3139d7671f1681d9401d5eb2be24add9",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 50 horas liberadas por mês e o ganho financeiro não têm registros de uso da planilha nem comparação antes e depois. Precisa conferir os históricos do bazar e validar com os responsáveis quanto tempo era gasto antes.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

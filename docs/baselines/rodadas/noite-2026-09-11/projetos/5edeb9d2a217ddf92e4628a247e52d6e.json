@@ -1,0 +1,44 @@
+{
+  "id": "5edeb9d2a217ddf92e4628a247e52d6e",
+  "nome": "Gocomercial",
+  "antes": {
+    "id": "5edeb9d2a217ddf92e4628a247e52d6e",
+    "nome": "Gocomercial",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "1557",
+    "categorias": "Custo evitado",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 69077,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "5edeb9d2a217ddf92e4628a247e52d6e",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho de 83 h/mês e R$ 1557 não tem registro de uso, comparação antes e depois nem memória de cálculo apresentada. Precisa conferir os atendimentos, horas liberadas e base usada para chegar ao valor mensal.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

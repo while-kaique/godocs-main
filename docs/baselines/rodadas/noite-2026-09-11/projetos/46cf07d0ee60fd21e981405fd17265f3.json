@@ -1,0 +1,46 @@
+{
+  "id": "46cf07d0ee60fd21e981405fd17265f3",
+  "nome": "GoPilot",
+  "antes": {
+    "id": "46cf07d0ee60fd21e981405fd17265f3",
+    "nome": "GoPilot",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "1047,85",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 89961,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "46cf07d0ee60fd21e981405fd17265f3",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho parece ser tempo liberado, não despesa que deixou de existir, e o valor descrito de R$ 12.480/mês não bate com o impacto líquido de R$ 1.047,85/mês. É preciso conferir o custo efetivamente reduzido e garantir que as mesmas horas não foram contadas duas vezes.\nCético: O ganho de R$ 12.480/mês parece ser apenas uma estimativa: não há registro de despesa que deixou de existir nem prova das horas liberadas. É preciso conferir o custo antes e depois e explicar a diferença para o impacto líquido de R$ 1.047,85.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

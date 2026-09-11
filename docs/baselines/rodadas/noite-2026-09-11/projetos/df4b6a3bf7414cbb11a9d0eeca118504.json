@@ -1,0 +1,44 @@
+{
+  "id": "df4b6a3bf7414cbb11a9d0eeca118504",
+  "nome": "Bot de detecção de Extravios",
+  "antes": {
+    "id": "df4b6a3bf7414cbb11a9d0eeca118504",
+    "nome": "Bot de detecção de Extravios",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "257,89",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 93931,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "df4b6a3bf7414cbb11a9d0eeca118504",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 37 h/mês são uma economia projetada, não prova de despesa que deixou de existir. Falta o registro da despesa ou do tempo efetivamente reduzido para confirmar o saving.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

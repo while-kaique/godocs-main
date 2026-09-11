@@ -1,0 +1,45 @@
+{
+  "id": "legado-120",
+  "nome": "Alerta Vendas Produtos Por Dia - Gocase",
+  "antes": {
+    "id": "legado-120",
+    "nome": "Alerta Vendas Produtos Por Dia - Gocase",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "147,095",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 74489,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-120",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor mensal é baixo, mas as 11 horas liberadas não provam uma despesa que deixou de existir. Para validar o ganho financeiro, falta indicar qual custo foi efetivamente eliminado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

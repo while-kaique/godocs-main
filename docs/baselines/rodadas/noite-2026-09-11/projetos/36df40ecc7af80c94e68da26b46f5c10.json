@@ -1,0 +1,45 @@
+{
+  "id": "36df40ecc7af80c94e68da26b46f5c10",
+  "nome": "GO MOVE",
+  "antes": {
+    "id": "36df40ecc7af80c94e68da26b46f5c10",
+    "nome": "GO MOVE",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "560,8",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 135562,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "36df40ecc7af80c94e68da26b46f5c10",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

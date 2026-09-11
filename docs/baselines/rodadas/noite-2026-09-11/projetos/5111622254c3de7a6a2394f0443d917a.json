@@ -1,0 +1,44 @@
+{
+  "id": "5111622254c3de7a6a2394f0443d917a",
+  "nome": "Inventario-ti",
+  "antes": {
+    "id": "5111622254c3de7a6a2394f0443d917a",
+    "nome": "Inventario-ti",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "568,1",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 171249,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "5111622254c3de7a6a2394f0443d917a",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho líquido de R$ 568,10 por mês parece projetado, pois não há prova de aluguel ou outra despesa que tenha parado. Precisa conferir contratos, pagamentos e registros de equipamentos ociosos antes de tratar isso como economia efetiva.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 5,
+      "estrelas_time": 5
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

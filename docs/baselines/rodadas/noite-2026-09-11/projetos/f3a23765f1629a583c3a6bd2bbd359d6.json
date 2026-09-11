@@ -1,0 +1,45 @@
+{
+  "id": "f3a23765f1629a583c3a6bd2bbd359d6",
+  "nome": "[ECOMM] Bot gerenciador de demandas",
+  "antes": {
+    "id": "f3a23765f1629a583c3a6bd2bbd359d6",
+    "nome": "[ECOMM] Bot gerenciador de demandas",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "384,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 78973,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "f3a23765f1629a583c3a6bd2bbd359d6",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 18 h/mês parecem uma estimativa de tempo poupado, não uma despesa que deixou de existir, e não há registro que prove a redução. Precisa conferir a rotina antes e depois e mostrar onde esse custo foi efetivamente eliminado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -52,6 +52,17 @@ em prod depois de a cópia nascer; revertido às 12:50 UTC e a régua da célula
   marcar "candidato ao comitê" (Pendente com flag) em vez de 5★ — é régua de VIZINHANÇA, não de prompt, e ainda não
   foi codada porque esgotou o teto de 2 correções para este problema.
 
-## Números finais
+## Números finais (14:03 UTC · 603 projetos: 570 aprovados + canários/pendentes · tempo mediano 86 s · 0 erro HTTP)
+
+- Junta: Aprovado 493 · Pendente 104 · Reprovado 6 (os 6 são Aprovados humanos com impacto < R$100 e nota 0 avaliada,
+  a régua composta do piso — não gravados, a decisão humana vence).
+- Estrelas, 196 comparáveis com nota humana ≥1: exatas 109 (56%) · ±1 157 (80%) · 2+ abaixo 21 · 2+ acima 18.
+- Faixas: humano 0-3 → agente {0-3: 239, 4-5: 15, 6-10: 2} · humano 4-5 → {9, 16, 1} · humano 6-10 → {2, 4, 2}.
+- Confiança: Aprovado alta 424 / média 69 · Pendente alta 67 / média 28 / baixa 9 · Reprovado 6.
+- Canários: PIAPP 6-10 ✓ · SendApp 5★ Aprovado ✓ · CX Hub 5★ Aprovado ✓ · Robô orçamento 5★ (era 6-10 na passada
+  anterior; ver medição da trava) · AVD Central v2 3★ Aprovado.
+- Porte para a GoDocs: 4 passes (12:37, 13:03, 13:48, 14:03 UTC), backups em `backup-godocs/`. 300 células de nota
+  humana conferidas contra o 1º backup: 0 alteradas (o BID 2026 foi revertido no dia).
+
 
 Ver `divergencias.md` (canários no topo, faixas de impacto, tempo mediano por projeto, divergências humano × agente).

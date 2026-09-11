@@ -1,0 +1,45 @@
+{
+  "id": "legado-184",
+  "nome": "Alerta Conversão v3 — Funil + Canal Dedicado",
+  "antes": {
+    "id": "legado-184",
+    "nome": "Alerta Conversão v3 — Funil + Canal Dedicado",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "14096,5",
+    "categorias": "receita_incremental",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 143924,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-184",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: A receita incremental não traz a base nem o local de medição, então não dá para confirmar o ganho. O cálculo aponta R$ 27.697/mês, valor alto que exige conferência humana e checagem contra dupla contagem.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 4 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 4
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

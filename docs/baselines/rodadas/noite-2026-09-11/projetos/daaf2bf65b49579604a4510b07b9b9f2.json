@@ -1,0 +1,45 @@
+{
+  "id": "daaf2bf65b49579604a4510b07b9b9f2",
+  "nome": "Inventory Control Tower — Módulo de Disponibilidade e Reposição",
+  "antes": {
+    "id": "daaf2bf65b49579604a4510b07b9b9f2",
+    "nome": "Inventory Control Tower — Módulo de Disponibilidade e Reposição",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "1373,65",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 66328,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "daaf2bf65b49579604a4510b07b9b9f2",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

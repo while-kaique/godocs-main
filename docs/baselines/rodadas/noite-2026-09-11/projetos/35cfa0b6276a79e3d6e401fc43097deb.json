@@ -1,0 +1,44 @@
+{
+  "id": "35cfa0b6276a79e3d6e401fc43097deb",
+  "nome": "Supply Lojas <> Estoque CDs",
+  "antes": {
+    "id": "35cfa0b6276a79e3d6e401fc43097deb",
+    "nome": "Supply Lojas <> Estoque CDs",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "480,93",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 90511,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "35cfa0b6276a79e3d6e401fc43097deb",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho financeiro depende de provar que as 69 horas liberadas viraram despesa que deixou de existir, e não apenas tempo disponível. Precisa conferir folha, horas extras ou contrato que mostre esse custo efetivamente interrompido.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

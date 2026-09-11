@@ -1,0 +1,45 @@
+{
+  "id": "legado-252",
+  "nome": "Metabase Supply + Distribuição de Dados",
+  "antes": {
+    "id": "legado-252",
+    "nome": "Metabase Supply + Distribuição de Dados",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "297,9",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 131524,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-252",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto declara 18 h/mês liberadas e R$ 297,90 de economia, mas não explica as tarefas afetadas nem mostra despesa que deixou de existir. Precisa apresentar registros de uso, horas antes e depois e a despesa interrompida.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

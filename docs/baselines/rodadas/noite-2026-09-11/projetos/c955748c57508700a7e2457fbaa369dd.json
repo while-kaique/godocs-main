@@ -1,0 +1,46 @@
+{
+  "id": "c955748c57508700a7e2457fbaa369dd",
+  "nome": "Analista de Boost de Estampas",
+  "antes": {
+    "id": "c955748c57508700a7e2457fbaa369dd",
+    "nome": "Analista de Boost de Estampas",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "124,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 62615,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "c955748c57508700a7e2457fbaa369dd",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O impacto líquido mensal é baixo, mas foi calculado a partir de horas liberadas, não de uma despesa comprovadamente eliminada. Para aprovar o saving, falta registrar qual atividade paga deixou de existir e conferir as horas declaradas.\nCético: O projeto promete melhorar o retorno do boost, mas não mostra venda ou despesa que já tenha sido evitada; isso parece projeção, não saving efetivado. É preciso conferir registros de tempo antes e depois e provar qual gasto parou.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

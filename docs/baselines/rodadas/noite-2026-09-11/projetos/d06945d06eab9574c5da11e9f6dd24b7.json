@@ -1,0 +1,44 @@
+{
+  "id": "d06945d06eab9574c5da11e9f6dd24b7",
+  "nome": "Dados Orgânicos Social - Gocase",
+  "antes": {
+    "id": "d06945d06eab9574c5da11e9f6dd24b7",
+    "nome": "Dados Orgânicos Social - Gocase",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 83093,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d06945d06eab9574c5da11e9f6dd24b7",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: Preocupa a atribuição das receitas, embora o projeto diga que separa as origens. Conferir no Data Mart e no Metabase se o link da bio responde por 93% e se somar tudo como stories realmente infla o valor em dez vezes.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

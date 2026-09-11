@@ -1,0 +1,44 @@
+{
+  "id": "936f764e78038a2d4abf2723b75b8332",
+  "nome": "Automação no Download e Encaminhamento de XML's",
+  "antes": {
+    "id": "936f764e78038a2d4abf2723b75b8332",
+    "nome": "Automação no Download e Encaminhamento de XML's",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "2716",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 156531,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "936f764e78038a2d4abf2723b75b8332",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 400 h/mês liberadas não têm registro de quem fazia o trabalho nem mostram despesa que deixou de existir. É preciso conferir apontamentos de horas, quantidade de pessoas envolvidas e a despesa antes e depois da automação.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

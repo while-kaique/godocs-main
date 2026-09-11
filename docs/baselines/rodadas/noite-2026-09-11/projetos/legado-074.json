@@ -1,0 +1,44 @@
+{
+  "id": "legado-074",
+  "nome": "[PROTHEUS] Copiar xml do nfe master para o protheus",
+  "antes": {
+    "id": "legado-074",
+    "nome": "[PROTHEUS] Copiar xml do nfe master para o protheus",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "218,295",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 78710,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-074",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor mensal é baixo e parece compatível com a atividade, sem sinal de dupla contagem. Falta comprovar que o saving veio de uma despesa que deixou de existir, com registro do custo ou da atividade antes e depois.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

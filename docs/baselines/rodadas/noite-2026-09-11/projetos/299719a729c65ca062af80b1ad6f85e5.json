@@ -1,0 +1,44 @@
+{
+  "id": "299719a729c65ca062af80b1ad6f85e5",
+  "nome": "Relatório de Cupons - Impacto de campanhas",
+  "antes": {
+    "id": "299719a729c65ca062af80b1ad6f85e5",
+    "nome": "Relatório de Cupons - Impacto de campanhas",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "174,465",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 83524,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "299719a729c65ca062af80b1ad6f85e5",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

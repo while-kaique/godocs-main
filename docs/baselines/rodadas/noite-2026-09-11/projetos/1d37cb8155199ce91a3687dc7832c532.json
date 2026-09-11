@@ -1,0 +1,45 @@
+{
+  "id": "1d37cb8155199ce91a3687dc7832c532",
+  "nome": "Análise Inteligente de Prazos",
+  "antes": {
+    "id": "1d37cb8155199ce91a3687dc7832c532",
+    "nome": "Análise Inteligente de Prazos",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "622,42",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 74920,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "1d37cb8155199ce91a3687dc7832c532",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O impacto líquido de R$ 622,42 por mês parece projetado, pois o texto fala em oportunidades e redução de atrasos, sem mostrar despesa que deixou de existir. Falta o registro das 52 h/mês liberadas e da despesa efetivamente interrompida.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 3 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 3,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "894e0244628f8558f28fdac9bfd955d5",
+  "nome": "GoCase Football Creator",
+  "antes": {
+    "id": "894e0244628f8558f28fdac9bfd955d5",
+    "nome": "GoCase Football Creator",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "826,115",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 82732,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "894e0244628f8558f28fdac9bfd955d5",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 62,58 horas liberadas e o impacto líquido mensal de R$826,12 parecem ser uma projeção, sem prova de que uma despesa existente parou. É preciso conferir registros do tempo antes e depois, além do uso real da ferramenta.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

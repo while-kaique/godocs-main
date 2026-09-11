@@ -1,0 +1,44 @@
+{
+  "id": "legado-221",
+  "nome": "Lab Gobeaute · Indexação de Documentos Técnicos + Enriquecimento de MPs",
+  "antes": {
+    "id": "legado-221",
+    "nome": "Lab Gobeaute · Indexação de Documentos Técnicos + Enriquecimento de MPs",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "2571,36875",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 114728,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-221",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho parece projetado: o texto mistura 373 horas pontuais com uma economia mensal, sem mostrar despesa que deixou de existir. Precisa conferir registros de horas, custo efetivamente pago e uso recorrente do processo.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

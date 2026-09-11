@@ -1,0 +1,44 @@
+{
+  "id": "8d200fc05d9267f7c820d97e5f732f67",
+  "nome": "Agente de Projetos",
+  "antes": {
+    "id": "8d200fc05d9267f7c820d97e5f732f67",
+    "nome": "Agente de Projetos",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "376,375",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 96003,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "8d200fc05d9267f7c820d97e5f732f67",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho parece ser apenas tempo liberado, não uma despesa que deixou de existir. Precisa conferir o custo antes e depois da automação e se alguém deixou de ser pago ou foi realocado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

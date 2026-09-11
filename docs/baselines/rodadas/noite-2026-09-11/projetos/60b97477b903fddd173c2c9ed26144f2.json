@@ -1,0 +1,44 @@
+{
+  "id": "60b97477b903fddd173c2c9ed26144f2",
+  "nome": "Expedição B2B",
+  "antes": {
+    "id": "60b97477b903fddd173c2c9ed26144f2",
+    "nome": "Expedição B2B",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "348,5",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 117804,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "60b97477b903fddd173c2c9ed26144f2",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 50 h/mês liberadas não vêm acompanhadas de registro de tempo antes e depois, nem de despesa que deixou de existir; o impacto líquido de R$ 348,50 parece uma projeção. Precisa conferir folhas ou horas registradas, volume de pedidos e a despesa efetivamente reduzida.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

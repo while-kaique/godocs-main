@@ -1,0 +1,44 @@
+{
+  "id": "66e286edd711576d3b13e51f97f918d5",
+  "nome": "NPS - Gestores e Candidatos",
+  "antes": {
+    "id": "66e286edd711576d3b13e51f97f918d5",
+    "nome": "NPS - Gestores e Candidatos",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "129,09",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 90240,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "66e286edd711576d3b13e51f97f918d5",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho de R$ 129,09 por mês parece projetado, pois não há registro de despesa que deixou de existir. É preciso conferir a rotina anterior, o custo comprovado e a evidência de que a automação eliminou esse gasto.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

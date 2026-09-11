@@ -1,0 +1,44 @@
+{
+  "id": "d3cc220e120532ac9012425b6c6b79ea",
+  "nome": "Control Tower - PCP",
+  "antes": {
+    "id": "d3cc220e120532ac9012425b6c6b79ea",
+    "nome": "Control Tower - PCP",
+    "status": "Pendente",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "1170,96",
+    "categorias": "Custo evitado",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 83077,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d3cc220e120532ac9012425b6c6b79ea",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 168 horas liberadas e o impacto mensal não têm registros ou método de cálculo apresentados. É preciso conferir logs do painel, tarefas afetadas e validação dos responsáveis antes de aprovar.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

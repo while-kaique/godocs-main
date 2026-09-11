@@ -1,0 +1,44 @@
+{
+  "id": "72ffe8f78369b47a697e12b93cbc45af",
+  "nome": "Radar de Mercado AZ",
+  "antes": {
+    "id": "72ffe8f78369b47a697e12b93cbc45af",
+    "nome": "Radar de Mercado AZ",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "519,57",
+    "categorias": "Custo evitado, Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 158624,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "72ffe8f78369b47a697e12b93cbc45af",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 4,
+      "estrelas_time": 4
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

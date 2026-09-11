@@ -1,0 +1,44 @@
+{
+  "id": "legado-112",
+  "nome": "gerarMultiplosPDFsComCodigosUnicos_DriveExport",
+  "antes": {
+    "id": "legado-112",
+    "nome": "gerarMultiplosPDFsComCodigosUnicos_DriveExport",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "282,65",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 66648,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-112",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho mensal de R$ 282,65 só é saving financeiro se reduzir uma despesa real. Falta comprovar o custo evitado e conferir que as 52,44 horas não foram contadas também como receita ou contrato.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "4f5fbf89f658883cacc5facf80b708a7",
+  "nome": "Relatório Transportador",
+  "antes": {
+    "id": "4f5fbf89f658883cacc5facf80b708a7",
+    "nome": "Relatório Transportador",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "4",
+    "confiancaAgente": "baixa",
+    "impacto": "508,3",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 79795,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "4f5fbf89f658883cacc5facf80b708a7",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 34 h/mês liberadas e o saving de R$ 508,30 não têm registro de custo ou despesa que deixou de existir. Precisa conferir folhas, contratos ou chamados antes e depois da implantação para provar a economia efetiva.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 2,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}
