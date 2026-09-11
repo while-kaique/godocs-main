@@ -44,7 +44,10 @@ rowsP.forEach((rp, idx) => {
   if ((rp[I.ea] ?? '') !== ea) set(idx, I.ea, ea, nome, 'Estrela Agente', rp[I.ea] ?? '');
   if ((rp[I.ca] ?? '') !== ca) set(idx, I.ca, ca, nome, 'Confiança Agente', rp[I.ca] ?? '');
   // Estrelas: só onde a nota humana ANTES era 0/vazia; grava a 0-5 que o agente pôs na cópia (nunca 6-10 → cópia mantém)
-  const hum = Number(String(a.estrelas ?? '').trim()); const humOk = Number.isFinite(hum) && hum >= 1;
+  // ⚠️ A nota humana pode ter mudado em PROD depois da cópia (Bruno mexeu na GoDocs de manhã): o "antes"
+  // vale para a cópia, mas quem protege a GoDocs é a célula ATUAL dela. Só escreve onde AS DUAS são 0/vazias.
+  const hum = Number(String(a.estrelas ?? '').trim()); const humP = Number(String(rp[I.est] ?? '').trim());
+  const humOk = (Number.isFinite(hum) && hum >= 1) || (Number.isFinite(humP) && humP >= 1);
   const estC = String(rc[I.est] ?? '').trim();
   if (!humOk && estC !== '' && /^\d+$/.test(estC) && Number(estC) <= 5 && (rp[I.est] ?? '').trim() !== estC) set(idx, I.est, estC, nome, 'Estrelas', rp[I.est] ?? '');
   // Status: só onde ANTES era Pendente e a cópia decidiu
