@@ -66,3 +66,17 @@ em prod depois de a cópia nascer; revertido às 12:50 UTC e a régua da célula
 
 
 Ver `divergencias.md` (canários no topo, faixas de impacto, tempo mediano por projeto, divergências humano × agente).
+
+## Estado da META ao fechar (11:15 BRT, por ordem do dono do produto: "pare a fila, não temos mais tempo")
+
+- **Base inteira**: 603 de 770 avaliados (todos os 570 aprovados + canários). Os 148 Reprovados/Descontinuados/Pendentes
+  ficaram fora por decisão do Luis (prazo da reunião). Retomar = `CAL_CONC=8 CAL_ORDEM=critico npx tsx --env-file=.env
+  scripts/calibragem/rodar-noite.mts docs/baselines/rodadas/noite-2026-09-11` (o driver pula quem já tem JSON).
+- **(a) 6-10 humanos**: 2 de 8 saem na faixa; 3 saem 5★. Duas correções gastas (teto combinado); a 3ª régua candidata
+  (vizinhança de âncora) é decisão registrada acima, não codada.
+- **(b)** SendApp e todos os ≥ R$10k saem ≥ 5★ ✓ (nenhum 2★).
+- **(c)** nenhum Aprovado humano foi gravado Reprovado ✓. O time REPROVARIA 6 aprovados humanos, todos pelo piso
+  composto (impacto < R$100 + nota 0 avaliada e citada) — a régua que o próprio dono do produto aplicou à mão em
+  137 projetos em 04/09. Na cópia esses 6 seguiam Aprovado porque a cópia é anterior àquela limpeza.
+- **(d)** 80% dentro de ±1 (196 comparáveis) ✓. **(e)** confiança acompanha a decisão ✓. **(f)** 86 s por projeto,
+  0 erro HTTP com concorrência 8; a base de 770 cabe em ~3h20 numa madrugada ✓.
