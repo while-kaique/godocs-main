@@ -80,3 +80,13 @@ Ver `divergencias.md` (canários no topo, faixas de impacto, tempo mediano por p
   137 projetos em 04/09. Na cópia esses 6 seguiam Aprovado porque a cópia é anterior àquela limpeza.
 - **(d)** 80% dentro de ±1 (196 comparáveis) ✓. **(e)** confiança acompanha a decisão ✓. **(f)** 86 s por projeto,
   0 erro HTTP com concorrência 8; a base de 770 cabe em ~3h20 numa madrugada ✓.
+
+## 14:18 UTC — coluna "Estrelas" da GoDocs recebeu a nota do AGENTE (ordem do Luis)
+
+`scripts/calibragem/gravar-estrelas-agente.mts` gravou **241 células** (backup `backup-godocs/GoDocs-estrelas-2026-09-11T14-18-29-980Z.json`,
+lista em `estrelas-agente-gravadas.json`). Protegidas, nunca escritas: 9 projetos com ação "estrelas" de humano no
+`admin_activity_log` de prod (`protegidos-log-humano.json`), 9 células ≥ 6 (comitê), 97 mudadas à mão depois da cópia
+(Bruno), 3 com agente na faixa 6-10, 2 fora do funil. **Revisão manual (23, mantida a nota humana):** quedas ≥2 sobre nota
+humana ≥3 (Godash 5→1, Prazo Otimizado 4→0, Shipping hub 4→1, GoHunter 5→3, Automação Download XML 5→2, Confere.AI 4→2…) e
+saltos ≥3 sobre nota humana ≥1 (Envio de Comprovante 1→5, Inventario-ti 1→5, B2B DW 1→4…). Exceção aplicada à mão:
+**Simulador de Custos - GoBeauty 2→5** (R$ 70,5 mil/mês = 11% da base, o eixo de tamanho dá 5★ por régua).

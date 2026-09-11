@@ -1,7 +1,147 @@
 {
-  "exportado_em": "2026-09-11T02:07:44.315Z",
-  "total": 392,
+  "exportado_em": "2026-09-11T14:17:07.193Z",
+  "total": 402,
   "itens": [
+    {
+      "id": "0af8de2fec61a60baaa0b98efbc3f89f",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "4d1e0abf61a2e18d7fd3ef261a7f90ae",
+      "projeto_nome": "Gestor de Crises",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 13:37:50"
+    },
+    {
+      "id": "e6ee207c8744ecf9cbc198cd4f0c104d",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-266",
+      "projeto_nome": "RV/RB Coorte -Gobeaute",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 13:35:56"
+    },
+    {
+      "id": "6abd6f9fd5789cd391a73bad2f791e13",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-265",
+      "projeto_nome": "RV/RB Coorte -Gocase",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 13:35:49"
+    },
+    {
+      "id": "e8bb03243a0a8998670d3963a81fdb93",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "af34e6b392a80cd8790f6fde17b78d61",
+      "projeto_nome": "Proxy AI",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 12:29:53"
+    },
+    {
+      "id": "c5c7c229a184395db0208b0362f2179a",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-157",
+      "projeto_nome": "Lab Gobeaute · Sistema de P&D, Fórmulas e Cadastros",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 11:54:11"
+    },
+    {
+      "id": "91665007621cca5a66d98545bad44264",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "e6a51663752df75d476215e469f3faf2",
+      "projeto_nome": "Agente de Compras Gobeaute",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 11:53:15"
+    },
+    {
+      "id": "c365f16637b05ba4b9332407f59e5aed",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "legado-240",
+      "projeto_nome": "BID 2026 — Sistema de Decisão de Compra de Matérias-Primas",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 11:52:30"
+    },
+    {
+      "id": "60f8fa9c01346f6bb41671238935034f",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "a550095c01aecfb2680b025f881beb18",
+      "projeto_nome": "Nomeador de Estampas",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 11:50:38"
+    },
+    {
+      "id": "6b5b8f13e2c51026d684c2d093d2df41",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "166f805ce43809d3b2c6c2e009e68daf",
+      "projeto_nome": "LIA DM - universo Gogroup",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 11:08:19"
+    },
+    {
+      "id": "1d341c56e14142c8de0a8b75075f640f",
+      "ator_email": "bruno.bezerra@gocase.com",
+      "acao": "status",
+      "projeto_id": "dd2e0b33c8f120d1422a835e257a8a10",
+      "projeto_nome": "App programa de estágio (Expedição Gogroup)",
+      "detalhe": "Aprovado",
+      "meta": {
+        "status_anterior": "Aprovado",
+        "status_novo": "Aprovado",
+        "motivo": null
+      },
+      "created_at": "2026-09-11 11:05:00"
+    },
     {
       "id": "e60dd737b7551f3ff9ea8e03cfe5bc41",
       "ator_email": "time-de-agentes@godocs",
