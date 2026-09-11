@@ -57,6 +57,9 @@ let fila = [
   ...antes.filter((l) => !eCanario(l) && !ePendente(l) && temEstrela(l)),
   ...antes.filter((l) => !eCanario(l) && !ePendente(l) && !temEstrela(l)),
 ].filter((l) => !fora(l));
+// CAL_SO_STATUS="Aprovado,Pendente" restringe a fila aos status listados (a entrega das estrelas é dos aprovados).
+const soStatus = (process.env.CAL_SO_STATUS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+if (soStatus.length) fila = fila.filter((l) => eCanario(l) || soStatus.includes(l.status.trim().toLowerCase()));
 // Só conta como FEITO quem tem resposta 2xx/4xx: falha 5xx fica para a próxima passada.
 const feitos = new Set(
   readdirSync(join(OUT, 'projetos'))
