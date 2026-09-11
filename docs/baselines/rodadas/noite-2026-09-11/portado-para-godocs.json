@@ -1,0 +1,523 @@
+{
+ "em": "2026-09-11T14:03:12.659Z",
+ "mudancas": [
+  {
+   "linha": 127,
+   "nome": "[GoChallenge] Comunicações; [GoChallenge]emails; [GoChallenge]Raspadinha",
+   "campo": "Estrela Agente",
+   "de": "1",
+   "para": "3"
+  },
+  {
+   "linha": 127,
+   "nome": "[GoChallenge] Comunicações; [GoChallenge]emails; [GoChallenge]Raspadinha",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "media"
+  },
+  {
+   "linha": 131,
+   "nome": "Gocreators - DashBoard",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "alta"
+  },
+  {
+   "linha": 285,
+   "nome": "Gobeaute - Acompanhamento de NPS/Review",
+   "campo": "Estrela Agente",
+   "de": "—",
+   "para": "1"
+  },
+  {
+   "linha": 285,
+   "nome": "Gobeaute - Acompanhamento de NPS/Review",
+   "campo": "Confiança Agente",
+   "de": "—",
+   "para": "alta"
+  },
+  {
+   "linha": 291,
+   "nome": "Programa de Indicação | Gogroup",
+   "campo": "Estrela Agente",
+   "de": "—",
+   "para": "1"
+  },
+  {
+   "linha": 291,
+   "nome": "Programa de Indicação | Gogroup",
+   "campo": "Confiança Agente",
+   "de": "—",
+   "para": "alta"
+  },
+  {
+   "linha": 338,
+   "nome": "FÉRIAS · PJs (TECNOLOGIA)",
+   "campo": "Estrela Agente",
+   "de": "1",
+   "para": "3"
+  },
+  {
+   "linha": 338,
+   "nome": "FÉRIAS · PJs (TECNOLOGIA)",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "alta"
+  },
+  {
+   "linha": 397,
+   "nome": "FullControl360°",
+   "campo": "Estrela Agente",
+   "de": "4",
+   "para": "3"
+  },
+  {
+   "linha": 397,
+   "nome": "FullControl360°",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "media"
+  },
+  {
+   "linha": 402,
+   "nome": "GoUniform",
+   "campo": "Estrela Agente",
+   "de": "—",
+   "para": "0"
+  },
+  {
+   "linha": 402,
+   "nome": "GoUniform",
+   "campo": "Confiança Agente",
+   "de": "—",
+   "para": "media"
+  },
+  {
+   "linha": 482,
+   "nome": "Mix Produtos Gobeaute",
+   "campo": "Estrela Agente",
+   "de": "3",
+   "para": "2"
+  },
+  {
+   "linha": 482,
+   "nome": "Mix Produtos Gobeaute",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "media"
+  },
+  {
+   "linha": 491,
+   "nome": "Controle de Entrega de Brindes",
+   "campo": "Estrela Agente",
+   "de": "—",
+   "para": "0"
+  },
+  {
+   "linha": 491,
+   "nome": "Controle de Entrega de Brindes",
+   "campo": "Confiança Agente",
+   "de": "—",
+   "para": "media"
+  },
+  {
+   "linha": 526,
+   "nome": "Ger.AI - Análise de Descostura Têxtil",
+   "campo": "Estrela Agente",
+   "de": "1",
+   "para": "0"
+  },
+  {
+   "linha": 543,
+   "nome": "SAIBBI — Sistema de Análise de Impressão BB Indústria",
+   "campo": "Estrela Agente",
+   "de": "3",
+   "para": "2"
+  },
+  {
+   "linha": 543,
+   "nome": "SAIBBI — Sistema de Análise de Impressão BB Indústria",
+   "campo": "Confiança Agente",
+   "de": "media",
+   "para": "alta"
+  },
+  {
+   "linha": 559,
+   "nome": "Abastecimento de tinta",
+   "campo": "Estrela Agente",
+   "de": "1",
+   "para": "3"
+  },
+  {
+   "linha": 559,
+   "nome": "Abastecimento de tinta",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "media"
+  },
+  {
+   "linha": 561,
+   "nome": "Hub de Importação",
+   "campo": "Estrela Agente",
+   "de": "4",
+   "para": "1"
+  },
+  {
+   "linha": 561,
+   "nome": "Hub de Importação",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "alta"
+  },
+  {
+   "linha": 565,
+   "nome": "Order Bump Gobeaute",
+   "campo": "Estrela Agente",
+   "de": "2",
+   "para": "1"
+  },
+  {
+   "linha": 565,
+   "nome": "Order Bump Gobeaute",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "alta"
+  },
+  {
+   "linha": 566,
+   "nome": "Ressarcimento CX",
+   "campo": "Estrela Agente",
+   "de": "2",
+   "para": "1"
+  },
+  {
+   "linha": 566,
+   "nome": "Ressarcimento CX",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "alta"
+  },
+  {
+   "linha": 575,
+   "nome": "GoProduct",
+   "campo": "Estrela Agente",
+   "de": "0",
+   "para": "1"
+  },
+  {
+   "linha": 575,
+   "nome": "GoProduct",
+   "campo": "Confiança Agente",
+   "de": "media",
+   "para": "alta"
+  },
+  {
+   "linha": 590,
+   "nome": "Teste de Descascamento (térmicos)",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "alta"
+  },
+  {
+   "linha": 591,
+   "nome": "Checklist de Inicio de turno",
+   "campo": "Estrela Agente",
+   "de": "4",
+   "para": "3"
+  },
+  {
+   "linha": 591,
+   "nome": "Checklist de Inicio de turno",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "media"
+  },
+  {
+   "linha": 592,
+   "nome": "ecom-metrics-hub",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "alta"
+  },
+  {
+   "linha": 604,
+   "nome": "Portal de Ocorrências B2B",
+   "campo": "Estrela Agente",
+   "de": "4",
+   "para": "2"
+  },
+  {
+   "linha": 604,
+   "nome": "Portal de Ocorrências B2B",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "media"
+  },
+  {
+   "linha": 607,
+   "nome": "Database Importações Gocase",
+   "campo": "Estrela Agente",
+   "de": "3",
+   "para": "2"
+  },
+  {
+   "linha": 607,
+   "nome": "Database Importações Gocase",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "alta"
+  },
+  {
+   "linha": 629,
+   "nome": "Haileydash",
+   "campo": "Estrela Agente",
+   "de": "—",
+   "para": "1"
+  },
+  {
+   "linha": 629,
+   "nome": "Haileydash",
+   "campo": "Confiança Agente",
+   "de": "—",
+   "para": "alta"
+  },
+  {
+   "linha": 637,
+   "nome": "HireFlow",
+   "campo": "Estrela Agente",
+   "de": "0",
+   "para": "1"
+  },
+  {
+   "linha": 637,
+   "nome": "HireFlow",
+   "campo": "Estrelas",
+   "de": "0",
+   "para": "1"
+  },
+  {
+   "linha": 637,
+   "nome": "HireFlow",
+   "campo": "Status",
+   "de": "Pendente",
+   "para": "Aprovado"
+  },
+  {
+   "linha": 648,
+   "nome": "Sistema de Alertas de Infra de Dados",
+   "campo": "Estrela Agente",
+   "de": "3",
+   "para": "1"
+  },
+  {
+   "linha": 650,
+   "nome": "Integração com Operador Logístico - Life of Colour",
+   "campo": "Estrela Agente",
+   "de": "6-10",
+   "para": "5"
+  },
+  {
+   "linha": 650,
+   "nome": "Integração com Operador Logístico - Life of Colour",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "media"
+  },
+  {
+   "linha": 666,
+   "nome": "Farol de insucessos",
+   "campo": "Estrela Agente",
+   "de": "2",
+   "para": "1"
+  },
+  {
+   "linha": 666,
+   "nome": "Farol de insucessos",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "alta"
+  },
+  {
+   "linha": 666,
+   "nome": "Farol de insucessos",
+   "campo": "Status",
+   "de": "Pendente",
+   "para": "Aprovado"
+  },
+  {
+   "linha": 671,
+   "nome": "Sistema de memória de M&A",
+   "campo": "Estrela Agente",
+   "de": "0",
+   "para": "1"
+  },
+  {
+   "linha": 671,
+   "nome": "Sistema de memória de M&A",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "media"
+  },
+  {
+   "linha": 691,
+   "nome": "Cases IA | Lógica",
+   "campo": "Estrela Agente",
+   "de": "5",
+   "para": "4"
+  },
+  {
+   "linha": 691,
+   "nome": "Cases IA | Lógica",
+   "campo": "Confiança Agente",
+   "de": "baixa",
+   "para": "alta"
+  },
+  {
+   "linha": 718,
+   "nome": "Acompanhamento de Despesa com Frete Real",
+   "campo": "Estrela Agente",
+   "de": "2",
+   "para": "1"
+  },
+  {
+   "linha": 719,
+   "nome": "[feature de Creators Hub] Creators Hub Completo",
+   "campo": "Status",
+   "de": "Pendente",
+   "para": "Aprovado"
+  },
+  {
+   "linha": 724,
+   "nome": "Integração reseller",
+   "campo": "Estrela Agente",
+   "de": "",
+   "para": "2"
+  },
+  {
+   "linha": 724,
+   "nome": "Integração reseller",
+   "campo": "Confiança Agente",
+   "de": "",
+   "para": "alta"
+  },
+  {
+   "linha": 724,
+   "nome": "Integração reseller",
+   "campo": "Estrelas",
+   "de": "",
+   "para": "2"
+  },
+  {
+   "linha": 724,
+   "nome": "Integração reseller",
+   "campo": "Status",
+   "de": "Pendente",
+   "para": "Aprovado"
+  },
+  {
+   "linha": 725,
+   "nome": "Notificação Revenue Bot",
+   "campo": "Estrela Agente",
+   "de": "",
+   "para": "1"
+  },
+  {
+   "linha": 725,
+   "nome": "Notificação Revenue Bot",
+   "campo": "Confiança Agente",
+   "de": "",
+   "para": "alta"
+  },
+  {
+   "linha": 725,
+   "nome": "Notificação Revenue Bot",
+   "campo": "Estrelas",
+   "de": "",
+   "para": "1"
+  },
+  {
+   "linha": 725,
+   "nome": "Notificação Revenue Bot",
+   "campo": "Status",
+   "de": "Pendente",
+   "para": "Aprovado"
+  },
+  {
+   "linha": 726,
+   "nome": "Catalogo agencias",
+   "campo": "Estrela Agente",
+   "de": "",
+   "para": "1"
+  },
+  {
+   "linha": 726,
+   "nome": "Catalogo agencias",
+   "campo": "Confiança Agente",
+   "de": "",
+   "para": "alta"
+  },
+  {
+   "linha": 726,
+   "nome": "Catalogo agencias",
+   "campo": "Estrelas",
+   "de": "",
+   "para": "1"
+  },
+  {
+   "linha": 726,
+   "nome": "Catalogo agencias",
+   "campo": "Status",
+   "de": "Pendente",
+   "para": "Aprovado"
+  },
+  {
+   "linha": 729,
+   "nome": "Gocase Internacional - Projeto Remessa Conforme",
+   "campo": "Estrela Agente",
+   "de": "1",
+   "para": "4"
+  },
+  {
+   "linha": 729,
+   "nome": "Gocase Internacional - Projeto Remessa Conforme",
+   "campo": "Confiança Agente",
+   "de": "alta",
+   "para": "media"
+  },
+  {
+   "linha": 751,
+   "nome": "Sistema DISC gogroup",
+   "campo": "Status",
+   "de": "Pendente",
+   "para": "Aprovado"
+  },
+  {
+   "linha": 764,
+   "nome": "Matriz de Habilidades — Produção",
+   "campo": "Estrela Agente",
+   "de": "1",
+   "para": "3"
+  },
+  {
+   "linha": 764,
+   "nome": "Matriz de Habilidades — Produção",
+   "campo": "Confiança Agente",
+   "de": "alta",
+   "para": "media"
+  },
+  {
+   "linha": 767,
+   "nome": "SYNAPSE",
+   "campo": "Confiança Agente",
+   "de": "media",
+   "para": "alta"
+  },
+  {
+   "linha": 770,
+   "nome": "Automação sinalização de erro do carrinho",
+   "campo": "Status",
+   "de": "Pendente",
+   "para": "Aprovado"
+  }
+ ]
+}

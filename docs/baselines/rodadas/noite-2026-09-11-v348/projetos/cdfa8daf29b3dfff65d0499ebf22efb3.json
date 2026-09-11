@@ -1,0 +1,44 @@
+{
+  "id": "cdfa8daf29b3dfff65d0499ebf22efb3",
+  "nome": "Cultural hub",
+  "antes": {
+    "id": "cdfa8daf29b3dfff65d0499ebf22efb3",
+    "nome": "Cultural hub",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 99071,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "cdfa8daf29b3dfff65d0499ebf22efb3",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time não fechou sozinho e a decisão é de gente.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time não fechou sozinho e a decisão é de gente.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

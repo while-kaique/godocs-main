@@ -1,0 +1,44 @@
+{
+  "id": "legado-267",
+  "nome": "N8N - Dados de Pré-cadastro Reseller",
+  "antes": {
+    "id": "legado-267",
+    "nome": "N8N - Dados de Pré-cadastro Reseller",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "295,015",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 72391,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-267",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho de 21 h/mês parece liberar tempo, mas não prova que uma despesa deixou de existir; o valor de R$ 295,01 precisa ser conferido com registros de custo ou redução real de trabalho pago.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

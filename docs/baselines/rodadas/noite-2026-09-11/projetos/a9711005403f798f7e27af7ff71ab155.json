@@ -1,0 +1,44 @@
+{
+  "id": "a9711005403f798f7e27af7ff71ab155",
+  "nome": "Painel de Desempenho — Agenda Tributária",
+  "antes": {
+    "id": "a9711005403f798f7e27af7ff71ab155",
+    "nome": "Painel de Desempenho — Agenda Tributária",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "308,8",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 73613,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "a9711005403f798f7e27af7ff71ab155",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 20,5 horas liberadas e o ganho mensal de R$ 308,80 não têm registro do trabalho anterior nem prova de que a despesa deixou de existir. Precisa conferir os controles antes e depois e a redução efetiva de custo.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

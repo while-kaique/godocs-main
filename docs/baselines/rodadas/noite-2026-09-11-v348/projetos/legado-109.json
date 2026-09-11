@@ -1,0 +1,45 @@
+{
+  "id": "legado-109",
+  "nome": "[DUDA] - Automação Cupons Beaute",
+  "antes": {
+    "id": "legado-109",
+    "nome": "[DUDA] - Automação Cupons Beaute",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "98,5",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 72666,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-109",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido de R$ 98,50 por mês fica abaixo do piso e não há prova de uma despesa que deixou de existir. Precisa conferir o custo anterior e o registro de que ele foi realmente eliminado.\nCético: O saving mensal de 98,50 não mostra qual despesa existia nem se ela parou de fato. Precisa conferir registros do custo anterior e evidência da redução após a automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "legado-154",
+  "nome": "Regularizações - GoGroup",
+  "antes": {
+    "id": "legado-154",
+    "nome": "Regularizações - GoGroup",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "170,32",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 58729,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-154",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: Preocupa tratar horas poupadas como despesa que deixou de existir, pois não há registro de redução de custo. É preciso conferir a despesa anterior e provar que ela parou, especialmente para o impacto líquido mensal de 170,32.\nCético: O saving de 170,32 não mostra qual despesa existia nem prova que ela deixou de ocorrer. É preciso conferir registros da despesa anterior e evidência do custo após a implantação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

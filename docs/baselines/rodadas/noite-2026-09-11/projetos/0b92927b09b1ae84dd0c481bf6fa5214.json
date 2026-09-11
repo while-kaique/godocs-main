@@ -1,0 +1,45 @@
+{
+  "id": "0b92927b09b1ae84dd0c481bf6fa5214",
+  "nome": "RPA - Ajuste de inventário",
+  "antes": {
+    "id": "0b92927b09b1ae84dd0c481bf6fa5214",
+    "nome": "RPA - Ajuste de inventário",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "182,685",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 96727,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "0b92927b09b1ae84dd0c481bf6fa5214",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O impacto parece baseado em horas liberadas, não em despesa que deixou de existir. Falta comprovar onde esse custo foi efetivamente evitado e conferir que não houve dupla contagem com outros ganhos.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 0 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

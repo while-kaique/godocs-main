@@ -1,0 +1,45 @@
+{
+  "id": "f482fa39fbab042409249c96ee0b5bc4",
+  "nome": "Gopilot – playson de Google Ads",
+  "antes": {
+    "id": "f482fa39fbab042409249c96ee0b5bc4",
+    "nome": "Gopilot – playson de Google Ads",
+    "status": "Aprovado",
+    "estrelas": "6",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 60118,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "f482fa39fbab042409249c96ee0b5bc4",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 6 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 6
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

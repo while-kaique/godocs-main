@@ -1,0 +1,44 @@
+{
+  "id": "4b386621693f2af77f7a803460d47b53",
+  "nome": "DRE de lançamentos — fechamento mensal",
+  "antes": {
+    "id": "4b386621693f2af77f7a803460d47b53",
+    "nome": "DRE de lançamentos — fechamento mensal",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "96,515",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 68478,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "4b386621693f2af77f7a803460d47b53",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido de R$ 96,52 por mês fica abaixo do piso e parece vir de horas economizadas, não de uma despesa que deixou de existir. Precisa conferir o registro do custo anterior e se houve redução efetiva de despesa.\nCético: O saving de 96,52 não mostra qual despesa existia e deixou de ocorrer, e não há documentação para conferir isso. Precisa do registro da despesa anterior e da prova de que ela parou após a automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

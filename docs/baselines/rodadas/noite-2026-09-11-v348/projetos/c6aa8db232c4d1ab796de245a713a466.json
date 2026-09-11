@@ -1,0 +1,44 @@
+{
+  "id": "c6aa8db232c4d1ab796de245a713a466",
+  "nome": "Sistema de Alertas de Infra de Dados",
+  "antes": {
+    "id": "c6aa8db232c4d1ab796de245a713a466",
+    "nome": "Sistema de Alertas de Infra de Dados",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "3,9925",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 74092,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "c6aa8db232c4d1ab796de245a713a466",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho informado é de R$ 3,99/mês e não há registro de despesa que deixou de existir. Se o benefício for evitar paradas, falta quantificar as perdas evitadas antes de aprovar.\nCético: O impacto líquido mensal foi declarado, mas não há registro de despesa que tenha parado nem prova de redução após os alertas. É preciso conferir logs de incidentes e uma despesa anterior e posterior para validar o saving.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

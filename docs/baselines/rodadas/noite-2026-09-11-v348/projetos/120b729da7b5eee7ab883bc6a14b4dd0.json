@@ -1,0 +1,44 @@
+{
+  "id": "120b729da7b5eee7ab883bc6a14b4dd0",
+  "nome": "Mapeamento de prazo ecomerce de nossas marcas e concorrentes",
+  "antes": {
+    "id": "120b729da7b5eee7ab883bc6a14b4dd0",
+    "nome": "Mapeamento de prazo ecomerce de nossas marcas e concorrentes",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "5819,35",
+    "categorias": "saving, receita_incremental",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 155969,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "120b729da7b5eee7ab883bc6a14b4dd0",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 5819 horas por mês equivale a cerca de 26 FTE, muito alto para um mapeamento de prazos sem informar quem fazia o trabalho. Precisa conferir a equipe envolvida e registros das horas antes e depois.\nFinanceiro: O valor mensal é alto e a documentação não mostra se há despesa realmente eliminada ou receita nova medida. Precisa conferir os registros de transporte e separar o que é economia do que é receita, para não contar o mesmo valor duas vezes.\nCético: O impacto líquido mensal de 5819.35 aparece sem base, medição ou prova de despesa que deixou de existir, e o projeto só descreve um mapeamento. Precisa anexar a origem do valor e registros que mostrem a economia efetivamente realizada.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

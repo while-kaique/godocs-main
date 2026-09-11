@@ -1,0 +1,21 @@
+{
+  "id": "legado-084",
+  "nome": "Automação da gestão de banco de horas",
+  "antes": {
+    "id": "legado-084",
+    "nome": "Automação da gestão de banco de horas",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "631,47",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 502,
+  "ms": 98241,
+  "tentativa": 2,
+  "resultado": {
+    "raw": "App error"
+  }
+}

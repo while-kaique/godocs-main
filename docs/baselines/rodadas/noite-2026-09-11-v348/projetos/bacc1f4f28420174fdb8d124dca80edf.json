@@ -1,0 +1,43 @@
+{
+  "id": "bacc1f4f28420174fdb8d124dca80edf",
+  "nome": "BB UNIFORMES E EPIS",
+  "antes": {
+    "id": "bacc1f4f28420174fdb8d124dca80edf",
+    "nome": "BB UNIFORMES E EPIS",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 71114,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "bacc1f4f28420174fdb8d124dca80edf",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: A descrição não mostra como o controle muda o processo nem onde se verifica a redução de faltas. Precisa do fluxo implantado e de registros de estoque ou distribuição para conferir o efeito.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

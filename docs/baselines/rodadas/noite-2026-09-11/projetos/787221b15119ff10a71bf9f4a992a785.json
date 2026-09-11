@@ -1,0 +1,44 @@
+{
+  "id": "787221b15119ff10a71bf9f4a992a785",
+  "nome": "SPG · Compras — Evolução de Custo Unitário por SKU × CD",
+  "antes": {
+    "id": "787221b15119ff10a71bf9f4a992a785",
+    "nome": "SPG · Compras — Evolução de Custo Unitário por SKU × CD",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "149,5",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 68480,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "787221b15119ff10a71bf9f4a992a785",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho de R$ 149,50/mês parece projetado, pois o projeto só mostra visibilidade para negociação e não prova despesa que deixou de existir. É preciso conferir notas fiscais e registros de negociação que mostrem o custo antes e depois.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "3b3a1a1f91f47a19c1586d91641ce79c",
+  "nome": "Análise de Posicionamento Salarial",
+  "antes": {
+    "id": "3b3a1a1f91f47a19c1586d91641ce79c",
+    "nome": "Análise de Posicionamento Salarial",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "124,09",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 69972,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "3b3a1a1f91f47a19c1586d91641ce79c",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

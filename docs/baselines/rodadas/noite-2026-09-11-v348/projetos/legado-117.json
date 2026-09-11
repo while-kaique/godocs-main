@@ -1,0 +1,45 @@
+{
+  "id": "legado-117",
+  "nome": "Estoque Unificado - ERP + WMS + Alertas Críticos",
+  "antes": {
+    "id": "legado-117",
+    "nome": "Estoque Unificado - ERP + WMS + Alertas Críticos",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "209,795",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 54647,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-117",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho equivale a quase uma pessoa em tempo integral, mas não há informação sobre quantas pessoas faziam a conferência antes. Precisa conferir a equipe envolvida e o registro da despesa que deixou de existir.\nFinanceiro: O ganho mensal informado não mostra uma despesa que realmente deixou de existir. Precisa conferir registros de gastos antes e depois, além de separar horas economizadas de economia em dinheiro.\nCético: O impacto líquido de 209,79 por mês não tem memória de cálculo nem prova de despesa que deixou de existir. Precisa conferir os registros antes e depois e a origem desse valor.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

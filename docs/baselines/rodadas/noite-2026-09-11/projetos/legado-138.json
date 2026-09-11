@@ -1,0 +1,45 @@
+{
+  "id": "legado-138",
+  "nome": "Portal de Download Automático de Bases do B2B",
+  "antes": {
+    "id": "legado-138",
+    "nome": "Portal de Download Automático de Bases do B2B",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "709,7",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 139040,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-138",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido de R$ 709,70 por mês parece coerente com as 66,67 horas liberadas e não indica dupla contagem. Como não há documentação, é preciso conferir se existia uma despesa que realmente deixou de ocorrer.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

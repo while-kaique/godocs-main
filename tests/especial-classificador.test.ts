@@ -143,15 +143,20 @@ describe('corpus — selecionarVizinhos', () => {
 });
 
 describe('corpus — textoParaEmbedding e hashTexto', () => {
-  it('lidera com o que o projeto FAZ, antes do memorial (o fim é o que o teto corta)', () => {
+  it('lidera com o que o projeto FAZ e o MEMORIAL (v1) fica de fora do vetor', () => {
+    // 11/09/2026: memorial é texto v1 com R$ e fórmula, e dominava o vetor — os vizinhos saíam
+    // "parecidos no memorial", não no que o projeto faz. Decisão do dono do produto.
     const t = textoParaEmbedding({
       nome: 'Bot X',
       o_que_faz: 'precifica SKUs por margem',
       contexto_especial: 'controla risco',
       memorial: 'memorial longo',
+      doc: 'doc curta',
     });
     expect(t.indexOf('Projeto: Bot X')).toBeLessThan(t.indexOf('O que faz:'));
-    expect(t.indexOf('O que faz:')).toBeLessThan(t.indexOf('Memorial:'));
+    expect(t).not.toContain('Memorial:');
+    expect(t).not.toContain('memorial longo');
+    expect(t).toContain('Documentação:');
   });
   it('NÃO inclui área/ferramenta/tipo (boilerplate que dilui e aproxima por setor, não por função)', () => {
     const t = textoParaEmbedding({
@@ -167,10 +172,10 @@ describe('corpus — textoParaEmbedding e hashTexto', () => {
     expect(t).toContain('GoPrice');
     expect(t).toContain('calcula preço');
   });
-  it('usa memorial OU doc, não os dois', () => {
-    const t = textoParaEmbedding({ memorial: 'MEM', doc: 'DOC' });
-    expect(t).toContain('MEM');
-    expect(t).not.toContain('DOC');
+  it('doc entra; memorial nunca (v1 fora do vetor desde 11/09/2026)', () => {
+    const t = textoParaEmbedding({ nome: 'X', memorial: 'MEM', doc: 'DOC' });
+    expect(t).toContain('Documentação:\nDOC');
+    expect(t).not.toContain('MEM');
   });
   it('hash muda quando o texto muda e é estável quando não muda', () => {
     const a = hashTexto('texto');

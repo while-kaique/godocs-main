@@ -1,0 +1,45 @@
+{
+  "id": "aaebdc509aa007231f95299186b83c51",
+  "nome": "Funil R&S",
+  "antes": {
+    "id": "aaebdc509aa007231f95299186b83c51",
+    "nome": "Funil R&S",
+    "status": "Aprovado",
+    "estrelas": "4",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "89,7",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 80532,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "aaebdc509aa007231f95299186b83c51",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 4 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 4,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

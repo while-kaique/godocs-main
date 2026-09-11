@@ -1,0 +1,44 @@
+{
+  "id": "892cd8959b348f5d30628773655affed",
+  "nome": "Promoção no Modo Go",
+  "antes": {
+    "id": "892cd8959b348f5d30628773655affed",
+    "nome": "Promoção no Modo Go",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "18,02875",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 65108,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "892cd8959b348f5d30628773655affed",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido informado é baixo para sustentar o projeto e pode refletir apenas horas estimadas, não uma despesa que deixou de existir. É preciso conferir o registro do trabalho antes feito, seu custo e se não foi contado também como receita ou outro ganho.\nCético: O impacto líquido é apresentado sem documentos que mostrem pedidos, períodos e mudanças de cupom usados no cálculo. Precisa conferir esses registros e separar aumento de vendas de saving efetivado, que exigiria uma despesa comprovadamente interrompida.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "d93874c95714c4050db05d0b5e236496",
+  "nome": "GoAssist Beneficios",
+  "antes": {
+    "id": "d93874c95714c4050db05d0b5e236496",
+    "nome": "GoAssist Beneficios",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "411,125",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 98096,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d93874c95714c4050db05d0b5e236496",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

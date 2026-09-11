@@ -1,0 +1,46 @@
+{
+  "id": "1387ecb575c9668970b74a384feee1c1",
+  "nome": "Declaração de Integridade e de Vínculo",
+  "antes": {
+    "id": "1387ecb575c9668970b74a384feee1c1",
+    "nome": "Declaração de Integridade e de Vínculo",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "579,075",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 206127,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "1387ecb575c9668970b74a384feee1c1",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor mensal depende de 21 horas liberadas virarem uma despesa realmente interrompida, e não apenas tempo disponível. Precisa conferir qual atividade ou custo deixou de existir para sustentar os R$ 579,08.\nCético: As 21 horas liberadas são uma estimativa, sem registro de que uma despesa deixou de existir. É preciso conferir folhas de ponto, tarefas ou outro registro que prove a redução efetiva e o cálculo do valor mensal.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 3 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 3,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

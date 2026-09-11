@@ -1,0 +1,21 @@
+{
+  "id": "legado-250",
+  "nome": "Slowmoving B2B n Overview Sales",
+  "antes": {
+    "id": "legado-250",
+    "nome": "Slowmoving B2B n Overview Sales",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "628,9",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 502,
+  "ms": 97965,
+  "tentativa": 2,
+  "resultado": {
+    "raw": "App error"
+  }
+}

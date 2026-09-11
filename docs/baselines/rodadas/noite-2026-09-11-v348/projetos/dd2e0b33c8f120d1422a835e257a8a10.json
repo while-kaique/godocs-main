@@ -1,0 +1,43 @@
+{
+  "id": "dd2e0b33c8f120d1422a835e257a8a10",
+  "nome": "App programa de estágio (Expedição Gogroup)",
+  "antes": {
+    "id": "dd2e0b33c8f120d1422a835e257a8a10",
+    "nome": "App programa de estágio (Expedição Gogroup)",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 76647,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "dd2e0b33c8f120d1422a835e257a8a10",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: Preocupa a falta de documentação e o campo “O que faz” vazio, o que impede confirmar como o processo mudou e onde o efeito é verificado. Precisa apresentar registros do uso e da mudança no acompanhamento da jornada.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

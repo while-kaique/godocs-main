@@ -1,0 +1,45 @@
+{
+  "id": "legado-027",
+  "nome": "[Gobeaute Tech] Status Report de pedidos travados na operação",
+  "antes": {
+    "id": "legado-027",
+    "nome": "[Gobeaute Tech] Status Report de pedidos travados na operação",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "161,7",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 61343,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-027",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor é baixo, mas o projeto só declara horas liberadas, não uma despesa que deixou de existir. Precisa conferir o custo dessas horas e onde a redução de despesa foi registrada.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

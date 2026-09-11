@@ -1,0 +1,44 @@
+{
+  "id": "d054d508d6b794a3c3b18f692f784208",
+  "nome": "Ajuda Facilities",
+  "antes": {
+    "id": "d054d508d6b794a3c3b18f692f784208",
+    "nome": "Ajuda Facilities",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "250,92",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 116660,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d054d508d6b794a3c3b18f692f784208",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 36 h/mês são uma estimativa, sem registros que mostrem tempo realmente poupado ou despesa que deixou de existir. Precisa conferir os tempos antes e depois e a folha ou custo afetado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

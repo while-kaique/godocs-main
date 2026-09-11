@@ -1,0 +1,44 @@
+{
+  "id": "f075deb74219cab44640b44ef71d486c",
+  "nome": "Dashboard de Orçamento de Operações (Orçamento Ops H2) com IA embarcada",
+  "antes": {
+    "id": "f075deb74219cab44640b44ef71d486c",
+    "nome": "Dashboard de Orçamento de Operações (Orçamento Ops H2) com IA embarcada",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "193,025",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 59124,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "f075deb74219cab44640b44ef71d486c",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 193 horas/mês pode caber em uma pessoa, mas o texto não mostra quantas pessoas faziam o acompanhamento nem o tempo antes. Precisa conferir registros de horas ou rotinas substituídas e quem deixou de executá-las.\nFinanceiro: O valor líquido mensal não está ligado a uma despesa que deixou de existir, apenas a mais visibilidade do orçamento. Precisa conferir registros de economia efetiva ou redução de custo antes de aprovar o impacto de 193,03.\nCético: O impacto líquido mensal de 193,03 não mostra uma despesa que deixou de existir, e o texto não traz prova de economia efetiva. Precisa apresentar o registro do custo antes e depois, além do uso real do dashboard.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

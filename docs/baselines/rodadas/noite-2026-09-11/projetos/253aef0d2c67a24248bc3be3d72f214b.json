@@ -1,0 +1,44 @@
+{
+  "id": "253aef0d2c67a24248bc3be3d72f214b",
+  "nome": "Integração reseller",
+  "antes": {
+    "id": "253aef0d2c67a24248bc3be3d72f214b",
+    "nome": "Integração reseller",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 100125,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "253aef0d2c67a24248bc3be3d72f214b",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: A descrição é genérica e não mostra qual processo mudou nem onde o efeito pode ser conferido. Precisa do fluxo antes e depois e de um registro do webhook ou da etapa do funil.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

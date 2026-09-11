@@ -1,0 +1,43 @@
+{
+  "id": "LEGADO-127",
+  "nome": "Automação do envio do report de Melhorias do Inbound",
+  "antes": {
+    "id": "LEGADO-127",
+    "nome": "Automação do envio do report de Melhorias do Inbound",
+    "status": "Reprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "55,15",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 88994,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-127",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho informado é de R$ 55,15 por mês, abaixo do piso de R$ 100, e não há documento mostrando uma despesa que deixou de existir. Para aprovar, é preciso conferir o custo efetivamente evitado e como foi calculado.\nCético: O impacto líquido de 55,15 parece ser tempo estimado, não despesa que deixou de existir. Falta o registro do custo antes e depois, além da prova de que essas horas realmente foram liberadas.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Reprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes reprovou o projeto por régua declarada.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time de agentes reprovou o projeto por régua declarada.",
+        "A análise do impacto ficou em Pendente e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar."
+      ]
+    },
+    "status_gravado": "Reprovado"
+  }
+}

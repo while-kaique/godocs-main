@@ -1,0 +1,43 @@
+{
+  "id": "5071c7c3b92bf98fb2e50e8e987ae091",
+  "nome": "HireFlow",
+  "antes": {
+    "id": "5071c7c3b92bf98fb2e50e8e987ae091",
+    "nome": "HireFlow",
+    "status": "Pendente",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 69534,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "5071c7c3b92bf98fb2e50e8e987ae091",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: A documentação está vazia e não mostra onde a mudança foi verificada na prática. Precisa apresentar registros do uso e do processo antes e depois para sustentar a aprovação.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

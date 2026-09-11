@@ -1,0 +1,43 @@
+{
+  "id": "ccedc03371ef0864ceadc99472dd9b00",
+  "nome": "Cross Brand",
+  "antes": {
+    "id": "ccedc03371ef0864ceadc99472dd9b00",
+    "nome": "Cross Brand",
+    "status": "Pendente",
+    "estrelas": "—",
+    "estrelaAgente": "—",
+    "confiancaAgente": "—",
+    "impacto": "1921,92",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 106519,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "ccedc03371ef0864ceadc99472dd9b00",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 1921,92 horas por mês exige trabalho antes feito por várias pessoas, mas o texto não informa quem executava essas tarefas nem quanto tempo gastava. É preciso conferir registros de rotina ou entrevistas com Kayo e os times das marcas.\nFinanceiro: O ganho mensal de 1921,92 ainda parece uma estimativa de decisão, não uma despesa comprovadamente evitada. Precisa conferir contratos rescindidos ou renegociados e os pagamentos que deixaram de ocorrer.\nCético: O saving mensal de 1.921,92 aparece como impacto esperado, mas não há registro de despesa que deixou de existir. É preciso conferir contratos encerrados ou renegociados e os pagamentos antes e depois.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir."
+      ]
+    },
+    "status_gravado": "Pendente"
+  }
+}

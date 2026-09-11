@@ -1,0 +1,45 @@
+{
+  "id": "43dbbb4308158f46de4284d6e6f4ab26",
+  "nome": "GoProspect",
+  "antes": {
+    "id": "43dbbb4308158f46de4284d6e6f4ab26",
+    "nome": "GoProspect",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "212,9",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 82857,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "43dbbb4308158f46de4284d6e6f4ab26",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 20 horas liberadas parecem uma estimativa, e a automação em massa ainda depende de uma API futura. Falta o registro do tempo antes e depois e a prova de que uma despesa realmente deixou de existir.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

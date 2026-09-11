@@ -1,0 +1,45 @@
+{
+  "id": "1b75bcf9e08ccb24f7247781beb4ca44",
+  "nome": "Ordens Travadas/Em Espera | Metabase -> Chat",
+  "antes": {
+    "id": "1b75bcf9e08ccb24f7247781beb4ca44",
+    "nome": "Ordens Travadas/Em Espera | Metabase -> Chat",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "125,46",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 81117,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "1b75bcf9e08ccb24f7247781beb4ca44",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho parece coerente com 18 h/mês, mas o projeto descreve alerta e transparência, não uma despesa que deixou de existir. Precisa conferir quem deixou de executar esse trabalho e onde o custo evitado está registrado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

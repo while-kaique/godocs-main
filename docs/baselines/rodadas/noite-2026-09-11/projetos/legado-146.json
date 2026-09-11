@@ -1,0 +1,45 @@
+{
+  "id": "legado-146",
+  "nome": "[GoChallenge] Comunicações; [GoChallenge]emails; [GoChallenge]Raspadinha",
+  "antes": {
+    "id": "legado-146",
+    "nome": "[GoChallenge] Comunicações; [GoChallenge]emails; [GoChallenge]Raspadinha",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "15,05125",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 297421,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-146",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho financeiro informado é baixo e o memorial fala em horas liberadas, não em despesa que deixou de existir. Confirme com registros se havia custo pago antes e se ele foi realmente eliminado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

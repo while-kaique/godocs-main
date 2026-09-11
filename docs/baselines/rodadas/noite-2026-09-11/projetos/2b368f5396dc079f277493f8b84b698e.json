@@ -1,0 +1,46 @@
+{
+  "id": "2b368f5396dc079f277493f8b84b698e",
+  "nome": "Gocase Internacional - Projeto Remessa Conforme",
+  "antes": {
+    "id": "2b368f5396dc079f277493f8b84b698e",
+    "nome": "Gocase Internacional - Projeto Remessa Conforme",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "5",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 115745,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "2b368f5396dc079f277493f8b84b698e",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 4 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 4
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

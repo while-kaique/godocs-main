@@ -1,0 +1,45 @@
+{
+  "id": "legado-262",
+  "nome": "Dashboard Pipeline de sucessão",
+  "antes": {
+    "id": "legado-262",
+    "nome": "Dashboard Pipeline de sucessão",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "325,45",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 49598,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-262",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 325,45 horas por mês exige comprovar que várias pessoas faziam esse trabalho antes do dashboard. Falta o registro das pessoas envolvidas e das horas gastas para conferir esse volume.\nFinanceiro: O valor líquido mensal de 325,45 parece coerente, mas falta mostrar qual despesa existia e deixou de ocorrer. Precisa conferir o registro dessa despesa e a base das horas usadas no cálculo.\nCético: O impacto líquido mensal de 325,45 não vem acompanhado de registro de uma despesa que deixou de existir, e o projeto não explica como o painel gerou essa economia. Precisa conferir a despesa antes e depois e os registros que comprovem o saving efetivado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

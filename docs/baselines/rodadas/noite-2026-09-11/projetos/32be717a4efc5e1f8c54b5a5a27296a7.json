@@ -1,0 +1,44 @@
+{
+  "id": "32be717a4efc5e1f8c54b5a5a27296a7",
+  "nome": "Relatórios Automáticos AVD-Gomoon",
+  "antes": {
+    "id": "32be717a4efc5e1f8c54b5a5a27296a7",
+    "nome": "Relatórios Automáticos AVD-Gomoon",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "124,5833333",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 89032,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "32be717a4efc5e1f8c54b5a5a27296a7",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho financeiro depende de comprovar que as 50 h/mês viraram despesa que deixou de existir, não apenas tempo liberado. Precisa conferir o custo antes da automação e onde essa redução aparece.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

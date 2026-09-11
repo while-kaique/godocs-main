@@ -1,0 +1,45 @@
+{
+  "id": "0153f250eb11f5575e027ea4c72aac53",
+  "nome": "Visão de Produtos por Influenciador",
+  "antes": {
+    "id": "0153f250eb11f5575e027ea4c72aac53",
+    "nome": "Visão de Produtos por Influenciador",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "291,67",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 71694,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "0153f250eb11f5575e027ea4c72aac53",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho parece ser uma estimativa de tempo para apoiar decisões, não uma despesa que deixou de existir. É preciso conferir registros do trabalho antes e depois e provar que esse custo realmente parou.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

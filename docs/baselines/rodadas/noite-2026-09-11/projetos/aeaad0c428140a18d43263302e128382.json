@@ -1,0 +1,44 @@
+{
+  "id": "aeaad0c428140a18d43263302e128382",
+  "nome": "Análise Inteligente de Contratos",
+  "antes": {
+    "id": "aeaad0c428140a18d43263302e128382",
+    "nome": "Análise Inteligente de Contratos",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "1835,975",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 57307,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "aeaad0c428140a18d43263302e128382",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor líquido parece vir de horas liberadas, mas isso não prova redução de despesa. Precisa conferir o custo dessas horas e se houve gasto que realmente deixou de existir, sem contar a mesma economia em outro impacto.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

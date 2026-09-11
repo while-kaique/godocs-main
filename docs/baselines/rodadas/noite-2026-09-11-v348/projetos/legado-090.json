@@ -1,0 +1,45 @@
+{
+  "id": "legado-090",
+  "nome": "Fomrs_RCA_RDstation",
+  "antes": {
+    "id": "legado-090",
+    "nome": "Fomrs_RCA_RDstation",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "42,58",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 90773,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-090",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho declarado é baixo e não sustenta o projeto sozinho. É preciso conferir o registro da despesa que existia e deixou de ocorrer.\nCético: O saving líquido de 42.58 não mostra que uma despesa realmente parou, apenas um ganho estimado de horas. Falta o registro da despesa anterior e a prova de que ela deixou de existir após a automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Reprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes reprovou o projeto por régua declarada.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time de agentes reprovou o projeto por régua declarada.",
+        "A análise do impacto ficou em Pendente e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Reprovado e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

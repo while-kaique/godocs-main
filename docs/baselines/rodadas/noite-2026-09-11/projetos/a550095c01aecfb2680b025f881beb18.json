@@ -1,0 +1,45 @@
+{
+  "id": "a550095c01aecfb2680b025f881beb18",
+  "nome": "Nomeador de Estampas",
+  "antes": {
+    "id": "a550095c01aecfb2680b025f881beb18",
+    "nome": "Nomeador de Estampas",
+    "status": "Aprovado",
+    "estrelas": "5",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "2911,17",
+    "categorias": "Custo evitado, Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 152753,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "a550095c01aecfb2680b025f881beb18",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 5 é âncora — o time recomendou 5 e não reescreveu a nota",
+      "estrelas": 5,
+      "estrelas_time": 5
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

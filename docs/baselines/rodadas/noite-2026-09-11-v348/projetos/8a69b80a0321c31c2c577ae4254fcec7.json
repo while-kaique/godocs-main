@@ -1,0 +1,43 @@
+{
+  "id": "8a69b80a0321c31c2c577ae4254fcec7",
+  "nome": "Evnio de e-mails com Informe de Rendimentos anual",
+  "antes": {
+    "id": "8a69b80a0321c31c2c577ae4254fcec7",
+    "nome": "Evnio de e-mails com Informe de Rendimentos anual",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "173,775",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 68890,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "8a69b80a0321c31c2c577ae4254fcec7",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho líquido mensal de 173,78 não mostra qual despesa deixou de existir, podendo ser apenas tempo realocado. Falta o registro do custo anterior e dos envios realizados para conferir o saving e a execução.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

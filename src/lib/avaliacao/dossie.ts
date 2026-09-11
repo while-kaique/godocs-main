@@ -23,6 +23,12 @@ export type FontesDossie = {
   versoes: { versao_num: number; acao: string; snapshot_projeto: string | null; created_at: string | null }[];
   eventos: { tipo: string; fase: string | null; dados: string | null; created_at: string | null }[];
   cargoAutor: string | null | undefined;
+  /**
+   * O TEXTO dos documentos do Drive (o `.md` da documentação compilada e anexos de texto), já lido
+   * por `lerTextoDocsDrive` (11/09/2026). `undefined` = não buscado (lacuna `texto_anexos`);
+   * `[]` = buscado e nada legível.
+   */
+  docsDrive?: { link: string; nome: string | null; mime: string | null; texto: string | null; aviso: string | null }[];
 };
 
 export type Lacuna = 'projeto' | 'documentacao' | 'espelho' | 'versoes' | 'texto_anexos' | 'v2' | 'teamguide';
@@ -89,6 +95,8 @@ export type Dossie = {
     justificativa_lider: string | null;
   };
   contexto: { contrafactual_afetados: string[]; membros: string[]; anexos_links: string[]; contexto_especial: string | null };
+  /** Documentos do Drive com texto lido (o `.md` da doc e anexos de texto). Vazio quando nada legível. */
+  docs_drive: { link: string; nome: string | null; mime: string | null; texto: string | null; aviso: string | null }[];
   historico: {
     versoes: { versao_num: number; acao: string; created_at: string | null }[];
     mudancas_ultimo_reenvio: { campo: string; antes: unknown; depois: unknown }[] | null;
@@ -259,7 +267,9 @@ function construir(f: FontesDossie, opts: { lacunaProjeto: boolean }): Dossie | 
   const lacunas = new Set<Lacuna>();
   if (!p && opts.lacunaProjeto) lacunas.add('projeto');
   if (!f.espelho) lacunas.add('espelho');
-  lacunas.add('texto_anexos');
+  // ⚠️ `texto_anexos` só é lacuna quando o texto do Drive NÃO foi buscado. Antes era permanente —
+  // e o dossiê afirmava ao agente que a evidência não existia, com 757 de 770 projetos com `.md`.
+  if (f.docsDrive === undefined) lacunas.add('texto_anexos');
 
   const id = texto(p?.id) ?? g('ID Projeto');
   if (!id) return null;
@@ -382,6 +392,7 @@ function construir(f: FontesDossie, opts: { lacunaProjeto: boolean }): Dossie | 
       anexos_links: p ? listaStrings(p.arquivos_links) : separarLinks(g('URL')),
       contexto_especial: texto(p?.contexto_especial) ?? g('Contexto do Projeto Especial'),
     },
+    docs_drive: (f.docsDrive ?? []).map((x) => ({ ...x })),
     historico: {
       versoes: versoesOrd.map((v) => ({ versao_num: v.versao_num, acao: v.acao, created_at: v.created_at })),
       mudancas_ultimo_reenvio: compararSnapshots(f.versoes),
@@ -423,7 +434,7 @@ const DESCRICAO_LACUNA: Record<Lacuna, string> = {
   documentacao: 'documentação compilada não encontrada',
   espelho: 'linha da planilha (espelho) não encontrada',
   versoes: 'sem versões registradas (submissão única ou legado)',
-  texto_anexos: 'texto dos anexos não é persistido (só os links)',
+  texto_anexos: 'texto dos documentos do Drive não foi lido nesta passada (só os links)',
   v2: 'campos do formulário v2 ausentes',
   teamguide: 'cargo do autor não consultado na TeamGuide',
 };
@@ -456,7 +467,11 @@ export function linhaImpactoBrutoLiquido(bruto: number | null, liquido: number |
   if (bruto === null && liquido === null) return null;
   // ⚠️ Usa o MESMO `fmt` do resto do dossiê: número com outra formatação para o mesmo campo é
   // ruído que o agente pode ler como duas grandezas diferentes.
-  return `Impacto bruto: ${fmt(bruto)} · impacto líquido MENSAL: ${fmt(liquido)} — os dois estão CORRETOS e diferem por construção (no líquido as horas entram ponderadas), e o número que vale para a régua é o LÍQUIDO MENSAL. A diferença entre eles NÃO é contradição nem erro de cálculo do autor.`;
+  // ⚠️ "R$" EXPLÍCITO (11/09/2026): sem a unidade, o especialista de horas da mesa leu o impacto
+  // líquido como HORAS — canários AVD Central v2 ("saving de 8.352 horas por mês equivale a 38
+  // pessoas") e CX Hub ("31.604,82 horas por mês"). Número sem unidade é convite ao erro de grandeza.
+  const r = (n: number | null) => (n === null ? '—' : `R$ ${fmt(n)}`);
+  return `Impacto bruto: ${r(bruto)} · impacto líquido MENSAL: ${r(liquido)} (valores em REAIS por mês, NÃO são horas) — os dois estão CORRETOS e diferem por construção (no líquido as horas entram ponderadas), e o número que vale para a régua é o LÍQUIDO MENSAL. A diferença entre eles NÃO é contradição nem erro de cálculo do autor.`;
 }
 
 export function linhaDoQueSeCobra(
@@ -502,6 +517,16 @@ export function dossieParaTexto(d: Dossie, opts: { comReais?: boolean } = {}): s
     ]),
   );
   partes.push(bloco('Descrição', [t(d.descricao)]));
+  // ⚠️ A DOCUMENTAÇÃO REAL do projeto: o `.md` no Drive (11/09/2026). Entra ANTES da doc do banco,
+  // que na maioria da base não existe. Com R$ omitidos quando `comReais` está desligado.
+  if (d.docs_drive.length) {
+    const linhas: (string | null)[] = [];
+    for (const x of d.docs_drive) {
+      if (x.texto) linhas.push(`### ${x.nome ?? x.link}\n${t(x.texto)}`);
+      else linhas.push(`(${x.nome ?? x.link}: ${x.aviso ?? 'sem texto'})`);
+    }
+    partes.push(bloco('Documentação do projeto (Drive)', linhas));
+  }
   partes.push(
     bloco('Documentação', d.documentacao.presente
       ? [
@@ -598,9 +623,10 @@ export function dossieParaTexto(d: Dossie, opts: { comReais?: boolean } = {}): s
     fin.custo_externo_mensal !== null ? `Custo externo mensal: ${fmt(fin.custo_externo_mensal)}` : null,
     fin.custo_projeto_itens.length ? `Itens de custo do projeto: ${t(JSON.stringify(fin.custo_projeto_itens))}` : null,
     fin.receita_mensal !== null ? `Receita mensal: ${fmt(fin.receita_mensal)} (${fin.tipo_receita ?? '—'})` : null,
-    fin.memorial_saving ? (reais ? `Memorial de saving:\n${fin.memorial_saving}` : '[memorial com valores omitidos]') : null,
-    fin.memorial_receita ? `Memorial de receita:\n${t(fin.memorial_receita)}` : null,
-    fin.observacoes_analisador ? `Parecer do analisador:\n${t(fin.observacoes_analisador)}` : null,
+    // ⚠️ MEMORIAL (saving/receita) e PARECER DO ANALISADOR SAÍRAM do texto (11/09/2026, decisão do
+    // dono do produto: "memorial hoje em dia não conta mais; tudo referente à v1 deve ser
+    // desconsiderado"). Os campos seguem no `Dossie` para leitores que não são prompt; o que o
+    // time lê é nome, descrição, documentação, os números da v2 e as evidências.
   ];
   if (d.v2) {
     linhasFin.push(

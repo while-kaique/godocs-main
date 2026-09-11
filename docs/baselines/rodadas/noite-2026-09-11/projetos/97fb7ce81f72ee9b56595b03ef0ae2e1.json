@@ -1,0 +1,45 @@
+{
+  "id": "97fb7ce81f72ee9b56595b03ef0ae2e1",
+  "nome": "Automação de Inputs de Saída",
+  "antes": {
+    "id": "97fb7ce81f72ee9b56595b03ef0ae2e1",
+    "nome": "Automação de Inputs de Saída",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "951,825",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 77731,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "97fb7ce81f72ee9b56595b03ef0ae2e1",
+    "mesa": {
+      "ok": true,
+      "motivo": "Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 3 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 3,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

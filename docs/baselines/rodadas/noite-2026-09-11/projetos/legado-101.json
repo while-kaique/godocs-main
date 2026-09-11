@@ -1,0 +1,44 @@
+{
+  "id": "legado-101",
+  "nome": "Insucessos - Gocase",
+  "antes": {
+    "id": "legado-101",
+    "nome": "Insucessos - Gocase",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "4085",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 95677,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-101",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho mensal de R$ 4085 não vem acompanhado de registro de despesa que deixou de existir, e as horas liberadas foram declaradas como nenhuma. Precisa conferir a despesa anterior e como a automação evita esse gasto.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

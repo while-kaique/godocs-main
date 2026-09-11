@@ -1,0 +1,44 @@
+{
+  "id": "10738e70d81958c0e6444309d6523ab8",
+  "nome": "Portal de SKUs Licenciados",
+  "antes": {
+    "id": "10738e70d81958c0e6444309d6523ab8",
+    "nome": "Portal de SKUs Licenciados",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "278,8",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 109778,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "10738e70d81958c0e6444309d6523ab8",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 40 horas liberadas não mostram que uma despesa deixou de existir, e o impacto líquido de R$ 278,80 por mês não tem registro de cálculo ou validação. Precisa conferir os controles antigos, as horas realmente gastas e a despesa que foi interrompida.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "legado-168",
+  "nome": "Painel de Pedidos em Aberto",
+  "antes": {
+    "id": "legado-168",
+    "nome": "Painel de Pedidos em Aberto",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "127,74",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 98113,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-168",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 12 h/mês liberadas não provam que uma despesa parou, e não há registro de custo evitado. Como parte da lógica foi incorporada ao SPG, é preciso conferir se o ganho não está sendo contado duas vezes.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

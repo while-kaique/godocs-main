@@ -1,0 +1,43 @@
+{
+  "id": "d06945d06eab9574c5da11e9f6dd24b7",
+  "nome": "Dados Orgânicos Social - Gocase",
+  "antes": {
+    "id": "d06945d06eab9574c5da11e9f6dd24b7",
+    "nome": "Dados Orgânicos Social - Gocase",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 75459,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d06945d06eab9574c5da11e9f6dd24b7",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto afirma que o painel é auditável e que o financeiro reconhece os números, mas não traz documentação nem registro de validação. É preciso conferir o painel, as fontes e a aprovação do financeiro.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

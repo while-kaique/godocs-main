@@ -1,0 +1,44 @@
+{
+  "id": "1647f47266fad130216f1ed778419946",
+  "nome": "Gestão de absenteísmo",
+  "antes": {
+    "id": "1647f47266fad130216f1ed778419946",
+    "nome": "Gestão de absenteísmo",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "372,355",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 87245,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "1647f47266fad130216f1ed778419946",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho mensal de R$372 parece plausível, mas falta comprovar que os descontos realmente ocorreram nos pagamentos. Conferir registros de presença e folhas ou notas antes e depois da ferramenta.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

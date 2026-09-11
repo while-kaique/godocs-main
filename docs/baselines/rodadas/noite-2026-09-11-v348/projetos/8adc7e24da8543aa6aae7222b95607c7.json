@@ -1,0 +1,45 @@
+{
+  "id": "8adc7e24da8543aa6aae7222b95607c7",
+  "nome": "GoHunter",
+  "antes": {
+    "id": "8adc7e24da8543aa6aae7222b95607c7",
+    "nome": "GoHunter",
+    "status": "Aprovado",
+    "estrelas": "5",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 159370,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "8adc7e24da8543aa6aae7222b95607c7",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 5 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 5
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

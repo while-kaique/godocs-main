@@ -1,0 +1,43 @@
+{
+  "id": "ddd015f93f4a84666a4e3e9e4fe8b003",
+  "nome": "Governança tecnologia Gobeaute",
+  "antes": {
+    "id": "ddd015f93f4a84666a4e3e9e4fe8b003",
+    "nome": "Governança tecnologia Gobeaute",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "213,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 69585,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "ddd015f93f4a84666a4e3e9e4fe8b003",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O saving líquido mensal de 213,75 não vem acompanhado de registro de despesa que deixou de existir. Precisa conferir a base de horas e a despesa realmente encerrada, não apenas o uso do painel.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

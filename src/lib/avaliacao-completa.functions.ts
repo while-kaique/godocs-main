@@ -111,6 +111,8 @@ async function estrelaPeloTimeInteiro(
   ok: boolean;
   motivo?: string;
   estrelas?: number | null;
+  /** A nota que o TIME recomendou nesta passada, mesmo quando a âncora humana venceu (11/09/2026). */
+  estrelas_time?: number | null;
   /** O consenso do TIME, que até 09/09/2026 era CALCULADO e JOGADO FORA aqui. */
   saida?: string;
   escape?: boolean;
@@ -170,20 +172,11 @@ async function estrelaPeloTimeInteiro(
   const avaliada = r.resultado.estrela.avaliada !== false;
   if (opts.dry) return { ok: true, estrelas: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca, avaliada };
 
-  // A âncora humana vence a nota do time: ela é verdade e exemplar do corpus, e a régua nunca
-  // reclassifica quem gente já julgou. O VEREDITO do time segue valendo (é o que a junta lê).
-  if (ancoraHumana != null) {
-    return {
-      ok: true,
-      estrelas: ancoraHumana,
-      saida: c.saida,
-      escape: c.escape,
-      confianca: c.confianca,
-      // nota de gente é julgamento por definição
-      avaliada: true,
-      motivo: `nota humana ${ancoraHumana} é âncora — o time julgou o mérito e não reescreveu a nota`,
-    };
-  }
+  // ⚠️ A âncora humana protege a coluna "Estrelas", NÃO as colunas do AGENTE (corrigido 11/09/2026).
+  // Antes este ponto dava `return` antes de gravar `especial_avaliacao` e `Estrela Agente`, então
+  // a recomendação do time para os 298 projetos com nota de gente NÃO ficava registrada em lugar
+  // nenhum além do log em árvore — e a calibragem (agente × humano) é exatamente esse par. Agora a
+  // recomendação é gravada sempre; o que a âncora bloqueia é a ESCRITA em "Estrelas".
 
   // Persistência em DOIS lugares, e os dois são necessários:
   //  - `especial_avaliacao` é de onde a FICHA lê a recomendação;
@@ -219,7 +212,7 @@ async function estrelaPeloTimeInteiro(
     // `automacao`/`inteligencia`/`autonomia`), e dois escritores na mesma célula é a briga que este
     // repo já pagou em outras colunas. O nível do time vira `Tipo de Projeto` só pelo eixo TIPO.
     const celulas: Record<string, string> = {
-      'Estrela Agente': rotuloNotaAgente(c.estrela).rotulo,
+      'Estrela Agente': rotuloNotaAgente(c.estrela, c.escape).rotulo,
       'Confiança Agente': c.confianca,
     };
     const tipoDoTime = TIPOS_PROJETO.find((t) => t.chave === r.resultado.estrela.tipo)?.rotulo;
@@ -231,7 +224,20 @@ async function estrelaPeloTimeInteiro(
   } catch (e) {
     console.error('[time-completo] falha ao escrever as colunas do agente:', e);
   }
-  return { ok: true, estrelas: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca, avaliada };
+  if (ancoraHumana != null) {
+    return {
+      ok: true,
+      estrelas: ancoraHumana,
+      estrelas_time: c.estrela,
+      saida: c.saida,
+      escape: c.escape,
+      confianca: c.confianca,
+      // nota de gente é julgamento por definição
+      avaliada: true,
+      motivo: `nota humana ${ancoraHumana} é âncora — o time recomendou ${c.estrela}${c.escape ? ' (6-10)' : ''} e não reescreveu a nota`,
+    };
+  }
+  return { ok: true, estrelas: c.estrela, estrelas_time: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca, avaliada };
 }
 
 export type ResultadoTimeCompleto = {
@@ -240,7 +246,7 @@ export type ResultadoTimeCompleto = {
   /** O veredito da mesa (impacto): `{ok, veredito, ...}` ou o motivo do NO-OP. */
   mesa: { ok: boolean; motivo?: string; veredito?: string | null };
   /** A nota: `{ok, estrelas}` ou o motivo (já tem nota humana, sem vizinhos…). */
-  estrela: { ok: boolean; motivo?: string; estrelas?: number | null };
+  estrela: { ok: boolean; motivo?: string; estrelas?: number | null; estrelas_time?: number | null };
   /** A JUNÇÃO das duas metades: uma análise só, com o status do funil que ela implica. */
   junta?: Juncao;
   /** O Status realmente gravado na planilha, ou `null` quando a flag está desligada / `dry`. */
@@ -291,6 +297,7 @@ function resumoEstrela(r: unknown): ResultadoTimeCompleto['estrela'] {
     ok: o.ok === true,
     motivo: typeof o.motivo === 'string' ? o.motivo : undefined,
     estrelas: typeof o.estrelas === 'number' ? o.estrelas : null,
+    estrelas_time: typeof o.estrelas_time === 'number' ? o.estrelas_time : null,
   };
 }
 
@@ -392,6 +399,26 @@ export async function avaliarProjetoComTimeCompleto(
         const porque = porqueNaoEncostou(permissao.motivo!, junta.status);
         junta.porques.push(porque);
         console.log(`[time-completo] ${projetoId}: status NÃO gravado — ${porque}`);
+        // ⚠️ A ESTRELA não depende do Status (11/09/2026, pedido do dono do produto: "todos devem
+        // ser avaliados e 0 estrelas só deve ser aquele que atende o critério de fato"). Até aqui a
+        // nota do time só entrava na célula JUNTO com o Status, e como o agente não encosta em
+        // projeto Aprovado, os aprovados ficavam com o `0` default da coluna manual mesmo depois de
+        // avaliados — indistinguível de "ninguém olhou". Agora a estrela 0-5 é gravada sozinha,
+        // mantendo o Status atual (mesmo status é sempre permitido), e só quando NÃO há nota humana
+        // (a âncora protege a nota de gente; a faixa 6-10 continua fora da célula).
+        const statusAtual = String(linhaAtual?.['Status'] ?? '').trim();
+        const ancoradaEmGente = String(e.motivo ?? '').includes('âncora');
+        if (notaParaCelula !== undefined && !ancoradaEmGente && statusAtual) {
+          try {
+            await definirStatusProjeto(
+              { projeto_id: projetoId, status: statusAtual as never, estrelas: notaParaCelula },
+              ATOR_TIME_AGENTES,
+            );
+            junta.porques.push(`A estrela ${notaParaCelula} do time foi gravada; o Status ${statusAtual} não foi tocado.`);
+          } catch (err) {
+            console.error('[time-completo] falha ao gravar só a estrela:', err);
+          }
+        }
       } else {
         await definirStatusProjeto(
           {

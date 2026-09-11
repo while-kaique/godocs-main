@@ -1,0 +1,45 @@
+{
+  "id": "7ede4163132737357ef11a56d8194fe3",
+  "nome": "Alertas de correções do Contas a Pagar e Intercompany",
+  "antes": {
+    "id": "7ede4163132737357ef11a56d8194fe3",
+    "nome": "Alertas de correções do Contas a Pagar e Intercompany",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "165,45",
+    "categorias": "Custo evitado, Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 111599,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "7ede4163132737357ef11a56d8194fe3",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: A liberação de 6 h por mês e o ganho líquido de R$ 165,45 não têm registro de antes e depois nem memória de cálculo verificável. É preciso conferir os tempos reais e a ligação deles com cada regra aplicada.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

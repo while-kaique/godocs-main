@@ -1,0 +1,44 @@
+{
+  "id": "LEGADO-269",
+  "nome": "Visão alerta integrações divergente Shopify x Intelipost GB",
+  "antes": {
+    "id": "LEGADO-269",
+    "nome": "Visão alerta integrações divergente Shopify x Intelipost GB",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "234,19",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 71058,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-269",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto declara 22 h/mês liberadas, mas não mostra quais tarefas deixaram de ser feitas nem prova de uma despesa que parou. Precisa apresentar registros da rotina anterior e confirmar o saving efetivado de R$ 234,19 por mês.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

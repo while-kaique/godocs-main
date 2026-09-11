@@ -1,0 +1,46 @@
+{
+  "id": "c0c69dcd5df93f5378160e1b49bf2f8d",
+  "nome": "Sistema de memória de M&A",
+  "antes": {
+    "id": "c0c69dcd5df93f5378160e1b49bf2f8d",
+    "nome": "Sistema de memória de M&A",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 106722,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "c0c69dcd5df93f5378160e1b49bf2f8d",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 3 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 3,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

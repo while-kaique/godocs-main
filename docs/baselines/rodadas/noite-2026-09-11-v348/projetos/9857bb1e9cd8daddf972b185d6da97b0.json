@@ -1,0 +1,43 @@
+{
+  "id": "9857bb1e9cd8daddf972b185d6da97b0",
+  "nome": "Controle de Paradas",
+  "antes": {
+    "id": "9857bb1e9cd8daddf972b185d6da97b0",
+    "nome": "Controle de Paradas",
+    "status": "Pendente",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "448,5",
+    "categorias": "Custo evitado",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 65094,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "9857bb1e9cd8daddf972b185d6da97b0",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho de 448,5 horas por mês equivale a cerca de duas pessoas em tempo integral, o que parece alto para um painel sem informar quem fazia o levantamento. Precisa conferir registros de tempo e quantas pessoas, nos três turnos, refaziam essa análise.\nFinanceiro: O ganho mensal de R$ 448,50 parece compatível com a rotina manual, mas falta conferir o registro das 30 horas liberadas e o valor usado por hora. Também é preciso confirmar que essas horas não foram contadas junto com outro custo evitado.\nCético: O impacto líquido mensal de 448,50 é informado sem mostrar o cálculo das horas liberadas e do valor por hora. Precisa conferir registros do trabalho manual, frequência das consultas e validação das 30 horas.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir."
+      ]
+    },
+    "status_gravado": "Pendente"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "3cc7f441c0de8ac489045a58968e4828",
+  "nome": "Suporte à queda de ripagem PrintFactory",
+  "antes": {
+    "id": "3cc7f441c0de8ac489045a58968e4828",
+    "nome": "Suporte à queda de ripagem PrintFactory",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "3132,03",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 90127,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "3cc7f441c0de8ac489045a58968e4828",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: As 318,4 horas por mês podem ser plausíveis para uma equipe de suporte, mas falta mostrar quantas pessoas faziam esse trabalho e quanto tempo era gasto antes. Confira registros de chamados ou apontamentos de horas.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "ca9f66e51fd930a620d0e2188dce7672",
+  "nome": "RPA de Relatório de Posição de Estoque de Extrema e Itapeva",
+  "antes": {
+    "id": "ca9f66e51fd930a620d0e2188dce7672",
+    "nome": "RPA de Relatório de Posição de Estoque de Extrema e Itapeva",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "389,475",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 95848,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "ca9f66e51fd930a620d0e2188dce7672",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho de R$ 2.700 parece ser um custo evitado, não uma despesa que existia e parou, e as horas liberadas também não têm registro de conferência. Precisa mostrar contrato ou cobrança da Logsmart e evidência do tempo gasto antes da automação.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "97bd0531e2b1773a5a275164a7567d5f",
+  "nome": "Painel Gerencial B2C",
+  "antes": {
+    "id": "97bd0531e2b1773a5a275164a7567d5f",
+    "nome": "Painel Gerencial B2C",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "1277,4",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 86445,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "97bd0531e2b1773a5a275164a7567d5f",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 120 h/mês liberadas não provam que uma despesa deixou de existir, e o impacto líquido de R$ 1.277,40 não tem documentação nem rastro de conferência. Precisa mostrar quais custos foram interrompidos e onde esses registros podem ser verificados.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -11,6 +11,7 @@ import { lerLinhaEspelho } from '@/lib/sheet-espelho';
 import { chaveProjeto } from '@/lib/projeto-chave';
 import { getCargoDe } from '@/lib/areas/teamguide.server';
 import { montarDossie, type Dossie, type FontesDossie } from '@/lib/avaliacao/dossie';
+import { lerTextoDocsDrive } from '@/lib/google/drive';
 
 async function tenta<T>(p: () => Promise<T>, fallback: T): Promise<T> {
   try {
@@ -55,6 +56,15 @@ export async function carregarDossie(projetoIdBruto: string): Promise<Dossie | n
     }
   }
 
+  // ⚠️ O `.md` da documentação vive no Drive (coluna "URL"); ler o texto é o que faz o agente
+  // julgar EVIDÊNCIA em vez de um link. Best-effort: falha vira aviso dentro do dossiê, nunca exceção.
+  const links = (() => {
+    const doBanco = (() => { try { const j = JSON.parse(String(projeto?.arquivos_links ?? '[]')); return Array.isArray(j) ? j.map(String) : []; } catch { return []; } })();
+    const daPlanilha = String((espelho as Record<string, string> | null)?.URL ?? '').split(/[\s,;]+/).map((x) => x.trim()).filter((x) => /^https?:/.test(x));
+    return [...new Set([...doBanco, ...daPlanilha])];
+  })();
+  const docsDrive = links.length ? await tenta(async () => lerTextoDocsDrive(links), undefined as never) : [];
+
   const fontes: FontesDossie = {
     projeto,
     documentacao: (docRow as { conteudo?: string } | null)?.conteudo ?? null,
@@ -62,6 +72,7 @@ export async function carregarDossie(projetoIdBruto: string): Promise<Dossie | n
     versoes: (versoes as FontesDossie['versoes']) ?? [],
     eventos: (eventos as FontesDossie['eventos']) ?? [],
     cargoAutor,
+    docsDrive,
   };
   return montarDossie(fontes);
 }

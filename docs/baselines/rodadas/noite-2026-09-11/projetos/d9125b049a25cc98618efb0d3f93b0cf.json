@@ -1,0 +1,45 @@
+{
+  "id": "d9125b049a25cc98618efb0d3f93b0cf",
+  "nome": "Automação de Chargebacks",
+  "antes": {
+    "id": "d9125b049a25cc98618efb0d3f93b0cf",
+    "nome": "Automação de Chargebacks",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "306,68",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 64784,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d9125b049a25cc98618efb0d3f93b0cf",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor de R$ 306,68 por mês parece baseado em horas liberadas, mas não há prova de que uma despesa deixou de existir. É preciso conferir o custo do agente e se houve redução de gasto ou apenas uso do tempo em outras tarefas.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

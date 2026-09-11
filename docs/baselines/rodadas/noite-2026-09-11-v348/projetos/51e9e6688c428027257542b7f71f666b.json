@@ -1,0 +1,44 @@
+{
+  "id": "51e9e6688c428027257542b7f71f666b",
+  "nome": "Gobeaute - Acompanhamento de NPS/Review",
+  "antes": {
+    "id": "51e9e6688c428027257542b7f71f666b",
+    "nome": "Gobeaute - Acompanhamento de NPS/Review",
+    "status": "Pendente",
+    "estrelas": "1",
+    "estrelaAgente": "—",
+    "confiancaAgente": "—",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 67257,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "51e9e6688c428027257542b7f71f666b",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir."
+      ]
+    },
+    "status_gravado": "Pendente"
+  }
+}

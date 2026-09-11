@@ -1,0 +1,44 @@
+{
+  "id": "75490b6b4fb70711102de90b0d24bd9c",
+  "nome": "V.I.S.I.O.N. — Visão Integrada de Supervisão Inteligente,  Operacional e de Negócios",
+  "antes": {
+    "id": "75490b6b4fb70711102de90b0d24bd9c",
+    "nome": "V.I.S.I.O.N. — Visão Integrada de Supervisão Inteligente,  Operacional e de Negócios",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "1177,92",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 80555,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "75490b6b4fb70711102de90b0d24bd9c",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: Não há prova de que as 144 h/mês liberadas reduziram uma despesa; podem ser apenas tempo redirecionado. Precisa do registro do custo antes e depois, ou de evidência de horas pagas que deixaram de existir.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

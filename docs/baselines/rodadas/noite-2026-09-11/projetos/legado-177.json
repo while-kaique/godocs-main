@@ -1,0 +1,46 @@
+{
+  "id": "legado-177",
+  "nome": "[CX] GOCASE - Envio retirada nos correios",
+  "antes": {
+    "id": "legado-177",
+    "nome": "[CX] GOCASE - Envio retirada nos correios",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "1762",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 83812,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-177",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O impacto mensal de R$ 1.762 não tem registro da despesa que teria sido eliminada. Precisa conferir essa despesa e como o valor foi calculado.\nCético: O saving de R$ 1.762 por mês não tem documento nem registro mostrando qual despesa dos Correios deixou de existir. É preciso conferir pedidos antes e depois da automação e a despesa efetivamente evitada.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

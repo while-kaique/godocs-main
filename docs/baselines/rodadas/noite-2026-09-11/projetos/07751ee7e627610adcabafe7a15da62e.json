@@ -1,0 +1,45 @@
+{
+  "id": "07751ee7e627610adcabafe7a15da62e",
+  "nome": "Destrava.AI",
+  "antes": {
+    "id": "07751ee7e627610adcabafe7a15da62e",
+    "nome": "Destrava.AI",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "3",
+    "confiancaAgente": "media",
+    "impacto": "11262,74",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 167956,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "07751ee7e627610adcabafe7a15da62e",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O saving mensal de R$11262,74 não vem acompanhado de prova de que essa despesa existia e parou, e as 11 horas liberadas parecem ser apenas estimativa. É preciso conferir folha, escala ou registros de trabalho antes e depois da automação.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 5 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 5
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

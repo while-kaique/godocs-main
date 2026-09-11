@@ -1,0 +1,44 @@
+{
+  "id": "legado-259",
+  "nome": "Registro Historico de Forecast, Insumos e Stock",
+  "antes": {
+    "id": "legado-259",
+    "nome": "Registro Historico de Forecast, Insumos e Stock",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "248,25",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 99581,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-259",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto não explica o que foi feito nem mostra registro de despesa que parou, então as 15 h/mês liberadas podem ser apenas estimativa. Precisa conferir a origem dos R$ 248,25 mensais e os registros de uso.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

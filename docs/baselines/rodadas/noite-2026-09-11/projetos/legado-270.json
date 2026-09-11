@@ -1,0 +1,46 @@
+{
+  "id": "legado-270",
+  "nome": "HRBP Workspace",
+  "antes": {
+    "id": "legado-270",
+    "nome": "HRBP Workspace",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "1020,275",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 72648,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-270",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: As 37 h/mês parecem horas liberadas, não uma despesa que deixou de existir. Falta indicar qual custo foi realmente eliminado e onde isso pode ser conferido.\nCético: O projeto declara 37 h/mês liberadas e R$ 1.020,27 por mês, mas não mostra qual despesa existia e deixou de ocorrer. Precisa apresentar registros de uso e da despesa efetivamente interrompida.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

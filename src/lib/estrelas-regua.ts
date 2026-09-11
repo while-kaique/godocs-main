@@ -170,7 +170,13 @@ export const CRITERIOS_ESTRELA: NivelEstrela[] = [
       'Está no caminho até o cliente, o fornecedor ou o mercado, sem humano entre a falha dele e o prejuízo. Assume a responsabilidade pela entrega final, com meta clara e auditável sendo entregue.',
     artefatos:
       'Agentes complexos, com claws, graph engineering e auto-cura. Metas claras e auditáveis sendo entregues.',
-    exemplos: ['CX - Ticket Creator', 'Robo orçamento', 'GoBrands', 'CTR Machine'],
+    // ⚠️ 11/09/2026: `Robo orçamento` (8★ humano), `GoBrands` (7★) e `CTR Machine` (7★) SAÍRAM daqui.
+    // Estavam listados como âncoras de 5★ e o cérebro da estrela os copiava: nos canários da rodada
+    // de calibragem, Robô orçamento e GoBrands saíram 5★ sem escape, contra 8 e 7 de gente. A
+    // verdade da base é a coluna "Estrelas" humana, e ela os põe na faixa 6-10 — hoje são exemplos
+    // de `ESCAPE_MUDA_O_JOGO.exemplos`. Um exemplo em nível errado é a forma mais barata de ancorar
+    // errado a base inteira.
+    exemplos: ['CX - Ticket Creator', 'Plataforma Smartonline - Pagamento de DIFAL'],
   },
 ];
 
@@ -392,6 +398,13 @@ export const ESCAPE_MUDA_O_JOGO = {
     'Sistema agêntico com impacto direto nos KPIs e no resultado financeiro.',
     'Abre novas frentes de receita ou de saving.',
   ],
+  /**
+   * Projetos REAIS que o comitê humano já colocou na faixa (nota humana ≥ 6 na base, 11/09/2026).
+   * São a âncora de comparação do PASSO 1: "este projeto se parece mais com estes ou com os de 5★?".
+   * ⚠️ Nomes como estão na planilha. Quem confere a nota humana ao vivo é `ancorasDe` (espelho); esta
+   * lista é o mínimo que o prompt carrega mesmo sem espelho.
+   */
+  exemplos: ['PIAPP', 'Robo orçamento', 'GoBrands', 'CTR Machine', 'SendApp'],
 } as const;
 
 /**
@@ -404,7 +417,7 @@ export const GATILHOS_ESCAPE = [
   {
     chave: 'nao_existiria',
     texto:
-      'Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria.',
+      'Existe atividade em curso hoje que NÃO existiria sem ele. Não "seria mais lenta": não existiria. Ter existido uma versão MANUAL de parte do trabalho não nega o gatilho: ele pergunta pela atividade NOVA (volume, horário, alcance, produto) que só existe por causa dele.',
   },
   {
     chave: 'sem_volta',
@@ -526,6 +539,7 @@ export function descreverEscape(): string {
     'Como a faixa se parece:',
     tracos,
     '',
+    `Projetos que o comitê humano JÁ colocou nesta faixa (compare com eles): ${ESCAPE_MUDA_O_JOGO.exemplos.join(' · ')}.`,
     '',
     'O CASO DA PLATAFORMA — leia com atenção, é onde mais se erra:',
     'Quando OUTRO projeto ou processo, NOMEADO, roda em cima deste (consome API, MCP, integração)',
@@ -624,8 +638,11 @@ export function escapeValido(ind: IndicacaoEscape): boolean {
  * comitê humano, comparando com quem já está lá. Mostrar "6★" na tela apaga essa diferença e
  * convida a triagem a aplicar o número com um clique, que é exatamente o que não pode acontecer.
  */
-export function rotuloNotaAgente(nota: number): { rotulo: string; sugestao: number | null } {
-  return ehEscape(nota)
+export function rotuloNotaAgente(nota: number, escape?: boolean | null): { rotulo: string; sugestao: number | null } {
+  // ⚠️ O time NUNCA produz nota ≥ 6: o cérebro é travado em `TETO_AGENTE` e o escape viaja num
+  // booleano à parte. Sem este parâmetro a coluna dizia "5" enquanto o funil dizia 6-10 para o
+  // MESMO projeto (caso AVD Central v2, 10/09/2026).
+  return escape === true || ehEscape(nota)
     ? { rotulo: `${FAIXA_ESCAPE.min}-${FAIXA_ESCAPE.max}`, sugestao: null }
     : { rotulo: String(nota), sugestao: null };
 }

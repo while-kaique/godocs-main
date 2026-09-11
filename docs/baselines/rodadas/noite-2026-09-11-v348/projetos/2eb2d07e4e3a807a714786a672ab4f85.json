@@ -1,0 +1,44 @@
+{
+  "id": "2eb2d07e4e3a807a714786a672ab4f85",
+  "nome": "Agente SDR Gobeaute — Qualificação e Roteamento Automático de Leads",
+  "antes": {
+    "id": "2eb2d07e4e3a807a714786a672ab4f85",
+    "nome": "Agente SDR Gobeaute — Qualificação e Roteamento Automático de Leads",
+    "status": "Aprovado",
+    "estrelas": "5",
+    "estrelaAgente": "5",
+    "confiancaAgente": "baixa",
+    "impacto": "2500",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 95976,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "2eb2d07e4e3a807a714786a672ab4f85",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 2.500 horas/mês parece maior que a capacidade das 7 pessoas citadas, mesmo com cobertura 24h. Precisa conferir registros de volume e tempo gasto antes da automação.\nFinanceiro: Falta comprovar que a triagem eliminada reduziu uma despesa de fato, e não apenas liberou tempo dos vendedores. Precisa conferir os registros de horas antes e depois e a base usada para estimar o ganho.\nCético: O ganho líquido mensal de 2500 não mostra qual despesa existia e deixou de ocorrer, nem há registro das horas antes e depois. É preciso conferir a base de cálculo e evidência de redução real de custo, não apenas triagem automatizada.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 5
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

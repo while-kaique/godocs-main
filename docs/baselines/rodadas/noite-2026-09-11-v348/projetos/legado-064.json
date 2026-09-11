@@ -1,0 +1,45 @@
+{
+  "id": "legado-064",
+  "nome": "[BRUNA] Automação NFs Gobeaute",
+  "antes": {
+    "id": "legado-064",
+    "nome": "[BRUNA] Automação NFs Gobeaute",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "1408,5",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 95340,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-064",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho mensal informado é alto para uma rotina de triagem de XML, e não há registro de quantas pessoas faziam esse trabalho. É preciso conferir a equipe envolvida e as horas gastas antes da automação.\nFinanceiro: O ganho líquido mensal de 1408,50 parece vir principalmente de horas poupadas, mas não há prova de redução de despesa. Precisa conferir o custo antes e depois e garantir que não se conte a mesma economia duas vezes.\nCético: O ganho mensal de 1408,50 está declarado, mas não há registro da despesa ou das horas que deixaram de existir. Precisa conferir a folha de horas, o custo usado e os registros antes e depois da automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

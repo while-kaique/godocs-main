@@ -1,0 +1,45 @@
+{
+  "id": "legado-216",
+  "nome": "Análise de Carteira Inteligente + Disparo WhatsApp",
+  "antes": {
+    "id": "legado-216",
+    "nome": "Análise de Carteira Inteligente + Disparo WhatsApp",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "2253,48",
+    "categorias": "saving, receita_incremental",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 104359,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-216",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O piso de R$ 195 mil por ano é receita projetada, mas não há base que mostre quanto foi recuperado pela ferramenta. É preciso conferir o registro das recompras antes e depois e a origem dos R$ 1,95 milhões parados.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

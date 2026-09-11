@@ -1,0 +1,46 @@
+{
+  "id": "7cc5e99cdc78654b7baa2717ac9eb6ca",
+  "nome": "Catálogos - House of beauty",
+  "antes": {
+    "id": "7cc5e99cdc78654b7baa2717ac9eb6ca",
+    "nome": "Catálogos - House of beauty",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 64835,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "7cc5e99cdc78654b7baa2717ac9eb6ca",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação.",
+        "A estrela 1 do time foi gravada; o Status Aprovado não foi tocado."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "788493d6f77542c89409a8e63e68a464",
+  "nome": "Robô DARF — Captura automática de guias e abertura de chamados de pagamento (GoService)",
+  "antes": {
+    "id": "788493d6f77542c89409a8e63e68a464",
+    "nome": "Robô DARF — Captura automática de guias e abertura de chamados de pagamento (GoService)",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "193,025",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 112492,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "788493d6f77542c89409a8e63e68a464",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: A economia financeira não está comprovada: o projeto mostra 7 h/mês liberadas, mas não indica despesa que deixou de existir; evitar multas é risco evitado, não saving efetivado. Precisa conferir custo de pessoal ou outro gasto que realmente parou.\nCético: O ganho de R$ 193,03 por mês e as 7 h/mês liberadas não têm registro que mostre o trabalho antes e depois da automação. Precisa conferir a quantidade de guias, o tempo real gasto e onde essa despesa deixou de existir.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

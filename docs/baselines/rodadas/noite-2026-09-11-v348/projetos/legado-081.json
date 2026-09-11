@@ -1,0 +1,43 @@
+{
+  "id": "legado-081",
+  "nome": "Automação de controle do período de experiência",
+  "antes": {
+    "id": "legado-081",
+    "nome": "Automação de controle do período de experiência",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "104,55",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 79910,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-081",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho de 104,55 por mês parece vir de tempo estimado, mas não há prova de despesa que deixou de existir. É preciso conferir registros do trabalho antes e depois da automação e evidência dos alertas enviados.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

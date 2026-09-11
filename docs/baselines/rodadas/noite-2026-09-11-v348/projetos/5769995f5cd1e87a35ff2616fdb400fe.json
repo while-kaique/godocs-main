@@ -1,0 +1,43 @@
+{
+  "id": "5769995f5cd1e87a35ff2616fdb400fe",
+  "nome": "Farol de insucessos",
+  "antes": {
+    "id": "5769995f5cd1e87a35ff2616fdb400fe",
+    "nome": "Farol de insucessos",
+    "status": "Pendente",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 66735,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "5769995f5cd1e87a35ff2616fdb400fe",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto descreve o fluxo esperado, mas não mostra registro de que o painel esteja em uso nem onde o efeito será conferido. É preciso anexar evidência do processo alterado e do local de verificação.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

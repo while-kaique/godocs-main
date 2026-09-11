@@ -1,0 +1,45 @@
+{
+  "id": "legado-047",
+  "nome": "[ILUSTRA] Gerador de Estampas Best Sellers",
+  "antes": {
+    "id": "legado-047",
+    "nome": "[ILUSTRA] Gerador de Estampas Best Sellers",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "4",
+    "confiancaAgente": "media",
+    "impacto": "6000",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 136112,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-047",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 3 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

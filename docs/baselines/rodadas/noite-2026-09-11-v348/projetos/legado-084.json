@@ -1,0 +1,45 @@
+{
+  "id": "legado-084",
+  "nome": "Automação da gestão de banco de horas",
+  "antes": {
+    "id": "legado-084",
+    "nome": "Automação da gestão de banco de horas",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "media",
+    "impacto": "631,47",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 85989,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-084",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor líquido mensal de 631,47 não está ligado a uma despesa que deixou de existir, pois o projeto só descreve comunicação e acompanhamento. É preciso conferir registros de custo evitado, como horas extras ou pagamentos reduzidos após a automação.\nCético: O saving líquido mensal de 631,47 não prova que uma despesa deixou de existir; falta mostrar a redução efetiva na folha ou no pagamento de horas extras. É preciso conferir os registros antes e depois da automação e a origem desse valor.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

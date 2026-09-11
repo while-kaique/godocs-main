@@ -1,0 +1,45 @@
+{
+  "id": "legado-177",
+  "nome": "[CX] GOCASE - Envio retirada nos correios",
+  "antes": {
+    "id": "legado-177",
+    "nome": "[CX] GOCASE - Envio retirada nos correios",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "1762",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 54939,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-177",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 1.762 horas por mês equivale a cerca de 8 pessoas em tempo integral, mas não há registro de quem fazia esse trabalho nem de despesa que deixou de existir. É preciso conferir a equipe envolvida e a evidência de redução efetiva de horas ou custo.\nFinanceiro: O valor mensal parece coerente com uma automação, mas falta provar que a despesa realmente existia e deixou de ocorrer. É preciso conferir registros dos envios e do custo ou esforço antes da automação.\nCético: O ganho mensal de 1762 não vem acompanhado de registros que mostrem qual despesa deixou de existir. É preciso conferir os pedidos antes e depois e a despesa efetivamente interrompida.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

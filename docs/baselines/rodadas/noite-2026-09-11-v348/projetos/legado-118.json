@@ -1,0 +1,43 @@
+{
+  "id": "LEGADO-118",
+  "nome": "Automatização de relatórios CX",
+  "antes": {
+    "id": "LEGADO-118",
+    "nome": "Automatização de relatórios CX",
+    "status": "Pendente",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "4929,55",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 114915,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-118",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 4.929,55 horas por mês é muito alto para uma automação de relatórios e não há registro de quantas pessoas faziam esse trabalho. Precisa conferir a equipe envolvida e evidência de que esse custo deixou de existir.\nFinanceiro: O valor mensal de R$ 4.929,55 precisa de comprovação de que a despesa existia e deixou de ocorrer. Conferir registros de horas, custo usado e se o mesmo ganho não foi contado também como receita.\nCético: O saving mensal de 4929.55 não mostra qual despesa existia e deixou de ocorrer, nem traz registro das horas e do custo usado. Precisa conferir folha ou contrato antes de tratar o ganho como efetivado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir."
+      ]
+    },
+    "status_gravado": "Pendente"
+  }
+}

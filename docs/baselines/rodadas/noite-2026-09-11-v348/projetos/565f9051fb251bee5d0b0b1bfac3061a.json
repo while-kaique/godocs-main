@@ -1,0 +1,44 @@
+{
+  "id": "565f9051fb251bee5d0b0b1bfac3061a",
+  "nome": "EXProjects",
+  "antes": {
+    "id": "565f9051fb251bee5d0b0b1bfac3061a",
+    "nome": "EXProjects",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 74914,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "565f9051fb251bee5d0b0b1bfac3061a",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: Preocupa a afirmação de redução de gastos sem indicar onde esse efeito será verificado. Precisa mostrar o processo alterado e um registro de orçamento ou cotações antes e depois.\nCético: O projeto promete reduzir gastos e antecipar riscos, mas não mostra qual processo mudou nem onde esse efeito será verificado. Precisa apresentar o fluxo antes e depois e registros de uso, alertas ou desvios evitados.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

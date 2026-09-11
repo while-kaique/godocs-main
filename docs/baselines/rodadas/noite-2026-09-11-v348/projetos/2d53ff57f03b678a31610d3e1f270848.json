@@ -1,0 +1,44 @@
+{
+  "id": "2d53ff57f03b678a31610d3e1f270848",
+  "nome": "Plano de Industrialização",
+  "antes": {
+    "id": "2d53ff57f03b678a31610d3e1f270848",
+    "nome": "Plano de Industrialização",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "184,515",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 64418,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "2d53ff57f03b678a31610d3e1f270848",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho mensal informado parece vir de horas poupadas, mas não há prova de despesa que deixou de existir. Precisa conferir o custo antes e depois e se essas horas não foram contadas também como outro benefício.\nCético: O impacto mensal líquido de 184,51 não mostra qual despesa deixou de existir nem prova que as horas foram realmente reduzidas. É preciso conferir registros de esforço antes e depois e a despesa correspondente.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

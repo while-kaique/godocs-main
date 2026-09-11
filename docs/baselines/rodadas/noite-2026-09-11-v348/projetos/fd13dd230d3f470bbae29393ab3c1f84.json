@@ -1,0 +1,45 @@
+{
+  "id": "fd13dd230d3f470bbae29393ab3c1f84",
+  "nome": "Inlfuhub",
+  "antes": {
+    "id": "fd13dd230d3f470bbae29393ab3c1f84",
+    "nome": "Inlfuhub",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "2069,55",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 84298,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "fd13dd230d3f470bbae29393ab3c1f84",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 2069,55 horas por mês equivale ao trabalho contínuo de várias pessoas, mas o projeto não informa quem fazia essas tarefas nem quantas pessoas foram liberadas. Precisa conferir registros de horas, atividades encerradas e a despesa que deixou de existir.\nFinanceiro: O impacto mensal líquido de 2.069,55 não mostra qual despesa deixou de existir nem como as horas foram convertidas em dinheiro. Precisa conferir registros da despesa anterior e a base usada para calcular o ganho.\nCético: O impacto é tratado como saving efetivado, mas não há registro de qual despesa existia e deixou de existir. Para aprovar, é preciso conferir essa despesa e a base usada para chegar a R$ 2.069,55 por mês.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 3 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

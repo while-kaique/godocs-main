@@ -1,0 +1,44 @@
+{
+  "id": "7166c713fabc8950e4d47512ddf9c201",
+  "nome": "Triagem Automática de E-mail — \"Precisa Ver\"",
+  "antes": {
+    "id": "7166c713fabc8950e4d47512ddf9c201",
+    "nome": "Triagem Automática de E-mail — \"Precisa Ver\"",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "303,325",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 111629,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "7166c713fabc8950e4d47512ddf9c201",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 303,32 horas por mês parece alto para a triagem da caixa de uma única liderança. É preciso conferir registros do tempo gasto antes e depois, e quantas pessoas realmente faziam essa tarefa.\nFinanceiro: O impacto líquido mensal de 303,32 parece representar tempo liberado, não uma despesa que deixou de existir. Para aprovar como saving, falta comprovar onde esse custo era pago e deixou de ser pago.\nCético: O impacto parece tratar tempo poupado como despesa que deixou de existir, mas não há prova de redução real de custo. Falta o registro do tempo antes e depois e da despesa efetivamente encerrada.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

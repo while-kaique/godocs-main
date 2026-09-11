@@ -1,0 +1,44 @@
+{
+  "id": "964d897c105d416b16a02ebb57792aee",
+  "nome": "Plataforma de Orçamento de Pessoal 2026 (GoGroup)",
+  "antes": {
+    "id": "964d897c105d416b16a02ebb57792aee",
+    "nome": "Plataforma de Orçamento de Pessoal 2026 (GoGroup)",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "714,265",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 56840,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "964d897c105d416b16a02ebb57792aee",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho de 714 horas por mês exige trabalho manual distribuído por mais de 3 pessoas, o que pode fazer sentido entre Gente & Gestão e FP&A. Falta conferir registros de tempo ou responsáveis que mostrem esse esforço antes da plataforma.\nFinanceiro: O ganho líquido mensal de 714,26 parece ser uma estimativa de horas poupadas, não uma despesa que deixou de existir. Para aprovar como saving, falta comprovar o tempo antes e depois e onde essa despesa foi efetivamente reduzida.\nCético: O impacto líquido mensal de 714,26 aparece sem memória de cálculo nem prova de despesa que deixou de existir. É preciso conferir os registros de redução de trabalho e a trilha das alterações antes de aprovar.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

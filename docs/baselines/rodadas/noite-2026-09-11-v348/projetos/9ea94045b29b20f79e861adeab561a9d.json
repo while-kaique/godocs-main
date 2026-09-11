@@ -1,0 +1,45 @@
+{
+  "id": "9ea94045b29b20f79e861adeab561a9d",
+  "nome": "Boletos Itaú via Proxy Bancária",
+  "antes": {
+    "id": "9ea94045b29b20f79e861adeab561a9d",
+    "nome": "Boletos Itaú via Proxy Bancária",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "6-10",
+    "confiancaAgente": "media",
+    "impacto": "2244,545",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 125810,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "9ea94045b29b20f79e861adeab561a9d",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 2.244,55 horas por mês equivale a cerca de 10 pessoas, mas o projeto não informa quantas pessoas faziam essa tarefa nem o volume de boletos. Precisa conferir registros do financeiro e a quantidade mensal de atendimentos para sustentar esse total.\nFinanceiro: O ganho depende de provar que o trabalho do financeiro deixou de gerar despesa, não apenas que houve economia de tempo. Falta o registro do custo anterior e da redução efetiva após a automação.\nCético: O ganho está descrito como horas evitadas, mas não há prova de uma despesa que existia e deixou de ocorrer. Precisa conferir registros do custo anterior e evidência de que ele parou após a automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

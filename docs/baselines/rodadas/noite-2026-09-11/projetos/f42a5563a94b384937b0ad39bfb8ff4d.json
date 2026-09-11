@@ -1,0 +1,46 @@
+{
+  "id": "f42a5563a94b384937b0ad39bfb8ff4d",
+  "nome": "Gocreators",
+  "antes": {
+    "id": "f42a5563a94b384937b0ad39bfb8ff4d",
+    "nome": "Gocreators",
+    "status": "Aprovado",
+    "estrelas": "6",
+    "estrelaAgente": "4",
+    "confiancaAgente": "media",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 156029,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "f42a5563a94b384937b0ad39bfb8ff4d",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 6 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 6,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

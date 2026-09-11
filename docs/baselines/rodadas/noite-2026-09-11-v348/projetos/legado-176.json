@@ -1,0 +1,44 @@
+{
+  "id": "legado-176",
+  "nome": "APP DE GESTÃO DE APE [Acompanhamento do Período de Experiência]",
+  "antes": {
+    "id": "legado-176",
+    "nome": "APP DE GESTÃO DE APE [Acompanhamento do Período de Experiência]",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "1581,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 88776,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-176",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 1.581,75 h/mês equivale a cerca de 7 FTE, alto para um app sem informar quantas pessoas faziam o processo. Precisa conferir o registro das pessoas envolvidas e da despesa de horas antes da automação.\nFinanceiro: O valor líquido mensal é apresentado, mas não está claro qual despesa existente deixou de ocorrer. É preciso conferir o registro dessa despesa e como as horas foram convertidas em economia, sem contar o mesmo ganho duas vezes.\nCético: O saving mensal de 1.581,75 não mostra qual despesa deixou de existir nem como foi medido. Precisa apresentar registros da despesa anterior e da redução após o app.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

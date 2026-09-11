@@ -1,0 +1,1692 @@
+{
+ "em": "2026-09-11T14:18:30.423Z",
+ "mudancas": [
+  {
+   "linha": 3,
+   "id": "legado-027",
+   "nome": "[Gobeaute Tech] Status Report de pedidos travados na operação",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 9,
+   "id": "legado-035",
+   "nome": "Damidash",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 13,
+   "id": "legado-040",
+   "nome": "GO LEADERS - GESTÃO DE INDICADORES",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 14,
+   "id": "legado-039",
+   "nome": "Controle de Checklist Fechamento Contábil",
+   "de": "1",
+   "para": 3
+  },
+  {
+   "linha": 15,
+   "id": "legado-041",
+   "nome": "Simulador B2B Gobeaute",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 16,
+   "id": "legado-042",
+   "nome": "Gestão de Lojas",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 17,
+   "id": "legado-043",
+   "nome": "Relatório Diário de Testes A/B (GrowthBook → Google Chat)",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 18,
+   "id": "legado-044",
+   "nome": "NPS | GESTORES",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 19,
+   "id": "legado-045",
+   "nome": "[Meli] - Check Updated Ad",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 22,
+   "id": "legado-048",
+   "nome": "Agente Midia paga",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 26,
+   "id": "legado-051",
+   "nome": "Cruzamento de NF, NFD e chave de acesso",
+   "de": "1",
+   "para": 0
+  },
+  {
+   "linha": 28,
+   "id": "legado-053",
+   "nome": "Cruzamento de XML com base Sheets por marca",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 36,
+   "id": "legado-062",
+   "nome": "[PROJETOS DE IA/RPA] DASH",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 40,
+   "id": "legado-069",
+   "nome": "Automação de farol do goLab.Ai",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 41,
+   "id": "legado-070",
+   "nome": "Automação de Relatório de Horas Extras e Banco de Horas",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 51,
+   "id": "legado-077",
+   "nome": "Coleta de Imagens Shopify",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 53,
+   "id": "legado-079",
+   "nome": "Automação - Coleta de Chamados do Jurídico",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 59,
+   "id": "43dbbb4308158f46de4284d6e6f4ab26",
+   "nome": "GoProspect",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 60,
+   "id": "c270ce30ee1a70138e7474f5022ebc28",
+   "nome": "Dashboard de Planejamento (dashdadosplanejamento)",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 66,
+   "id": "legado-073",
+   "nome": "AUTOMAÇÃO EFD CONTRIBUIÇÕES",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 67,
+   "id": "legado-086",
+   "nome": "Automação Relatório de Programação de Férias",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 71,
+   "id": "legado-093",
+   "nome": "Farol Overview D-1 Produtividade",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 72,
+   "id": "legado-094",
+   "nome": "Farol Diário Completo - Gocase",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 77,
+   "id": "legado-098",
+   "nome": "Automação disputas",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 78,
+   "id": "legado-099",
+   "nome": "Classificação BADS do BOT",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 84,
+   "id": "legado-100b",
+   "nome": "Automação de análise - Personalização/Modelo errado",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 85,
+   "id": "legado-100a",
+   "nome": "Automação Reunião por área",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 86,
+   "id": "legado-101",
+   "nome": "Insucessos - Gocase",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 87,
+   "id": "legado-109",
+   "nome": "[DUDA] - Automação Cupons Beaute",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 89,
+   "id": "legado-111",
+   "nome": "[DUDA] CPMV",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 90,
+   "id": "legado-108",
+   "nome": "Marketplace Scraper - Faturamento",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 92,
+   "id": "legado-107",
+   "nome": "[Tiny] Auth Layer",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 93,
+   "id": "legado-113",
+   "nome": "Waitlist Gobeaute",
+   "de": "0",
+   "para": 4
+  },
+  {
+   "linha": 97,
+   "id": "legado-116",
+   "nome": "Não Classificadas - Versão Final",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 98,
+   "id": "legado-117",
+   "nome": "Estoque Unificado - ERP + WMS + Alertas Críticos",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 100,
+   "id": "legado-120",
+   "nome": "Alerta Vendas Produtos Por Dia - Gocase",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 101,
+   "id": "legado-119",
+   "nome": "Chamados Aprovação via Chat V4",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 105,
+   "id": "legado-125",
+   "nome": "Resumo Executivo - Social Selling",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 106,
+   "id": "legado-123",
+   "nome": "Pipeline de sucessão de lideranças",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 108,
+   "id": "86ee91737aaec4705480a41992d05a1c",
+   "nome": "Facilities Hub",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 109,
+   "id": "legado-128",
+   "nome": "automatização controle de pedidos",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 112,
+   "id": "legado-131",
+   "nome": "Torre de Controle Gobeaute",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 114,
+   "id": "legado-137",
+   "nome": "Coletado X Processado",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 115,
+   "id": "legado-134",
+   "nome": "Estabilizador de Dados BI",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 116,
+   "id": "legado-135",
+   "nome": "Auditor de SLA",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 117,
+   "id": "legado-138",
+   "nome": "Portal de Download Automático de Bases do B2B",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 118,
+   "id": "db6eba61c6b1dbaa6cffe93d08ab1cee",
+   "nome": "Solicitação de Rescisão",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 119,
+   "id": "dd39b29ea3dc3fc51332d9a650c12fc7",
+   "nome": "Live Machine",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 124,
+   "id": "legado-142",
+   "nome": "Facilities - Gestão Operacional",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 125,
+   "id": "legado-143",
+   "nome": "Copiloto IA - Simulador B2B",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 127,
+   "id": "legado-146",
+   "nome": "[GoChallenge] Comunicações; [GoChallenge]emails; [GoChallenge]Raspadinha",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 130,
+   "id": "legado-149",
+   "nome": "Criação de agentes de IA para construção de descrições de cargos",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 134,
+   "id": "legado-152",
+   "nome": "Gostream",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 139,
+   "id": "legado-162",
+   "nome": "SPG · Comparativos Automáticos",
+   "de": "1",
+   "para": 3
+  },
+  {
+   "linha": 142,
+   "id": "legado-158",
+   "nome": "SPG · Interface Única com Dashboard",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 143,
+   "id": "legado-159",
+   "nome": "SPG · Painel de PCP Online",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 144,
+   "id": "legado-161",
+   "nome": "SPG · Carteira de Pedidos Online",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 145,
+   "id": "legado-164",
+   "nome": "SPG · Agente Revisão de Carteira v2",
+   "de": "1",
+   "para": 3
+  },
+  {
+   "linha": 154,
+   "id": "legado-188",
+   "nome": "tb_comissao",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 156,
+   "id": "legado-156",
+   "nome": "CX Hub — Plataforma Central de Operações de Backoffice CX",
+   "de": "3",
+   "para": 5
+  },
+  {
+   "linha": 157,
+   "id": "legado-176",
+   "nome": "APP DE GESTÃO DE APE [Acompanhamento do Período de Experiência]",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 166,
+   "id": "legado-184",
+   "nome": "Alerta Conversão v3 — Funil + Canal Dedicado",
+   "de": "0",
+   "para": 4
+  },
+  {
+   "linha": 170,
+   "id": "legado-192",
+   "nome": "Dados de entrega",
+   "de": "1",
+   "para": 0
+  },
+  {
+   "linha": 177,
+   "id": "legado-194",
+   "nome": "Konduto - Alerta + Travamento",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 182,
+   "id": "legado-202",
+   "nome": "Squad de Agentes de I.A",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 184,
+   "id": "legado-203",
+   "nome": "Dashboard - Gocase Performance Produtos",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 186,
+   "id": "legado-205",
+   "nome": "Gestão visual de projetos",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 192,
+   "id": "legado-211",
+   "nome": "Controle Capex - Extrema-MG",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 194,
+   "id": "legado-212",
+   "nome": "Planner de Bancadas",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 196,
+   "id": "legado-215",
+   "nome": "Previsão de Estoque + Análise de Pedido Unificada",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 197,
+   "id": "legado-216",
+   "nome": "Análise de Carteira Inteligente + Disparo WhatsApp",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 208,
+   "id": "legado-229",
+   "nome": "CX Transporte BI",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 210,
+   "id": "legado-226",
+   "nome": "TFA Flow — Portal de Registro e Resolução de Faltas, Sobras e Avarias",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 212,
+   "id": "legado-234",
+   "nome": "Gosales - Propostas <> Hubspot",
+   "de": "1",
+   "para": 3
+  },
+  {
+   "linha": 213,
+   "id": "legado-235",
+   "nome": "Tool - Estoque Gocase",
+   "de": "1",
+   "para": 3
+  },
+  {
+   "linha": 215,
+   "id": "legado-237",
+   "nome": "Material Bruto - Lookup",
+   "de": "1",
+   "para": 3
+  },
+  {
+   "linha": 228,
+   "id": "legado-248",
+   "nome": "Automação dos Cards de Vagas",
+   "de": "1",
+   "para": 0
+  },
+  {
+   "linha": 229,
+   "id": "legado-249",
+   "nome": "Analytics Gocase",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 236,
+   "id": "legado-252",
+   "nome": "Metabase Supply + Distribuição de Dados",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 237,
+   "id": "legado-253",
+   "nome": "Stock Request",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 238,
+   "id": "legado-255",
+   "nome": "Slow Moving Gocase v2 — Análise e Excesso",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 239,
+   "id": "legado-257",
+   "nome": "Databook Supply Gogroup",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 243,
+   "id": "legado-261",
+   "nome": "Stockie - Copiloto Inteligente",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 244,
+   "id": "legado-256",
+   "nome": "Automacao do Plano de Sortimento Gocase",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 246,
+   "id": "legado-254",
+   "nome": "Sortimento Gobeuate",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 253,
+   "id": "d1579cfa97be186fc9a13a6f036d7474",
+   "nome": "GoGroup Mobility",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 254,
+   "id": "1844c74da817b98d8084ffefaf982f83",
+   "nome": "Controle de Pedidos de Compra Gobeaute",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 256,
+   "id": "2a7695206a58d660fa367fcdab4f963a",
+   "nome": "Gocheck",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 259,
+   "id": "71f8c78816d6a3dd9088f1d2a39ffc5a",
+   "nome": "Portal de Reembolsos (Gobeaute)",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 260,
+   "id": "ca9f66e51fd930a620d0e2188dce7672",
+   "nome": "RPA de Relatório de Posição de Estoque de Extrema e Itapeva",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 261,
+   "id": "48c8f4e05b8853fa00057811b69085c2",
+   "nome": "Balanço e DRE Combinado (Gocase)",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 263,
+   "id": "5ebe736d7bd4b27ba7138ebba2de9daf",
+   "nome": "Gerador de Vistas",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 265,
+   "id": "0b92927b09b1ae84dd0c481bf6fa5214",
+   "nome": "RPA - Ajuste de inventário",
+   "de": "1",
+   "para": 0
+  },
+  {
+   "linha": 272,
+   "id": "8bdd59602d2ec57e255a89175fa33d07",
+   "nome": "Feedback time operacional",
+   "de": "0",
+   "para": 4
+  },
+  {
+   "linha": 274,
+   "id": "e4b1dcc3e07f56a7f576c672fcc78824",
+   "nome": "AVD Central v2",
+   "de": "4",
+   "para": 5
+  },
+  {
+   "linha": 275,
+   "id": "b35f788c70ef99bfb465fb4d20d36a9d",
+   "nome": "Resumo NFS | Trello → Chat",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 278,
+   "id": "1b75bcf9e08ccb24f7247781beb4ca44",
+   "nome": "Ordens Travadas/Em Espera | Metabase -> Chat",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 281,
+   "id": "50f7370646f7b8dafc071ec9615dcb31",
+   "nome": "Gestão de Contencioso | Gogroup",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 282,
+   "id": "3ec81350fc444814eb61630353ae233b",
+   "nome": "Automação End-to-End de Inadimplência",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 284,
+   "id": "cddae49aba75b90af7f210ac5a2c4073",
+   "nome": "N8N Audit",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 286,
+   "id": "be298b19e8921082d3f7445b7422445f",
+   "nome": "Controle de bonificações",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 294,
+   "id": "7e4004e94b6102fb6a6a1bc6fd0627f0",
+   "nome": "Agente Demonstracoes Contabeis",
+   "de": "1",
+   "para": 0
+  },
+  {
+   "linha": 297,
+   "id": "1058a17a415fb7ce749044bfe3cb6885",
+   "nome": "Plataforma de Gestão de Pagamento de Prestadores PJ",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 301,
+   "id": "61815f1e4ffe49c19a77dedcab544ad1",
+   "nome": "Pós Vendas B2B - Analisador de CRM",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 306,
+   "id": "27974e66b3f3cd233e153ca34156736b",
+   "nome": "Automação de envio Reinf",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 307,
+   "id": "033884529f4c1a5e0b648899f649f354",
+   "nome": "Dashboard de resultados AVD 2025",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 309,
+   "id": "9ea94045b29b20f79e861adeab561a9d",
+   "nome": "Boletos Itaú via Proxy Bancária",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 314,
+   "id": "797a887e1fcba72cf7da73c9dfffa81a",
+   "nome": "hub de mensagens dos grupos do time de influenciadores",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 320,
+   "id": "084f0d94ec2ad51b4d3b0e73cda57948",
+   "nome": "Acompanhamento de Mudanças de Preço",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 325,
+   "id": "f4888bd4bfae265b91c1b45e8d3324f1",
+   "nome": "Sistema de alertas",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 328,
+   "id": "a557f78db43bb57038d6d694038ac029",
+   "nome": "Torre de Controle Supply Gogroup",
+   "de": "1",
+   "para": 3
+  },
+  {
+   "linha": 329,
+   "id": "a36ed1702e5c5f9b538c1b410d669978",
+   "nome": "Analytics Gobeaute: Ponto Ótimo de Pedido",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 331,
+   "id": "3f951b0ad47c42be5de0406c3999d1fd",
+   "nome": "Painel de Indicadores Gogroup",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 333,
+   "id": "4f83eb613abc6d704bc4f1ef3bb0877c",
+   "nome": "Portal de Jornada do Cliente B2B",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 334,
+   "id": "2d53ff57f03b678a31610d3e1f270848",
+   "nome": "Plano de Industrialização",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 335,
+   "id": "caddf5a75fa33da411b7e84e39cc0475",
+   "nome": "Fluxo de carrinho abandonado e checkout",
+   "de": "3",
+   "para": 4
+  },
+  {
+   "linha": 337,
+   "id": "4c0b4e19ac8316415208f764d25ebe7e",
+   "nome": "Fast Track",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 338,
+   "id": "e0bc3303bdb4ab42cab081c977bc6ea9",
+   "nome": "FÉRIAS · PJs (TECNOLOGIA)",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 339,
+   "id": "131abf36629d46bf8c52cf92df3c551c",
+   "nome": "Conciliacao contabil Automatica",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 348,
+   "id": "ade11cc282647402bb7402d6ffd8dcfe",
+   "nome": "Automação de Relatório de Malas",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 349,
+   "id": "97bd0531e2b1773a5a275164a7567d5f",
+   "nome": "Painel Gerencial B2C",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 350,
+   "id": "04a1e4edee977d07335e203d6a67f890",
+   "nome": "Integrações multi-plataforma de CRM",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 351,
+   "id": "b1f79e9bb4658629252565ae737ac496",
+   "nome": "Bela – Assistente Virtual Inteligente para RCA e Inside Sales",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 352,
+   "id": "f7abd07ec0318867fae7a7eb0fe130a0",
+   "nome": "Movimentações em excessão à AVD",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 353,
+   "id": "c9f41b4250fad168322a3b6a8ec85f99",
+   "nome": "Auditoria de Contas Meta Ads",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 354,
+   "id": "042ceb241415c998dc98038ef31c4907",
+   "nome": "Automação de Nfs via Python",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 356,
+   "id": "8eced3893d869c42bea54e24be242d27",
+   "nome": "GoPromos",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 357,
+   "id": "25252e7ac823ff7b9e151a1ecf53604e",
+   "nome": "Gestão da Transparência Supply",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 361,
+   "id": "02b8188891c62bc531240f046c4b639f",
+   "nome": "FAQ dos Agentes",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 362,
+   "id": "d9125b049a25cc98618efb0d3f93b0cf",
+   "nome": "Automação de Chargebacks",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 364,
+   "id": "f0129730dfb62dbdfe9ad72be73367e2",
+   "nome": "GoComunica - Canal de Comunicação Interna do Time de People",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 365,
+   "id": "70ac508ffef75517e5ca90db0f2b9ddf",
+   "nome": "Gohelp",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 368,
+   "id": "f30237cb64731ee43cd474944eda5ee0",
+   "nome": "Simulador Dinâmico de Custos MOD",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 377,
+   "id": "6fe28b8e74447813c2563936fd6f430d",
+   "nome": "Dashboard de Macro Influenciadores",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 379,
+   "id": "a30d14ca06bd9b04c7a5852433e9bfa7",
+   "nome": "twogo - Planilhamento RA gocase",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 385,
+   "id": "110f199139399ccd797af95aee10f165",
+   "nome": "Sucesso.AI",
+   "de": "2",
+   "para": 4
+  },
+  {
+   "linha": 387,
+   "id": "b0634b89bef9ada24cbde538de91e767",
+   "nome": "Dashboard gOpex",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 388,
+   "id": "85443676002563cbdfb4ae8b85a605ba",
+   "nome": "Pesquisa pulso - Gogroup",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 393,
+   "id": "3f625de8dfbba719e411e4420e71f89c",
+   "nome": "Agente Estoque Custo",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 394,
+   "id": "9e205b20011868b7a6cdef7fc13730fc",
+   "nome": "Agente Auditoria Frete",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 395,
+   "id": "ccf5eb1d3a1e189e1eb290721485cc69",
+   "nome": "Alerta e previsão de reembolsos por depósito",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 396,
+   "id": "248a344a3d28b968155d04092603b7b6",
+   "nome": "Rankings de Gamificação Tiktok Shop",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 397,
+   "id": "f872b3d903047f213f60615358056ab2",
+   "nome": "FullControl360°",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 398,
+   "id": "ce2841057333e92477500158ea8049ec",
+   "nome": "DRE · acompanhamento real x orçado",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 400,
+   "id": "b9059d498a219240957de4f90cef8c2d",
+   "nome": "Assistente de promoções & cupons para agentes de CX",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 408,
+   "id": "81a58b7774846b87f3b788edbd39543b",
+   "nome": "Controle",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 409,
+   "id": "f3a23765f1629a583c3a6bd2bbd359d6",
+   "nome": "[ECOMM] Bot gerenciador de demandas",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 410,
+   "id": "1201f1b825c691c3e463efc27aa3fc57",
+   "nome": "Automação de Antifraude Gocase",
+   "de": "1",
+   "para": 3
+  },
+  {
+   "linha": 413,
+   "id": "3cc7f441c0de8ac489045a58968e4828",
+   "nome": "Suporte à queda de ripagem PrintFactory",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 418,
+   "id": "62b60c15e40ce23d063a7e58f2db7ff1",
+   "nome": "Classificação Automática de NPS e Review por IA",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 420,
+   "id": "8bce20c2919b3e6d94bfd4933116a6d8",
+   "nome": "Tesla Bot",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 421,
+   "id": "08b47ab57b21c0dd7b171054d48654c7",
+   "nome": "Ger.AI CX - Analista de Melhoria Contínua",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 427,
+   "id": "723127b3df977676770f030fb388d0f1",
+   "nome": "Alerta Hit",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 428,
+   "id": "0153f250eb11f5575e027ea4c72aac53",
+   "nome": "Visão de Produtos por Influenciador",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 430,
+   "id": "fd165938a9c4583fb007e167a36e6615",
+   "nome": "Hailey",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 433,
+   "id": "d85b7b561fa38b711363b582d19fecad",
+   "nome": "Hitmaker Social · Trend TikTok → Post Publicado em <1h",
+   "de": "0",
+   "para": 5
+  },
+  {
+   "linha": 441,
+   "id": "9cb401f220d25e212ecdfe888ed39ab2",
+   "nome": "Kanban de Atividades/Projetos - SalesOps",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 442,
+   "id": "0bd70ba17882781235e433235d4f16d9",
+   "nome": "Automação Semanal de Cronograma de Mala do Monday",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 446,
+   "id": "64307dcc3e497887862791a88f52c874",
+   "nome": "Automação de Lançamentos Contábeis Notas de Serviços",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 450,
+   "id": "788493d6f77542c89409a8e63e68a464",
+   "nome": "Robô DARF — Captura automática de guias e abertura de chamados de pagamento (GoService)",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 457,
+   "id": "c9b86294e194954e9719a7f2bec05b22",
+   "nome": "gocase · playbook de visual merchandising",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 459,
+   "id": "ac15e77f72462417e2fb67ab582805e4",
+   "nome": "Hub RCA / Vendedores - Gobeaute",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 460,
+   "id": "f4b5f9b6c411221863ab32b6cc4a8a29",
+   "nome": "Plataforma de Cadastro de Produtos GoBeaute",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 461,
+   "id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+   "nome": "Sab.IÁ — Analista de IA para geração de FAQs",
+   "de": "1",
+   "para": 3
+  },
+  {
+   "linha": 463,
+   "id": "0c126bc37f8d5b9ed16a6ceb7aa8f61b",
+   "nome": "Argos - CDP inteligente",
+   "de": "3",
+   "para": 5
+  },
+  {
+   "linha": 467,
+   "id": "c3b73cbf2f8cbbe83b4067886bd2f314",
+   "nome": "Portal de Pedidos Travados (Houdini)",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 472,
+   "id": "dd99b132e1c98e8aedec88fe528ca660",
+   "nome": "AUTOMACAO DE FLUXO DE CAIXA INDIRETO X DIRETO",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 474,
+   "id": "48a99d5a536decfcec59d07de6378bcd",
+   "nome": "Automação Margem Diária GoCase",
+   "de": "0",
+   "para": 4
+  },
+  {
+   "linha": 482,
+   "id": "2e7661ed9d40c55958cb7cff0402c893",
+   "nome": "Mix Produtos Gobeaute",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 490,
+   "id": "07751ee7e627610adcabafe7a15da62e",
+   "nome": "Destrava.AI",
+   "de": "0",
+   "para": 5
+  },
+  {
+   "linha": 494,
+   "id": "1f9eee488fe69a28d695892490dee0d1",
+   "nome": "Plataforma Goseller",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 497,
+   "id": "36df40ecc7af80c94e68da26b46f5c10",
+   "nome": "GO MOVE",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 498,
+   "id": "f3032ec8d4dc423a8fb1adecd6fab2bd",
+   "nome": "Chat  Produção & Perdas",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 499,
+   "id": "29899445b2da1e827d277f8bf72fdd37",
+   "nome": "Farol de Ciência do Código de Conduta",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 501,
+   "id": "c955748c57508700a7e2457fbaa369dd",
+   "nome": "Analista de Boost de Estampas",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 502,
+   "id": "4243da19e69c851313ff8f0485d945cd",
+   "nome": "SPG · Motor de Saving Real — YTD automático de NF (produto canônico × UF)",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 503,
+   "id": "6a46c2628e247a1972355d31bb9ab195",
+   "nome": "SPG · Módulo Insumos — Projeção de Caixas e Kraft por Perfil de Pedido",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 506,
+   "id": "c373cfe2df938334bfd87c02d9b8a631",
+   "nome": "Resposta Pública - Gocase e Kokeshi",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 511,
+   "id": "90740a2b7cbaa107c447c755ffddb887",
+   "nome": "Radar CX",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 513,
+   "id": "86577b3dc2bfeb0f0a728ae4b5416a58",
+   "nome": "Radar de Conexão - internet escritório de Fortaleza",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 514,
+   "id": "fd06f0d284d019f84731f86fa9b78c7c",
+   "nome": "Spectrum - Gerador de pautas de CRM com IA",
+   "de": "0",
+   "para": 4
+  },
+  {
+   "linha": 517,
+   "id": "daaf2bf65b49579604a4510b07b9b9f2",
+   "nome": "Inventory Control Tower — Módulo de Disponibilidade e Reposição",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 518,
+   "id": "5ccda086567143e8d632e2d83ce4033a",
+   "nome": "AUTOMAÇÃO DO PROCESSO DE CONTRATAÇÃO DE PJ INICIO<>FIM",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 520,
+   "id": "5b5fe53c98c7ef9db16384b8de4f6424",
+   "nome": "Contábil Hub",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 521,
+   "id": "52b81ea03b43507441a09cc0cbae2637",
+   "nome": "Radar de Fechamento — Conciliador Contábil ⇄ Financeiro",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 523,
+   "id": "c3a3e0a7d241d28a9c7b82807258cc6e",
+   "nome": "Radar de Fechamento: Validações Contábil ⇄ Fiscal + Validações de Variações Contábeis + Relatório Final de Fechamento",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 525,
+   "id": "72cf70e153722d934b010972a6c89e09",
+   "nome": "Godata",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 527,
+   "id": "e5364930ead472f973ba575a9114097b",
+   "nome": "Automação Análise de Crédito",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 528,
+   "id": "9f00af06cbbea1aafdb400062a7c2d72",
+   "nome": "Automação das Solicitações de Pagamento",
+   "de": "0",
+   "para": 5
+  },
+  {
+   "linha": 530,
+   "id": "a521856e6ac299aad4bc3d9251f5d417",
+   "nome": "Trocas e Devoluções - Lojas Físicas",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 537,
+   "id": "d93874c95714c4050db05d0b5e236496",
+   "nome": "GoAssist Beneficios",
+   "de": "0",
+   "para": 1
+  },
+  {
+   "linha": 541,
+   "id": "0c27f59f8456d1fccc725f92ab2164f4",
+   "nome": "PCP BIA",
+   "de": "0",
+   "para": 2
+  },
+  {
+   "linha": 554,
+   "id": "ecda75be6aa981954da880d5a64331b0",
+   "nome": "Centralizador de opt-out GoBeaute",
+   "de": "0",
+   "para": 3
+  },
+  {
+   "linha": 572,
+   "id": "39553b210705e924902ed6eb95cb320a",
+   "nome": "Universo Gocoins",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 573,
+   "id": "cccccfd86433071aa5c310bef548c022",
+   "nome": "Robô de Notas de Débito (Ressarcimento)",
+   "de": "2",
+   "para": 0
+  },
+  {
+   "linha": 574,
+   "id": "c417fe024caf2b48b5701b82070b34b9",
+   "nome": "Agente de Waitlists",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 575,
+   "id": "85d3a9d728fdb909f0b2b290d37b7d88",
+   "nome": "GoProduct",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 578,
+   "id": "f547704dc3ab6ccdcf763e28beecd109",
+   "nome": "Agente de apuração de Impostos",
+   "de": "4",
+   "para": 3
+  },
+  {
+   "linha": 582,
+   "id": "1387ecb575c9668970b74a384feee1c1",
+   "nome": "Declaração de Integridade e de Vínculo",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 591,
+   "id": "8f315702b9f3ea3f20e9d1fc104a1d1f",
+   "nome": "Checklist de Inicio de turno",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 593,
+   "id": "bb24d1b523b325d2d97a37f4c7bd1c0f",
+   "nome": "Gocontent Machine",
+   "de": "4",
+   "para": 5
+  },
+  {
+   "linha": 595,
+   "id": "8aed1235aad8d630c5cf3535f3fe969e",
+   "nome": "Carteira de clientes",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 597,
+   "id": "7363ac724047eaba4b2de065f171ec82",
+   "nome": "Cockpit Contábil",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 598,
+   "id": "8743590ad9c54710a71d607e433b64c6",
+   "nome": "Gohelp - Influenciadores Gobeauty",
+   "de": "4",
+   "para": 3
+  },
+  {
+   "linha": 607,
+   "id": "ae6af3b0bcfcff0bc47322c0a37547f4",
+   "nome": "Database Importações Gocase",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 608,
+   "id": "c508f9083c801d5b6fbc982339599c27",
+   "nome": "Dashboard Analytics Gerencial Gocase",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 612,
+   "id": "112f8c36a33cd813d9debc160253f029",
+   "nome": "Órbita",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 615,
+   "id": "4f5fbf89f658883cacc5facf80b708a7",
+   "nome": "Relatório Transportador",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 620,
+   "id": "c19b41ebd28f92560f5c8c826aaa4389",
+   "nome": "Gohelp - Influenciadores Gocase",
+   "de": "3",
+   "para": 4
+  },
+  {
+   "linha": 622,
+   "id": "452ee30f320161450960537cf1594cb1",
+   "nome": "Painel de Acuracidade - B2C",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 623,
+   "id": "d6920a2d656749635b5cdcf15dadf4d1",
+   "nome": "Gestão de Consumíveis",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 627,
+   "id": "9512d433f168a6eb0804e5b543cdb5fe",
+   "nome": "Painel S&OE - Gobeaute",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 629,
+   "id": "546988880104067db81665f63481eca1",
+   "nome": "Haileydash",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 636,
+   "id": "9d6bc6e07c35162faefc92ae2a074287",
+   "nome": "Evidências de Descostura — Bolsa Fitness Puffer [Monitoramento de Crise]",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 639,
+   "id": "964d897c105d416b16a02ebb57792aee",
+   "nome": "Plataforma de Orçamento de Pessoal 2026 (GoGroup)",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 646,
+   "id": "edb6bc16201a7168bb26dd45496225b7",
+   "nome": "Controle de Vencimentos",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 655,
+   "id": "4d669d9a11b96cb96393a735c30677dd",
+   "nome": "Automação dos Câmbios Internacionais",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 657,
+   "id": "3fc2ff2403b80d6113c6362ffcb3bf67",
+   "nome": "Board de Coleções / MKT - ILUSTRA",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 660,
+   "id": "25a913771d281e20d18ea9f7cb699cb9",
+   "nome": "Automação na Criação de Chamados de Pagamentos de Fornecedores (Gobeaute)",
+   "de": "4",
+   "para": 3
+  },
+  {
+   "linha": 662,
+   "id": "6f58d8ab4b3c894d6800a158505e8538",
+   "nome": "Launch Intelligence",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 666,
+   "id": "5769995f5cd1e87a35ff2616fdb400fe",
+   "nome": "Farol de insucessos",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 667,
+   "id": "d9574be54d6bee5f91fbe401e05d188a",
+   "nome": "Cérebro de trocas Gocase",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 670,
+   "id": "664437f3b5981fbabf24ca51e82fe436",
+   "nome": "Avaliação de Desempenho 90° Lojas Gocase",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 672,
+   "id": "eef2ba7414d5ed3540b017063f804add",
+   "nome": "RA Monitor",
+   "de": "1",
+   "para": 0
+  },
+  {
+   "linha": 673,
+   "id": "f9f0000b601d81a3e508cb9beae503ca",
+   "nome": "Freight Cost Intelligence (CFI)",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 674,
+   "id": "0c708b3d696c121e7644393209235860",
+   "nome": "Conexão MCP-GTI",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 676,
+   "id": "902e766c772ae08634e031d51ab56923",
+   "nome": "Onboarding & Integração — Gente & Gestão",
+   "de": "3",
+   "para": 2
+  },
+  {
+   "linha": 678,
+   "id": "aaebdc509aa007231f95299186b83c51",
+   "nome": "Funil R&S",
+   "de": "4",
+   "para": 3
+  },
+  {
+   "linha": 679,
+   "id": "4790ee41286dffa0b9ff13117596295f",
+   "nome": "Quiz de Vendas Apice",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 694,
+   "id": "4c1b13c1d3ddd9096ec04498e17e4d40",
+   "nome": "Automação da Conciliação Asaas <> Reseller <> Factory",
+   "de": "1",
+   "para": 2
+  },
+  {
+   "linha": 697,
+   "id": "5cb3fae21e905218094c037d44f06ebf",
+   "nome": "GoEvidências",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 715,
+   "id": "7a507c09a6ef6c2697ff3be4ebe85d7b",
+   "nome": "Monitoramento PJs",
+   "de": "3",
+   "para": 4
+  },
+  {
+   "linha": 718,
+   "id": "61685a97cf63321fe90e057ebb12d2ba",
+   "nome": "Acompanhamento de Despesa com Frete Real",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 734,
+   "id": "f37f21334575c03d0f2fa50d24aee75a",
+   "nome": "Report Diário de Vendas da Live Instagram — Gocase",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 736,
+   "id": "7166c713fabc8950e4d47512ddf9c201",
+   "nome": "Triagem Automática de E-mail — \"Precisa Ver\"",
+   "de": "2",
+   "para": 0
+  },
+  {
+   "linha": 737,
+   "id": "0f0621e107917da6d2d1e3120b3b3e5e",
+   "nome": "Painel SLA com Agentes",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 743,
+   "id": "185d2b3f9b29c05ee128c31d24def550",
+   "nome": "Godownload",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 746,
+   "id": "ac6d4ee0f278d9c153dc3f493cbaa171",
+   "nome": "Jornada Inbound",
+   "de": "2",
+   "para": 1
+  },
+  {
+   "linha": 748,
+   "id": "120b729da7b5eee7ab883bc6a14b4dd0",
+   "nome": "Mapeamento de prazo ecomerce de nossas marcas e concorrentes",
+   "de": "2",
+   "para": 3
+  },
+  {
+   "linha": 761,
+   "id": "c18a94a9c1de74ae12514a1b1c099c5c",
+   "nome": "Alerta de oportunidades",
+   "de": "1",
+   "para": 3
+  },
+  {
+   "linha": 764,
+   "id": "99dd0ab0ecb3503a6a61e75e71e7fc8a",
+   "nome": "Matriz de Habilidades — Produção",
+   "de": "1",
+   "para": 3
+  }
+ ]
+}

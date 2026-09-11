@@ -16,6 +16,10 @@ import { carregarAcuraciaMedida } from '@/lib/avaliacao-calibragem.functions';
 import { buscarDuplicataNaLista, checarPlausibilidadeHoras, calcularImpactoBasico } from '@/lib/avaliacao/ferramentas';
 import { numero, texto, type Dossie } from '@/lib/avaliacao/dossie';
 import type { Mensagem } from '@/lib/avaliacao/ferramentas';
+import { cosseno } from '@/lib/embeddings';
+import { garantirEmbeddings, carregarEmbeddingsBase } from '@/lib/avaliacao-normais.functions';
+import { mapResumo, type ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
+import { chaveProjeto } from '@/lib/projeto-chave';
 
 export type OpcoesTime = {
   cicloId?: string | null;
@@ -23,25 +27,8 @@ export type OpcoesTime = {
   liberacao?: { liberarAprovar?: boolean; liberarAjuste?: boolean };
 };
 
-const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
-
-export function modelosDoTime(env?: Record<string, string | undefined>): {
-  especialista: string | undefined;
-  estrela: string | undefined;
-  cetico: string | undefined;
-  effortEspecialista: string | undefined;
-} {
-  const e = env ?? ((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {});
-  const leve = e.AVALIACAO_MODELO_LEVE?.trim() || undefined;
-  const forte = e.AVALIACAO_MODELO_FORTE?.trim() || undefined;
-  const effortCru = e.AVALIACAO_REASONING_EFFORT_LEVE?.trim().toLowerCase() || '';
-  return {
-    especialista: leve,
-    estrela: forte,
-    cetico: forte,
-    effortEspecialista: EFFORTS.has(effortCru) ? effortCru : undefined,
-  };
-}
+export { modelosDoTime } from '@/lib/avaliacao/modelos';
+import { modelosDoTime } from '@/lib/avaliacao/modelos';
 
 export function executorPadrao(
   dossie: Dossie,
@@ -93,8 +80,13 @@ export function executorPadrao(
           receita_mensal: n(a.receita_mensal, dossie.financeiro.receita_mensal),
         });
       }
-      case 'ler_evidencia':
-        return { link: a.link ?? null, texto: null, aviso: 'o texto do anexo não é persistido pelo sistema; só o link existe' };
+      case 'ler_evidencia': {
+        // O texto dos docs do Drive já está no dossiê (11/09/2026); a ferramenta devolve o que há.
+        const link = typeof a.link === 'string' ? a.link : null;
+        const doc = dossie.docs_drive.find((d) => !link || d.link === link || d.link.includes(link)) ?? dossie.docs_drive[0] ?? null;
+        if (doc?.texto) return { link: doc.link, nome: doc.nome, texto: doc.texto, aviso: doc.aviso };
+        return { link: link ?? null, texto: null, aviso: doc?.aviso ?? 'nenhum documento de texto legível no Drive para este projeto' };
+      }
       default:
         throw new Error(`ferramenta desconhecida: ${String(nome)}`);
     }
@@ -131,6 +123,87 @@ function vizinhosLexicais(dossie: Dossie, linhas: LinhaEsp[]): VizinhoTime[] {
     out.push({ id, nome: g(r, 'Projeto') ?? id, nota: nota !== null && nota >= 1 ? nota : null, status, similaridade: Number(sim.toFixed(2)), resumo: (g(r, 'Descrição') ?? '').slice(0, 220) });
   }
   return out.sort((a, b) => b.similaridade - a.similaridade).slice(0, 6);
+}
+
+/** Piso de similaridade e K dos vizinhos por embedding do time (mesma régua do corpus da mesa). */
+export const PISO_SIM_TIME = 0.2;
+export const K_VIZINHOS_TIME = 8;
+
+/** Uma linha do espelho reduzida ao que o vizinho precisa carregar. PURA. */
+export function linhaParaVizinhoBase(r: LinhaEsp): { id: string; nome: string; status: string | null; nota: number | null; impacto: number | null; descricao: string } | null {
+  const id = g(r, 'ID Projeto');
+  if (!id) return null;
+  const status = g(r, 'Status');
+  if (/descontinuad/i.test(status ?? '')) return null;
+  const notaCrua = numero(g(r, 'Estrelas'));
+  const nota = notaCrua !== null && notaCrua >= 1 ? notaCrua : null;
+  const decidido = /^(aprovad|reprovad)/i.test(status ?? '') || nota !== null;
+  if (!decidido) return null;
+  return {
+    id,
+    nome: g(r, 'Projeto') ?? id,
+    status,
+    nota,
+    impacto: numero(g(r, 'Impacto Líquido Mensal')) ?? numero(g(r, 'Impacto Líquido')),
+    descricao: g(r, 'Descrição') ?? '',
+  };
+}
+
+/** Resumo do vizinho como o agente lê: TAMANHO na frente, depois o que faz. PURA. */
+export function resumoDeVizinho(v: { status: string | null; impacto: number | null; descricao: string }): string {
+  const tam = v.impacto !== null ? `impacto líquido mensal R$ ${v.impacto.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}` : 'sem impacto declarado';
+  return `[${v.status ?? 'sem status'} · ${tam}] ${v.descricao.slice(0, 180)}`;
+}
+
+/**
+ * Vizinhos do time por EMBEDDING sobre a BASE INTEIRA decidida por gente (11/09/2026).
+ *
+ * ⚠️ Substitui `vizinhosLexicais` como caminho principal. O lexical (sobreposição de palavras em
+ * nome+descrição) devolvia "sem vizinho" com frequência, e sem vizinho a confiança caía para baixa
+ * por construção — foi a raiz de metade dos `humano`/`ajuste` do retroativo. Aqui a fonte é a
+ * MESMA tabela que a mesa usa (`projeto_embedding`): um espaço vetorial, dois consumidores. O
+ * cosseno é em JS (750 × 3072 é barato); Pinecone segue sendo do classificador.
+ * ⚠️ Cada vizinho carrega o TAMANHO (impacto v2) no resumo: é o que o dono do produto pediu —
+ * "esse projeto faz isso e move X" — para o agente posicionar por comparação, não só por função.
+ * ⚠️ Nunca lança. Sem vetor do alvo (chave sem embedding, geração falhou) devolve `[]` e o
+ * chamador cai no lexical.
+ */
+export async function vizinhosPorEmbedding(dossie: Dossie, linhas: LinhaEsp[]): Promise<VizinhoTime[]> {
+  try {
+    const resumos = linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null);
+    const resumoPorId = new Map(resumos.map((p) => [chaveProjeto(p.id), p]));
+    const alvoId = chaveProjeto(dossie.id);
+    let mapa = await carregarEmbeddingsBase();
+    // Só o ALVO é garantido aqui (cap 1); a base é papel do backfill (`backfillEmbeddingsBase`).
+    mapa = (await garantirEmbeddings([alvoId], resumoPorId, mapa, { capGeracao: 1 })).mapa;
+    const alvo = mapa.get(alvoId)?.vetor ?? mapa.get(dossie.id)?.vetor;
+    if (!alvo) return [];
+    const out: VizinhoTime[] = [];
+    for (const r of linhas) {
+      const v = linhaParaVizinhoBase(r);
+      if (!v || chaveProjeto(v.id) === alvoId) continue;
+      const vetor = mapa.get(chaveProjeto(v.id))?.vetor ?? mapa.get(v.id)?.vetor;
+      if (!vetor) continue;
+      const sim = cosseno(alvo, vetor);
+      if (!Number.isFinite(sim) || sim < PISO_SIM_TIME) continue;
+      out.push({ id: v.id, nome: v.nome, nota: v.nota, status: v.status, similaridade: Number(sim.toFixed(2)), resumo: resumoDeVizinho(v) });
+    }
+    return out.sort((a, b) => b.similaridade - a.similaridade).slice(0, K_VIZINHOS_TIME);
+  } catch {
+    return [];
+  }
+}
+
+/** Soma do `Impacto Líquido Mensal` dos APROVADOS — o denominador REAL do 2º eixo. PURA. */
+export function totalImpactoAprovados(linhas: LinhaEsp[]): number | null {
+  let total = 0;
+  let n = 0;
+  for (const r of linhas) {
+    if (!/^aprovad/i.test(g(r, 'Status') ?? '')) continue;
+    const v = numero(g(r, 'Impacto Líquido Mensal')) ?? numero(g(r, 'Impacto Líquido'));
+    if (v !== null && v > 0) { total += v; n++; }
+  }
+  return n > 0 ? total : null;
 }
 
 /** Âncoras congeladas da faixa 6–10: todo projeto da base com nota HUMANA ≥ 6 (D9). */
@@ -175,7 +248,10 @@ export async function avaliarProjetoComTime(
   } catch {
     linhas = [];
   }
-  const vizinhos = vizinhosLexicais(dossie, linhas);
+  // Embedding primeiro (base inteira, com tamanho); lexical só como rede quando o alvo não tem vetor.
+  const porEmbedding = await vizinhosPorEmbedding(dossie, linhas);
+  const vizinhos = porEmbedding.length ? porEmbedding : vizinhosLexicais(dossie, linhas);
+  const totalBaseImpacto = totalImpactoAprovados(linhas);
   const executar = executorPadrao(dossie, { getCargoDe, listarCandidatosDuplicata: async () => candidatosDe(linhas), vizinhos });
 
   const abriuAqui = !opts.cicloId;
@@ -223,6 +299,7 @@ export async function avaliarProjetoComTime(
       registrar: registrar as never,
       liberacao,
       ancoras: ancorasDe(linhas),
+      totalBaseImpacto,
       // ⚠️ Env em RUNTIME, DEFAULT desligado (sem ela o teto é o de sempre). Ligada, desliga a
       // réplica do mérito, que é o que faz a passada caber nos 300 s do edge.
       // ⚠️ **PASSADA CURTA — é teto de INFRAESTRUTURA (300 s do edge), medido hoje.** O gargalo é

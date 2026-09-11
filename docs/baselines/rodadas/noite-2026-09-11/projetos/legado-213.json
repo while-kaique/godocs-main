@@ -1,0 +1,45 @@
+{
+  "id": "legado-213",
+  "nome": "Controle de Estoque - Gobeaute",
+  "antes": {
+    "id": "legado-213",
+    "nome": "Controle de Estoque - Gobeaute",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "404,51",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 67124,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-213",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto declara 38 horas liberadas por mês, mas não mostra registros de que uma despesa existente deixou de ocorrer; o impacto líquido de R$ 404,51 pode ser apenas estimativa. É preciso conferir folhas de ponto, tarefas ou pagamentos antes da aprovação.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

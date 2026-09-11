@@ -1,0 +1,44 @@
+{
+  "id": "b46066870c015db1e374c7e557ef3488",
+  "nome": "LP Skill Creator para Jump",
+  "antes": {
+    "id": "b46066870c015db1e374c7e557ef3488",
+    "nome": "LP Skill Creator para Jump",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "300",
+    "categorias": "Receita incremental",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 101709,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "b46066870c015db1e374c7e557ef3488",
+    "mesa": {
+      "ok": true,
+      "motivo": "Precedente: O projeto se parece com os aprovados de criação e apoio a Growth, mas não traz a base nem o local de medição da receita estimada. Precisa registrar esses dados e mostrar o uso da ferramenta em produção.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

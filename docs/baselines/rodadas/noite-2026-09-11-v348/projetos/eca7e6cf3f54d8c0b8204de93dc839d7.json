@@ -1,0 +1,44 @@
+{
+  "id": "eca7e6cf3f54d8c0b8204de93dc839d7",
+  "nome": "Portal e Conferência de Devoluções (CD)",
+  "antes": {
+    "id": "eca7e6cf3f54d8c0b8204de93dc839d7",
+    "nome": "Portal e Conferência de Devoluções (CD)",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "414,715",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 120464,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "eca7e6cf3f54d8c0b8204de93dc839d7",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O tempo por conferência parece crível, mas 415 horas por mês exigem cerca de 150 conferências mensais nesse ritmo. Falta conferir o volume real de devoluções no CD e os registros de uso do aplicativo.\nFinanceiro: A economia parece ser tempo liberado, não despesa que deixou de existir, e o projeto não mostra redução em folha, horas extras ou cobrança do CD. Para validar o ganho mensal de R$ 414,71, é preciso conferir registros de custo antes e depois.\nCético: O ganho de horas não prova que uma despesa parou, pois a equipe pode ter sido apenas deslocada. Falta o registro do volume de devoluções, do custo antes e da redução efetiva na folha ou no contrato do CD.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

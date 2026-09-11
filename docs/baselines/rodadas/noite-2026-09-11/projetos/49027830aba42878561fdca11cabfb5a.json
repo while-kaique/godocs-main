@@ -1,0 +1,44 @@
+{
+  "id": "49027830aba42878561fdca11cabfb5a",
+  "nome": "Reconhecimento dos Mantras",
+  "antes": {
+    "id": "49027830aba42878561fdca11cabfb5a",
+    "nome": "Reconhecimento dos Mantras",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "48,79",
+    "categorias": "Custo evitado",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 67062,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "49027830aba42878561fdca11cabfb5a",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 7 horas liberadas por mês não têm registro do tempo antes e depois do processo, nem evidência de uso real do aplicativo. Para aprovar, é preciso conferir logs de uso, quantidade de indicações e uma medição do trabalho manual substituído.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

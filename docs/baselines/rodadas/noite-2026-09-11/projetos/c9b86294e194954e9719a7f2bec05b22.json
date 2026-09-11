@@ -1,0 +1,45 @@
+{
+  "id": "c9b86294e194954e9719a7f2bec05b22",
+  "nome": "gocase · playbook de visual merchandising",
+  "antes": {
+    "id": "c9b86294e194954e9719a7f2bec05b22",
+    "nome": "gocase · playbook de visual merchandising",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "384,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 63548,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "c9b86294e194954e9719a7f2bec05b22",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: As 18 h/mês liberadas são apenas uma estimativa e não provam que uma despesa deixou de existir. Falta registro das horas antes e depois e da despesa efetivamente encerrada.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

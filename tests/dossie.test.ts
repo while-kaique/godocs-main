@@ -589,7 +589,9 @@ describe('dossieParaTexto', () => {
     expect(txt).not.toMatch(/7[.,]?321/);
     // O memorial de saving traz R$ → sai e entra a marca de omissão.
     expect(txt).not.toContain(MEMORIAL_SAVING_MARCADOR);
-    expect(txt).toContain('[memorial com valores omitidos]');
+    // 11/09/2026: memorial (v1) saiu do texto do dossiê — em qualquer modo.
+    expect(txt).not.toContain('[memorial com valores omitidos]');
+    expect(txt).not.toContain('Memorial de saving');
     expect(txt).not.toContain('chat_messages');
 
     // Mesmo comportamento com comReais explícito em false.
@@ -603,7 +605,8 @@ describe('dossieParaTexto', () => {
     const txt = dossieParaTexto(d, { comReais: true });
     for (const t of TITULOS) expect(txt).toContain(t);
     expect(txt).toMatch(/8[.,]?844/);
-    expect(txt).toContain(MEMORIAL_SAVING_MARCADOR);
+    // 11/09/2026: memorial (v1) NÃO entra no texto nem com comReais; o campo segue no objeto.
+    expect(txt).not.toContain(MEMORIAL_SAVING_MARCADOR);
     expect(txt).not.toContain('[memorial com valores omitidos]');
     expect(txt).not.toContain('chat_messages');
   });

@@ -1,0 +1,45 @@
+{
+  "id": "b9059d498a219240957de4f90cef8c2d",
+  "nome": "Assistente de promoções & cupons para agentes de CX",
+  "antes": {
+    "id": "b9059d498a219240957de4f90cef8c2d",
+    "nome": "Assistente de promoções & cupons para agentes de CX",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "249,16",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 79852,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "b9059d498a219240957de4f90cef8c2d",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: Há divergência entre as horas informadas na descrição e no memorial, e não há prova de que uma despesa realmente deixou de existir. É preciso conferir a base das horas e o registro do custo evitado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

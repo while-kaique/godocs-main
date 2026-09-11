@@ -1,0 +1,44 @@
+{
+  "id": "LEGADO-100B",
+  "nome": "Automação de análise - Personalização/Modelo errado",
+  "antes": {
+    "id": "LEGADO-100B",
+    "nome": "Automação de análise - Personalização/Modelo errado",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "132,4",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 69542,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-100B",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor mensal é baixo e combina com a troca da conferência manual por rotina automática. Falta comprovar que o gasto ou as horas da conferência realmente deixaram de existir, com registro do antes e do depois.\nCético: O saving mensal de 132,40 não tem registro mostrando que uma despesa deixou de existir. É preciso conferir a escala manual antes e depois e a evidência de redução efetiva do gasto.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

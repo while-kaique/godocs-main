@@ -36,6 +36,8 @@ import {
   ceticoEstrelaFallback,
   travaEscapeSemCitacao,
   type ResultadoCeticoEstrela,
+  reconciliarReplicaEstrela,
+  derrubarEscapePorGatilho,
 } from '@/lib/avaliacao/cetico-estrela';
 import { conciliar, type Consenso, type Liberacao } from '@/lib/avaliacao/consenso';
 import { impactoMensalDeclarado } from '@/lib/materialidade-piso';
@@ -221,6 +223,13 @@ export async function avaliarComTime(args: {
    * contribuição dele é a NOTA. A réplica existia para resolver o mérito — que deixou de ser dele.
    */
   maxRodadasDebate?: number;
+  /**
+   * Soma do `Impacto Líquido Mensal` dos APROVADOS da base, calculada por quem tem o espelho em
+   * mãos (11/09/2026). ⚠️ Sem isto o share do 2º eixo dividia por `BASE_IMPACTO_MENSAL_REFERENCIA`,
+   * um número FIXO medido em 10/09 — a base cresce, o share cai e o 5★ de hoje viraria 4★ sem
+   * ninguém mexer em nada. Ausente/inválido → cai na referência (comportamento antigo).
+   */
+  totalBaseImpacto?: number | null;
 }): Promise<ResultadoTime> {
   const { dossie, vizinhos } = args;
   const maxTools = args.ferramentasPorAgente ?? FERRAMENTAS_POR_AGENTE;
@@ -351,6 +360,7 @@ export async function avaliarComTime(args: {
       savingReais: dossie.financeiro.saving_reais,
       receitaMensal: dossie.financeiro.receita_mensal,
     }),
+    totalBase: args.totalBaseImpacto ?? null,
   });
 
   // ── rodada 1 ──
@@ -369,6 +379,7 @@ export async function avaliarComTime(args: {
       objecaoDoCetico,
       painelDoImpacto: julgamentos,
       pisoDeImpacto,
+      ancorasComite: paresDeComite(vizinhos, args.ancoras ?? []),
     });
     const loop = await loopComFerramentas({ chamarLlm: chamar('estrela'), mensagensIniciais: prompt, executar: args.executar, maxChamadas: maxTools });
     const ctx = { temVizinhos, notaHumana: args.notaHumana, pisoDeImpacto };
@@ -448,8 +459,27 @@ export async function avaliarComTime(args: {
   // não convergem — eles alternam. Se o cético insistir depois da volta, quem decide é o consenso.
   let ceticoEstrela = await rodarCeticoEstrela(estrela, raizId, 1);
   if (ceticoEstrela.refuta && ceticoEstrela.motivo) {
-    estrela = await rodarEstrela(2, ceticoEstrela.motivo);
+    const primeira = estrela;
+    const replica = await rodarEstrela(2, ceticoEstrela.motivo);
+    // ⚠️ Trava depois do debate (11/09/2026): a réplica baixa no máximo 1 nível por volta, e um
+    // escape 6–10 válido só cai se o cético NOMEOU o gatilho derrubado. Medido: 21 de 96 réplicas
+    // desabavam ≥2 níveis e 10 de 15 escapes válidos sumiam por objeção genérica.
+    estrela = reconciliarReplicaEstrela(primeira, replica, ceticoEstrela);
+    if (estrela !== replica) {
+      await registrarSeguro(
+        { pai_id: raizId, agente: 'trava-replica-estrela', tipo: 'cetico', rodada: 2, entrada: `réplica ${replica.nota}★ (escape ${replica.escape.valido ? 'sim' : 'não'})`, saida: json({ nota: estrela.nota, escape: estrela.escape.valido, gatilho_refutado: ceticoEstrela.gatilho_refutado }), veredito: `${estrela.nota}`, duracao_ms: 0 },
+        true,
+      );
+    }
     ceticoEstrela = await rodarCeticoEstrela(estrela, raizId, 2);
+    const semEscape = derrubarEscapePorGatilho(estrela, ceticoEstrela);
+    if (semEscape !== estrela) {
+      await registrarSeguro(
+        { pai_id: raizId, agente: 'trava-replica-estrela', tipo: 'cetico', rodada: 3, entrada: `cético da 2ª volta nomeou "${ceticoEstrela.gatilho_refutado}"`, saida: json({ nota: semEscape.nota, escape: false }), veredito: `${semEscape.nota}`, duracao_ms: 0 },
+        true,
+      );
+      estrela = semEscape;
+    }
   }
 
   // ── consolida + cético (+ réplica com teto) ──

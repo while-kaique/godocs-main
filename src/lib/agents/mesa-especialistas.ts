@@ -239,3 +239,30 @@ export function montarPareceresDaMesa(v: {
     return { dimensao: dim, preocupa: d.preocupa, argumento: cortar400(d.motivo ?? ''), confianca: d.confianca };
   });
 }
+
+
+// ─── Trava: falta de material NÃO é preocupação (11/09/2026) ────────────────────────────────────
+//
+// ⚠️ Régua declarada, irmã de `aplicarTravaCeticoMaterial` do time. Nos canários da rodada de
+// calibragem a mesa mandou SendApp (R$ 97 mil/mês, 7★ humano) e CX Hub (R$ 31 mil/mês) para
+// `em_validacao` com pareceres do tipo "faltam a equipe envolvida e as horas por rotina; é preciso
+// conferir a memória de cálculo". O dono do produto foi explícito: memorial não conta mais e a
+// avaliação é sobre nome, descrição, evidências e os números da v2. Um parecer que só pede material
+// vira RESSALVA (fica registrado, derruba confiança), não veto — a menos que traga um SINAL
+// CONCRETO (número implausível, contradição, dupla contagem, projeção), que é o que a régua de
+// preocupação sempre exigiu.
+const SO_PEDE_MATERIAL = /(falta|faltam|sem |n[ãa]o (h[áa]|informa|mostra|apresenta|comprova|registra|traz|detalha)|precisa (conferir|confirmar|comprovar|validar)|é preciso (conferir|confirmar|comprovar|validar)|conferir (a |o )?(mem[óo]ria|registro|comprovante|fonte|extrato))[^.]{0,80}(mem[óo]ria de c[áa]lculo|registro|comprovante|evid[êe]ncia|documenta|equipe envolvida|horas (economizadas |gastas )?por rotina|anexo|extrato|fonte|despesa que (deixou|realmente))/i;
+const SINAL_CONCRETO = /(implaus|acima do teto|passa o teto|dupla contagem|contad[oa]s? (duas vezes|dos dois lados)|contradi|n[ãa]o bate|diverg|inflad|absurd|projetad|projeç[ãa]o|estimativa|pessoas em tempo integral|fte|excede|imposs[íi]vel|duplicat|mesmo escopo|receita bruta)/i;
+
+export function aplicarTravaMaterialMesa(j: JulgamentoEspecialista): JulgamentoEspecialista {
+  if (!j.preocupa) return j;
+  const arg = j.argumento ?? '';
+  if (SINAL_CONCRETO.test(arg)) return j;
+  if (!SO_PEDE_MATERIAL.test(arg)) return j;
+  return {
+    ...j,
+    preocupa: false,
+    argumento: `${arg} [ressalva: pede material ou memória de cálculo, sem sinal concreto — não barra]`,
+    sinais: [...(j.sinais ?? []), 'preocupação só por falta de material rebaixada a ressalva'],
+  };
+}

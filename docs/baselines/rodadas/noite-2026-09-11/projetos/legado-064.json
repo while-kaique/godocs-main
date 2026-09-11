@@ -1,0 +1,45 @@
+{
+  "id": "legado-064",
+  "nome": "[BRUNA] Automação NFs Gobeaute",
+  "antes": {
+    "id": "legado-064",
+    "nome": "[BRUNA] Automação NFs Gobeaute",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "1408,5",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 110132,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-064",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho mensal de R$ 1.408,50 parece vir de horas liberadas, mas isso não prova redução de despesa. Falta confirmar se as 140 h/mês viraram economia efetiva e onde esse custo deixou de existir.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time recomendou 2 e não reescreveu a nota",
+      "estrelas": 2,
+      "estrelas_time": 2
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

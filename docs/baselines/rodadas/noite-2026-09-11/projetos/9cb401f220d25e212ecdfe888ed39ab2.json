@@ -1,0 +1,45 @@
+{
+  "id": "9cb401f220d25e212ecdfe888ed39ab2",
+  "nome": "Kanban de Atividades/Projetos - SalesOps",
+  "antes": {
+    "id": "9cb401f220d25e212ecdfe888ed39ab2",
+    "nome": "Kanban de Atividades/Projetos - SalesOps",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "571,425",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 84598,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "9cb401f220d25e212ecdfe888ed39ab2",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O impacto vem de 29 horas liberadas, não de uma despesa comprovadamente eliminada. Falta mostrar como essas horas viram economia financeira real de R$ 571,42 por mês.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

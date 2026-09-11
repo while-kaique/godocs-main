@@ -1,0 +1,44 @@
+{
+  "id": "112f8c36a33cd813d9debc160253f029",
+  "nome": "Órbita",
+  "antes": {
+    "id": "112f8c36a33cd813d9debc160253f029",
+    "nome": "Órbita",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "876,15",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 67416,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "112f8c36a33cd813d9debc160253f029",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 876 horas/mês exige mostrar quantas pessoas realmente faziam essas tarefas e como as horas foram medidas. Falta o registro por equipe ou atividade para confirmar esse volume.\nFinanceiro: O saving de licença de US$ 171 por mês é plausível, mas o impacto líquido de 876,15 por mês depende de horas poupadas e não está comprovado. Precisa conferir o cancelamento das licenças e o registro das horas, sem contar o mesmo ganho duas vezes.\nCético: O saving de licenças foi declarado, mas não há registro da cobrança anterior nem do cancelamento das 19 licenças. Falta conferir esses documentos e a memória do saving mensal de 876,15 para separar economia efetiva de projeção.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "As duas metades do time divergiram: a análise do impacto aponta Pendente e a da estrela aponta Aprovado. Fica pendente para gente decidir.",
+      "concordam": false,
+      "confianca": "baixa",
+      "porques": [
+        "As duas metades do time divergiram: a análise do impacto aponta Pendente e a da estrela aponta Aprovado. Fica pendente para gente decidir.",
+        "Pela estrela: O time de agentes aprovou o projeto.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

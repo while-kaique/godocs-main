@@ -1,0 +1,44 @@
+{
+  "id": "b2efc76ad706b68fe7745477a5f5bf49",
+  "nome": "Typebot - Cadastro Afiliados",
+  "antes": {
+    "id": "b2efc76ad706b68fe7745477a5f5bf49",
+    "nome": "Typebot - Cadastro Afiliados",
+    "status": "Aprovado",
+    "estrelas": "5",
+    "estrelaAgente": "5",
+    "confiancaAgente": "media",
+    "impacto": "1003,68",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 70299,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "b2efc76ad706b68fe7745477a5f5bf49",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 1003,68 horas por mês equivale a cerca de 4,6 pessoas em tempo integral, alto para um cadastro automatizado sem informar quem fazia o trabalho. Precisa conferir o volume mensal de cadastros, o tempo por cadastro e quantas pessoas realmente executavam essas etapas.\nFinanceiro: O ganho líquido mensal de R$ 1.003,68 depende de horas poupadas, mas não há registro do tempo anterior nem da despesa que deixou de existir. Precisa conferir esses registros para confirmar que é saving efetivo, sem contar horas como receita.\nCético: O saving não tem registro de uma despesa que existia e deixou de existir, nem prova das horas realmente eliminadas. Para aprovar, é preciso conferir a despesa anterior e evidências do uso automático no cadastro e na criação dos cupons.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 5
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

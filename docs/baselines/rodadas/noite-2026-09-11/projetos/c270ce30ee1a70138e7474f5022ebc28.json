@@ -1,0 +1,45 @@
+{
+  "id": "c270ce30ee1a70138e7474f5022ebc28",
+  "nome": "Dashboard de Planejamento (dashdadosplanejamento)",
+  "antes": {
+    "id": "c270ce30ee1a70138e7474f5022ebc28",
+    "nome": "Dashboard de Planejamento (dashdadosplanejamento)",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "965,125",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 154599,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "c270ce30ee1a70138e7474f5022ebc28",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor mensal parece compatível com as 35 horas liberadas, sem sinal de dupla contagem. Falta comprovar que esse trabalho era despesa existente e deixou de ocorrer, com registro do custo e do uso do dashboard.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

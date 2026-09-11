@@ -1,0 +1,44 @@
+{
+  "id": "legado-254",
+  "nome": "Sortimento Gobeuate",
+  "antes": {
+    "id": "legado-254",
+    "nome": "Sortimento Gobeuate",
+    "status": "Pendente",
+    "estrelas": "0",
+    "estrelaAgente": "5",
+    "confiancaAgente": "media",
+    "impacto": "12011,34",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 220116,
+  "tentativa": 2,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-254",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: As 440 horas/mês superam as cerca de 330 horas da consolidação diária de 3 pessoas, pois também incluem análises que antes não eram feitas. Precisa conferir registros de trabalho e a despesa da consultoria que deixou de existir.\nFinanceiro: O ganho de R$ 12.011 por mês depende de confirmar que a consultoria deixou de ser paga, pois as análises novas não são economia. Conferir contrato, notas ou cancelamento da Trinômio e evitar contar as mesmas horas junto com a despesa.\nCético: O ganho de 440 horas por mês não bate claramente com o esforço diário descrito, e não há prova de que a despesa da consultoria realmente parou. É preciso conferir notas da consultoria e registros de trabalho antes e depois.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": true,
+      "porque": "O time avaliou e o projeto se sustenta, mas caiu na faixa 6 a 10: fica pendente até o comitê humano cravar a estrela (6, 7, 8, 9 ou 10) e aprovar.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time avaliou e o projeto se sustenta, mas caiu na faixa 6 a 10: fica pendente até o comitê humano cravar a estrela (6, 7, 8, 9 ou 10) e aprovar.",
+        "A análise do impacto ficou em Pendente, então há o que conferir junto com a estrela."
+      ]
+    },
+    "status_gravado": "Pendente"
+  }
+}

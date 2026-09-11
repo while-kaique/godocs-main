@@ -1,0 +1,44 @@
+{
+  "id": "7e7df436c826e1fc69dbc6843b47898d",
+  "nome": "Estoque ao vivo Gobeaute",
+  "antes": {
+    "id": "7e7df436c826e1fc69dbc6843b47898d",
+    "nome": "Estoque ao vivo Gobeaute",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "689,18",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 87595,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "7e7df436c826e1fc69dbc6843b47898d",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho de 689 horas por mês é alto e precisa ser ligado a várias pessoas que realmente faziam essas consultas. Falta o registro do time envolvido e das horas gastas antes, além de evidência de que esse trabalho parou.\nFinanceiro: O ganho mensal de R$ 689,18 parece compatível com a eliminação de consultas manuais, mas falta provar que esse custo já existia e deixou de ocorrer. Conferir registros das horas gastas e a despesa correspondente antes de aprovar.\nCético: O impacto mensal de 689,18 não mostra uma despesa que deixou de existir, apenas uma possível economia de tempo. É preciso conferir registros de horas e evidência de redução real de custo antes de aprovar.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

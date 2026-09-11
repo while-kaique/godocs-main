@@ -1,0 +1,44 @@
+{
+  "id": "165b6c6fa396ad88cc4f33be32513061",
+  "nome": "Sistema de Gestão de Riscos",
+  "antes": {
+    "id": "165b6c6fa396ad88cc4f33be32513061",
+    "nome": "Sistema de Gestão de Riscos",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "media",
+    "impacto": "7357,87",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 166674,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "165b6c6fa396ad88cc4f33be32513061",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O valor líquido mensal de R$ 7.357,87 não vem acompanhado de registro de uma despesa que existia e parou, apenas de 16 h/mês liberadas. Precisa conferir folhas, contratos ou pagamentos anteriores que comprovem a economia efetiva.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

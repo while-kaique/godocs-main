@@ -1,0 +1,45 @@
+{
+  "id": "4e5fd243efe0a5963460a05e1491a1ae",
+  "nome": "Análise de convergência  - premissas de AVD",
+  "antes": {
+    "id": "4e5fd243efe0a5963460a05e1491a1ae",
+    "nome": "Análise de convergência  - premissas de AVD",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "196,4725",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 144368,
+  "tentativa": 2,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "4e5fd243efe0a5963460a05e1491a1ae",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto declara 28,5 horas liberadas e R$ 196,47 por mês, mas não mostra qual despesa deixou de existir nem como o resultado foi medido. Precisa apresentar os registros das tarefas antes e depois e a comprovação do gasto evitado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

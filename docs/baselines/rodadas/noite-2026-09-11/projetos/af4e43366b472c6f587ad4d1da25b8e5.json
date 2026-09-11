@@ -1,0 +1,46 @@
+{
+  "id": "af4e43366b472c6f587ad4d1da25b8e5",
+  "nome": "Automação de subidas de vídeo nos canais de youtube das marcas",
+  "antes": {
+    "id": "af4e43366b472c6f587ad4d1da25b8e5",
+    "nome": "Automação de subidas de vídeo nos canais de youtube das marcas",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "280,32",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 117875,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "af4e43366b472c6f587ad4d1da25b8e5",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O impacto parece vir de horas liberadas, não de uma despesa que deixou de existir. Falta registrar o custo ou gasto anterior que foi realmente eliminado para validar os R$ 280,32 mensais.\nCético: As 26,33 h/mês liberadas não têm registro de antes e depois, e não está claro que uma despesa realmente parou. Precisa conferir os tempos registrados e a despesa eliminada que sustenta os R$ 280,32 mensais.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação.",
+        "A estrela 1 do time foi gravada; o Status Aprovado não foi tocado."
+      ]
+    },
+    "status_gravado": null
+  }
+}

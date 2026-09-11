@@ -1,0 +1,45 @@
+{
+  "id": "c3de05afe937e1818b8a41261d37ba53",
+  "nome": "Shipping hub",
+  "antes": {
+    "id": "c3de05afe937e1818b8a41261d37ba53",
+    "nome": "Shipping hub",
+    "status": "Aprovado",
+    "estrelas": "4",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 68904,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "c3de05afe937e1818b8a41261d37ba53",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 4 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 4,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes aprovou o projeto.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time de agentes aprovou o projeto."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

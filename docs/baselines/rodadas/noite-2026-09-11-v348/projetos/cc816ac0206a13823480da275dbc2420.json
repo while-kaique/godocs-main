@@ -1,0 +1,44 @@
+{
+  "id": "cc816ac0206a13823480da275dbc2420",
+  "nome": "Hub de Playbooks de Marca — Gobeaute",
+  "antes": {
+    "id": "cc816ac0206a13823480da275dbc2420",
+    "nome": "Hub de Playbooks de Marca — Gobeaute",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "1508,7125",
+    "categorias": "Custo evitado",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 74419,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "cc816ac0206a13823480da275dbc2420",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 1.508,71 h/mês equivale a cerca de 7 pessoas em tempo integral, alto para a descrição de criação de playbooks sem equipe envolvida. Falta registrar quantas pessoas faziam esse trabalho e quantas horas cada uma gastava.\nCético: O impacto mensal de 1508,71 não tem memória de cálculo nem prova das horas poupadas, e parte dos playbooks ainda está em produção. Precisa anexar os arquivos finais, registros de uso e a origem das horas liberadas para conferir o ganho.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

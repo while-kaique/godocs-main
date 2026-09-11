@@ -1,0 +1,45 @@
+{
+  "id": "033884529f4c1a5e0b648899f649f354",
+  "nome": "Dashboard de resultados AVD 2025",
+  "antes": {
+    "id": "033884529f4c1a5e0b648899f649f354",
+    "nome": "Dashboard de resultados AVD 2025",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "—",
+    "confiancaAgente": "—",
+    "impacto": "42,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 69530,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "033884529f4c1a5e0b648899f649f354",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido informado é baixo e o memorial fala em 12 h/mês liberadas, não em despesa que deixou de existir. Para confirmar o ganho financeiro, falta registrar qual custo mensal foi evitado e onde isso é conferido.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

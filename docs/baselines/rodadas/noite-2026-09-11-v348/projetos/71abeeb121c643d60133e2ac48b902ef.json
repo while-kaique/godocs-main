@@ -1,0 +1,45 @@
+{
+  "id": "71abeeb121c643d60133e2ac48b902ef",
+  "nome": "Tiny Cadastro autônomo ficha técnica produto",
+  "antes": {
+    "id": "71abeeb121c643d60133e2ac48b902ef",
+    "nome": "Tiny Cadastro autônomo ficha técnica produto",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "278,8",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 117196,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "71abeeb121c643d60133e2ac48b902ef",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: A economia de 278,8 horas por mês equivale a mais de uma pessoa em tempo integral, mas não há registro de quantas pessoas faziam os cadastros. É preciso conferir a equipe envolvida, o volume de produtos e o tempo antes da automação.\nCético: O impacto líquido mensal de 278,80 não tem rastro de volume de cadastros, tempo poupado nem despesa que deixou de existir. Para aprovar, é preciso conferir esses registros e provar que a economia foi efetivada, não apenas estimada.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

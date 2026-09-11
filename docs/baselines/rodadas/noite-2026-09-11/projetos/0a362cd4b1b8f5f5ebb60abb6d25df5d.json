@@ -1,0 +1,46 @@
+{
+  "id": "0a362cd4b1b8f5f5ebb60abb6d25df5d",
+  "nome": "Gocase B2B Service Desk (RMA E CADASTROS)",
+  "antes": {
+    "id": "0a362cd4b1b8f5f5ebb60abb6d25df5d",
+    "nome": "Gocase B2B Service Desk (RMA E CADASTROS)",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "—",
+    "confiancaAgente": "—",
+    "impacto": "502,605",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 110461,
+  "tentativa": 2,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "0a362cd4b1b8f5f5ebb60abb6d25df5d",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor depende de 77 h/mês liberadas, mas não há prova de que isso reduza uma despesa de fato. Precisa conferir se houve custo eliminado, e não apenas trabalho realocado.\nCético: O ganho parece projetado, mas não há prova de que uma despesa existente deixou de ocorrer. Falta o registro do custo antes e depois da plataforma, além da confirmação das 77 horas liberadas.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

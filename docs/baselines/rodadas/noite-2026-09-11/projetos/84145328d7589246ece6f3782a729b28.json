@@ -1,0 +1,46 @@
+{
+  "id": "84145328d7589246ece6f3782a729b28",
+  "nome": "Abastecimento de tinta",
+  "antes": {
+    "id": "84145328d7589246ece6f3782a729b28",
+    "nome": "Abastecimento de tinta",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 99382,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "84145328d7589246ece6f3782a729b28",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação.",
+        "A estrela 3 do time foi gravada; o Status Aprovado não foi tocado."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "legado-077",
+  "nome": "Coleta de Imagens Shopify",
+  "antes": {
+    "id": "legado-077",
+    "nome": "Coleta de Imagens Shopify",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "102,4075",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 70900,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-077",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor líquido mensal de 102,41 parece coerente, mas não há registro de que uma despesa existente deixou de ocorrer. Precisa conferir as horas antes e depois e a despesa evitada.\nCético: O saving mensal de 102,41 não mostra qual despesa existia nem prova que ela parou; a documentação também está vazia. Precisa conferir o registro da despesa anterior e evidência de que deixou de ocorrer.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

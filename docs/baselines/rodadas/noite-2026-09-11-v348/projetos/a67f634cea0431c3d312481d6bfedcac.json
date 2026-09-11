@@ -1,0 +1,45 @@
+{
+  "id": "a67f634cea0431c3d312481d6bfedcac",
+  "nome": "CX Self-Service",
+  "antes": {
+    "id": "a67f634cea0431c3d312481d6bfedcac",
+    "nome": "CX Self-Service",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "1062,51",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 96433,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "a67f634cea0431c3d312481d6bfedcac",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O texto descreve 64 h/mês liberadas de um analista, mas o impacto líquido informado é 1062,51 h/mês, volume que exigiria várias pessoas. É preciso conferir a memória de cálculo e identificar quais pessoas realmente faziam esse trabalho.\nFinanceiro: O ganho parece vir das 64 h liberadas, mas não há prova de despesa que deixou de existir, então isso pode ser apenas capacidade liberada. Precisa conferir custo evitado em folha, contratação ou serviço externo que sustente os R$ 1.062,51 mensais.\nCético: As 64 h/mês parecem tempo liberado, não despesa que deixou de existir, e não há documentação que prove redução de custo. É preciso conferir registros de horas, custo do time e evidência de que essa despesa parou.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

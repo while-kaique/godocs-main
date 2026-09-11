@@ -1,0 +1,43 @@
+{
+  "id": "4c1ca5a0a03de674093bbf821cdee9f3",
+  "nome": "GoIA vendas Gocase",
+  "antes": {
+    "id": "4c1ca5a0a03de674093bbf821cdee9f3",
+    "nome": "GoIA vendas Gocase",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "987,9",
+    "categorias": "Custo evitado",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 76006,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "4c1ca5a0a03de674093bbf821cdee9f3",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O impacto líquido mensal de 987,90 não vem acompanhado do registro que mostra como a ferramenta gerou esse ganho, e uso por 32 usuários não prova aumento de vendas. É preciso conferir a comparação com lojas ou períodos sem a ferramenta e os dados de vendas usados no cálculo.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

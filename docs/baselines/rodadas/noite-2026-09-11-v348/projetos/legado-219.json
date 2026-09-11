@@ -1,0 +1,45 @@
+{
+  "id": "LEGADO-219",
+  "nome": "Feel Nutrition — Criação de Marca com IA (Naming + Visual + Estratégia)",
+  "antes": {
+    "id": "LEGADO-219",
+    "nome": "Feel Nutrition — Criação de Marca com IA (Naming + Visual + Estratégia)",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "—",
+    "confiancaAgente": "—",
+    "impacto": "1034,0625",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 59319,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-219",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 1.034 horas por mês equivale a quase 5 pessoas em tempo integral, mas não há registro de quantas pessoas faziam esse trabalho. Precisa conferir a equipe envolvida e a despesa que deixou de existir.\nFinanceiro: O ganho mensal foi informado, mas não há registro de uma despesa anterior que tenha sido encerrada. Precisa conferir a despesa evitada e sua comprovação.\nCético: O saving efetivado não está comprovado: falta mostrar qual despesa existia, quanto foi pago e onde ela deixou de ocorrer. Confira contratos, notas ou registros financeiros que sustentem os R$ 1.034,06 mensais.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

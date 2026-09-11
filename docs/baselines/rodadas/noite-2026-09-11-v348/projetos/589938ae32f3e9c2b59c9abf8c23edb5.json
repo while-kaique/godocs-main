@@ -1,0 +1,44 @@
+{
+  "id": "589938ae32f3e9c2b59c9abf8c23edb5",
+  "nome": "Plataforma Smartonline - Pagamento de DIFAL e captura de xmls",
+  "antes": {
+    "id": "589938ae32f3e9c2b59c9abf8c23edb5",
+    "nome": "Plataforma Smartonline - Pagamento de DIFAL e captura de xmls",
+    "status": "Aprovado",
+    "estrelas": "5",
+    "estrelaAgente": "5",
+    "confiancaAgente": "alta",
+    "impacto": "117475,25",
+    "categorias": "Custo evitado",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 154130,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "589938ae32f3e9c2b59c9abf8c23edb5",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho mensal de R$ 117.475 é alto e precisa de conferência humana, principalmente para confirmar que multas e juros realmente deixaram de nascer. Também é preciso revisar a ligação entre esse valor e as horas liberadas, evitando contar o mesmo ganho duas vezes.\nCético: Preocupa a falta de registros que comprovem os atrasos, multas e juros que deixaram de ocorrer, além da diferença entre o valor divulgado e o memorial. Precisa conferir os pagamentos antes e depois da automação e a composição do impacto líquido de R$ 117.475,25.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 5
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

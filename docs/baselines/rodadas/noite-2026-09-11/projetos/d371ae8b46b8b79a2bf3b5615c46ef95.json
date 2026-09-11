@@ -1,0 +1,45 @@
+{
+  "id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+  "nome": "Sab.IÁ — Analista de IA para geração de FAQs",
+  "antes": {
+    "id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+    "nome": "Sab.IÁ — Analista de IA para geração de FAQs",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "8063,44",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 151999,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: A liberação de 1.496 horas por mês equivale a quase 7 pessoas em tempo integral, mas o texto não informa quantas pessoas faziam essa análise e redação antes. É preciso conferir a escala do time e registros de horas ou volume de atendimentos trabalhados.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 3 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

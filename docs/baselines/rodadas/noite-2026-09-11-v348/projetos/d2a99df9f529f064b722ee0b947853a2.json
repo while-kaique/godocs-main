@@ -1,0 +1,45 @@
+{
+  "id": "d2a99df9f529f064b722ee0b947853a2",
+  "nome": "Portal de devoluções de CX",
+  "antes": {
+    "id": "d2a99df9f529f064b722ee0b947853a2",
+    "nome": "Portal de devoluções de CX",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "3",
+    "confiancaAgente": "media",
+    "impacto": "384,75",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 68674,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d2a99df9f529f064b722ee0b947853a2",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 384,75 h/mês parece plausível para uma operação manual de devoluções ponta a ponta. Falta confirmar quantas pessoas faziam essa rotina e conferir registros de esforço ou escala.\nFinanceiro: O impacto líquido mensal de 384,75 depende de horas poupadas, mas não há registro de despesa que deixou de existir. É preciso conferir folha, custo contratado ou redução de horas pagas para validar o saving.\nCético: O impacto líquido mensal de 384,75 não mostra qual despesa existia e deixou de ocorrer, nem prova que as horas poupadas viraram redução de custo. Falta o registro da despesa anterior e a conferência das horas e do valor usado no cálculo.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

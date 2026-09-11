@@ -1,0 +1,44 @@
+{
+  "id": "0c708b3d696c121e7644393209235860",
+  "nome": "Conexão MCP-GTI",
+  "antes": {
+    "id": "0c708b3d696c121e7644393209235860",
+    "nome": "Conexão MCP-GTI",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "1028,5",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 89799,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "0c708b3d696c121e7644393209235860",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 1.028,5 horas/mês é alto e precisa estar ligado a várias pessoas que realmente faziam essas tarefas. Falta comprovar a equipe envolvida, o tempo gasto antes e a despesa que deixou de existir, com registros de esforço e folha ou contrato.\nFinanceiro: O valor mensal de 1028,50 parece vir de horas poupadas, mas o projeto não mostra uma despesa que deixou de existir. Precisa conferir registros de custo antes e depois e garantir que essas horas não sejam contadas também como receita ou contrato.\nCético: O impacto líquido mensal foi informado sem mostrar horas poupadas, custo anterior ou prova de que uma despesa realmente parou. É preciso conferir registros de uso e despesas antes e depois, além da documentação das permissões e auditoria.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

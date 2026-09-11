@@ -1,0 +1,45 @@
+{
+  "id": "27974e66b3f3cd233e153ca34156736b",
+  "nome": "Automação de envio Reinf",
+  "antes": {
+    "id": "27974e66b3f3cd233e153ca34156736b",
+    "nome": "Automação de envio Reinf",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "424,165",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 72725,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "27974e66b3f3cd233e153ca34156736b",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O volume de 424 horas por mês parece possível para o envio manual de 17 CNPJs, mas exige confirmar quantas pessoas faziam a tarefa e por quanto tempo. Falta o registro das horas ou da despesa antes da automação.\nFinanceiro: O ganho mensal de R$ 424,17 parece compatível com a automação, mas não há prova de que essa despesa realmente deixou de existir. Precisa conferir o tempo antes e depois e o registro de redução efetiva no custo do time.\nCético: O ganho mensal de 424,17 não vem acompanhado de registro do tempo antes e depois nem prova de despesa que deixou de existir. Precisa conferir os apontamentos do time fiscal e a evidência de uso para as 17 empresas.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "e57b287a0fa5c3abfb815d13d5f3c556",
+  "nome": "Conferencia por bipagem Charlie",
+  "antes": {
+    "id": "e57b287a0fa5c3abfb815d13d5f3c556",
+    "nome": "Conferencia por bipagem Charlie",
+    "status": "Pendente",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "alta",
+    "impacto": "6736,56",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 136013,
+  "tentativa": 2,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "e57b287a0fa5c3abfb815d13d5f3c556",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido é muito alto e exigiria cerca de 31 pessoas em dedicação integral, mas o tamanho do time não foi informado. É preciso conferir quantos operadores faziam essa atividade e registros da despesa ou horas que realmente deixaram de existir.\nFinanceiro: O ganho mensal informado é alto e precisa de conferência humana. Falta o registro da despesa que deixou de existir e a prova de que as horas não foram contadas junto com outra receita ou economia.\nCético: O saving mensal de 6736,56 não vem acompanhado de prova de uma despesa que deixou de existir. Precisa conferir a despesa antes e depois, além dos registros de bipagem e do tempo economizado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir."
+      ]
+    },
+    "status_gravado": "Pendente"
+  }
+}

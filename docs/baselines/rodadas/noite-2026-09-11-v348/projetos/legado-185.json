@@ -1,0 +1,44 @@
+{
+  "id": "LEGADO-185",
+  "nome": "Alerta de Rupturas",
+  "antes": {
+    "id": "LEGADO-185",
+    "nome": "Alerta de Rupturas",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "saving, receita_incremental",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 63858,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-185",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor de R$ 7.300/mês não combina com o impacto líquido mensal informado como zero, e o saving não mostra qual despesa deixou de existir. Precisa conferir a origem do valor e um registro da economia efetivamente realizada.\nCético: O impacto líquido mensal é 0, e não há descrição do funcionamento nem documentação para confirmar benefício. É preciso anexar a base de medição e registros de vendas evitadas para revisão humana.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

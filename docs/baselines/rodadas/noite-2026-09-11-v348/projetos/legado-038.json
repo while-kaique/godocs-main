@@ -1,0 +1,45 @@
+{
+  "id": "legado-038",
+  "nome": "Base Custos - Gobeaute",
+  "antes": {
+    "id": "legado-038",
+    "nome": "Base Custos - Gobeaute",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "183,835",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 67123,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-038",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho informado é coerente com uma automação de base, mas falta comprovar que o saving virou uma despesa que deixou de existir. Precisa conferir o registro da despesa anterior e sua interrupção.\nCético: O impacto líquido mensal de 183,84 está sem documentação que mostre qual despesa deixou de existir. Precisa conferir registros da despesa antes e depois da automação e a validação financeira.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "a550095c01aecfb2680b025f881beb18",
+  "nome": "Nomeador de Estampas",
+  "antes": {
+    "id": "a550095c01aecfb2680b025f881beb18",
+    "nome": "Nomeador de Estampas",
+    "status": "Aprovado",
+    "estrelas": "5",
+    "estrelaAgente": "5",
+    "confiancaAgente": "media",
+    "impacto": "2911,17",
+    "categorias": "Custo evitado, Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 103926,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "a550095c01aecfb2680b025f881beb18",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho líquido de 2911,17 horas por mês equivale a cerca de 13 pessoas em tempo integral, mas só há registro de 29 horas liberadas. É preciso conferir quantas pessoas faziam a tarefa e quantos ciclos de SKU ocorriam por mês.\nCético: O ganho líquido mensal de R$ 2.911,17 não tem documentação que permita conferir horas, volume de estampas e valor usado. Precisa apresentar os registros de antes e depois e a planilha do cálculo.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "legado-028",
+  "nome": "RELATÓRIO R&S OFICIAL - 2026",
+  "antes": {
+    "id": "legado-028",
+    "nome": "RELATÓRIO R&S OFICIAL - 2026",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "160,535",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 78090,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-028",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido mensal de 160,53 parece vir de horas poupadas, mas não há prova de uma despesa que deixou de existir. Precisa conferir o custo registrado antes e depois da automação.\nCético: O impacto líquido mensal de 160,53 não tem memória de cálculo nem registro que mostre uma despesa existente e depois interrompida. Precisa conferir a fonte dos dados e evidência do saving efetivado antes da aprovação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

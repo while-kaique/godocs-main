@@ -1,0 +1,43 @@
+{
+  "id": "084f0d94ec2ad51b4d3b0e73cda57948",
+  "nome": "Acompanhamento de Mudanças de Preço",
+  "antes": {
+    "id": "084f0d94ec2ad51b4d3b0e73cda57948",
+    "nome": "Acompanhamento de Mudanças de Preço",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 59396,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "084f0d94ec2ad51b4d3b0e73cda57948",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes aprovou o projeto.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time de agentes aprovou o projeto."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

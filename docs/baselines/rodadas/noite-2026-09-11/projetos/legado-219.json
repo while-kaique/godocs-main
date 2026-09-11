@@ -1,0 +1,45 @@
+{
+  "id": "LEGADO-219",
+  "nome": "Feel Nutrition — Criação de Marca com IA (Naming + Visual + Estratégia)",
+  "antes": {
+    "id": "LEGADO-219",
+    "nome": "Feel Nutrition — Criação de Marca com IA (Naming + Visual + Estratégia)",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "1034,0625",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 105315,
+  "tentativa": 2,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-219",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido de R$ 1.034,06 por mês parece coerente, mas horas liberadas não provam, sozinhas, que houve despesa evitada. Precisa conferir a despesa ou contratação que deixou de ocorrer e garantir que as horas não foram contadas também como receita.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "5a0eba5329975cea1a5a084cea4244b4",
+  "nome": "Dashboard BOT · Gogroup",
+  "antes": {
+    "id": "5a0eba5329975cea1a5a084cea4244b4",
+    "nome": "Dashboard BOT · Gogroup",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "610,28",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 76015,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "5a0eba5329975cea1a5a084cea4244b4",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O saving parece projetado a partir de horas liberadas, mas não há prova de despesa que realmente deixou de existir. Também há diferença entre as horas declaradas no projeto e no memorial; é preciso conferir a base de horas e registros de redução de custo.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

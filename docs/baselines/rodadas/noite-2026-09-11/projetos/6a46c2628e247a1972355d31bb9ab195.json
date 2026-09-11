@@ -1,0 +1,46 @@
+{
+  "id": "6a46c2628e247a1972355d31bb9ab195",
+  "nome": "SPG · Módulo Insumos — Projeção de Caixas e Kraft por Perfil de Pedido",
+  "antes": {
+    "id": "6a46c2628e247a1972355d31bb9ab195",
+    "nome": "SPG · Módulo Insumos — Projeção de Caixas e Kraft por Perfil de Pedido",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "104,65",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 83225,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "6a46c2628e247a1972355d31bb9ab195",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor é baixo, mas o projeto descreve melhor uma previsão de compras do que uma despesa que deixou de existir. Precisa conferir notas, compras evitadas e rupturas antes de reconhecer o saving.\nCético: O impacto é só uma projeção de compra, sem prova de que uma despesa de embalagem já deixou de existir. Precisa conferir pedidos de compra, consumo real e rupturas evitadas antes de aprovar o saving.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "2dae95f8312550644ff1d2ae26e3c52c",
+  "nome": "Debug-skill",
+  "antes": {
+    "id": "2dae95f8312550644ff1d2ae26e3c52c",
+    "nome": "Debug-skill",
+    "status": "Pendente",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "especial",
+    "especial": "Sim"
+  },
+  "http": 200,
+  "ms": 60786,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "2dae95f8312550644ff1d2ae26e3c52c",
+    "mesa": {
+      "ok": true,
+      "motivo": "especial, NO-OP",
+      "veredito": null
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+        "O time pede ajuste ao autor antes de decidir."
+      ]
+    },
+    "status_gravado": "Pendente"
+  }
+}

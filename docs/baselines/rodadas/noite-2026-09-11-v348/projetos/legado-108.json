@@ -1,0 +1,45 @@
+{
+  "id": "legado-108",
+  "nome": "Marketplace Scraper - Faturamento",
+  "antes": {
+    "id": "legado-108",
+    "nome": "Marketplace Scraper - Faturamento",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "74,475",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 76944,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-108",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho líquido mensal é R$ 74,47, abaixo do piso, e não há registro de despesa que deixou de existir. Para confirmar, é preciso conferir o custo anterior da coleta e o saving efetivamente registrado.\nCético: O impacto líquido mensal de 74,47 não vem acompanhado de prova de que uma despesa real deixou de existir. É preciso conferir registros de pagamento ou horas pagas antes e depois da automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

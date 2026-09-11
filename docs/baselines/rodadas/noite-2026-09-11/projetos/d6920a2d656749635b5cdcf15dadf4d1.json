@@ -1,0 +1,45 @@
+{
+  "id": "d6920a2d656749635b5cdcf15dadf4d1",
+  "nome": "Gestão de Consumíveis",
+  "antes": {
+    "id": "d6920a2d656749635b5cdcf15dadf4d1",
+    "nome": "Gestão de Consumíveis",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "757,525",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 102421,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d6920a2d656749635b5cdcf15dadf4d1",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor mensal é baixo e está ligado às horas liberadas, sem sinal claro de dupla contagem. Como o projeto também fala em savings, é preciso conferir se há despesa que deixou de existir e onde isso foi registrado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 2,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

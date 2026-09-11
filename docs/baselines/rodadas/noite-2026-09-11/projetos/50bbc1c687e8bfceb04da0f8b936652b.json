@@ -1,0 +1,44 @@
+{
+  "id": "50bbc1c687e8bfceb04da0f8b936652b",
+  "nome": "Painel de Dimensionamento - CX",
+  "antes": {
+    "id": "50bbc1c687e8bfceb04da0f8b936652b",
+    "nome": "Painel de Dimensionamento - CX",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "195,23",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 76371,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "50bbc1c687e8bfceb04da0f8b936652b",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor líquido mensal é baixo, mas parece ser apenas a conversão de 7,08 horas liberadas, não uma despesa que deixou de existir. Precisa conferir se houve redução real de custo ou apenas tempo disponível.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

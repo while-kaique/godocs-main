@@ -89,6 +89,7 @@ import {
   conciliarJulgamentos,
   montarPareceresDaMesa,
   type VotosDeterministicos,
+  aplicarTravaMaterialMesa,
 } from '@/lib/agents/mesa-especialistas';
 import { carregarCorrecoesDaTriagem, licoesParaPrompt } from '@/lib/correcoes.functions';
 import { linhaDoQueSeCobra, linhaImpactoBrutoLiquido } from '@/lib/avaliacao/dossie';
@@ -154,7 +155,9 @@ async function montarEntradaSemanticaNormal(
     o_que_faz: oQueFazDoc(docRow?.conteudo),
     area: ctx?.area_nome ?? ctx?.area ?? resumo?.area ?? null,
     descricao: ctx?.descricao_breve ?? null,
-    memorial: ctx?.memorial_calculo ?? null,
+    // ⚠️ `memorial_calculo` é v1 e NÃO entra mais (11/09/2026) — nem no texto da mesa, nem no
+    // embedding. Ver `textoParaEmbedding`.
+    memorial: null,
     doc: resumoDocParaTexto(docRow?.conteudo),
   };
 }
@@ -166,7 +169,29 @@ type MapaEmbedding = Map<
   { vetor: number[]; modelo: string; dim: number; hash: string | null }
 >;
 
-function decodificarEmbeddings(rows: ProjetoEmbeddingRow[]): MapaEmbedding {
+/**
+ * Cache POR ISOLATE dos vetores decodificados da base (11/09/2026).
+ *
+ * ⚠️ Medido na staging com 8 avaliações em paralelo: `Worker exceeded memory limit` em 24 requests
+ * — cada avaliação carregava e decodificava a tabela INTEIRA (`projeto_embedding`, 770 × 3072
+ * floats ≈ 9,5 MB + o base64) DUAS vezes (mesa e time). Uma cópia compartilhada por isolate, com
+ * TTL curto, resolve sem mudar nenhuma régua. O backfill NÃO usa o cache (precisa ver o que acabou
+ * de gravar) e o invalida ao gerar.
+ */
+const EMBEDDINGS_CACHE_TTL_MS = 120_000;
+let embeddingsCache: { em: number; mapa: MapaEmbedding } | null = null;
+export async function carregarEmbeddingsBase(): Promise<MapaEmbedding> {
+  const agora = Date.now();
+  if (embeddingsCache && agora - embeddingsCache.em < EMBEDDINGS_CACHE_TTL_MS) return embeddingsCache.mapa;
+  const mapa = decodificarEmbeddings(await getEmbeddingsProjetos());
+  embeddingsCache = { em: agora, mapa };
+  return mapa;
+}
+export function invalidarEmbeddingsBase(): void {
+  embeddingsCache = null;
+}
+
+export function decodificarEmbeddings(rows: ProjetoEmbeddingRow[]): MapaEmbedding {
   const mapa: MapaEmbedding = new Map();
   for (const r of rows) {
     try {
@@ -188,7 +213,7 @@ function decodificarEmbeddings(rows: ProjetoEmbeddingRow[]): MapaEmbedding {
  * que falta ou mudou, grava em `projeto_embedding` e devolve o mapa atualizado. Bounded por
  * `capGeracao` (custo + tempo do cron). Nunca lança.
  */
-async function garantirEmbeddings(
+export async function garantirEmbeddings(
   ids: string[],
   resumoPorId: Map<string, ProjetoDashboardResumo>,
   embeddings: MapaEmbedding,
@@ -198,18 +223,26 @@ async function garantirEmbeddings(
   const modeloAlvo = embeddingConfig()?.modelo;
   const pendentes: { id: string; texto: string; hash: string }[] = [];
 
-  for (const id of ids) {
-    if (pendentes.length >= cap) break;
-    const entrada = await montarEntradaSemanticaNormal(id, resumoPorId.get(id));
-    if (!entrada) continue;
-    const texto = textoParaEmbedding(entrada);
-    if (!texto) continue;
-    const hash = hashTexto(texto);
-    const atual = embeddings.get(id);
-    const frescoTexto = atual != null && atual.hash === hash;
-    const frescoModelo = atual != null && (!modeloAlvo || atual.modelo === modeloAlvo);
-    if (frescoTexto && frescoModelo) continue;
-    pendentes.push({ id, texto, hash });
+  // ⚠️ Entradas carregadas em PARALELO (lotes de 16): cada `montarEntradaSemanticaNormal` são 2
+  // consultas por RPC (~150 ms), e em série 770 ids davam ~3 min só de leitura — medido em
+  // 11/09/2026 na staging (173 s num `dry`), encostando no corte de 300 s do edge.
+  const LOTE_LEITURA = 16;
+  for (let i = 0; i < ids.length && pendentes.length < cap; i += LOTE_LEITURA) {
+    const lote = ids.slice(i, i + LOTE_LEITURA);
+    const entradas = await Promise.all(lote.map((id) => montarEntradaSemanticaNormal(id, resumoPorId.get(id))));
+    for (let j = 0; j < lote.length && pendentes.length < cap; j++) {
+      const id = lote[j];
+      const entrada = entradas[j];
+      if (!entrada) continue;
+      const texto = textoParaEmbedding(entrada);
+      if (!texto) continue;
+      const hash = hashTexto(texto);
+      const atual = embeddings.get(id);
+      const frescoTexto = atual != null && atual.hash === hash;
+      const frescoModelo = atual != null && (!modeloAlvo || atual.modelo === modeloAlvo);
+      if (frescoTexto && frescoModelo) continue;
+      pendentes.push({ id, texto, hash });
+    }
   }
 
   let gerados = 0;
@@ -589,7 +622,14 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
       area: entrada?.area ?? '',
       descricao: entrada?.descricao ?? '',
       o_que_faz: entrada?.o_que_faz ?? '',
-      memorial: [entrada?.memorial ?? '', impactoLinha, exigivel].filter(Boolean).join('\n\n'),
+      // ⚠️ A linha de HORAS vem separada e com unidade (11/09/2026): sem ela, a única grandeza no
+      // texto era o impacto em R$, e o especialista de horas o tratou como horas (canários).
+      memorial: [
+        entrada?.memorial ?? '',
+        `Horas humanas liberadas declaradas: ${fin.horas > 0 ? `${fin.horas} h/mês` : 'nenhuma (categoria sem horas ou não informado)'}.`,
+        impactoLinha,
+        exigivel,
+      ].filter(Boolean).join('\n\n'),
       doc: entrada?.doc ?? '',
     };
     const vizinhosTexto = vizinhosArr.map((v) => [v.nome, v.area].filter(Boolean).join(', '));
@@ -604,7 +644,7 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
     const entradas = montarEntradasEspecialistas(votosDet, texto, vizinhosTexto, licoes);
     // `julgarComEspecialista` NUNCA lança (fail-safe → voto determinístico daquela dimensão), então
     // um agente que falhe não derruba a mesa nem o lote de background.
-    julgamentos = await Promise.all(entradas.map(julgarComEspecialista));
+    julgamentos = (await Promise.all(entradas.map(julgarComEspecialista))).map(aplicarTravaMaterialMesa);
     conciliado = conciliarJulgamentos(julgamentos, {
       especial: projeto.especial === 1,
       fluxoDireto: ehLider,
@@ -889,7 +929,7 @@ export async function carregarContextoPainel(
   const linhaPorId = mapaDeLinhas(linhas);
   const aprovados = selecionarAprovadosNormais(resumos);
 
-  let embeddings = decodificarEmbeddings(await getEmbeddingsProjetos());
+  let embeddings = await carregarEmbeddingsBase();
   const idsEmbeddar = Array.from(new Set([...idsAlvo, ...aprovados.map((a) => a.id)]));
   const ger = await garantirEmbeddings(idsEmbeddar, resumoPorId, embeddings, {
     capGeracao: opts.capGeracao ?? 60,
@@ -1137,4 +1177,50 @@ export async function avancarDeliberacoesPendentes(
   }
 
   return { ok: true, ligado: true, dry, abertas: abertas.length, avancadas, encerradas, resultados };
+}
+
+
+/**
+ * BACKFILL dos embeddings da BASE INTEIRA (aprovados, reprovados, pendentes, especiais) — a fonte
+ * única de vizinhos do time da estrela e da mesa (11/09/2026).
+ *
+ * ⚠️ Por que existe: `carregarContextoPainel` só embedda os APROVADOS e com cap de 60 por corrida
+ * do cron — 750 vetores levariam horas e reprovados/pendentes nunca entrariam. A visão PANORÂMICA
+ * que o dono do produto pede ("esse projeto faz isso e move X, comparado com toda a base") exige a
+ * base inteira no mesmo espaço vetorial. Paginado por `cap` (direto na OpenAI, ~1 min por 64) e
+ * dirigido por quem chama até `pendentes` voltar 0. `dry` (DEFAULT) só conta.
+ */
+export async function backfillEmbeddingsBase(
+  opts: { dry?: boolean; cap?: number } = {},
+): Promise<{ ok: boolean; dry: boolean; total: number; com_vetor_fresco: number; pendentes: number; gerados: number; motivo?: string }> {
+  const dry = opts.dry ?? true;
+  const cap = Math.max(1, Math.min(opts.cap ?? 64, 256));
+  try {
+    const { linhas } = await lerResumosEspelho();
+    const resumos = linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null);
+    const resumoPorId = new Map(resumos.map((p) => [p.id, p]));
+    const ids = resumos.map((p) => p.id);
+    const mapa = decodificarEmbeddings(await getEmbeddingsProjetos());
+    const modeloAlvo = embeddingConfig()?.modelo;
+    if (dry) {
+      // Conta quem está fresco SEM gerar (mesma régua do `garantirEmbeddings`), em lotes paralelos.
+      let frescos = 0;
+      for (let i = 0; i < ids.length; i += 16) {
+        const lote = ids.slice(i, i + 16);
+        const entradas = await Promise.all(lote.map((id) => montarEntradaSemanticaNormal(id, resumoPorId.get(id))));
+        for (let j = 0; j < lote.length; j++) {
+          const texto = entradas[j] ? textoParaEmbedding(entradas[j]!) : '';
+          const atual = mapa.get(lote[j]);
+          if (texto && atual && atual.hash === hashTexto(texto) && (!modeloAlvo || atual.modelo === modeloAlvo)) frescos++;
+        }
+      }
+      return { ok: true, dry, total: ids.length, com_vetor_fresco: frescos, pendentes: ids.length - frescos, gerados: 0 };
+    }
+    // Sem dry: gera direto (o `garantirEmbeddings` já pula quem está fresco). `gerados < cap` = acabou.
+    const ger = await garantirEmbeddings(ids, resumoPorId, mapa, { capGeracao: cap });
+    if (ger.gerados > 0) invalidarEmbeddingsBase();
+    return { ok: true, dry, total: ids.length, com_vetor_fresco: -1, pendentes: ger.gerados < cap ? 0 : -1, gerados: ger.gerados };
+  } catch (e) {
+    return { ok: false, dry, total: 0, com_vetor_fresco: 0, pendentes: 0, gerados: 0, motivo: e instanceof Error ? e.message : String(e) };
+  }
 }

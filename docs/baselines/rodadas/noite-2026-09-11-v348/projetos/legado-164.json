@@ -1,0 +1,44 @@
+{
+  "id": "LEGADO-164",
+  "nome": "SPG · Agente Revisão de Carteira v2",
+  "antes": {
+    "id": "LEGADO-164",
+    "nome": "SPG · Agente Revisão de Carteira v2",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "441,2",
+    "categorias": "saving",
+    "especial": "—"
+  },
+  "http": 200,
+  "ms": 57402,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "LEGADO-164",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho de 441,2 horas por mês equivale ao trabalho de cerca de 2 pessoas, mas não há registro de quantas pessoas faziam as revisões. Precisa conferir a alocação de horas ou os registros da equipe.\nFinanceiro: O saving mensal de 441,20 precisa de prova de uma despesa que existia e deixou de ocorrer; a descrição só mostra identificação de anomalias. Falta o registro da despesa anterior e da redução efetiva.\nCético: O saving mensal de 441,20 é apenas declarado: não há registro da despesa que existia nem prova de que deixou de ocorrer. Para aprovar, é preciso conferir a despesa antes e depois e a memória das horas ponderadas.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

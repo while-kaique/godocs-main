@@ -1,0 +1,43 @@
+{
+  "id": "dd804126e9677a45ffa1b232383ba552",
+  "nome": "CONTROLE PEDIDOS B2B",
+  "antes": {
+    "id": "dd804126e9677a45ffa1b232383ba552",
+    "nome": "CONTROLE PEDIDOS B2B",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 69361,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "dd804126e9677a45ffa1b232383ba552",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto afirma automação e melhora na gestão, mas não traz registro da planilha, do painel ou das mensagens enviadas. É preciso conferir esses registros e uma mudança real de status para confirmar que o processo funciona como descrito.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

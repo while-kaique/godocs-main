@@ -1,0 +1,45 @@
+{
+  "id": "70ac508ffef75517e5ca90db0f2b9ddf",
+  "nome": "Gohelp",
+  "antes": {
+    "id": "70ac508ffef75517e5ca90db0f2b9ddf",
+    "nome": "Gohelp",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "1290,74",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 111179,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "70ac508ffef75517e5ca90db0f2b9ddf",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O projeto declara 88,02 horas liberadas, mas não mostra qual despesa deixou de existir; economia de tempo não prova redução de custo. Precisa apresentar registros de pagamento, horas contratadas ou outra despesa efetivamente reduzida.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time recomendou 1 e não reescreveu a nota",
+      "estrelas": 0,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

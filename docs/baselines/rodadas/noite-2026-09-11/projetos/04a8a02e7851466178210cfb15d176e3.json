@@ -1,0 +1,44 @@
+{
+  "id": "04a8a02e7851466178210cfb15d176e3",
+  "nome": "Disparador automático de emails CX",
+  "antes": {
+    "id": "04a8a02e7851466178210cfb15d176e3",
+    "nome": "Disparador automático de emails CX",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "1108,28",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 91289,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "04a8a02e7851466178210cfb15d176e3",
+    "mesa": {
+      "ok": true,
+      "motivo": "Precedente: O projeto é parecido com automações de comunicação e rotinas internas de CX já aprovadas. A economia declarada de R$ 1.108,28 precisa ser conferida com registros de despesas de WhatsApp que realmente deixaram de existir.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

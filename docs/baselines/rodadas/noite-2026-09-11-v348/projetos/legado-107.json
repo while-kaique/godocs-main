@@ -1,0 +1,45 @@
+{
+  "id": "legado-107",
+  "nome": "[Tiny] Auth Layer",
+  "antes": {
+    "id": "legado-107",
+    "nome": "[Tiny] Auth Layer",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "165,5",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 63964,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-107",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho mensal de 165,50 parece coerente, mas não há prova de uma despesa que deixou de existir. Precisa conferir o registro do custo anterior e sua interrupção após os 5 workflows.\nCético: O impacto líquido mensal de 165,50 foi declarado, mas não há documentação nem registro de uma despesa que deixou de existir. Precisa conferir a despesa anterior e os registros dos 5 workflows em uso.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 1 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

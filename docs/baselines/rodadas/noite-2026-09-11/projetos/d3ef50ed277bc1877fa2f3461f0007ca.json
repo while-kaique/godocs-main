@@ -1,0 +1,45 @@
+{
+  "id": "d3ef50ed277bc1877fa2f3461f0007ca",
+  "nome": "Simulador de Custos - GoBeauty",
+  "antes": {
+    "id": "d3ef50ed277bc1877fa2f3461f0007ca",
+    "nome": "Simulador de Custos - GoBeauty",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "5",
+    "confiancaAgente": "media",
+    "impacto": "70537,55",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 154250,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "d3ef50ed277bc1877fa2f3461f0007ca",
+    "mesa": {
+      "ok": true,
+      "motivo": "Cético: O ganho de R$ 70537,55 por mês parece projetado, mas não há prova de despesa que deixou de existir. Precisa conferir os registros do custo anterior e como ele foi reduzido pela automação.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 2 é âncora — o time recomendou 5 e não reescreveu a nota",
+      "estrelas": 2,
+      "estrelas_time": 5
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "1d45f9dd9966de3d6ac5716b9f7a7455",
+  "nome": "Pacote de Gestão de Dados",
+  "antes": {
+    "id": "1d45f9dd9966de3d6ac5716b9f7a7455",
+    "nome": "Pacote de Gestão de Dados",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "media",
+    "impacto": "832,12",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 92652,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "1d45f9dd9966de3d6ac5716b9f7a7455",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving de 832 horas por mês é alto para um pacote descrito de forma ampla, sem informar quantas pessoas faziam essas tarefas. Precisa conferir o registro das horas e a despesa que deixou de existir.\nFinanceiro: O impacto de 832,12 por mês parece vir de horas poupadas, mas não há prova de uma despesa que deixou de existir. Precisa conferir o registro da despesa anterior e mostrar onde ela foi reduzida.\nCético: O impacto líquido mensal de 832,12 não tem memória de cálculo nem prova de uma despesa que deixou de existir. É preciso apresentar os registros da despesa anterior e conferir como as horas foram ponderadas.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

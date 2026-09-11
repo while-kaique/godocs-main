@@ -1,0 +1,46 @@
+{
+  "id": "6a93373382510154e90645c0aaeef605",
+  "nome": "Robô Extrato bancário Asaas - Apice",
+  "antes": {
+    "id": "6a93373382510154e90645c0aaeef605",
+    "nome": "Robô Extrato bancário Asaas - Apice",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "media",
+    "impacto": "0",
+    "categorias": "Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 152692,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "6a93373382510154e90645c0aaeef605",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: Não há incoerência nos valores, pois o ganho foi declarado como imensurável. Falta registrar qual etapa do processo mudou e onde o time confirma o efeito da base gerada.\nCético: A descrição diz que a base é auditável, mas não mostra o processo alterado nem onde o efeito é conferido. Precisa de um registro ou exemplo da base gerada e do uso pelo financeiro.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time não fechou sozinho e a decisão é de gente.",
+      "concordam": true,
+      "confianca": "media",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time não fechou sozinho e a decisão é de gente.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação.",
+        "A estrela 3 do time foi gravada; o Status Aprovado não foi tocado."
+      ]
+    },
+    "status_gravado": null
+  }
+}

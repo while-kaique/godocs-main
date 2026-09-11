@@ -1,0 +1,44 @@
+{
+  "id": "902e766c772ae08634e031d51ab56923",
+  "nome": "Onboarding & Integração — Gente & Gestão",
+  "antes": {
+    "id": "902e766c772ae08634e031d51ab56923",
+    "nome": "Onboarding & Integração — Gente & Gestão",
+    "status": "Aprovado",
+    "estrelas": "3",
+    "estrelaAgente": "3",
+    "confiancaAgente": "baixa",
+    "impacto": "91,195",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 68863,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "902e766c772ae08634e031d51ab56923",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho de R$ 91,20/mês parece depender de horas poupadas, não de uma despesa que deixou de existir. Para aprovar, é preciso conferir registros do custo antes e depois da automação.\nCético: O ganho mensal de 91,19 parece vir de horas poupadas, mas não há registro de uma despesa que deixou de existir. Precisa conferir qual custo foi realmente cortado e os registros antes e depois da automação.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

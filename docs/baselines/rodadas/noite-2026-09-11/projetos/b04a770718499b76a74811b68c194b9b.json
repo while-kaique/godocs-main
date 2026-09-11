@@ -1,0 +1,44 @@
+{
+  "id": "b04a770718499b76a74811b68c194b9b",
+  "nome": "Galeria de Lançamentos",
+  "antes": {
+    "id": "b04a770718499b76a74811b68c194b9b",
+    "nome": "Galeria de Lançamentos",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "alta",
+    "impacto": "353,41",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 129429,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "b04a770718499b76a74811b68c194b9b",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho parece ser tempo liberado, não uma despesa que deixou de existir, então o valor financeiro pode estar superestimado. Precisa conferir o custo de pessoal usado e se houve redução real de gasto, não apenas troca do trabalho manual.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

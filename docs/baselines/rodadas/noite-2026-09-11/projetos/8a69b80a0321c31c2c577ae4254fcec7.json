@@ -1,0 +1,44 @@
+{
+  "id": "8a69b80a0321c31c2c577ae4254fcec7",
+  "nome": "Evnio de e-mails com Informe de Rendimentos anual",
+  "antes": {
+    "id": "8a69b80a0321c31c2c577ae4254fcec7",
+    "nome": "Evnio de e-mails com Informe de Rendimentos anual",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "alta",
+    "impacto": "173,775",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 86708,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "8a69b80a0321c31c2c577ae4254fcec7",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor mensal é baixo, mas as horas liberadas não provam que uma despesa deixou de existir. Precisa conferir o custo antes da automação e se ele foi realmente eliminado, não apenas redirecionado.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1,
+      "estrelas_time": 1
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

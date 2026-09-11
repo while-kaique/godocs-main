@@ -1,0 +1,44 @@
+{
+  "id": "9cede95b8da4fbbaf68e75e84491ea29",
+  "nome": "Pesquisa Satisfação Prima Vida",
+  "antes": {
+    "id": "9cede95b8da4fbbaf68e75e84491ea29",
+    "nome": "Pesquisa Satisfação Prima Vida",
+    "status": "Aprovado",
+    "estrelas": "1",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "38,62083333",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 63206,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "9cede95b8da4fbbaf68e75e84491ea29",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O valor de R$ 38,62 por mês parece refletir horas ponderadas, não uma despesa que deixou de existir. Para validar o ganho financeiro, falta registro de redução no contrato ou de economia obtida na negociação com a operadora.\nCético: O ganho descrito é uma expectativa de negociação, não uma despesa comprovadamente reduzida. Falta o registro de uma economia efetiva ou de uma decisão da operadora baseada na pesquisa.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 1
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

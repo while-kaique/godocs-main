@@ -1,0 +1,44 @@
+{
+  "id": "a8d2545f3072c88da9c8d2681f71a231",
+  "nome": "Calculadora de Preço Mínimo B2B",
+  "antes": {
+    "id": "a8d2545f3072c88da9c8d2681f71a231",
+    "nome": "Calculadora de Preço Mínimo B2B",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "110,3",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 70922,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "a8d2545f3072c88da9c8d2681f71a231",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho parece ser tempo liberado, não uma despesa que deixou de existir. Falta comprovar se essas horas geram economia financeira efetiva ou apenas capacidade para outras tarefas.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0,
+      "estrelas_time": 0
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "alta",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}

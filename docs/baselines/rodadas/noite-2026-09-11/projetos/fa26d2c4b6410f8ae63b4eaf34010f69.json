@@ -1,0 +1,21 @@
+{
+  "id": "fa26d2c4b6410f8ae63b4eaf34010f69",
+  "nome": "Banco de Dados de Supply Gogroup",
+  "antes": {
+    "id": "fa26d2c4b6410f8ae63b4eaf34010f69",
+    "nome": "Banco de Dados de Supply Gogroup",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "6-10",
+    "confiancaAgente": "baixa",
+    "impacto": "628,9",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 502,
+  "ms": 92185,
+  "tentativa": 2,
+  "resultado": {
+    "raw": "App error"
+  }
+}

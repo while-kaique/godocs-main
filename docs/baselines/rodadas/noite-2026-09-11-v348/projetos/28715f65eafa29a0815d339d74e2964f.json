@@ -1,0 +1,44 @@
+{
+  "id": "28715f65eafa29a0815d339d74e2964f",
+  "nome": "PWA de Manutenção",
+  "antes": {
+    "id": "28715f65eafa29a0815d339d74e2964f",
+    "nome": "PWA de Manutenção",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "1982,5",
+    "categorias": "Custo evitado, Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 68920,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "28715f65eafa29a0815d339d74e2964f",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O ganho de 1982,5 horas por mês equivale a cerca de 9 pessoas em tempo integral, mas o texto não informa quantas pessoas faziam essas tarefas. Precisa conferir a equipe envolvida e registros de ordens de serviço e tempos antes de aceitar esse total.\nFinanceiro: A descrição sustenta economia, mas não mostra como se chega a R$ 1.982,50 por mês nem separa paradas, peças e horas. Precisa conferir registros de paradas evitadas e custos realmente não incorridos para descartar dupla contagem.\nCético: O memorial informa 4000 de impacto bruto e 1982,50 mensais, mas não traz registros que mostrem como esses valores foram medidos. É preciso conferir ordens de serviço, paradas e período usado no cálculo antes de aprovar.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 2
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "As duas metades do time divergiram: a análise do impacto aponta Pendente e a da estrela aponta Aprovado. Fica pendente para gente decidir.",
+      "concordam": false,
+      "confianca": "baixa",
+      "porques": [
+        "As duas metades do time divergiram: a análise do impacto aponta Pendente e a da estrela aponta Aprovado. Fica pendente para gente decidir.",
+        "Pela estrela: O time de agentes aprovou o projeto.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

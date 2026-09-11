@@ -1,0 +1,44 @@
+{
+  "id": "1f0ab4fadc6f934fee9c101e2f190d8c",
+  "nome": "Automação - Cobranças Apice Asaas",
+  "antes": {
+    "id": "1f0ab4fadc6f934fee9c101e2f190d8c",
+    "nome": "Automação - Cobranças Apice Asaas",
+    "status": "Aprovado",
+    "estrelas": "2",
+    "estrelaAgente": "2",
+    "confiancaAgente": "alta",
+    "impacto": "42,31375",
+    "categorias": "Custo evitado, Ganho imensurável",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 161655,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "1f0ab4fadc6f934fee9c101e2f190d8c",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho financeiro é baixo, R$ 42,31 por mês, e fica abaixo do piso de R$ 100. Precisa confirmar se há outra razão de negócio para aprovar, além da economia calculada.\nSó um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.",
+      "veredito": "aprovar"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 3,
+      "estrelas_time": 3
+    },
+    "junta": {
+      "status": "Aprovado",
+      "flag6a10": false,
+      "porque": "O time do impacto aprovou o projeto; o mérito é dele.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time do impacto aprovou o projeto.",
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito."
+      ]
+    },
+    "status_gravado": "Aprovado"
+  }
+}
