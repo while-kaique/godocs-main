@@ -17,7 +17,7 @@ const OUT = process.argv[2] || `docs/baselines/rodadas/noite-${new Date().toISOS
 if (!COOKIE) throw new Error('E2E_COOKIE ausente no .env');
 mkdirSync(join(OUT, 'projetos'), { recursive: true });
 
-const CANARIOS = [/^sendapp$/i, /^cx hub/i, /avd central v2/i, /^piapp$/i, /rob[oô] (de )?or[çc]amento/i];
+const CANARIOS = [/^sendapp$/i, /^cx hub/i, /avd central v2/i, /^piapp$/i, /rob[oô] (de )?or[çc]amento/i, /^gobrands$/i];
 
 // ── snapshot ANTES (a régua da comparação) ──
 const sid = process.env.GOOGLE_SHEETS_ID || '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
@@ -47,6 +47,7 @@ let fila = [
 const feitos = new Set(readdirSync(join(OUT, 'projetos')).map((f) => f.replace(/\.json$/, '')));
 fila = fila.filter((l) => !feitos.has(l.id.toLowerCase()));
 if (LIMITE > 0) fila = fila.slice(0, LIMITE);
+if (process.env.CAL_SO_FILA) { console.log(fila.slice(0, 12).map((l) => `${l.id} ${l.status}/${l.estrelas || '-'} ${l.nome.slice(0, 50)}`).join('\n')); console.log(`[noite] (só fila) total ${fila.length}`); process.exit(0); }
 console.log(`[noite] fila: ${fila.length} (canários ${antes.filter(eCanario).length}, pendentes ${antes.filter(ePendente).length}, com estrela ${antes.filter(temEstrela).length}) · já feitos ${feitos.size} · conc ${CONC}`);
 
 // ── execução ──
