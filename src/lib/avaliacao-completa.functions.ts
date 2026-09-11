@@ -399,6 +399,26 @@ export async function avaliarProjetoComTimeCompleto(
         const porque = porqueNaoEncostou(permissao.motivo!, junta.status);
         junta.porques.push(porque);
         console.log(`[time-completo] ${projetoId}: status NÃO gravado — ${porque}`);
+        // ⚠️ A ESTRELA não depende do Status (11/09/2026, pedido do dono do produto: "todos devem
+        // ser avaliados e 0 estrelas só deve ser aquele que atende o critério de fato"). Até aqui a
+        // nota do time só entrava na célula JUNTO com o Status, e como o agente não encosta em
+        // projeto Aprovado, os aprovados ficavam com o `0` default da coluna manual mesmo depois de
+        // avaliados — indistinguível de "ninguém olhou". Agora a estrela 0-5 é gravada sozinha,
+        // mantendo o Status atual (mesmo status é sempre permitido), e só quando NÃO há nota humana
+        // (a âncora protege a nota de gente; a faixa 6-10 continua fora da célula).
+        const statusAtual = String(linhaAtual?.['Status'] ?? '').trim();
+        const ancoradaEmGente = String(e.motivo ?? '').includes('âncora');
+        if (notaParaCelula !== undefined && !ancoradaEmGente && statusAtual) {
+          try {
+            await definirStatusProjeto(
+              { projeto_id: projetoId, status: statusAtual as never, estrelas: notaParaCelula },
+              ATOR_TIME_AGENTES,
+            );
+            junta.porques.push(`A estrela ${notaParaCelula} do time foi gravada; o Status ${statusAtual} não foi tocado.`);
+          } catch (err) {
+            console.error('[time-completo] falha ao gravar só a estrela:', err);
+          }
+        }
       } else {
         await definirStatusProjeto(
           {
