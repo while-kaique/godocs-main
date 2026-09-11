@@ -1,0 +1,45 @@
+{
+  "id": "legado-159",
+  "nome": "SPG · Painel de PCP Online",
+  "antes": {
+    "id": "legado-159",
+    "nome": "SPG · Painel de PCP Online",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "—",
+    "confiancaAgente": "—",
+    "impacto": "441,2",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 85516,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-159",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 441,2 horas por mês equivale a cerca de 2 pessoas, mas o texto só comprova 4 horas por semana de preparação. Falta o registro de quantas pessoas faziam essas tarefas e do tempo mensal antes da ferramenta.\nFinanceiro: O ganho parece vir de horas liberadas, não de uma despesa que deixou de existir. Precisa conferir o custo usado e se essas horas reduziram pagamento ou contrato, em vez de apenas mudar de atividade.\nCético: O impacto de R$ 441,20 por mês parece vir de tempo poupado, mas não há prova de que essa despesa deixou de existir. É preciso conferir o custo registrado antes e depois e os registros de uso do painel.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "legado-143",
+  "nome": "Copiloto IA - Simulador B2B",
+  "antes": {
+    "id": "legado-143",
+    "nome": "Copiloto IA - Simulador B2B",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "2",
+    "confiancaAgente": "baixa",
+    "impacto": "1654,9",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 68977,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-143",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido de 1.654,90 h/mês equivale a cerca de 7,5 pessoas em tempo integral, mas não há registro de quantas pessoas faziam as simulações. Para validar, conferir a equipe envolvida, o volume mensal e as horas gastas antes da automação.\nFinanceiro: O impacto líquido mensal de 1.654,90 depende de horas ponderadas, mas não há registro de despesa que deixou de existir. É preciso conferir a alocação das horas e a redução efetiva do custo.\nCético: O ganho mensal de 1654,90 não vem acompanhado de registro mostrando que uma despesa existente realmente parou, e a diferença para o impacto bruto pode esconder dupla contagem. Precisa conferir folhas de horas, custo anterior e evidência do saving efetivado.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

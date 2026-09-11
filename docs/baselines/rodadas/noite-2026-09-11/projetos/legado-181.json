@@ -1,0 +1,44 @@
+{
+  "id": "legado-181",
+  "nome": "Barbours by Anna Lu · Linha Collab 3 SKUs",
+  "antes": {
+    "id": "legado-181",
+    "nome": "Barbours by Anna Lu · Linha Collab 3 SKUs",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "0",
+    "confiancaAgente": "baixa",
+    "impacto": "110,3",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 64806,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-181",
+    "mesa": {
+      "ok": true,
+      "motivo": "Horas: O saving líquido mensal de 110,3 horas parece alto para um pacote pontual estimado em 16 horas de trabalho manual. É preciso conferir se esse esforço se repete todo mês e quais pessoas realmente gastavam esse tempo.\nFinanceiro: O ganho parece baseado em horas evitadas e em uma agência que não foi necessariamente contratada, além de misturar isso com uma oportunidade de R$ 50k + 4% de royalties. Precisa conferir o custo que existia de fato e separar receita potencial de despesa realmente evitada.\nPrecedente: O projeto se parece bastante com os aprovados de Brand Keeper e sourcing, pelo uso de IA para criar materiais estratégicos encadeados. Preocupa apenas o saving estimado, que precisa ser confirmado com registro de uma despesa real que deixou de existir.\nCético: Não há registro de uma despesa que existia e deixou de ocorrer; o ganho parece estimado por horas internas e preço de agência. Para aprovar, é preciso conferir registros de trabalho e uma despesa ou contratação evitada.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Pendente",
+      "flag6a10": false,
+      "porque": "O time pede ajuste ao autor antes de decidir.",
+      "concordam": true,
+      "confianca": "alta",
+      "porques": [
+        "As duas metades do time chegaram ao mesmo lugar: Pendente.",
+        "O time pede ajuste ao autor antes de decidir.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Pendente e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}

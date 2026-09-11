@@ -1,0 +1,45 @@
+{
+  "id": "legado-146",
+  "nome": "[GoChallenge] Comunicações; [GoChallenge]emails; [GoChallenge]Raspadinha",
+  "antes": {
+    "id": "legado-146",
+    "nome": "[GoChallenge] Comunicações; [GoChallenge]emails; [GoChallenge]Raspadinha",
+    "status": "Aprovado",
+    "estrelas": "0",
+    "estrelaAgente": "1",
+    "confiancaAgente": "baixa",
+    "impacto": "15,05125",
+    "categorias": "saving",
+    "especial": "Não"
+  },
+  "http": 200,
+  "ms": 131310,
+  "tentativa": 1,
+  "resultado": {
+    "ok": true,
+    "projeto_id": "legado-146",
+    "mesa": {
+      "ok": true,
+      "motivo": "Financeiro: O ganho informado é de R$ 15,05 por mês, abaixo do piso de R$ 100 por mês. Precisa conferir o registro da despesa que deixou de existir e se as horas não foram contadas junto com outro benefício.\nCético: O projeto informa impacto líquido mensal de 15,05, mas não mostra qual despesa existia e deixou de existir nos três fluxos. Para aprovar, é preciso conferir registros das horas antes e depois e a despesa efetivamente interrompida.\nOs especialistas divergiram, então vai para a triagem.",
+      "veredito": "em_validacao"
+    },
+    "estrela": {
+      "ok": true,
+      "motivo": "nota humana 0 é âncora — o time julgou o mérito e não reescreveu a nota",
+      "estrelas": 0
+    },
+    "junta": {
+      "status": "Reprovado",
+      "flag6a10": false,
+      "porque": "O time de agentes reprovou o projeto por régua declarada.",
+      "concordam": false,
+      "confianca": "media",
+      "porques": [
+        "O time de agentes reprovou o projeto por régua declarada.",
+        "A análise do impacto ficou em Pendente e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar.",
+        "O projeto já está Aprovado e o agente não rebaixa aprovação de ninguém: a avaliação concluiu Reprovado e fica registrada como recomendação."
+      ]
+    },
+    "status_gravado": null
+  }
+}
