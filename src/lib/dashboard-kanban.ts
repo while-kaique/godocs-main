@@ -20,19 +20,11 @@
  */
 import type { ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 import { STATUS_TRIAGEM, pilulaDe, metaStatus } from "@/components/dashboard/status-triagem";
-import {
-  NOTAS_BASE,
-  SEM_NOTA,
-  chaveArea,
-  filaDe,
-  rotuloNota,
-  ROTULO_FILA,
-  type Fila,
-} from "@/lib/especiais-view";
+import { NOTAS_BASE, SEM_NOTA, chaveArea, rotuloNota } from "@/lib/especiais-view";
 import { agruparPorAutor } from "@/lib/aprovacao-pendentes-view";
 
 /** Por qual chave os cartões são empilhados. */
-export type EixoKanban = "status" | "fila" | "nota" | "autor" | "area";
+export type EixoKanban = "status" | "nota" | "autor" | "area";
 
 export type MetaEixo = {
   eixo: EixoKanban;
@@ -47,9 +39,19 @@ export type MetaEixo = {
  * específico (quem submeteu). "Nota" e "Autor" são, respectivamente, a `/especiais` e a
  * `/aprovacoes-pendentes` de antes.
  */
+/**
+ * ⚠️ **O eixo "Fila" SAIU em 14/09/2026** (decisão do Luis). Ele agrupava por `filaDe`, que
+ * respondia "com quem está a bola" cruzando `Status` + `Aprovação do Líder` + `Especial?` —
+ * uma derivação que existia porque o estado do projeto morava em duas colunas. Com a coluna
+ * ÚNICA de status (`status-funil.ts`), o eixo "Status" já responde isso: `Pendente` é o
+ * líder, `Pré-aprovado` é a validação, `Ajuste pedido` é o autor. Dois eixos para a mesma
+ * pergunta faziam o seletor parecer ter mais opções do que tem.
+ *
+ * A régua `filaDe` continua viva em `especiais-view.ts`: ela serve a `/especiais` e a
+ * `/aprovacoes-pendentes`, que seguem no ar.
+ */
 export const EIXOS: readonly MetaEixo[] = [
   { eixo: "status", rotulo: "Status", pergunta: "Em que pé está cada projeto" },
-  { eixo: "fila", rotulo: "Fila", pergunta: "Com quem está a bola agora" },
   { eixo: "nota", rotulo: "Nota", pergunta: "Quanto a triagem já pontuou" },
   { eixo: "autor", rotulo: "Autor", pergunta: "Quem submeteu, para falar uma vez só" },
   { eixo: "area", rotulo: "Área", pergunta: "De onde vêm os projetos" },
@@ -88,28 +90,6 @@ export const CARTOES_INCREMENTO = 8;
  */
 const STATUS_SEMPRE_VISIVEIS = ["pendente", "aprovado", "reprovado"] as const;
 
-/** Ordem das filas no quadro: quem espera a gente primeiro, quem já acabou por último. */
-const ORDEM_FILA: readonly Fila[] = [
-  "reenvio",
-  "especial",
-  "rpa",
-  "lider",
-  "autor",
-  "sem_lider",
-  "decidido",
-];
-
-/** Uma linha por fila dizendo de quem é a bola, sem repetir o rótulo. */
-const APOIO_FILA: Record<Fila, string> = {
-  reenvio: "O autor precisa corrigir e reenviar",
-  especial: "Sem memorial financeiro: decide a validação central",
-  rpa: "O líder já passou, falta a validação",
-  lider: "Esperando o parecer do líder",
-  autor: "O líder pediu ajuste ao autor",
-  sem_lider: "Ninguém foi acionado ainda",
-  decidido: "Já tem decisão registrada",
-};
-
 function chaveAutorOuArea(valor: string): string {
   return valor.toLowerCase();
 }
@@ -128,8 +108,6 @@ export function agruparKanban(
   switch (eixo) {
     case "status":
       return porStatus(projetos, maisAntigos);
-    case "fila":
-      return porFila(projetos, maisAntigos);
     case "nota":
       return porNota(projetos, maisAntigos);
     case "autor":
@@ -179,27 +157,6 @@ function porStatus(projetos: ProjetoDashboardResumo[], maisAntigos: boolean): Co
       rotulo: s.label,
       apoio: null,
       cor: s.cor,
-      projetos: lista,
-      total: lista.length,
-    };
-  });
-}
-
-function porFila(projetos: ProjetoDashboardResumo[], maisAntigos: boolean): ColunaKanban[] {
-  const grupos = new Map<Fila, ProjetoDashboardResumo[]>();
-  for (const p of projetos) {
-    const k = filaDe(p);
-    const lista = grupos.get(k);
-    if (lista) lista.push(p);
-    else grupos.set(k, [p]);
-  }
-  return ORDEM_FILA.filter((f) => (grupos.get(f)?.length ?? 0) > 0).map((f) => {
-    const lista = ordenar(grupos.get(f) ?? [], maisAntigos);
-    return {
-      chave: f,
-      rotulo: ROTULO_FILA[f],
-      apoio: APOIO_FILA[f],
-      cor: f === "decidido" ? null : "var(--go-blue)",
       projetos: lista,
       total: lista.length,
     };

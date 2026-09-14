@@ -109,8 +109,10 @@ export function FiltroCategorias({
   );
 
   if (expandido) {
+    // `w-full`: a contagem de cada categoria é alinhada à direita, então esta é a única
+    // coisa do painel que PRECISA da largura da coluna (ver o `items-start` do `Campo`).
     return (
-      <div>
+      <div className="w-full">
         {lista}
         {ativo && (
           <button

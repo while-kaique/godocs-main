@@ -202,7 +202,9 @@ export function BarraFiltros({
               aria-label="Filtrar por área"
               value={filtros.area}
               onChange={(e) => setFiltros((f) => ({ ...f, area: e.target.value }))}
-              className="h-9 w-full rounded-full border border-input bg-card px-3 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+              // ⚠️ `width:auto` num `<select>` mede a opção MAIS LARGA, e nome de área é longo
+              // ("OPERAÇÕES GOCASE E GOBEAUTE"). O teto evita o campo voltar a esticar.
+              className="h-9 w-auto max-w-[240px] rounded-full border border-input bg-card pl-3 pr-8 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
               style={{
                 ["--tw-ring-color" as string]: AZUL,
                 borderColor: filtros.area !== TODAS_AS_AREAS ? AZUL : undefined,
@@ -230,7 +232,7 @@ export function BarraFiltros({
               onChange={(e) =>
                 setFiltros((f) => ({ ...f, agente: e.target.value as FiltroAgente }))
               }
-              className="h-9 w-full rounded-full border border-input bg-card px-3 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+              className="h-9 w-auto max-w-full rounded-full border border-input bg-card pl-3 pr-8 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
               style={{
                 ["--tw-ring-color" as string]: AZUL,
                 borderColor: filtros.agente !== "todos" ? AZUL : undefined,
@@ -277,7 +279,14 @@ function Campo({
   className?: string;
 }) {
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
+    /**
+     * ⚠️ `items-start`: sem ele, `flex-col` estica TODO filho até a largura da coluna da
+     * grade, e um `<select>` de duas palavras virava uma caixa de 620 px ao lado de pílulas
+     * do tamanho do texto (pedido do Luis, 14/09/2026). Quem precisa da largura inteira
+     * pede `w-full` no próprio filho — é o caso da lista de categorias, cuja contagem é
+     * alinhada à direita.
+     */
+    <div className={`flex flex-col items-start gap-1.5 ${className}`}>
       <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         {rotulo}
       </span>

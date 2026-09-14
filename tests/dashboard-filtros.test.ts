@@ -4,7 +4,7 @@
 // faz a tela mostrar projeto a mais e ninguém percebe; (2) data em fuso — o calendário
 // pintando "hoje" no dia errado, ou o projeto enviado hoje sumindo do filtro "Hoje",
 // porque alguém trocou `Date.UTC` por `new Date(iso).getDate()`.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from "vitest";
 import {
   FILTROS_VAZIOS,
   TODAS_AS_AREAS,
@@ -21,7 +21,7 @@ import {
   totalSemStatus,
   type FiltrosDashboard,
   casaAgente,
-} from '@/lib/dashboard-filtros';
+} from "@/lib/dashboard-filtros";
 import {
   categoriasDeGanho,
   casaCategorias,
@@ -30,8 +30,8 @@ import {
   descreverFaixaEstrelas,
   descreverFiltrosAtivos,
   limparDimensao,
-} from '@/lib/dashboard-filtros';
-import { ROTULO_ESTADO_PARECER, chaveDoEstado } from '@/lib/aprovacoes-parecer';
+} from "@/lib/dashboard-filtros";
+import { ROTULO_ESTADO_PARECER, chaveDoEstado } from "@/lib/aprovacoes-parecer";
 import {
   PRESETS_PERIODO,
   contarDias,
@@ -45,34 +45,34 @@ import {
   somarDias,
   somarMeses,
   ultimoDiaDoMes,
-} from '@/lib/calendario-datas';
-import type { ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
+} from "@/lib/calendario-datas";
+import type { ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 
 function proj(over: Partial<ProjetoDashboardResumo> = {}): ProjetoDashboardResumo {
   return {
-    id: 'P1',
-    nome: 'Projeto',
-    autor: 'Fulano',
-    email: 'f@gocase.com',
-    area: 'Fiscal',
-    status: 'Pendente',
-    statusChave: 'pendente',
-    dataSubmissao: '10/08/2026',
+    id: "P1",
+    nome: "Projeto",
+    autor: "Fulano",
+    email: "f@gocase.com",
+    area: "Fiscal",
+    status: "Pendente",
+    statusChave: "pendente",
+    dataSubmissao: "10/08/2026",
     dataOrdenacao: Date.UTC(2026, 7, 10),
     ganhoTotal: 1000,
     savingReais: 1000,
     receitaMensal: null,
     savingEfetivado: null,
     custoEvitadoHoras: null,
-    complexidade: 'Média',
-  tipoProjeto: null,
-    tipos: 'Saving',
+    complexidade: "Média",
+    tipoProjeto: null,
+    tipos: "Saving",
     especial: false,
     aprovacaoLider: null,
     estrelas: null,
     estrelaAgente: null,
     confiancaAgente: null,
-    busca: 'projeto fulano',
+    busca: "projeto fulano",
     ...over,
   };
 }
@@ -82,110 +82,114 @@ const filtros = (over: Partial<FiltrosDashboard> = {}): FiltrosDashboard => ({
   ...over,
 });
 
-describe('composição dos filtros (AND)', () => {
+describe("composição dos filtros (AND)", () => {
   const base = [
-    proj({ id: 'A', especial: true, statusChave: 'pendente', area: 'Fiscal' }),
-    proj({ id: 'B', especial: false, statusChave: 'pendente', area: 'CX' }),
-    proj({ id: 'C', especial: true, statusChave: 'aprovado', area: 'Fiscal' }),
+    proj({ id: "A", especial: true, statusChave: "pendente", area: "Fiscal" }),
+    proj({ id: "B", especial: false, statusChave: "pendente", area: "CX" }),
+    proj({ id: "C", especial: true, statusChave: "aprovado", area: "Fiscal" }),
   ];
 
-  it('sem filtro nenhum devolve a lista inteira', () => {
-    expect(aplicarFiltros(base, filtros()).map((p) => p.id)).toEqual(['A', 'B', 'C']);
+  it("sem filtro nenhum devolve a lista inteira", () => {
+    expect(aplicarFiltros(base, filtros()).map((p) => p.id)).toEqual(["A", "B", "C"]);
   });
 
   // ⚠️ A dimensão "natureza" (Especiais × Padrão) SAIU em 14/09/2026: ela existia porque só
   // o especial recebia nota, e hoje todo projeto tem nota. Este teste existe para a volta
   // ser uma DECISÃO — a flag `especial` continua no dado (ícone no cartão, fluxo próprio),
   // o que não existe mais é o recorte.
-  it('natureza NÃO recorta mais: especial e padrão convivem em qualquer fila', () => {
-    const pendentes = aplicarFiltros(base, filtros({ status: 'pendente' }));
-    expect(pendentes.map((p) => p.id)).toEqual(['A', 'B']);
+  it("natureza NÃO recorta mais: especial e padrão convivem em qualquer fila", () => {
+    const pendentes = aplicarFiltros(base, filtros({ status: "pendente" }));
+    expect(pendentes.map((p) => p.id)).toEqual(["A", "B"]);
   });
 
-  it('área soma com status', () => {
-    const r = aplicarFiltros(base, filtros({ status: 'pendente', area: 'Fiscal' }));
-    expect(r.map((p) => p.id)).toEqual(['A']);
-    expect(aplicarFiltros(base, filtros({ area: 'CX' })).map((p) => p.id)).toEqual(['B']);
+  it("área soma com status", () => {
+    const r = aplicarFiltros(base, filtros({ status: "pendente", area: "Fiscal" }));
+    expect(r.map((p) => p.id)).toEqual(["A"]);
+    expect(aplicarFiltros(base, filtros({ area: "CX" })).map((p) => p.id)).toEqual(["B"]);
   });
 
-  it('status legado cai na pílula equivalente (rejeitado → ajuste pedido)', () => {
-    const legado = [proj({ id: 'L', statusChave: 'rejeitado' })];
-    expect(aplicarFiltros(legado, filtros({ status: 'ajuste pedido' })).map((p) => p.id)).toEqual(
-      ['L'],
-    );
+  it("status legado cai na pílula equivalente (rejeitado → ajuste pedido)", () => {
+    const legado = [proj({ id: "L", statusChave: "rejeitado" })];
+    expect(aplicarFiltros(legado, filtros({ status: "ajuste pedido" })).map((p) => p.id)).toEqual([
+      "L",
+    ]);
   });
 });
 
-describe('filtro de ganho', () => {
+describe("filtro de ganho", () => {
   const base = [
-    proj({ id: 'S', savingReais: 5000, receitaMensal: null }),
-    proj({ id: 'R', savingReais: null, receitaMensal: 3000 }),
-    proj({ id: 'Z', savingReais: 0, receitaMensal: 0 }),
-    proj({ id: 'N', savingReais: null, receitaMensal: null }),
+    proj({ id: "S", savingReais: 5000, receitaMensal: null }),
+    proj({ id: "R", savingReais: null, receitaMensal: 3000 }),
+    proj({ id: "Z", savingReais: 0, receitaMensal: 0 }),
+    proj({ id: "N", savingReais: null, receitaMensal: null }),
   ];
 
   it('"com saving" exige valor POSITIVO — zero e vazio ficam de fora', () => {
-    expect(aplicarFiltros(base, filtros({ ganho: 'saving' })).map((p) => p.id)).toEqual(['S']);
+    expect(aplicarFiltros(base, filtros({ ganho: "saving" })).map((p) => p.id)).toEqual(["S"]);
   });
 
   it('"com receita" olha a receita incremental, não o ganho total', () => {
-    expect(aplicarFiltros(base, filtros({ ganho: 'receita' })).map((p) => p.id)).toEqual(['R']);
+    expect(aplicarFiltros(base, filtros({ ganho: "receita" })).map((p) => p.id)).toEqual(["R"]);
   });
 
-  it('projeto com os dois ganhos aparece nas duas filas', () => {
-    const duplo = [proj({ id: 'D', savingReais: 10, receitaMensal: 10 })];
-    expect(aplicarFiltros(duplo, filtros({ ganho: 'saving' })).length).toBe(1);
-    expect(aplicarFiltros(duplo, filtros({ ganho: 'receita' })).length).toBe(1);
+  it("projeto com os dois ganhos aparece nas duas filas", () => {
+    const duplo = [proj({ id: "D", savingReais: 10, receitaMensal: 10 })];
+    expect(aplicarFiltros(duplo, filtros({ ganho: "saving" })).length).toBe(1);
+    expect(aplicarFiltros(duplo, filtros({ ganho: "receita" })).length).toBe(1);
   });
 });
 
-describe('filtro de período', () => {
-  it('as duas pontas são INCLUSIVAS, inclusive com hora no carimbo', () => {
+describe("filtro de período", () => {
+  it("as duas pontas são INCLUSIVAS, inclusive com hora no carimbo", () => {
     const p = proj({ dataOrdenacao: Date.UTC(2026, 7, 21, 14, 30) });
-    expect(casaPeriodo(p, { inicio: '2026-08-17', fim: '2026-08-21' })).toBe(true);
-    expect(casaPeriodo(p, { inicio: '2026-08-17', fim: '2026-08-20' })).toBe(false);
+    expect(casaPeriodo(p, { inicio: "2026-08-17", fim: "2026-08-21" })).toBe(true);
+    expect(casaPeriodo(p, { inicio: "2026-08-17", fim: "2026-08-20" })).toBe(false);
     const inicio = proj({ dataOrdenacao: Date.UTC(2026, 7, 17) });
-    expect(casaPeriodo(inicio, { inicio: '2026-08-17', fim: '2026-08-21' })).toBe(true);
+    expect(casaPeriodo(inicio, { inicio: "2026-08-17", fim: "2026-08-21" })).toBe(true);
   });
 
-  it('projeto sem data não entra em janela nenhuma', () => {
-    expect(casaPeriodo(proj({ dataOrdenacao: null }), { inicio: '2026-01-01', fim: '2026-12-31' }))
-      .toBe(false);
+  it("projeto sem data não entra em janela nenhuma", () => {
+    expect(
+      casaPeriodo(proj({ dataOrdenacao: null }), { inicio: "2026-01-01", fim: "2026-12-31" }),
+    ).toBe(false);
   });
 
-  it('sem período, tudo passa', () => {
+  it("sem período, tudo passa", () => {
     expect(casaPeriodo(proj({ dataOrdenacao: null }), null)).toBe(true);
   });
 
-  it('um dia só: só o projeto daquele dia', () => {
+  it("um dia só: só o projeto daquele dia", () => {
     const base = [
-      proj({ id: 'ONTEM', dataOrdenacao: Date.UTC(2026, 7, 16) }),
-      proj({ id: 'HOJE', dataOrdenacao: Date.UTC(2026, 7, 17) }),
+      proj({ id: "ONTEM", dataOrdenacao: Date.UTC(2026, 7, 16) }),
+      proj({ id: "HOJE", dataOrdenacao: Date.UTC(2026, 7, 17) }),
     ];
-    const r = aplicarFiltros(base, filtros({ periodo: { inicio: '2026-08-17', fim: '2026-08-17' } }));
-    expect(r.map((p) => p.id)).toEqual(['HOJE']);
+    const r = aplicarFiltros(
+      base,
+      filtros({ periodo: { inicio: "2026-08-17", fim: "2026-08-17" } }),
+    );
+    expect(r.map((p) => p.id)).toEqual(["HOJE"]);
   });
 });
 
-describe('contagens da faixa de pílulas', () => {
+describe("contagens da faixa de pílulas", () => {
   const base = [
-    proj({ id: 'A', area: 'Fiscal', statusChave: 'pendente' }),
-    proj({ id: 'B', area: 'CX', statusChave: 'pendente' }),
-    proj({ id: 'C', area: 'Fiscal', statusChave: 'aprovado' }),
+    proj({ id: "A", area: "Fiscal", statusChave: "pendente" }),
+    proj({ id: "B", area: "CX", statusChave: "pendente" }),
+    proj({ id: "C", area: "Fiscal", statusChave: "aprovado" }),
   ];
 
-  it('a contagem da pílula respeita os demais filtros', () => {
+  it("a contagem da pílula respeita os demais filtros", () => {
     expect(contarPorPilula(base, filtros())).toEqual({ pendente: 2, aprovado: 1 });
     // Com a área recortando, a faixa conta DENTRO do recorte: é o que impede "Pendente 2"
     // abrir uma lista de 1.
-    expect(contarPorPilula(base, filtros({ area: 'Fiscal' }))).toEqual({
+    expect(contarPorPilula(base, filtros({ area: "Fiscal" }))).toEqual({
       pendente: 1,
       aprovado: 1,
     });
   });
 
-  it('a contagem da pílula IGNORA o status escolhido (senão a faixa colapsaria em 1)', () => {
-    expect(contarPorPilula(base, filtros({ status: 'aprovado' }))).toEqual({
+  it("a contagem da pílula IGNORA o status escolhido (senão a faixa colapsaria em 1)", () => {
+    expect(contarPorPilula(base, filtros({ status: "aprovado" }))).toEqual({
       pendente: 2,
       aprovado: 1,
     });
@@ -193,235 +197,245 @@ describe('contagens da faixa de pílulas', () => {
 
   it('"Todos" mostra o total do recorte, não o da planilha', () => {
     expect(totalSemStatus(base, filtros())).toBe(3);
-    expect(totalSemStatus(base, filtros({ area: 'Fiscal' }))).toBe(2);
+    expect(totalSemStatus(base, filtros({ area: "Fiscal" }))).toBe(2);
   });
 });
 
-describe('utilitários da barra', () => {
-  it('conta quantos recortes estão ativos (o status não entra)', () => {
+describe("utilitários da barra", () => {
+  it("conta quantos recortes estão ativos (o status não entra)", () => {
     expect(contarFiltrosAtivos(filtros())).toBe(0);
-    expect(contarFiltrosAtivos(filtros({ status: 'pendente' }))).toBe(0);
+    expect(contarFiltrosAtivos(filtros({ status: "pendente" }))).toBe(0);
     expect(
       contarFiltrosAtivos(
-        filtros({ ganho: 'saving', area: 'CX', periodo: { inicio: 'a', fim: 'b' } }),
+        filtros({ ganho: "saving", area: "CX", periodo: { inicio: "a", fim: "b" } }),
       ),
     ).toBe(3);
   });
 
-  it('lista as áreas presentes, sem repetir e em ordem', () => {
-    const base = [proj({ area: 'Fiscal' }), proj({ area: 'CX' }), proj({ area: 'Fiscal' }), proj({ area: null })];
-    expect(areasDisponiveis(base)).toEqual(['CX', 'Fiscal']);
+  it("lista as áreas presentes, sem repetir e em ordem", () => {
+    const base = [
+      proj({ area: "Fiscal" }),
+      proj({ area: "CX" }),
+      proj({ area: "Fiscal" }),
+      proj({ area: null }),
+    ];
+    expect(areasDisponiveis(base)).toEqual(["CX", "Fiscal"]);
   });
 
-  it('TODAS_AS_AREAS não recorta nada', () => {
-    const base = [proj({ area: 'Fiscal' }), proj({ area: null })];
+  it("TODAS_AS_AREAS não recorta nada", () => {
+    const base = [proj({ area: "Fiscal" }), proj({ area: null })];
     expect(aplicarFiltros(base, filtros({ area: TODAS_AS_AREAS })).length).toBe(2);
   });
 });
 
-describe('aritmética do calendário', () => {
-  it('a grade tem SEMPRE 42 células e começa num domingo', () => {
-    for (const mes of ['2026-08-01', '2026-02-01', '2027-01-01']) {
+describe("aritmética do calendário", () => {
+  it("a grade tem SEMPRE 42 células e começa num domingo", () => {
+    for (const mes of ["2026-08-01", "2026-02-01", "2027-01-01"]) {
       const g = gradeDoMes(mes);
       expect(g.length).toBe(42);
       expect(new Date(`${g[0].iso}T00:00:00Z`).getUTCDay()).toBe(0);
     }
   });
 
-  it('a grade marca o que é do mês e o que é emenda', () => {
-    const g = gradeDoMes('2026-08-01');
+  it("a grade marca o que é do mês e o que é emenda", () => {
+    const g = gradeDoMes("2026-08-01");
     expect(g.filter((c) => c.doMes).length).toBe(31);
     expect(g.find((c) => c.doMes)!.dia).toBe(1);
   });
 
-  it('somarMeses preserva o dia quando ele existe no destino', () => {
-    expect(somarMeses('2026-01-31', 1)).toBe('2026-02-28');
-    expect(somarMeses('2026-03-15', -1)).toBe('2026-02-15');
-    expect(somarMeses('2026-12-10', 1)).toBe('2027-01-10');
+  it("somarMeses preserva o dia quando ele existe no destino", () => {
+    expect(somarMeses("2026-01-31", 1)).toBe("2026-02-28");
+    expect(somarMeses("2026-03-15", -1)).toBe("2026-02-15");
+    expect(somarMeses("2026-12-10", 1)).toBe("2027-01-10");
   });
 
-  it('somarDias atravessa mês e ano', () => {
-    expect(somarDias('2026-08-31', 1)).toBe('2026-09-01');
-    expect(somarDias('2027-01-01', -1)).toBe('2026-12-31');
+  it("somarDias atravessa mês e ano", () => {
+    expect(somarDias("2026-08-31", 1)).toBe("2026-09-01");
+    expect(somarDias("2027-01-01", -1)).toBe("2026-12-31");
   });
 
-  it('contarDias é inclusivo nas duas pontas (17→21 = 5 dias)', () => {
-    expect(contarDias({ inicio: '2026-08-17', fim: '2026-08-21' })).toBe(5);
-    expect(contarDias({ inicio: '2026-08-17', fim: '2026-08-17' })).toBe(1);
+  it("contarDias é inclusivo nas duas pontas (17→21 = 5 dias)", () => {
+    expect(contarDias({ inicio: "2026-08-17", fim: "2026-08-21" })).toBe(5);
+    expect(contarDias({ inicio: "2026-08-17", fim: "2026-08-17" })).toBe(1);
   });
 
-  it('ordenarIntervalo aceita o 2º clique ANTES do 1º', () => {
-    expect(ordenarIntervalo('2026-08-21', '2026-08-17')).toEqual({
-      inicio: '2026-08-17',
-      fim: '2026-08-21',
+  it("ordenarIntervalo aceita o 2º clique ANTES do 1º", () => {
+    expect(ordenarIntervalo("2026-08-21", "2026-08-17")).toEqual({
+      inicio: "2026-08-17",
+      fim: "2026-08-21",
     });
   });
 
-  it('rejeita data que não existe', () => {
-    expect(ehIsoValido('2026-02-31')).toBe(false);
-    expect(ehIsoValido('2026-2-3')).toBe(false);
-    expect(ehIsoValido('2026-02-28')).toBe(true);
+  it("rejeita data que não existe", () => {
+    expect(ehIsoValido("2026-02-31")).toBe(false);
+    expect(ehIsoValido("2026-2-3")).toBe(false);
+    expect(ehIsoValido("2026-02-28")).toBe(true);
   });
 
-  it('os atalhos olham para trás e terminam hoje', () => {
-    const hoje = '2026-08-17';
+  it("os atalhos olham para trás e terminam hoje", () => {
+    const hoje = "2026-08-17";
     const por = (c: string) => PRESETS_PERIODO.find((p) => p.chave === c)!.intervalo(hoje);
-    expect(por('hoje')).toEqual({ inicio: hoje, fim: hoje });
-    expect(por('7d')).toEqual({ inicio: '2026-08-11', fim: hoje });
-    expect(contarDias(por('7d'))).toBe(7);
-    expect(contarDias(por('30d'))).toBe(30);
-    expect(por('mes')).toEqual({ inicio: '2026-08-01', fim: hoje });
-    expect(por('mes_passado')).toEqual({ inicio: '2026-07-01', fim: '2026-07-31' });
-    expect(por('ano')).toEqual({ inicio: '2026-01-01', fim: hoje });
+    expect(por("hoje")).toEqual({ inicio: hoje, fim: hoje });
+    expect(por("7d")).toEqual({ inicio: "2026-08-11", fim: hoje });
+    expect(contarDias(por("7d"))).toBe(7);
+    expect(contarDias(por("30d"))).toBe(30);
+    expect(por("mes")).toEqual({ inicio: "2026-08-01", fim: hoje });
+    expect(por("mes_passado")).toEqual({ inicio: "2026-07-01", fim: "2026-07-31" });
+    expect(por("ano")).toEqual({ inicio: "2026-01-01", fim: hoje });
   });
 
-  it('reconhece o atalho que descreve o intervalo (para marcá-lo como ativo)', () => {
-    expect(presetDoIntervalo({ inicio: '2026-08-17', fim: '2026-08-17' }, '2026-08-17')).toBe('hoje');
-    expect(presetDoIntervalo({ inicio: '2026-08-03', fim: '2026-08-09' }, '2026-08-17')).toBe(null);
-    expect(presetDoIntervalo(null, '2026-08-17')).toBe(null);
+  it("reconhece o atalho que descreve o intervalo (para marcá-lo como ativo)", () => {
+    expect(presetDoIntervalo({ inicio: "2026-08-17", fim: "2026-08-17" }, "2026-08-17")).toBe(
+      "hoje",
+    );
+    expect(presetDoIntervalo({ inicio: "2026-08-03", fim: "2026-08-09" }, "2026-08-17")).toBe(null);
+    expect(presetDoIntervalo(null, "2026-08-17")).toBe(null);
   });
 
-  it('ultimoDiaDoMes acerta fevereiro bissexto', () => {
-    expect(ultimoDiaDoMes('2028-02-10')).toBe('2028-02-29');
-    expect(ultimoDiaDoMes('2026-02-10')).toBe('2026-02-28');
+  it("ultimoDiaDoMes acerta fevereiro bissexto", () => {
+    expect(ultimoDiaDoMes("2028-02-10")).toBe("2028-02-29");
+    expect(ultimoDiaDoMes("2026-02-10")).toBe("2026-02-28");
   });
 
-  it('rótulos saem em português', () => {
-    expect(rotuloMes('2026-08-01')).toBe('Agosto 2026');
-    expect(rotuloIntervalo({ inicio: '2026-08-17', fim: '2026-08-21' })).toBe('17 ago – 21 ago');
-    expect(rotuloIntervalo({ inicio: '2026-03-01', fim: '2026-03-01' })).toBe('1 mar');
+  it("rótulos saem em português", () => {
+    expect(rotuloMes("2026-08-01")).toBe("Agosto 2026");
+    expect(rotuloIntervalo({ inicio: "2026-08-17", fim: "2026-08-21" })).toBe("17 ago – 21 ago");
+    expect(rotuloIntervalo({ inicio: "2026-03-01", fim: "2026-03-01" })).toBe("1 mar");
   });
 
-  it('hoje usa o relógio LOCAL — às 22h de Brasília o UTC já virou e o dia estaria errado', () => {
+  it("hoje usa o relógio LOCAL — às 22h de Brasília o UTC já virou e o dia estaria errado", () => {
     // 17/08/2026 22:30 em UTC-3 = 18/08 01:30 UTC. "Hoje" tem de ser 17.
     const local = new Date(2026, 7, 17, 22, 30);
-    expect(hojeIso(local)).toBe('2026-08-17');
+    expect(hojeIso(local)).toBe("2026-08-17");
   });
 });
 
-describe('peso do payload da listagem', () => {
+describe("peso do payload da listagem", () => {
   // Medido em prod (17/08/2026, 639 projetos): a resposta pesava 563,6 KB e `observacoes`
   // sozinho era 160 KB (28%) — o parecer do analisador, que a TABELA nunca desenhou. Cada
   // campo aqui é multiplicado por ~600, então campo que ninguém desenha é lentidão pura.
   // Este teste é o canário: recolocar um campo desses falha aqui em vez de degradar a tela.
-  it('o resumo carrega SÓ o que a tabela e os filtros desenham', () => {
+  it("o resumo carrega SÓ o que a tabela e os filtros desenham", () => {
     const chaves = Object.keys(proj()).sort();
     expect(chaves).toEqual(
       [
-        'aprovacaoLider',
-        'area',
-        'autor',
-        'busca',
-        'confiancaAgente',
-        'complexidade',
-        'dataOrdenacao',
-        'dataSubmissao',
-        'email',
-        'especial',
-        'estrelaAgente',
+        "aprovacaoLider",
+        "area",
+        "autor",
+        "busca",
+        "confiancaAgente",
+        "complexidade",
+        "dataOrdenacao",
+        "dataSubmissao",
+        "email",
+        "especial",
+        "estrelaAgente",
         // Número curto e DESENHADO (coluna "Estrelas" + filtro por faixa) — passa no canário.
-        'estrelas',
-        'ganhoTotal',
-        'id',
-        'nome',
-        'receitaMensal',
-        'savingReais',
+        "estrelas",
+        "ganhoTotal",
+        "id",
+        "nome",
+        "receitaMensal",
+        "savingReais",
         // ⚠️ Estes DOIS não são desenhados: eles decidem a CATEGORIA de ganho no filtro
         // (09/09/2026). O canário aceita porque são NÚMEROS CURTOS e existe precedente direto —
         // `savingReais`/`receitaMensal` também servem só ao filtro. O que o gotcha 4 proíbe é
         // TEXTO longo multiplicado por ~750 linhas (o `observacoes`, 160 KB do payload).
         // ⚠️ A régua da categoria é o VALOR destas colunas, nunca o rótulo `tipos` — que ficou em
         // vocabulário da v1 em 647 linhas enquanto os valores já foram realocados.
-        'savingEfetivado',
-        'custoEvitadoHoras',
-        'status',
-        'statusChave',
+        "savingEfetivado",
+        "custoEvitadoHoras",
+        "status",
+        "statusChave",
         // Rótulo CURTO ("Agente", "Dashboard") e DESENHADO — divide a célula "Tipo · Nível"
         // com a complexidade, que é o outro eixo da mesma categorização (item 5.4). Entrou
         // sem coluna nova justamente porque a tabela já é densa.
-        'tipoProjeto',
-        'tipos',
+        "tipoProjeto",
+        "tipos",
       ].sort(),
     );
   });
 
-  it('os campos removidos não voltam por engano', () => {
+  it("os campos removidos não voltam por engano", () => {
     // `Ferramenta` CONTINUA sendo lida (alimenta o índice de busca), mas não viaja
     // como campo próprio — por isso ela some daqui e permanece em `COLUNAS_RESUMO`.
-    for (const morto of ['observacoes', 'atualizadoEm', 'savingHoras', 'ferramenta']) {
+    for (const morto of ["observacoes", "atualizadoEm", "savingHoras", "ferramenta"]) {
       expect(Object.keys(proj())).not.toContain(morto);
     }
   });
 });
 
-describe('filtro de pré-aprovação do líder', () => {
+describe("filtro de pré-aprovação do líder", () => {
   const base = [
-    proj({ id: 'AP', aprovacaoLider: 'Pré-aprovado' }),
-    proj({ id: 'PEND', aprovacaoLider: 'Pré-pendente' }),
-    proj({ id: 'AJU', aprovacaoLider: 'Ajuste pedido' }),
-    proj({ id: 'REP', aprovacaoLider: 'Pré-reprovado' }),
-    proj({ id: 'DISP', aprovacaoLider: 'Dispensado' }),
-    proj({ id: 'VAZIO', aprovacaoLider: null }),
+    proj({ id: "AP", aprovacaoLider: "Pré-aprovado" }),
+    proj({ id: "PEND", aprovacaoLider: "Pré-pendente" }),
+    proj({ id: "AJU", aprovacaoLider: "Ajuste pedido" }),
+    proj({ id: "REP", aprovacaoLider: "Pré-reprovado" }),
+    proj({ id: "DISP", aprovacaoLider: "Dispensado" }),
+    proj({ id: "VAZIO", aprovacaoLider: null }),
     // Isenção D12: quem é coordenador para cima nunca entra em fila.
-    proj({ id: 'ISENTO', aprovacaoLider: 'Pré-aprovado (liderança)' }),
+    proj({ id: "ISENTO", aprovacaoLider: "Pré-aprovado (liderança)" }),
   ];
 
-  it('recorta por estado do parecer', () => {
-    expect(aplicarFiltros(base, filtros({ parecer: 'aprovado' })).map((p) => p.id)).toEqual(['AP']);
-    expect(aplicarFiltros(base, filtros({ parecer: 'pendente' })).map((p) => p.id)).toEqual(['PEND']);
-    expect(aplicarFiltros(base, filtros({ parecer: 'ajuste' })).map((p) => p.id)).toEqual(['AJU']);
-    expect(aplicarFiltros(base, filtros({ parecer: 'reprovado' })).map((p) => p.id)).toEqual(['REP']);
-    expect(aplicarFiltros(base, filtros({ parecer: 'dispensado' })).map((p) => p.id)).toEqual(['DISP']);
+  it("recorta por estado do parecer", () => {
+    expect(aplicarFiltros(base, filtros({ parecer: "aprovado" })).map((p) => p.id)).toEqual(["AP"]);
+    expect(aplicarFiltros(base, filtros({ parecer: "pendente" })).map((p) => p.id)).toEqual([
+      "PEND",
+    ]);
+    expect(aplicarFiltros(base, filtros({ parecer: "ajuste" })).map((p) => p.id)).toEqual(["AJU"]);
+    expect(aplicarFiltros(base, filtros({ parecer: "reprovado" })).map((p) => p.id)).toEqual([
+      "REP",
+    ]);
+    expect(aplicarFiltros(base, filtros({ parecer: "dispensado" })).map((p) => p.id)).toEqual([
+      "DISP",
+    ]);
   });
 
   it('ISENÇÃO não é pré-aprovação — "Pré-aprovado (liderança)" fica fora de "Pré-aprovado"', () => {
     // Se casasse, filtrar "Pré-aprovado" daria a impressão de que um líder olhou o projeto.
-    expect(chaveDoEstado('Pré-aprovado (liderança)')).toBe('sem_parecer');
-    const semParecer = aplicarFiltros(base, filtros({ parecer: 'sem_parecer' })).map((p) => p.id);
-    expect(semParecer).toEqual(['VAZIO', 'ISENTO']);
+    expect(chaveDoEstado("Pré-aprovado (liderança)")).toBe("sem_parecer");
+    const semParecer = aplicarFiltros(base, filtros({ parecer: "sem_parecer" })).map((p) => p.id);
+    expect(semParecer).toEqual(["VAZIO", "ISENTO"]);
   });
 
-  it('aceita a grafia da planilha sem acento (o cabeçalho real já mordeu antes)', () => {
-    expect(casaParecer(proj({ aprovacaoLider: 'pre aprovado' }), 'aprovado')).toBe(true);
-    expect(casaParecer(proj({ aprovacaoLider: 'PRE-APROVADO' }), 'aprovado')).toBe(true);
+  it("aceita a grafia da planilha sem acento (o cabeçalho real já mordeu antes)", () => {
+    expect(casaParecer(proj({ aprovacaoLider: "pre aprovado" }), "aprovado")).toBe(true);
+    expect(casaParecer(proj({ aprovacaoLider: "PRE-APROVADO" }), "aprovado")).toBe(true);
   });
 
-  it('soma com status, natureza e área (AND, como as outras dimensões)', () => {
+  it("soma com status, natureza e área (AND, como as outras dimensões)", () => {
     const misto = [
-      proj({ id: 'A', aprovacaoLider: 'Pré-aprovado', statusChave: 'pendente', especial: true }),
-      proj({ id: 'B', aprovacaoLider: 'Pré-aprovado', statusChave: 'aprovado', especial: true }),
-      proj({ id: 'C', aprovacaoLider: 'Pré-pendente', statusChave: 'pendente', especial: true }),
+      proj({ id: "A", aprovacaoLider: "Pré-aprovado", statusChave: "pendente", especial: true }),
+      proj({ id: "B", aprovacaoLider: "Pré-aprovado", statusChave: "aprovado", especial: true }),
+      proj({ id: "C", aprovacaoLider: "Pré-pendente", statusChave: "pendente", especial: true }),
     ];
-    const r = aplicarFiltros(
-      misto,
-      filtros({ parecer: 'aprovado', status: 'pendente' }),
-    );
-    expect(r.map((p) => p.id)).toEqual(['A']);
+    const r = aplicarFiltros(misto, filtros({ parecer: "aprovado", status: "pendente" }));
+    expect(r.map((p) => p.id)).toEqual(["A"]);
   });
 
-  it('entra na contagem de filtros ativos e no recorte das pílulas', () => {
-    expect(contarFiltrosAtivos(filtros({ parecer: 'aprovado' }))).toBe(1);
+  it("entra na contagem de filtros ativos e no recorte das pílulas", () => {
+    expect(contarFiltrosAtivos(filtros({ parecer: "aprovado" }))).toBe(1);
     const misto = [
-      proj({ id: 'A', aprovacaoLider: 'Pré-aprovado', statusChave: 'pendente' }),
-      proj({ id: 'B', aprovacaoLider: 'Pré-pendente', statusChave: 'pendente' }),
+      proj({ id: "A", aprovacaoLider: "Pré-aprovado", statusChave: "pendente" }),
+      proj({ id: "B", aprovacaoLider: "Pré-pendente", statusChave: "pendente" }),
     ];
-    expect(contarPorPilula(misto, filtros({ parecer: 'aprovado' }))).toEqual({ pendente: 1 });
+    expect(contarPorPilula(misto, filtros({ parecer: "aprovado" }))).toEqual({ pendente: 1 });
   });
 
-  it('o campo só oferece estados PRESENTES, na ordem de leitura e com a contagem', () => {
+  it("o campo só oferece estados PRESENTES, na ordem de leitura e com a contagem", () => {
     const disponiveis = pareceresDisponiveis([
-      proj({ aprovacaoLider: 'Pré-aprovado' }),
-      proj({ aprovacaoLider: 'Pré-aprovado' }),
-      proj({ aprovacaoLider: 'Pré-pendente' }),
+      proj({ aprovacaoLider: "Pré-aprovado" }),
+      proj({ aprovacaoLider: "Pré-aprovado" }),
+      proj({ aprovacaoLider: "Pré-pendente" }),
     ]);
     // `pendente` vem antes de `aprovado`: o que espera decisão primeiro.
     expect(disponiveis).toEqual([
-      { estado: 'pendente', total: 1 },
-      { estado: 'aprovado', total: 2 },
+      { estado: "pendente", total: 1 },
+      { estado: "aprovado", total: 2 },
     ]);
     expect(disponiveis.map((d) => ROTULO_ESTADO_PARECER[d.estado])).toEqual([
-      'Pré-pendente',
-      'Pré-aprovado',
+      "Pré-pendente",
+      "Pré-aprovado",
     ]);
   });
 });
@@ -429,7 +443,7 @@ describe('filtro de pré-aprovação do líder', () => {
 // ─── Faixa de estrelas (nota da triagem) ───────────────────────────────────────
 // A escala NÃO tem teto (17/08/2026), então o filtro é uma FAIXA com pontas abertas: um
 // `<select>` de opções fixas voltaria a inventar o teto que a ficha acabou de perder.
-describe('filtro por quantidade de estrelas', () => {
+describe("filtro por quantidade de estrelas", () => {
   it('ponta aberta: só a mínima já é "1 estrela ou mais"', () => {
     expect(casaEstrelas(proj({ estrelas: 1 }), 1, null)).toBe(true);
     expect(casaEstrelas(proj({ estrelas: 12 }), 1, null)).toBe(true);
@@ -439,13 +453,13 @@ describe('filtro por quantidade de estrelas', () => {
     expect(casaEstrelas(proj({ estrelas: 3 }), null, 2)).toBe(false);
   });
 
-  it('faixa fechada é INCLUSIVA nas duas pontas', () => {
+  it("faixa fechada é INCLUSIVA nas duas pontas", () => {
     expect(casaEstrelas(proj({ estrelas: 3 }), 3, 5)).toBe(true);
     expect(casaEstrelas(proj({ estrelas: 5 }), 3, 5)).toBe(true);
     expect(casaEstrelas(proj({ estrelas: 6 }), 3, 5)).toBe(false);
   });
 
-  it('nota acima de 5 entra (não há teto na escala)', () => {
+  it("nota acima de 5 entra (não há teto na escala)", () => {
     expect(casaEstrelas(proj({ estrelas: 10 }), 6, null)).toBe(true);
   });
 
@@ -454,19 +468,19 @@ describe('filtro por quantidade de estrelas', () => {
     expect(casaEstrelas(proj({ estrelas: null }), 1, null)).toBe(false);
   });
 
-  it('sem faixa não recorta nada', () => {
+  it("sem faixa não recorta nada", () => {
     expect(casaEstrelas(proj({ estrelas: null }), null, null)).toBe(true);
     expect(contarFiltrosAtivos(filtros())).toBe(0);
   });
 
-  it('soma (AND) com as outras dimensões e conta como UM filtro ativo', () => {
+  it("soma (AND) com as outras dimensões e conta como UM filtro ativo", () => {
     const misto = [
-      proj({ id: 'A', estrelas: 5, statusChave: 'pendente' }),
-      proj({ id: 'B', estrelas: 1, statusChave: 'pendente' }),
-      proj({ id: 'C', estrelas: 8, statusChave: 'aprovado' }),
+      proj({ id: "A", estrelas: 5, statusChave: "pendente" }),
+      proj({ id: "B", estrelas: 1, statusChave: "pendente" }),
+      proj({ id: "C", estrelas: 8, statusChave: "aprovado" }),
     ];
-    const f = filtros({ estrelasMin: 4, status: 'pendente' });
-    expect(aplicarFiltros(misto, f).map((p) => p.id)).toEqual(['A']);
+    const f = filtros({ estrelasMin: 4, status: "pendente" });
+    expect(aplicarFiltros(misto, f).map((p) => p.id)).toEqual(["A"]);
     // Duas pontas preenchidas seguem sendo UMA dimensão no "Limpar filtros".
     expect(contarFiltrosAtivos(filtros({ estrelasMin: 1, estrelasMax: 3 }))).toBe(1);
     // E a contagem das pílulas respeita o recorte (senão "Pendente 3" abriria lista de 1).
@@ -481,92 +495,94 @@ describe('filtro por quantidade de estrelas', () => {
 // ─── Contagem do campo de PRÉ-STATUS (casamento com os outros filtros) ─────────
 // Bug relatado pelo Luis: o campo dizia "Pré-pendente (26)" e abria uma lista de 3 quando
 // havia outro filtro ligado — ele contava sobre a planilha INTEIRA, ao contrário das pílulas.
-describe('contagem do campo de pré-status', () => {
+describe("contagem do campo de pré-status", () => {
   const base = [
-    proj({ id: 'A', aprovacaoLider: 'Pré-pendente', especial: true, statusChave: 'pendente' }),
-    proj({ id: 'B', aprovacaoLider: 'Pré-pendente', especial: false, statusChave: 'pendente' }),
-    proj({ id: 'C', aprovacaoLider: 'Pré-aprovado', especial: true, statusChave: 'aprovado' }),
+    proj({ id: "A", aprovacaoLider: "Pré-pendente", especial: true, statusChave: "pendente" }),
+    proj({ id: "B", aprovacaoLider: "Pré-pendente", especial: false, statusChave: "pendente" }),
+    proj({ id: "C", aprovacaoLider: "Pré-aprovado", especial: true, statusChave: "aprovado" }),
   ];
 
-  it('respeita os DEMAIS filtros (era o que dava contagem errada)', () => {
+  it("respeita os DEMAIS filtros (era o que dava contagem errada)", () => {
     expect(pareceresDisponiveis(base, filtros())).toEqual([
-      { estado: 'pendente', total: 2 },
-      { estado: 'aprovado', total: 1 },
+      { estado: "pendente", total: 2 },
+      { estado: "aprovado", total: 1 },
     ]);
     // Some junto com o recorte de status/estrelas.
-    expect(pareceresDisponiveis(base, filtros({ status: 'aprovado' }))).toEqual([
-      { estado: 'aprovado', total: 1 },
+    expect(pareceresDisponiveis(base, filtros({ status: "aprovado" }))).toEqual([
+      { estado: "aprovado", total: 1 },
     ]);
   });
 
-  it('IGNORA a própria dimensão — escolher um estado não apaga os outros do campo', () => {
-    expect(pareceresDisponiveis(base, filtros({ parecer: 'pendente' }))).toEqual([
-      { estado: 'pendente', total: 2 },
-      { estado: 'aprovado', total: 1 },
+  it("IGNORA a própria dimensão — escolher um estado não apaga os outros do campo", () => {
+    expect(pareceresDisponiveis(base, filtros({ parecer: "pendente" }))).toEqual([
+      { estado: "pendente", total: 2 },
+      { estado: "aprovado", total: 1 },
     ]);
   });
 
-  it('o estado SELECIONADO nunca desaparece, mesmo com 0 no recorte', () => {
+  it("o estado SELECIONADO nunca desaparece, mesmo com 0 no recorte", () => {
     // Recorte sem nenhum parecer "aprovado": o campo mantém a opção (com 0) para o select
     // não renderizar em branco e a pessoa saber o que desfazer.
-    const r = pareceresDisponiveis(base, filtros({ parecer: 'aprovado', estrelasMin: 9 }));
-    expect(r).toEqual([{ estado: 'aprovado', total: 0 }]);
+    const r = pareceresDisponiveis(base, filtros({ parecer: "aprovado", estrelasMin: 9 }));
+    expect(r).toEqual([{ estado: "aprovado", total: 0 }]);
   });
 
-  it('a contagem do campo CONCORDA com o tamanho da lista filtrada', () => {
-    for (const estado of ['pendente', 'aprovado'] as const) {
+  it("a contagem do campo CONCORDA com o tamanho da lista filtrada", () => {
+    for (const estado of ["pendente", "aprovado"] as const) {
       const f = filtros({ parecer: estado });
       const doCampo = pareceresDisponiveis(base, f).find((e) => e.estado === estado)!.total;
       expect(aplicarFiltros(base, f).length).toBe(doCampo);
     }
   });
 
-  it('sem argumento de filtros, conta a listagem inteira (compatível com o call antigo)', () => {
+  it("sem argumento de filtros, conta a listagem inteira (compatível com o call antigo)", () => {
     expect(pareceresDisponiveis(base)).toEqual([
-      { estado: 'pendente', total: 2 },
-      { estado: 'aprovado', total: 1 },
+      { estado: "pendente", total: 2 },
+      { estado: "aprovado", total: 1 },
     ]);
   });
 
   it('casaFiltrosExceto é a fonte única do "ignora a própria dimensão"', () => {
-    const p = proj({ statusChave: 'pendente', especial: true, estrelas: 4 });
-    const f = filtros({ status: 'aprovado', estrelasMin: 4 });
-    expect(casaFiltrosExceto(p, f, 'status')).toBe(true); // só o status desencaixava
-    expect(casaFiltrosExceto(p, f, 'estrelas')).toBe(false); // o status continua barrando
+    const p = proj({ statusChave: "pendente", especial: true, estrelas: 4 });
+    const f = filtros({ status: "aprovado", estrelasMin: 4 });
+    expect(casaFiltrosExceto(p, f, "status")).toBe(true); // só o status desencaixava
+    expect(casaFiltrosExceto(p, f, "estrelas")).toBe(false); // o status continua barrando
   });
 });
 
-describe('rótulo da faixa de estrelas', () => {
-  it('diz a faixa em texto (o estado nunca é só cor na pílula)', () => {
-    expect(rotuloFaixaEstrelas(null, null)).toBe('Estrelas');
-    expect(rotuloFaixaEstrelas(0, 0)).toBe('Sem nota');
-    expect(rotuloFaixaEstrelas(3, null)).toBe('3+');
-    expect(rotuloFaixaEstrelas(null, 3)).toBe('até 3');
-    expect(rotuloFaixaEstrelas(2, 4)).toBe('2–4');
-    expect(rotuloFaixaEstrelas(3, 3)).toBe('3');
+describe("rótulo da faixa de estrelas", () => {
+  it("diz a faixa em texto (o estado nunca é só cor na pílula)", () => {
+    expect(rotuloFaixaEstrelas(null, null)).toBe("Estrelas");
+    expect(rotuloFaixaEstrelas(0, 0)).toBe("Sem nota");
+    expect(rotuloFaixaEstrelas(3, null)).toBe("3+");
+    expect(rotuloFaixaEstrelas(null, 3)).toBe("até 3");
+    expect(rotuloFaixaEstrelas(2, 4)).toBe("2–4");
+    expect(rotuloFaixaEstrelas(3, 3)).toBe("3");
   });
 });
 
-describe('descontinuados fora da fila (só na pílula própria)', () => {
+describe("descontinuados fora da fila (só na pílula própria)", () => {
   const base = [
-    proj({ id: 'PEND', statusChave: 'pendente' }),
-    proj({ id: 'APR', statusChave: 'aprovado' }),
-    proj({ id: 'DESC', statusChave: 'descontinuado' }),
+    proj({ id: "PEND", statusChave: "pendente" }),
+    proj({ id: "APR", statusChave: "aprovado" }),
+    proj({ id: "DESC", statusChave: "descontinuado" }),
   ];
 
   it('"Todos" esconde os descontinuados', () => {
-    const ids = aplicarFiltros(base, { ...FILTROS_VAZIOS, status: 'todos' }).map((p) => p.id);
-    expect(ids).toEqual(['PEND', 'APR']);
+    const ids = aplicarFiltros(base, { ...FILTROS_VAZIOS, status: "todos" }).map((p) => p.id);
+    expect(ids).toEqual(["PEND", "APR"]);
   });
 
-  it('nenhuma outra pílula mostra descontinuado', () => {
-    const ids = aplicarFiltros(base, { ...FILTROS_VAZIOS, status: 'aprovado' }).map((p) => p.id);
-    expect(ids).toEqual(['APR']);
+  it("nenhuma outra pílula mostra descontinuado", () => {
+    const ids = aplicarFiltros(base, { ...FILTROS_VAZIOS, status: "aprovado" }).map((p) => p.id);
+    expect(ids).toEqual(["APR"]);
   });
 
   it('a pílula "Descontinuado" mostra só eles', () => {
-    const ids = aplicarFiltros(base, { ...FILTROS_VAZIOS, status: 'descontinuado' }).map((p) => p.id);
-    expect(ids).toEqual(['DESC']);
+    const ids = aplicarFiltros(base, { ...FILTROS_VAZIOS, status: "descontinuado" }).map(
+      (p) => p.id,
+    );
+    expect(ids).toEqual(["DESC"]);
   });
 
   it('o total de "Todos" não conta descontinuados', () => {
@@ -576,40 +592,40 @@ describe('descontinuados fora da fila (só na pílula própria)', () => {
   it('a pílula "Descontinuado" mantém a própria contagem', () => {
     expect(contarPorPilula(base, FILTROS_VAZIOS).descontinuado).toBe(1);
   });
-})
+});
 
 describe('filtro "o agente já rodou?" (08/09/2026) — a dimensão que faz o LOTE valer', () => {
-  it('separa quem tem nota do agente de quem não tem', () => {
-    const com = proj({ id: 'A', estrelaAgente: '3' });
-    const faixa = proj({ id: 'B', estrelaAgente: '6-10' });
-    const sem = proj({ id: 'C', estrelaAgente: null });
-    const traco = proj({ id: 'D', estrelaAgente: '—' });
-    expect(casaAgente(com, 'com')).toBe(true);
-    expect(casaAgente(faixa, 'com')).toBe(true);
+  it("separa quem tem nota do agente de quem não tem", () => {
+    const com = proj({ id: "A", estrelaAgente: "3" });
+    const faixa = proj({ id: "B", estrelaAgente: "6-10" });
+    const sem = proj({ id: "C", estrelaAgente: null });
+    const traco = proj({ id: "D", estrelaAgente: "—" });
+    expect(casaAgente(com, "com")).toBe(true);
+    expect(casaAgente(faixa, "com")).toBe(true);
     // ⚠️ O travessão é o placeholder de "nunca rodou" (nunca célula vazia) — conta como SEM.
-    expect(casaAgente(traco, 'com')).toBe(false);
-    expect(casaAgente(sem, 'sem')).toBe(true);
-    expect(casaAgente(traco, 'sem')).toBe(true);
-    expect(casaAgente(com, 'sem')).toBe(false);
+    expect(casaAgente(traco, "com")).toBe(false);
+    expect(casaAgente(sem, "sem")).toBe(true);
+    expect(casaAgente(traco, "sem")).toBe(true);
+    expect(casaAgente(com, "sem")).toBe(false);
     // 'todos' não recorta nada
-    for (const p of [com, faixa, sem, traco]) expect(casaAgente(p, 'todos')).toBe(true);
+    for (const p of [com, faixa, sem, traco]) expect(casaAgente(p, "todos")).toBe(true);
   });
 
   it('SOMA (AND) com as outras dimensões e entra na conta de "Limpar filtros"', () => {
     const base = [
-      proj({ id: 'A', estrelaAgente: null, statusChave: 'reprovado' }),
-      proj({ id: 'B', estrelaAgente: '2', statusChave: 'reprovado' }),
-      proj({ id: 'C', estrelaAgente: null, statusChave: 'aprovado' }),
+      proj({ id: "A", estrelaAgente: null, statusChave: "reprovado" }),
+      proj({ id: "B", estrelaAgente: "2", statusChave: "reprovado" }),
+      proj({ id: "C", estrelaAgente: null, statusChave: "aprovado" }),
     ];
-    const f = { ...FILTROS_VAZIOS, agente: 'sem' as const, status: 'reprovado' };
-    expect(aplicarFiltros(base, f).map((p) => p.id)).toEqual(['A']);
+    const f = { ...FILTROS_VAZIOS, agente: "sem" as const, status: "reprovado" };
+    expect(aplicarFiltros(base, f).map((p) => p.id)).toEqual(["A"]);
     expect(contarFiltrosAtivos(f)).toBe(1);
   });
 
-  it('entra em casaFiltrosExceto — a contagem do próprio campo ignora a própria dimensão', () => {
-    const p = proj({ id: 'A', estrelaAgente: '3' });
-    expect(casaFiltrosExceto(p, { ...FILTROS_VAZIOS, agente: 'sem' }, 'agente')).toBe(true);
-    expect(casaFiltrosExceto(p, { ...FILTROS_VAZIOS, agente: 'sem' }, 'status')).toBe(false);
+  it("entra em casaFiltrosExceto — a contagem do próprio campo ignora a própria dimensão", () => {
+    const p = proj({ id: "A", estrelaAgente: "3" });
+    expect(casaFiltrosExceto(p, { ...FILTROS_VAZIOS, agente: "sem" }, "agente")).toBe(true);
+    expect(casaFiltrosExceto(p, { ...FILTROS_VAZIOS, agente: "sem" }, "status")).toBe(false);
   });
 });
 
@@ -617,53 +633,57 @@ describe('filtro "o agente já rodou?" (08/09/2026) — a dimensão que faz o LO
 //
 // Pedido do Luis: *"quero ver custo evitado, saving efetivado, ganho imensuravel, receita. E tem
 // que ser diamico tb, e somar, posso selecionar 2 ao msm tempo e filtrar devidamente."*
-describe('categoriasDeGanho — normaliza v1, v2 e snake_case', () => {
-  it('a categoria sai do VALOR das colunas da v2', () => {
-    expect(categoriasDeGanho(proj({ savingEfetivado: 5000 }))).toEqual(['saving_efetivado']);
-    expect(categoriasDeGanho(proj({ custoEvitadoHoras: 60 }))).toEqual(['custo_evitado']);
-    expect(categoriasDeGanho(proj({ receitaMensal: 900 }))).toEqual(['receita_incremental']);
+describe("categoriasDeGanho — normaliza v1, v2 e snake_case", () => {
+  it("a categoria sai do VALOR das colunas da v2", () => {
+    expect(categoriasDeGanho(proj({ savingEfetivado: 5000 }))).toEqual(["saving_efetivado"]);
+    expect(categoriasDeGanho(proj({ custoEvitadoHoras: 60 }))).toEqual(["custo_evitado"]);
+    expect(categoriasDeGanho(proj({ receitaMensal: 900 }))).toEqual(["receita_incremental"]);
   });
 
-  it('sem NENHUM dos três números → imensurável (é a definição do formulário)', () => {
-    expect(categoriasDeGanho(proj())).toEqual(['imensuravel']);
+  it("sem NENHUM dos três números → imensurável (é a definição do formulário)", () => {
+    expect(categoriasDeGanho(proj())).toEqual(["imensuravel"]);
     // Zero não é valor: "0" numa coluna não declara categoria.
-    expect(categoriasDeGanho(proj({ savingEfetivado: 0, custoEvitadoHoras: 0 }))).toEqual(['imensuravel']);
+    expect(categoriasDeGanho(proj({ savingEfetivado: 0, custoEvitadoHoras: 0 }))).toEqual([
+      "imensuravel",
+    ]);
   });
 
-  it('imensurável NUNCA convive com as outras', () => {
+  it("imensurável NUNCA convive com as outras", () => {
     const c = categoriasDeGanho(proj({ custoEvitadoHoras: 60 }));
-    expect(c).not.toContain('imensuravel');
+    expect(c).not.toContain("imensuravel");
   });
 
-  it('⚠️ o RÓTULO velho não interfere — quem manda é o valor', () => {
+  it("⚠️ o RÓTULO velho não interfere — quem manda é o valor", () => {
     // 647 das 750 linhas de prod ainda têm `Tipos de Ganho = "saving"` (vocabulário da v1), mas os
     // VALORES já foram realocados para as colunas da v2. Ler o rótulo devolveria a base errada e
     // exigiria um bucket de legado — que foi vetado, com razão. Aqui o rótulo é ignorado.
-    expect(categoriasDeGanho(proj({ tipos: 'saving', custoEvitadoHoras: 60 }))).toEqual(['custo_evitado']);
-    expect(categoriasDeGanho(proj({ tipos: 'especial', savingEfetivado: 100 }))).toEqual(['saving_efetivado']);
+    expect(categoriasDeGanho(proj({ tipos: "saving", custoEvitadoHoras: 60 }))).toEqual([
+      "custo_evitado",
+    ]);
+    expect(categoriasDeGanho(proj({ tipos: "especial", savingEfetivado: 100 }))).toEqual([
+      "saving_efetivado",
+    ]);
   });
 
-  it('projeto em DUAS categorias devolve as duas — parou despesa E liberou horas', () => {
-    expect(categoriasDeGanho(proj({ savingEfetivado: 3000, custoEvitadoHoras: 40 })).sort()).toEqual(
-      ['custo_evitado', 'saving_efetivado'],
-    );
+  it("projeto em DUAS categorias devolve as duas — parou despesa E liberou horas", () => {
+    expect(
+      categoriasDeGanho(proj({ savingEfetivado: 3000, custoEvitadoHoras: 40 })).sort(),
+    ).toEqual(["custo_evitado", "saving_efetivado"]);
   });
-
-
 });
 
-describe('casaCategorias — dentro da dimensão é OU', () => {
-  const custo = proj({ id: 'A', custoEvitadoHoras: 60 });
-  const receita = proj({ id: 'B', receitaMensal: 900 });
-  const ambos = proj({ id: 'C', custoEvitadoHoras: 60, receitaMensal: 900 });
-  const legado = proj({ id: 'D', savingEfetivado: 5000 });
+describe("casaCategorias — dentro da dimensão é OU", () => {
+  const custo = proj({ id: "A", custoEvitadoHoras: 60 });
+  const receita = proj({ id: "B", receitaMensal: 900 });
+  const ambos = proj({ id: "C", custoEvitadoHoras: 60, receitaMensal: 900 });
+  const legado = proj({ id: "D", savingEfetivado: 5000 });
 
-  it('nada selecionado não recorta nada', () => {
+  it("nada selecionado não recorta nada", () => {
     for (const p of [custo, receita, ambos, legado]) expect(casaCategorias(p, [])).toBe(true);
   });
 
   it('DUAS selecionadas trazem quem tem QUALQUER uma — é o que "somar" quer dizer', () => {
-    const sel = ['custo_evitado', 'receita_incremental'] as const;
+    const sel = ["custo_evitado", "receita_incremental"] as const;
     expect(casaCategorias(custo, sel)).toBe(true);
     expect(casaCategorias(receita, sel)).toBe(true);
     expect(casaCategorias(ambos, sel)).toBe(true);
@@ -671,96 +691,113 @@ describe('casaCategorias — dentro da dimensão é OU', () => {
     expect(casaCategorias(legado, sel)).toBe(false);
   });
 
-  it('some (E) com as outras dimensões, como todo filtro desta barra', () => {
+  it("some (E) com as outras dimensões, como todo filtro desta barra", () => {
     const lista = [
-      proj({ id: 'A', custoEvitadoHoras: 60, area: 'Fiscal' }),
-      proj({ id: 'B', custoEvitadoHoras: 60, area: 'CX' }),
-      proj({ id: 'C', savingEfetivado: 5000, area: 'Fiscal' }),
+      proj({ id: "A", custoEvitadoHoras: 60, area: "Fiscal" }),
+      proj({ id: "B", custoEvitadoHoras: 60, area: "CX" }),
+      proj({ id: "C", savingEfetivado: 5000, area: "Fiscal" }),
     ];
-    const r = aplicarFiltros(lista, filtros({ categorias: ['custo_evitado'], area: 'Fiscal' }));
-    expect(r.map((p) => p.id)).toEqual(['A']);
+    const r = aplicarFiltros(lista, filtros({ categorias: ["custo_evitado"], area: "Fiscal" }));
+    expect(r.map((p) => p.id)).toEqual(["A"]);
   });
 
   it('conta como UMA dimensão em "Limpar filtros", mesmo com 3 marcadas', () => {
     expect(
-      contarFiltrosAtivos(filtros({ categorias: ['custo_evitado', 'imensuravel', 'receita_incremental'] })),
+      contarFiltrosAtivos(
+        filtros({ categorias: ["custo_evitado", "imensuravel", "receita_incremental"] }),
+      ),
     ).toBe(1);
     expect(contarFiltrosAtivos(filtros({ categorias: [] }))).toBe(0);
   });
 });
 
-describe('categoriasDisponiveis — dinâmico e contado sobre o RECORTE', () => {
+describe("categoriasDisponiveis — dinâmico e contado sobre o RECORTE", () => {
   const lista = [
-    proj({ id: 'A', custoEvitadoHoras: 60, statusChave: 'aprovado' }),
-    proj({ id: 'B', custoEvitadoHoras: 60, statusChave: 'reprovado' }),
-    proj({ id: 'C', receitaMensal: 900, statusChave: 'aprovado' }),
-    proj({ id: 'D', savingEfetivado: 5000, statusChave: 'aprovado' }),
+    proj({ id: "A", custoEvitadoHoras: 60, statusChave: "aprovado" }),
+    proj({ id: "B", custoEvitadoHoras: 60, statusChave: "reprovado" }),
+    proj({ id: "C", receitaMensal: 900, statusChave: "aprovado" }),
+    proj({ id: "D", savingEfetivado: 5000, statusChave: "aprovado" }),
   ];
 
-  it('lista só o que EXISTE, na ordem dos cards da Etapa 2, com contagem', () => {
+  it("lista só o que EXISTE, na ordem dos cards da Etapa 2, com contagem", () => {
     const d = categoriasDisponiveis(lista, filtros());
     // Ordem dos cards da Etapa 2: saving efetivado antes de custo evitado, receita depois.
-    expect(d.map((x) => x.categoria)).toEqual(['saving_efetivado', 'custo_evitado', 'receita_incremental']);
-    expect(d.find((x) => x.categoria === 'custo_evitado')?.total).toBe(2);
+    expect(d.map((x) => x.categoria)).toEqual([
+      "saving_efetivado",
+      "custo_evitado",
+      "receita_incremental",
+    ]);
+    expect(d.find((x) => x.categoria === "custo_evitado")?.total).toBe(2);
   });
 
-  it('⚠️ a contagem respeita os OUTROS filtros', () => {
+  it("⚠️ a contagem respeita os OUTROS filtros", () => {
     // Contar sobre a base inteira fazia o campo dizer "2" e abrir uma lista de 1 — o mesmo
     // defeito que as pílulas e o campo de pré-status já não têm.
-    const d = categoriasDisponiveis(lista, filtros({ status: 'aprovado' }));
-    expect(d.find((x) => x.categoria === 'custo_evitado')?.total).toBe(1);
+    const d = categoriasDisponiveis(lista, filtros({ status: "aprovado" }));
+    expect(d.find((x) => x.categoria === "custo_evitado")?.total).toBe(1);
   });
 
-  it('⚠️ e IGNORA a própria dimensão — senão marcar uma apagaria as outras', () => {
-    const d = categoriasDisponiveis(lista, filtros({ categorias: ['custo_evitado'] }));
-    expect(d.map((x) => x.categoria)).toContain('receita_incremental');
+  it("⚠️ e IGNORA a própria dimensão — senão marcar uma apagaria as outras", () => {
+    const d = categoriasDisponiveis(lista, filtros({ categorias: ["custo_evitado"] }));
+    expect(d.map((x) => x.categoria)).toContain("receita_incremental");
   });
 
-  it('⚠️ categoria MARCADA nunca desaparece, mesmo com 0 no recorte', () => {
+  it("⚠️ categoria MARCADA nunca desaparece, mesmo com 0 no recorte", () => {
     // Opção que some deixa a pessoa sem saber o que está filtrando e sem como desmarcar.
-    const d = categoriasDisponiveis(lista, filtros({ categorias: ['imensuravel'] }));
-    const x = d.find((c) => c.categoria === 'imensuravel');
+    const d = categoriasDisponiveis(lista, filtros({ categorias: ["imensuravel"] }));
+    const x = d.find((c) => c.categoria === "imensuravel");
     expect(x).toBeTruthy();
     expect(x?.total).toBe(0);
   });
 });
 
-describe('rotuloCategorias — o texto da pílula', () => {
-  it('vazio, uma e várias', () => {
-    expect(rotuloCategorias([])).toBe('Ganhos');
-    expect(rotuloCategorias(['custo_evitado'])).toBe('Custo evitado');
-    expect(rotuloCategorias(['custo_evitado', 'imensuravel'])).toBe('2 categorias');
+describe("rotuloCategorias — o texto da pílula", () => {
+  it("vazio, uma e várias", () => {
+    expect(rotuloCategorias([])).toBe("Ganhos");
+    expect(rotuloCategorias(["custo_evitado"])).toBe("Custo evitado");
+    expect(rotuloCategorias(["custo_evitado", "imensuravel"])).toBe("2 categorias");
   });
 
-  it('sem seleção nada é recortado', () => {
+  it("sem seleção nada é recortado", () => {
     expect(casaCategorias(proj({ custoEvitadoHoras: 60 }), [])).toBe(true);
   });
 });
 
 // ─── Estrela EXATA (09/09/2026) ───────────────────────────────────────────────────────────────
-describe('faixa EXATA de estrelas', () => {
-  it('`min === max` recorta só aquela nota — era o que faltava', () => {
+describe("faixa EXATA de estrelas", () => {
+  it("`min === max` recorta só aquela nota — era o que faltava", () => {
     // Queixa do Luis: "O toast que abre para eu selecionar estrelas so mostre 1+, 2+, 3+. Nao
     // consigo ver so o que é 1." O estado já sabia expressar isso; faltava a tela.
     const lista = [
-      proj({ id: 'zero', estrelas: 0 }),
-      proj({ id: 'um', estrelas: 1 }),
-      proj({ id: 'dois', estrelas: 2 }),
-      proj({ id: 'semNota', estrelas: null }),
+      proj({ id: "zero", estrelas: 0 }),
+      proj({ id: "um", estrelas: 1 }),
+      proj({ id: "dois", estrelas: 2 }),
+      proj({ id: "semNota", estrelas: null }),
     ];
-    expect(aplicarFiltros(lista, filtros({ estrelasMin: 1, estrelasMax: 1 })).map((p) => p.id)).toEqual(['um']);
+    expect(
+      aplicarFiltros(lista, filtros({ estrelasMin: 1, estrelasMax: 1 })).map((p) => p.id),
+    ).toEqual(["um"]);
     // "1 ou mais" continua trazendo 1 e 2 — os dois recortes convivem.
-    expect(aplicarFiltros(lista, filtros({ estrelasMin: 1 })).map((p) => p.id)).toEqual(['um', 'dois']);
+    expect(aplicarFiltros(lista, filtros({ estrelasMin: 1 })).map((p) => p.id)).toEqual([
+      "um",
+      "dois",
+    ]);
   });
 
-  it('a fila do 0 pega quem tem 0 explícito E quem não tem nota (célula vazia conta como 0)', () => {
-    const lista = [proj({ id: 'zero', estrelas: 0 }), proj({ id: 'semNota', estrelas: null }), proj({ id: 'um', estrelas: 1 })];
-    expect(aplicarFiltros(lista, filtros({ estrelasMin: 0, estrelasMax: 0 })).map((p) => p.id)).toEqual(['zero', 'semNota']);
+  it("a fila do 0 pega quem tem 0 explícito E quem não tem nota (célula vazia conta como 0)", () => {
+    const lista = [
+      proj({ id: "zero", estrelas: 0 }),
+      proj({ id: "semNota", estrelas: null }),
+      proj({ id: "um", estrelas: 1 }),
+    ];
+    expect(
+      aplicarFiltros(lista, filtros({ estrelasMin: 0, estrelasMax: 0 })).map((p) => p.id),
+    ).toEqual(["zero", "semNota"]);
   });
 
   it('o rótulo e a frase distinguem exato de "ou mais"', () => {
-    expect(rotuloFaixaEstrelas(1, 1)).toBe('1');
-    expect(rotuloFaixaEstrelas(1, null)).toBe('1+');
+    expect(rotuloFaixaEstrelas(1, 1)).toBe("1");
+    expect(rotuloFaixaEstrelas(1, null)).toBe("1+");
     expect(descreverFaixaEstrelas(1, 1)).toMatch(/Exatamente 1 estrela/);
     expect(descreverFaixaEstrelas(1, null)).toMatch(/1 estrela ou mais/);
   });
@@ -771,37 +808,35 @@ describe('faixa EXATA de estrelas', () => {
 // Os campos de filtro saíram da barra e foram para um painel que fica FECHADO. Sem as
 // pílulas do que está ligado, recorte ligado vira recorte invisível: a lista encolhe e
 // ninguém sabe por quê. Estes testes seguram as duas metades disso.
-describe('descreverFiltrosAtivos e limparDimensao', () => {
-  it('sem filtro ligado, não há pílula nenhuma', () => {
+describe("descreverFiltrosAtivos e limparDimensao", () => {
+  it("sem filtro ligado, não há pílula nenhuma", () => {
     expect(descreverFiltrosAtivos(FILTROS_VAZIOS)).toEqual([]);
   });
 
-  it('o STATUS não vira pílula: ele já é a faixa, com contagem própria', () => {
-    const f: FiltrosDashboard = { ...FILTROS_VAZIOS, status: 'aprovado' };
+  it("o STATUS não vira pílula: ele já é a faixa, com contagem própria", () => {
+    const f: FiltrosDashboard = { ...FILTROS_VAZIOS, status: "aprovado" };
     expect(descreverFiltrosAtivos(f)).toEqual([]);
   });
 
-  it('cada dimensão ligada vira uma pílula com texto legível', () => {
+  it("cada dimensão ligada vira uma pílula com texto legível", () => {
     const f: FiltrosDashboard = {
       ...FILTROS_VAZIOS,
-      especial: 'apenas',
-      area: 'FISCAL',
+      area: "FISCAL",
       estrelasMin: 3,
       estrelasMax: null,
-      agente: 'sem',
+      agente: "sem",
       soMultiplos: true,
     };
     const chips = descreverFiltrosAtivos(f);
-    expect(chips.map((c) => c.chave)).toEqual(['estrelas', 'area', 'agente', 'multiplos']);
-    expect(chips.map((c) => c.rotulo)).toContain('FISCAL');
-    expect(chips.map((c) => c.rotulo)).toContain('3+');
+    expect(chips.map((c) => c.chave)).toEqual(["estrelas", "area", "agente", "multiplos"]);
+    expect(chips.map((c) => c.rotulo)).toContain("FISCAL");
+    expect(chips.map((c) => c.rotulo)).toContain("3+");
   });
 
-  it('a contagem de pílulas bate com a contagem de filtros ativos', () => {
+  it("a contagem de pílulas bate com a contagem de filtros ativos", () => {
     const f: FiltrosDashboard = {
       ...FILTROS_VAZIOS,
-      especial: 'sem',
-      categorias: ['receita_incremental'],
+      categorias: ["receita_incremental"],
       estrelasMin: 1,
       estrelasMax: 4,
       soMultiplos: true,
@@ -809,45 +844,42 @@ describe('descreverFiltrosAtivos e limparDimensao', () => {
     expect(descreverFiltrosAtivos(f)).toHaveLength(contarFiltrosAtivos(f));
   });
 
-  it('a faixa de estrelas é UMA pílula, mesmo com as duas pontas', () => {
+  it("a faixa de estrelas é UMA pílula, mesmo com as duas pontas", () => {
     const f: FiltrosDashboard = { ...FILTROS_VAZIOS, estrelasMin: 2, estrelasMax: 4 };
     const chips = descreverFiltrosAtivos(f);
     expect(chips).toHaveLength(1);
-    expect(chips[0].rotulo).toBe('2–4');
+    expect(chips[0].rotulo).toBe("2–4");
   });
 
-  it('fechar uma pílula zera SÓ a dimensão dela', () => {
+  it("fechar uma pílula zera SÓ a dimensão dela", () => {
     const f: FiltrosDashboard = {
       ...FILTROS_VAZIOS,
-      status: 'pendente',
-      especial: 'apenas',
-      area: 'FISCAL',
+      status: "pendente",
+      area: "FISCAL",
     };
-    const depois = limparDimensao(f, 'area');
+    const depois = limparDimensao(f, "area");
     expect(depois.area).toBe(TODAS_AS_AREAS);
-    expect(depois.especial).toBe('apenas');
     // ⚠️ A fila de status sobrevive: ela é a faixa de cima, não uma pílula de filtro.
-    expect(depois.status).toBe('pendente');
+    expect(depois.status).toBe("pendente");
   });
 
-  it('fechar a pílula da faixa de estrelas abre as DUAS pontas', () => {
+  it("fechar a pílula da faixa de estrelas abre as DUAS pontas", () => {
     const f: FiltrosDashboard = { ...FILTROS_VAZIOS, estrelasMin: 2, estrelasMax: 4 };
-    const depois = limparDimensao(f, 'estrelas');
+    const depois = limparDimensao(f, "estrelas");
     expect(depois.estrelasMin).toBeNull();
     expect(depois.estrelasMax).toBeNull();
   });
 
-  it('toda pílula que a tela desenha tem como ser fechada', () => {
+  it("toda pílula que a tela desenha tem como ser fechada", () => {
     const cheio: FiltrosDashboard = {
       ...FILTROS_VAZIOS,
-      especial: 'apenas',
-      categorias: ['saving_efetivado'],
-      periodo: { inicio: '2026-09-01', fim: '2026-09-30' },
+      categorias: ["saving_efetivado"],
+      periodo: { inicio: "2026-09-01", fim: "2026-09-30" },
       estrelasMin: 1,
       estrelasMax: null,
-      area: 'FISCAL',
-      parecer: chaveDoEstado('Pré-pendente'),
-      agente: 'com',
+      area: "FISCAL",
+      parecer: chaveDoEstado("Pré-pendente"),
+      agente: "com",
       soMultiplos: true,
     };
     let atual = cheio;

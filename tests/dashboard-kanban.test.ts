@@ -110,22 +110,14 @@ describe("eixo autor", () => {
   });
 });
 
-describe("eixo fila", () => {
-  it("separa quem espera o líder de quem espera a validação", () => {
-    const colunas = agruparKanban(
-      [
-        projeto({ id: "a", aprovacaoLider: "Pré-pendente" }),
-        projeto({ id: "b", aprovacaoLider: "Pré-aprovado por Fulano" }),
-      ],
-      "fila",
-    );
-    expect(colunas.find((c) => c.chave === "lider")?.projetos.map((p) => p.id)).toEqual(["a"]);
-    expect(colunas.find((c) => c.chave === "rpa")?.projetos.map((p) => p.id)).toEqual(["b"]);
-  });
-
-  it("fila sem ninguém não vira coluna vazia (ao contrário do status)", () => {
-    const colunas = agruparKanban([projeto({ aprovacaoLider: "Pré-pendente" })], "fila");
-    expect(colunas).toHaveLength(1);
+// ⚠️ O eixo "Fila" SAIU em 14/09/2026 (decisão do Luis): com a coluna ÚNICA de status, o eixo
+// "Status" já responde "com quem está a bola" (Pendente = líder, Pré-aprovado = validação,
+// Ajuste pedido = autor). Dois eixos para a mesma pergunta faziam o seletor parecer ter mais
+// opções do que tem. A régua `filaDe` continua viva em `especiais-view.ts`, para as telas que
+// seguem no ar.
+describe("o seletor de eixos", () => {
+  it("não oferece mais o eixo Fila", () => {
+    expect(EIXOS.map((e) => e.eixo)).toEqual(["status", "nota", "autor", "area"]);
   });
 });
 

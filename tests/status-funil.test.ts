@@ -255,10 +255,9 @@ describe("planejar a migração", () => {
     const antes = [linha("a", "Pendente", "Pré-aprovado"), linha("b", "Reenvio Pendente", "")];
     const r1 = planejarMigracao(antes);
     expect(r1.mudancas).toHaveLength(2);
-    const depois = antes.map((l, i) => ({
+    const depois = antes.map((l) => ({
       ...l,
       Status: r1.mudancas.find((m) => m.id === l["ID Projeto"])?.para ?? l.Status,
-      _i: i,
     }));
     expect(planejarMigracao(depois).mudancas).toEqual([]);
   });
