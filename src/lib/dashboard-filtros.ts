@@ -16,7 +16,12 @@
 import type { ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 import { pilulaDe } from "@/components/dashboard/status-triagem";
 import { msDeIso, type Intervalo } from "@/lib/calendario-datas";
-import { ORDEM_ESTADO_PARECER, chaveDoEstado, type EstadoParecer } from "@/lib/aprovacoes-parecer";
+import {
+  ORDEM_ESTADO_PARECER,
+  ROTULO_ESTADO_PARECER,
+  chaveDoEstado,
+  type EstadoParecer,
+} from "@/lib/aprovacoes-parecer";
 
 /** Recorte por natureza do projeto. `sem` = só os padrão (o inverso de `apenas`). */
 export type FiltroEspecial = "todos" | "apenas" | "sem";
@@ -464,4 +469,69 @@ export function totalSemStatus(projetos: ProjetoDashboardResumo[], f: FiltrosDas
     (a, [k, v]) => (k === "descontinuado" ? a : a + v),
     0,
   );
+}
+
+/**
+ * Uma dimensão de filtro LIGADA, escrita para caber numa pílula que a pessoa pode desligar.
+ *
+ * Existe porque os filtros saíram da barra e foram para um painel que fica FECHADO: sem
+ * isto, recorte ligado vira recorte invisível — a lista encolhe e ninguém sabe por quê.
+ * A `chave` é a dimensão (a mesma palavra de `casaFiltrosExceto`), para o botão de fechar
+ * saber o que zerar.
+ */
+export type ChipFiltro = { chave: DimensaoFiltro | "multiplos"; rotulo: string };
+
+/**
+ * As dimensões ligadas, na ordem em que aparecem no painel. PURA.
+ *
+ * ⚠️ O STATUS fica de fora de propósito: ele é a faixa de pílulas, sempre visível e com
+ * contagem própria — repeti-lo como chip diria duas vezes a mesma coisa.
+ */
+export function descreverFiltrosAtivos(f: FiltrosDashboard): ChipFiltro[] {
+  const chips: ChipFiltro[] = [];
+  if (f.especial !== "todos") {
+    chips.push({ chave: "especial", rotulo: f.especial === "apenas" ? "Especiais" : "Padrão" });
+  }
+  if (f.categorias.length > 0) chips.push({ chave: "categorias", rotulo: rotuloCategorias(f.categorias) });
+  if (f.periodo) chips.push({ chave: "periodo", rotulo: `${f.periodo.inicio} a ${f.periodo.fim}` });
+  if (f.estrelasMin != null || f.estrelasMax != null) {
+    chips.push({ chave: "estrelas", rotulo: rotuloFaixaEstrelas(f.estrelasMin, f.estrelasMax) });
+  }
+  if (f.area !== TODAS_AS_AREAS) chips.push({ chave: "area", rotulo: f.area });
+  if (f.parecer !== TODOS_OS_PARECERES) {
+    chips.push({ chave: "parecer", rotulo: ROTULO_ESTADO_PARECER[f.parecer as EstadoParecer] ?? f.parecer });
+  }
+  if (f.agente !== "todos") {
+    chips.push({ chave: "agente", rotulo: f.agente === "sem" ? "Sem análise do agente" : "Com análise do agente" });
+  }
+  if (f.soMultiplos) chips.push({ chave: "multiplos", rotulo: "Autores com 2 ou mais" });
+  return chips;
+}
+
+/** Zera UMA dimensão, preservando as outras (o X de cada pílula ativa). PURA. */
+export function limparDimensao(f: FiltrosDashboard, chave: ChipFiltro["chave"]): FiltrosDashboard {
+  switch (chave) {
+    case "especial":
+      return { ...f, especial: "todos" };
+    case "categorias":
+      return { ...f, categorias: [] };
+    case "periodo":
+      return { ...f, periodo: null };
+    case "estrelas":
+      return { ...f, estrelasMin: null, estrelasMax: null };
+    case "area":
+      return { ...f, area: TODAS_AS_AREAS };
+    case "parecer":
+      return { ...f, parecer: TODOS_OS_PARECERES };
+    case "agente":
+      return { ...f, agente: "todos" };
+    case "multiplos":
+      return { ...f, soMultiplos: false };
+    // `ganho` é a dimensão LEGADA (substituída por `categorias`) — nunca vira chip, mas o
+    // `switch` a cobre para o TypeScript exigir revisão quando uma dimensão nova nascer.
+    case "ganho":
+      return { ...f, ganho: "todos" };
+    case "status":
+      return { ...f, status: "todos" };
+  }
 }

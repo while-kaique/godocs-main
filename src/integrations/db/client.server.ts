@@ -3457,6 +3457,50 @@ export async function getAvaliacoesNormaisPorIds(
   return out;
 }
 
+/**
+ * A coluna "Agente" da LISTAGEM: só os 4 escalares que o chip desenha, da tabela inteira.
+ *
+ * ⚠️ **Por que não reusar `getAvaliacoesNormaisPorIds`** (medido em prod, 14/09/2026): aquela
+ * função existe para um punhado de ids e faz `SELECT *`. A listagem manda a base INTEIRA, e aí
+ * ela vira **8 consultas** (o `IN` quebrado no teto de 100 variáveis do Godeploy) que arrastam
+ * o `votos` de cada linha — o JSON com os pareceres dos 4 agentes, que a tabela não desenha.
+ * Pior: ela só pode começar DEPOIS de o espelho chegar, porque precisa dos ids.
+ *
+ * Aqui é **uma consulta, sem `IN`, sem blob** — e por não depender de id nenhum ela roda em
+ * paralelo com a leitura do espelho, saindo do caminho crítico. Ver `listarProjetosDashboard`.
+ *
+ * ⚠️ Devolve avaliação de projeto que talvez nem esteja na planilha (apagado, rascunho). Quem
+ * monta o payload varre os PROJETOS e consulta este mapa, nunca o contrário — então linha órfã
+ * aqui não vira campo a mais na resposta.
+ */
+export async function getResumoAvaliacoesNormais(): Promise<Map<string, ResumoAvaliacaoNormal>> {
+  const linhas = await queryAll<ResumoAvaliacaoNormal & { projeto_id: string }>(
+    `SELECT projeto_id, veredito, confianca, aplicar, divergencia FROM projeto_avaliacao`,
+    [],
+  );
+  const out = new Map<string, ResumoAvaliacaoNormal>();
+  for (const l of linhas) out.set(String(l.projeto_id ?? "").toLowerCase(), l);
+  return out;
+}
+
+export type ResumoAvaliacaoNormal = {
+  veredito: string;
+  confianca: number;
+  aplicar: number;
+  divergencia: number;
+};
+
+/** Os votos 👍/👎 da base inteira, só `projeto_id` + `voto`. Mesma razão da função acima. */
+export async function getTodosFeedbacks(): Promise<Map<string, string>> {
+  const linhas = await queryAll<{ projeto_id: string; voto: string }>(
+    `SELECT projeto_id, voto FROM avaliacao_feedback`,
+    [],
+  );
+  const out = new Map<string, string>();
+  for (const l of linhas) out.set(String(l.projeto_id ?? "").toLowerCase(), l.voto);
+  return out;
+}
+
 /** id + veredito (sem votos) — para o backfill saber quem já foi avaliado sem puxar os blobs. */
 export async function getIdsAvaliacoesNormais(): Promise<string[]> {
   const rows = await queryAll<{ projeto_id: string }>(

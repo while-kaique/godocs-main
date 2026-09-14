@@ -190,8 +190,11 @@ const GRUPOS: Grupo[] = [
       'URL',
     ],
   },
+  // ⚠️ Os dois títulos falavam a v1 ("Saving e horas", "Custos e receita") sobre colunas
+  // que já são da v2 — o mesmo desencontro que `rotuloColuna` conserta célula a célula.
+  // Hoje eles nomeiam os DOIS braços do ganho como o formulário os nomeia.
   {
-    titulo: 'Saving e horas',
+    titulo: 'Custo evitado (horas liberadas)',
     colunas: [
       'Alguém Fazia?',
       'Freq. Custo Evitado',
@@ -205,12 +208,14 @@ const GRUPOS: Grupo[] = [
     ],
   },
   {
-    titulo: 'Custos e receita',
+    titulo: 'Saving efetivado, receita e custo para rodar',
     colunas: [
       'Saving Efetivado',
       'Freq. Saving Efetivado',
       'Evidência Saving Efetivado',
-      'Custo Externo Mensal',
+      // ⚠️ `Custo Externo Mensal` SAIU da planilha em 03/09/2026 (a D3 da v2 fundiu as duas
+      // linhas de custo em `Custo para Rodar`). Pedir a coluna aqui só fazia a ficha
+      // procurar uma célula que não existe mais.
       'Custo para Rodar',
       'Freq. Custo para Rodar',
       'Justificativa Custo para Rodar',
@@ -1294,20 +1299,20 @@ export function ProjetoDetalheDialog({
                   {/* A nota mora junto do status porque é a MESMA decisão: a triagem
                       olha o projeto uma vez e registra as duas coisas no mesmo salvar. */}
                   <span className="mt-3 block text-[11px] font-semibold text-muted-foreground">
-                    Nota da triagem — coluna "Estrelas" da planilha
+                    Nota da triagem, na coluna "Estrelas" da planilha
                   </span>
                   <NotaEstrelas valor={estrelas} onChange={setEstrelas} />
                 </label>
                 <label className="block">
                   <span className="text-[11px] font-semibold text-muted-foreground">
-                    Motivo / observações — vai para a coluna "Observações" e é o texto que o
+                    Motivo e observações. Vai para a coluna "Observações" e é o texto que o
                     dono recebe no e-mail de reenvio
                   </span>
                   <textarea
                     value={observacoes}
                     onChange={(e) => setObservacoes(e.target.value)}
                     rows={3}
-                    placeholder="Ex.: o memorial não quebra as horas por atividade — favor detalhar a composição."
+                    placeholder="Ex.: o memorial não quebra as horas por atividade. Favor detalhar a composição."
                     className="mt-1 w-full resize-y rounded-md border border-input bg-background p-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   />
                 </label>
@@ -1320,8 +1325,8 @@ export function ProjetoDetalheDialog({
                 <label className="mt-3 block">
                   <span className="text-[11px] font-semibold text-muted-foreground">
                     {pedeMotivoReprovado
-                      ? 'Motivo da reprovação — vai para a coluna "Motivo Reprovado" e é o que o autor vê (sobrepõe o motivo do analisador)'
-                      : 'Motivo do reenvio — vai para a coluna "Motivo Reenvio" e é o que o autor vê'}
+                      ? 'Motivo da reprovação. Vai para a coluna "Motivo Reprovado" e é o que o autor vê (sobrepõe o motivo do analisador)'
+                      : 'Motivo do reenvio. Vai para a coluna "Motivo Reenvio" e é o que o autor vê'}
                   </span>
                   <textarea
                     value={pedeMotivoReprovado ? motivoReprovado : motivoReenvio}
@@ -1333,7 +1338,7 @@ export function ProjetoDetalheDialog({
                     rows={2}
                     placeholder={
                       pedeMotivoReprovado
-                        ? 'Ex.: entrega executada uma única vez, sem indicador verificável — não se enquadra como projeto recorrente.'
+                        ? 'Ex.: entrega executada uma única vez, sem indicador verificável. Não se enquadra como projeto recorrente.'
                         : 'Ex.: projeto parado, em manutenção; reenviar depois de aplicar as correções.'
                     }
                     className="mt-1 w-full resize-y rounded-md border border-input bg-background p-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -1489,7 +1494,7 @@ export function ProjetoDetalheDialog({
                 {MEMORIAIS.filter((m) => campos[m]).map((m) => (
                   <details key={m} className="mb-2 rounded-lg border border-border bg-card">
                     <summary className="cursor-pointer px-3 py-2 text-[13px] font-semibold">
-                      {m}
+                      {rotuloColuna(m)}
                     </summary>
                     <div className="whitespace-pre-wrap border-t border-border px-3 py-2 text-[12.5px] leading-relaxed">
                       {campos[m]}

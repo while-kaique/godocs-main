@@ -228,7 +228,7 @@ export function ParecerLiderPainel({ parecer }: { parecer: ParecerLider }) {
 
       {semRespostas && !parecer.cabecalho && !parecer.assinatura && (
         <p className="mt-2 text-[12.5px] text-muted-foreground">
-          A planilha não tem detalhe deste parecer — só o estado.
+          A planilha guarda só o estado deste parecer, sem o detalhe.
         </p>
       )}
     </div>

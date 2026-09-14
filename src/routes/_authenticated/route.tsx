@@ -5,17 +5,15 @@ import { lerAuthCache, gravarAuthCache, limparAuthCache, AUTH_CACHE_MS } from "@
 import { iniciarPrefetchDashboard } from "@/lib/dashboard-prefetch";
 import {
   LayoutDashboard,
-  Building2,
   ExternalLink,
-  FlaskConical,
   Search,
   Loader2,
-  Mail,
-  Star,
-  ClipboardList,
   Workflow,
   GitMerge,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
+import { ITENS_NAV, lerMenuRecolhido, gravarMenuRecolhido, type ItemNav } from "@/lib/admin-nav";
 
 // Cache do auth no cliente — evita fetch repetido a cada navegação dentro do admin.
 // Dois níveis: memória (mais rápido, morre no reload) e `sessionStorage` (sobrevive ao
@@ -156,73 +154,78 @@ function GuardaAcesso({
 function AuthenticatedLayout() {
   const { user, verificacao } = Route.useRouteContext();
   const [confirmado, setConfirmado] = useState<CurrentUser | null>(user);
+  // Menu recolhido: preferência por navegador, lida na montagem (ver `admin-nav.ts`).
+  // Nasce ABERTO para quem nunca escolheu — a versão só de ícones é opção de quem já
+  // sabe onde tudo está, não o primeiro contato.
+  const [recolhido, setRecolhido] = useState(false);
+  useEffect(() => setRecolhido(lerMenuRecolhido()), []);
+
+  function alternarMenu() {
+    setRecolhido((r) => {
+      gravarMenuRecolhido(!r);
+      return !r;
+    });
+  }
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-64 flex-col border-r border-sidebar-border bg-sidebar p-4 md:flex">
-        <div className="mb-8 flex items-center gap-2 px-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold">
+      <aside
+        className="hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-3 transition-[width] duration-200 md:flex motion-reduce:transition-none"
+        style={{ width: recolhido ? 68 : 232 }}
+      >
+        <div className="mb-6 flex items-center gap-2 px-1">
+          <div
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-bold text-white"
+            style={{ background: "var(--go-blue)" }}
+            aria-hidden
+          >
             G
           </div>
-          <span className="font-semibold tracking-tight">GoDocs Admin</span>
+          {!recolhido && (
+            <span className="truncate font-semibold tracking-tight">GoDocs Admin</span>
+          )}
+          <button
+            type="button"
+            onClick={alternarMenu}
+            aria-label={recolhido ? "Expandir o menu" : "Recolher o menu"}
+            title={recolhido ? "Expandir o menu" : "Recolher o menu"}
+            className="ml-auto rounded-md p-1.5 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+            style={{ ["--tw-ring-color" as string]: "var(--go-blue)" }}
+          >
+            {recolhido ? (
+              <PanelLeftOpen className="h-4 w-4" aria-hidden />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" aria-hidden />
+            )}
+          </button>
         </div>
 
-        <nav className="flex-1 space-y-1">
-          {/*
-            ⚠️ Único item da sidebar SEM preload no hover. Navegar para `/dashboard` dispara
-            `iniciarPrefetchDashboard()` no `beforeLoad` do layout, e ali não há como
-            distinguir hover de clique (ver a nota no `beforeLoad`): o mouse passando pelo
-            item viraria uma leitura da planilha, cuja cota é COMPARTILHADA com produção.
-            O chunk volta a carregar no clique — o que não custa quase nada aqui, porque o
-            tempo do `/dashboard` é dominado pelos ~2 s da planilha, não pelo JS.
-          */}
-          <NavItem to="/dashboard" preload={false} icon={<LayoutDashboard className="h-4 w-4" />}>
-            Dashboard
-          </NavItem>
-          <NavItem to="/especiais" icon={<Star className="h-4 w-4" />}>
-            Especiais
-          </NavItem>
-          <NavItem
-            to="/aprovacoes-pendentes"
-            icon={<ClipboardList className="h-4 w-4" />}
-          >
-            Aprovação de pendentes
-          </NavItem>
-          {/* Vizinho das outras duas telas de decisão (Especiais, Aprovação de pendentes):
-              as três são filas onde um admin julga projeto a projeto. */}
-          <NavItem to="/aglutinacao" icon={<GitMerge className="h-4 w-4" />}>
-            Aglutinação
-          </NavItem>
-          <NavItem to="/areas" icon={<Building2 className="h-4 w-4" />}>
-            Áreas
-          </NavItem>
-          <NavItem to="/investigador" icon={<Search className="h-4 w-4" />}>
-            Investigador
-          </NavItem>
-          <NavItem to="/email-legados" icon={<Mail className="h-4 w-4" />}>
-            Disparo de e-mails
-          </NavItem>
-          <NavItem to="/testes" icon={<FlaskConical className="h-4 w-4" />}>
-            Testes
-          </NavItem>
-          <NavItem to="/fluxos" icon={<Workflow className="h-4 w-4" />}>
-            Fluxos
-          </NavItem>
-          <Link
-            to="/"
-            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <ExternalLink className="h-4 w-4" /> Ver plataforma
-          </Link>
+        <nav className="flex-1 space-y-1" aria-label="Navegação do admin">
+          {ITENS_NAV.map((item) => (
+            <NavItem key={item.to} item={item} recolhido={recolhido} />
+          ))}
         </nav>
 
-        <div className="mt-6 border-t border-sidebar-border pt-4 px-2">
-          <div className="text-sm font-medium text-sidebar-foreground truncate">
-            {/* Enquanto o veredito não chega, o rodapé fica discreto em vez de vazio —
-                a identidade não é o que a pessoa veio ver. */}
-            {confirmado?.email ?? "Verificando acesso…"}
-          </div>
-          <div className="text-xs text-sidebar-foreground/60 mt-0.5">Admin</div>
+        <div className="mt-6 space-y-1 border-t border-sidebar-border pt-3">
+          <Link
+            to="/"
+            title="Ver plataforma"
+            className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+            style={{ ["--tw-ring-color" as string]: "var(--go-blue)" }}
+          >
+            <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+            {!recolhido && <span className="truncate">Ver plataforma</span>}
+          </Link>
+          {!recolhido && (
+            <div className="px-2.5 pt-2">
+              <div className="truncate text-[12.5px] font-medium text-sidebar-foreground">
+                {/* Enquanto o veredito não chega, o rodapé fica discreto em vez de vazio —
+                    a identidade não é o que a pessoa veio ver. */}
+                {confirmado?.email ?? "Verificando acesso…"}
+              </div>
+              <div className="mt-0.5 text-[11px] text-sidebar-foreground/60">Admin</div>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -236,29 +239,36 @@ function AuthenticatedLayout() {
   );
 }
 
-function NavItem({
-  to,
-  icon,
-  children,
-  preload,
-}: {
-  to: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  /** `false` desliga o preload no hover deste item (ver o "Dashboard" acima). */
-  preload?: false;
-}) {
+/** Os ícones por nome — o módulo `admin-nav` é PURO e não importa React. */
+const ICONES = {
+  dashboard: LayoutDashboard,
+  aglutinacao: GitMerge,
+  investigador: Search,
+  fluxos: Workflow,
+} as const;
+
+function NavItem({ item, recolhido }: { item: ItemNav; recolhido: boolean }) {
+  const Icone = ICONES[item.icone];
   return (
     <Link
-      to={to}
-      preload={preload}
+      to={item.to}
+      preload={item.preload}
+      // Recolhido, o `title` é a ÚNICA pista do que o ícone significa — por isso ele
+      // carrega o rótulo junto da descrição, não só a descrição.
+      title={recolhido ? `${item.rotulo}: ${item.descricao}` : item.descricao}
       activeProps={{
         className: "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
+        style: { boxShadow: "inset 2px 0 0 var(--go-blue)" },
       }}
-      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+      style={{ ["--tw-ring-color" as string]: "var(--go-blue)" }}
     >
-      {icon}
-      {children}
+      <Icone className="h-4 w-4 shrink-0" aria-hidden />
+      {recolhido ? (
+        <span className="sr-only">{item.rotulo}</span>
+      ) : (
+        <span className="truncate">{item.rotulo}</span>
+      )}
     </Link>
   );
 }

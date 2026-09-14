@@ -181,3 +181,129 @@ em `localStorage`, mudança de range/colunas lidas, paginação server-side.
 Editar dados do projeto pela tela (memorial, horas, saving) · e-mail automático ao mudar status (já
 existe `/email-legados`) · paginação/busca server-side · mexer na regra TEMPORÁRIA que grava "Pendente"
 na IDA.
+
+---
+
+## 7. Fusão das 3 telas de triagem (14/09/2026)
+
+**Pedido (Luis):** *"A tela de especiais + aprovação de pendentes podem ser fundidas a tela de
+dashboard. Vai ser uma view de kanban e uma view de lista, dinâmica, rápida de carregamento. O
+skeleton loading vai ser de no máximo 2 segundos. Na tela só deve aparecer os novos nomes da
+coluna de v2. Filtros bem organizados e de fácil acesso, mas sem poluir a tela. Evitar textos
+poluindo a tela, sem traços nos textos. Remover do menu lateral 'Áreas', 'Disparo de e-mails' e
+'Testes', e fazer com que ele encolha e expanda."*
+
+### D11 — o eixo do quadro é DADO, não rota
+
+As três telas (`/dashboard`, `/especiais`, `/aprovacoes-pendentes`) liam o **mesmo** espelho da
+planilha, com o **mesmo** `mapResumo`, gravavam status pela **mesma** rota e abriam a **mesma**
+ficha. O que as distinguia era o `groupBy` e o recorte de escopo. Isso virou uma tabela de eixos
+em `src/lib/dashboard-kanban.ts` (PURO): `status` · `fila` · `nota` · `autor` · `area`, onde
+**`nota` é a antiga `/especiais`** e **`autor` a antiga `/aprovacoes-pendentes`**. Acrescentar um
+eixo passa a ser uma entrada, não uma tela.
+
+**O que NÃO foi reescrito, de propósito:** a régua de fila/espera/urgência continua em
+`especiais-view.ts` e o agrupamento por autor em `aprovacao-pendentes-view.ts`. Os dois já eram
+puros e testados; redigitá-los criaria duas verdades sobre "de quem é a bola".
+
+**As rotas antigas continuam de pé.** O que saiu foi a porta no menu. Links para `/especiais` e
+`/aprovacoes-pendentes` circulam em conversa e e-mail, e o comparador por **âncora** e a
+**divisão de áreas por validador** (`especial_referencia`, `POST /api/admin/especiais/dono`)
+seguem morando lá: não foram portados.
+
+### D12 — colunas que aparecem MESMO VAZIAS
+
+No eixo `status`, os **3 status do funil** (`pendente`/`aprovado`/`reprovado`) aparecem sempre; no
+eixo `nota`, os **níveis 0 a 5**. Motivo: coluna que some faz "não há reprovado hoje" ser lido como
+"reprovar não existe", e a régua da nota com buraco no 4 diz que 4 não existe. Acima de 5 a escala
+é **aberta** (há 7, 8 e 10 na planilha) e o nível só ganha coluna quando tem projeto. `sem-nota`
+(célula vazia) continua sendo coluna **própria**, diferente de `0`.
+
+### D13 — o quadro não custa rede
+
+Ele reagrupa a listagem que já está no cache do React Query. Trocar de vista ou de eixo é `useMemo`,
+não requisição. Canário em `tests/dashboard-kanban.test.ts` conta os `apiFetch` da tela (são 4: a
+listagem, o fallback sem prefetch, o "Atualizar" e a gravação de status) — nenhum deles depende de
+vista nem de eixo.
+
+### D14 — filtros: painel que abre, pílulas do que está ligado
+
+Eram 8 controles sempre visíveis, ocupando 4 linhas antes do primeiro projeto. Agora a barra tem
+**busca + botão "Filtros" (com a contagem) + as pílulas ativas**, e os campos moram num painel
+fechado por padrão (`painel-filtros.tsx`).
+
+⚠️ **Com os campos escondidos, recorte ligado vira recorte invisível** — a lista encolhe e ninguém
+sabe por quê. As pílulas são o que impede isso, e cada uma desliga a própria dimensão. Régua nas
+puras `descreverFiltrosAtivos` e `limparDimensao` (`dashboard-filtros.ts`): **filtro novo entra nas
+duas no mesmo commit**, senão ele recorta a lista sem aparecer em lugar nenhum.
+
+⚠️ O painel é **inline, não popover**: dentro dele há três controles que já usam portal (período,
+nota, categorias), e popover dentro de popover fecha um ao abrir o outro.
+
+⚠️ O **status fica de fora** das pílulas: ele é a faixa de cima, com contagem própria e sempre
+visível. Repeti-lo diria duas vezes a mesma coisa.
+
+### D15 — a lentidão era uma consulta, não a planilha
+
+Medido em 14/09/2026, 6 chamadas quentes de cada lado com base equivalente (782 × 770 projetos):
+`GET /api/admin/dashboard/projetos` tinha **mediana 1,74 s** em prod. Não era a planilha (a listagem lê o espelho desde 11/08) nem o payload (o edge já comprime em zstd:
+620 KB viram ~87 KB no fio). Era a **coluna do agente**: vinha de `carregarSombraDaListagem(ids)` →
+`getAvaliacoesNormaisPorIds`, que **precisa dos ids** e por isso só podia começar depois de o
+espelho chegar — e, com a base inteira, virava **8 consultas** `SELECT *` (o `IN` quebrado no teto
+de 100 variáveis do Godeploy) arrastando o `votos` de cada linha: o JSON com os pareceres dos 4
+agentes, que a tabela nunca desenha.
+
+Trocada por **`getResumoAvaliacoesNormais`** + **`getTodosFeedbacks`** (uma consulta cada, só os
+escalares, sem `IN`), que por não dependerem de id nenhum entram no **mesmo `Promise.all`** da
+leitura do espelho. Na staging, com o código novo: **mediana 1,22 s** — cerca de 0,5 s (30%) a menos.
+
+⚠️ **Honestidade da medida:** a primeira leitura isolada deu 2,5 s em prod e sugeria ~1 s de ganho;
+com 6 amostras quentes o ganho real é ~0,5 s. ⚠️ **Isolate FRIO continua custando 20 s+** nos dois
+ambientes — é comportamento da plataforma (já registrado na seção 6) e nenhum skeleton o esconde.
+O alvo de "skeleton de no máximo 2 s" vale para o caminho quente, que é onde a triagem vive.
+
+⚠️ É o **gotcha 4 desta spec aplicado a uma segunda tabela**: campo que a tela não desenha não
+viaja — e aqui ele nem era campo, era blob. ⚠️ O leitor por `IN` **continua existindo** (a ficha em
+lote o usa); o canário em `tests/dashboard-admin.test.ts` proíbe a **listagem** de voltar a chamá-lo.
+⚠️ Não procurar ganho no tamanho do payload de novo: a compressão já resolve isso.
+
+### D16 — vocabulário: só v2 na tela
+
+A migração renomeou 19 colunas, mas quatro ficaram com o nome da v1 porque renomeá-las quebraria o
+casamento por nome de quem as escreve. Elas ganharam **rótulo de exibição** em `rotuloColuna`
+(`src/lib/coluna-rotulo.ts`, a mesma fonte única dos papéis): `Saving Horas Real`/`Escalado` →
+"Horas liberadas: carga real / ganho por escala", `Memorial de Saving` → "Memorial do impacto",
+`Diff …` → "Diferença de …". Os dois títulos de grupo da ficha passaram a nomear os braços do ganho
+("Custo evitado (horas liberadas)" e "Saving efetivado, receita e custo para rodar"), e
+**`Custo Externo Mensal` saiu** da ficha: a coluna não existe na planilha desde 03/09/2026.
+
+⚠️ É **rótulo, nunca chave**. Nada aqui muda como a célula é lida ou escrita.
+
+### D17 — o travessão saiu das telas
+
+Célula vazia é vazia; `StatusBadge` sem status diz **"Sem status"**; `ChipAgente` sem análise vira
+`sr-only`. Multiplicado por 600 linhas, o traço competia com o dado real e não dizia nada que o
+cabeçalho da coluna já não dissesse.
+
+⚠️ Isso é **apresentação**. `ouTraco` (`dashboard-resumo.ts`) continua gravando `—` na planilha, e
+isso **não muda**: lá o travessão é o padrão de "texto vazio" da própria base.
+
+### D18 — menu lateral: 4 itens, e recolhe
+
+Ficaram **Triagem · Aglutinação · Investigador · Fluxos** (`src/lib/admin-nav.ts`, PURO). Saíram
+**Áreas**, **Disparo de e-mails** e **Testes** (não são trabalho de rotina da triagem) e as duas
+telas absorvidas.
+
+⚠️ **Sair do menu não é deixar de existir**: as cinco rotas continuam no ar, alcançáveis por URL, e
+`tests/admin-nav.test.ts` cobra os arquivos no repo. ⚠️ O **Dashboard segue sendo o único
+`preload={false}`**, pela razão de sempre: hover num link com preload dispara
+`iniciarPrefetchDashboard()` no `beforeLoad` do layout, e a cota de leitura é compartilhada com
+produção. Recolhido, o rótulo vai para `sr-only` e o `title` carrega rótulo + descrição; a
+preferência mora em `localStorage` e **nunca lança** (aba anônima, armazenamento bloqueado).
+
+### D19 — smoke de render
+
+O repo não tem harness de render (sem jsdom), então os guards de UI eram feitos sobre o **fonte** —
+o que pega fiação e não pega componente que explode ao montar. `tests/quadro-render.test.ts` renderiza
+o quadro com `renderToStaticMarkup` (não precisa de DOM) nos **5 eixos**, com dado real, e prova que
+o travessão não voltou. Sem JSX de propósito: a suíte só coleta `tests/**/*.test.ts`.

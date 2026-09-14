@@ -94,7 +94,9 @@ const STATUS_CONFIG: Record<
 
 export function StatusBadge({ status }: { status: string | null }) {
   const cfg = STATUS_CONFIG[status ?? ""] ?? {
-    label: status ?? "—",
+    // ⚠️ Sem status, o rótulo é a PALAVRA (14/09/2026). O travessão saiu das telas: ele
+    // não dizia nada que "Sem status" não diga, e num badge se lia como falha de render.
+    label: status ?? "Sem status",
     bg: "rgba(0,0,0,0.03)",
     border: "rgba(0,0,0,0.1)",
     color: "#6b7280",

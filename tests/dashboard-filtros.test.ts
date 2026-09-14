@@ -28,6 +28,8 @@ import {
   categoriasDisponiveis,
   rotuloCategorias,
   descreverFaixaEstrelas,
+  descreverFiltrosAtivos,
+  limparDimensao,
 } from '@/lib/dashboard-filtros';
 import { ROTULO_ESTADO_PARECER, chaveDoEstado } from '@/lib/aprovacoes-parecer';
 import {
@@ -777,5 +779,103 @@ describe('faixa EXATA de estrelas', () => {
     expect(rotuloFaixaEstrelas(1, null)).toBe('1+');
     expect(descreverFaixaEstrelas(1, 1)).toMatch(/Exatamente 1 estrela/);
     expect(descreverFaixaEstrelas(1, null)).toMatch(/1 estrela ou mais/);
+  });
+});
+
+// ─── O que está filtrando, em texto ──────────────────────────────────────────
+//
+// Os campos de filtro saíram da barra e foram para um painel que fica FECHADO. Sem as
+// pílulas do que está ligado, recorte ligado vira recorte invisível: a lista encolhe e
+// ninguém sabe por quê. Estes testes seguram as duas metades disso.
+describe('descreverFiltrosAtivos e limparDimensao', () => {
+  it('sem filtro ligado, não há pílula nenhuma', () => {
+    expect(descreverFiltrosAtivos(FILTROS_VAZIOS)).toEqual([]);
+  });
+
+  it('o STATUS não vira pílula: ele já é a faixa, com contagem própria', () => {
+    const f: FiltrosDashboard = { ...FILTROS_VAZIOS, status: 'aprovado' };
+    expect(descreverFiltrosAtivos(f)).toEqual([]);
+  });
+
+  it('cada dimensão ligada vira uma pílula com texto legível', () => {
+    const f: FiltrosDashboard = {
+      ...FILTROS_VAZIOS,
+      especial: 'apenas',
+      area: 'FISCAL',
+      estrelasMin: 3,
+      estrelasMax: null,
+      agente: 'sem',
+      soMultiplos: true,
+    };
+    const chips = descreverFiltrosAtivos(f);
+    expect(chips.map((c) => c.chave)).toEqual([
+      'especial',
+      'estrelas',
+      'area',
+      'agente',
+      'multiplos',
+    ]);
+    expect(chips.map((c) => c.rotulo)).toContain('Especiais');
+    expect(chips.map((c) => c.rotulo)).toContain('FISCAL');
+    expect(chips.map((c) => c.rotulo)).toContain('3+');
+  });
+
+  it('a contagem de pílulas bate com a contagem de filtros ativos', () => {
+    const f: FiltrosDashboard = {
+      ...FILTROS_VAZIOS,
+      especial: 'sem',
+      categorias: ['receita_incremental'],
+      estrelasMin: 1,
+      estrelasMax: 4,
+      soMultiplos: true,
+    };
+    expect(descreverFiltrosAtivos(f)).toHaveLength(contarFiltrosAtivos(f));
+  });
+
+  it('a faixa de estrelas é UMA pílula, mesmo com as duas pontas', () => {
+    const f: FiltrosDashboard = { ...FILTROS_VAZIOS, estrelasMin: 2, estrelasMax: 4 };
+    const chips = descreverFiltrosAtivos(f);
+    expect(chips).toHaveLength(1);
+    expect(chips[0].rotulo).toBe('2–4');
+  });
+
+  it('fechar uma pílula zera SÓ a dimensão dela', () => {
+    const f: FiltrosDashboard = {
+      ...FILTROS_VAZIOS,
+      status: 'pendente',
+      especial: 'apenas',
+      area: 'FISCAL',
+    };
+    const depois = limparDimensao(f, 'area');
+    expect(depois.area).toBe(TODAS_AS_AREAS);
+    expect(depois.especial).toBe('apenas');
+    // ⚠️ A fila de status sobrevive: ela é a faixa de cima, não uma pílula de filtro.
+    expect(depois.status).toBe('pendente');
+  });
+
+  it('fechar a pílula da faixa de estrelas abre as DUAS pontas', () => {
+    const f: FiltrosDashboard = { ...FILTROS_VAZIOS, estrelasMin: 2, estrelasMax: 4 };
+    const depois = limparDimensao(f, 'estrelas');
+    expect(depois.estrelasMin).toBeNull();
+    expect(depois.estrelasMax).toBeNull();
+  });
+
+  it('toda pílula que a tela desenha tem como ser fechada', () => {
+    const cheio: FiltrosDashboard = {
+      ...FILTROS_VAZIOS,
+      especial: 'apenas',
+      categorias: ['saving_efetivado'],
+      periodo: { inicio: '2026-09-01', fim: '2026-09-30' },
+      estrelasMin: 1,
+      estrelasMax: null,
+      area: 'FISCAL',
+      parecer: chaveDoEstado('Pré-pendente'),
+      agente: 'com',
+      soMultiplos: true,
+    };
+    let atual = cheio;
+    for (const chip of descreverFiltrosAtivos(cheio)) atual = limparDimensao(atual, chip.chave);
+    expect(descreverFiltrosAtivos(atual)).toEqual([]);
+    expect(contarFiltrosAtivos(atual)).toBe(0);
   });
 });

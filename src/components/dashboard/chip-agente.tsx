@@ -42,12 +42,14 @@ export function ChipAgente({
   /** O GRAU da confiança do classificador (alta/media/baixa). */
   confianca?: string | null;
 }) {
-  // Sem NADA do agente: "—" quieto (ninguém rodou neste projeto ainda). ⚠️ A nota sozinha já
-  // conta como "o agente passou por aqui": a estrela e o veredito vêm de rodadas que podem ter
-  // acontecido em momentos diferentes, e esconder a nota porque falta o veredito apagaria
-  // justamente o que a triagem procura.
+  // Sem NADA do agente, a célula fica VAZIA (ninguém rodou neste projeto ainda) — o
+  // travessão saiu das telas em 14/09/2026 e, multiplicado por 600 linhas, ele só competia
+  // com o dado real. Quem precisa da informação em palavra tem o `sr-only`.
+  // ⚠️ A nota sozinha já conta como "o agente passou por aqui": a estrela e o veredito vêm
+  // de rodadas que podem ter acontecido em momentos diferentes, e esconder a nota porque
+  // falta o veredito apagaria justamente o que a triagem procura.
   if (!dados && !estrela) {
-    return <span className="text-[12.5px] text-muted-foreground">—</span>;
+    return <span className="sr-only">Sem análise do agente</span>;
   }
   const a = aparenciaConfianca(dados?.confianca ?? null);
   const grau = typeof dados?.confianca === "number" ? grauConfianca(dados.confianca) : null;

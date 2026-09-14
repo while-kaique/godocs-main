@@ -16,10 +16,34 @@
  */
 import { chaveColuna } from '@/lib/coluna-chave';
 
-/** Nome da coluna (como na planilha) → rótulo exibido. Casamento tolerante a acento/caixa. */
+/**
+ * Nome da coluna (como na planilha) → rótulo exibido. Casamento tolerante a acento/caixa.
+ *
+ * Dois grupos, pela mesma razão: **o nome da coluna é histórico, o rótulo é o que a pessoa
+ * entende.**
+ *
+ * 1. **Papéis** — na planilha as colunas se chamam "Participantes" / "Participantes 2"; no
+ *    formulário a pessoa escolheu "Coautor" / "Participante". O "2" é resíduo de quando a
+ *    coluna nasceu ao lado da original.
+ *
+ * 2. **Sobras do vocabulário da v1** (14/09/2026) — a migração renomeou 19 colunas
+ *    (`NOME_LEGADO`, em `coluna-chave.ts`), mas estas quatro ficaram com o nome antigo
+ *    porque renomear a coluna quebraria o casamento por nome de quem as escreve. Elas
+ *    continuavam gritando "Saving" numa tela que não fala mais esse idioma: o pedido do
+ *    Luis foi não misturar as duas gerações, "para não confundir".
+ *
+ * ⚠️ Isto é só o RÓTULO. Nada aqui altera a chave usada para ler/escrever a célula — e é
+ * por isso que a correção cabe aqui e não numa renomeação de coluna.
+ */
 const ROTULOS: Record<string, string> = {
   Participantes: 'Coautor',
   'Participantes 2': 'Participante',
+  // Sobras da v1. O conceito de cada uma está descrito em `coluna-chave.ts`.
+  'Saving Horas Real': 'Horas liberadas: carga real',
+  'Saving Horas Escalado': 'Horas liberadas: ganho por escala',
+  'Memorial de Saving': 'Memorial do impacto',
+  'Diff Horas / Antes': 'Diferença de horas',
+  'Diff Saving / Antes': 'Diferença de impacto',
 };
 
 const POR_CHAVE = new Map(Object.entries(ROTULOS).map(([col, rot]) => [chaveColuna(col), rot]));

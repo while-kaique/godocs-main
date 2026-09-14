@@ -33,6 +33,10 @@ vi.mock('@/integrations/db/client.server', async () => ({
   getReenviosPorIds: vi.fn(async () => new Map()),
   // Avaliação em SOMBRA (teste sombra) — tabelas INTERNAS; por padrão sem recomendação/voto.
   getAvaliacoesNormaisPorIds: vi.fn(async () => new Map()),
+  // ⚠️ Os dois leitores da LISTAGEM são outros: sem `IN` e sem blob, para poderem rodar em
+  // paralelo com a leitura do espelho (ver `listarProjetosDashboard`).
+  getResumoAvaliacoesNormais: vi.fn(async () => new Map()),
+  getTodosFeedbacks: vi.fn(async () => new Map()),
   getAvaliacaoNormal: vi.fn(async () => null),
   getDeliberacao: vi.fn(async () => null),
   getDeliberacoesPorIds: vi.fn(async () => new Map()),
@@ -271,6 +275,35 @@ describe('listarProjetosDashboard', () => {
     expect(r.projetos.map((p) => p.id)).toEqual(['b', 'a']);
     expect(r.total).toBe(2);
     expect(r.contagem).toEqual({ pendente: 2 });
+  });
+
+  // ⚠️ Medido em prod (14/09/2026): a coluna do agente vinha de `getAvaliacoesNormaisPorIds`,
+  // que precisa dos ids e por isso só podia rodar DEPOIS do espelho — e, com a base inteira,
+  // virava 8 consultas `SELECT *` arrastando o JSON dos pareceres. Eram ~1,4 s de servidor
+  // numa resposta que precisa caber em 2 s de tela. Os leitores da listagem não dependem de
+  // id, o que é o que permite rodá-los EM PARALELO com a leitura do espelho.
+  it('a coluna do agente não depende dos ids — é o que a tira do caminho crítico', async () => {
+    const db = await import('@/integrations/db/client.server');
+    (db.getAvaliacoesNormaisPorIds as unknown as { mockClear: () => void }).mockClear();
+    (db.getResumoAvaliacoesNormais as unknown as { mockClear: () => void }).mockClear();
+    await semearEspelho([linha({ 'ID Projeto': 'a' })]);
+    await listarProjetosDashboard();
+    expect(db.getResumoAvaliacoesNormais).toHaveBeenCalled();
+    expect(db.getTodosFeedbacks).toHaveBeenCalled();
+    // O leitor por `IN` continua existindo (a FICHA em lote o usa), mas não na listagem.
+    expect(db.getAvaliacoesNormaisPorIds).not.toHaveBeenCalled();
+  });
+
+  it('falha na leitura do agente NÃO derruba a listagem', async () => {
+    const db = await import('@/integrations/db/client.server');
+    const original = db.getResumoAvaliacoesNormais as unknown as {
+      mockRejectedValueOnce: (e: Error) => void;
+    };
+    original.mockRejectedValueOnce(new Error('banco fora'));
+    await semearEspelho([linha({ 'ID Projeto': 'a' })]);
+    const r = await listarProjetosDashboard();
+    expect(r.projetos).toHaveLength(1);
+    expect(r.avaliacoes).toEqual({});
   });
 
   it('NUNCA lê a planilha na listagem — o dado vem do espelho', async () => {
