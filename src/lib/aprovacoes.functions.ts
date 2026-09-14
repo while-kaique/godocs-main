@@ -20,10 +20,10 @@
 //    (quem não lidera ninguém) entra em fila. Ex.: o coordenador de RPA é isento; o
 //    analista do time dele não é, e quem aprova é o coordenador — não o líder acima.
 
-import { z } from 'zod';
-import { registrarAtividade } from '@/lib/atividades.functions';
-import { ehLideranca, getLideresDe, getLideradosDe } from '@/lib/areas/teamguide.server';
-import { espelhoTeamGuideDisponivel } from '@/lib/teamguide-espelho';
+import { z } from "zod";
+import { registrarAtividade } from "@/lib/atividades.functions";
+import { ehLideranca, getLideresDe, getLideradosDe } from "@/lib/areas/teamguide.server";
+import { espelhoTeamGuideDisponivel } from "@/lib/teamguide-espelho";
 import {
   AVISO_SAVING_INCOERENTE,
   bloqueiaPreAprovacao,
@@ -31,36 +31,34 @@ import {
   detalharChecklist,
   rotuloChecklist,
   type ChaveChecklist,
-} from '@/lib/aprovacoes-checklist';
-import { derivarNomeDeEmail } from '@/lib/auth.functions';
+} from "@/lib/aprovacoes-checklist";
+import { derivarNomeDeEmail } from "@/lib/auth.functions";
 import {
   preAprovacaoCongelada,
   COPY_CONGELAMENTO_PREAPROVACAO,
-} from '@/lib/congelamento-preaprovacao';
-import { compararVersoes, type CampoComparado, type SnapshotVersao } from '@/lib/diff-versoes';
-import {
-  extrairResumoMemorial,
-  normalizarMarcadoresMemorial,
-} from '@/lib/agents/memorial-format';
-import { updateRowByProjectId } from '@/lib/google/sheets';
-import { notificarChatPreAprovacao } from '@/lib/notificacao-projeto.functions';
-import { notificarLiderDoProjetoPai } from '@/lib/gomoon-lideres.functions';
-import { lerLinhasEspelho, lerStatusDoEspelho } from '@/lib/sheet-espelho';
+} from "@/lib/congelamento-preaprovacao";
+import { compararVersoes, type CampoComparado, type SnapshotVersao } from "@/lib/diff-versoes";
+import { extrairResumoMemorial, normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
+import { updateRowByProjectId } from "@/lib/google/sheets";
+import { notificarChatPreAprovacao } from "@/lib/notificacao-projeto.functions";
+import { notificarLiderDoProjetoPai } from "@/lib/gomoon-lideres.functions";
+import { lerLinhasEspelho, lerStatusDoEspelho } from "@/lib/sheet-espelho";
 import {
   resumirGanhoDaPlanilha,
+  resumirGanhoV2,
   rotularCategoriasGanho,
   type ResumoGanho,
-} from '@/lib/notificacao-ganho';
-import { deveNotificarDecisao } from '@/lib/notificacao-chat';
-import { espelharEscrita } from '@/lib/sheet-espelho';
-import { runBackground } from '@/lib/background';
+} from "@/lib/notificacao-ganho";
+import { deveNotificarDecisao } from "@/lib/notificacao-chat";
+import { espelharEscrita } from "@/lib/sheet-espelho";
+import { runBackground } from "@/lib/background";
 import {
   STATUS_FINAIS,
   ehArquivado,
   statusDoParecerDoLider,
   statusDoTexto,
   type StatusProjeto,
-} from '@/lib/status-funil';
+} from "@/lib/status-funil";
 import {
   abrirAprovacoesPendentes,
   decidirAprovacoesDoProjeto,
@@ -74,7 +72,7 @@ import {
   getVersoesRecentesDe,
   type AprovacaoRow,
   type VersaoParaComparacao,
-} from '@/integrations/db/client.server';
+} from "@/integrations/db/client.server";
 
 // 3 desfechos (decisão do Lucas, 04/08/2026): 'ajuste' devolve ao autor para corrigir,
 // 'reprovado' é recusa. Antes os dois eram 'reprovado' — linhas ANTIGAS com 'reprovado'
@@ -82,15 +80,15 @@ import {
 // só na staging).
 // 'dispensado' (D29, 06/08/2026) NÃO é parecer: é o sistema fechando a fila porque o
 // analisador reprovou o projeto por critério. Ele nunca é escrito por `decidirAprovacao`.
-export type Veredito = 'pendente' | 'aprovado' | 'ajuste' | 'reprovado' | 'dispensado';
+export type Veredito = "pendente" | "aprovado" | "ajuste" | "reprovado" | "dispensado";
 
 /** Comentário gravado nas linhas dispensadas — vira a 2ª linha da justificativa. */
 export const MOTIVO_DISPENSA_CRITERIO =
-  'O projeto foi reprovado pela análise automática de critério.';
+  "O projeto foi reprovado pela análise automática de critério.";
 
 /** Um veredito de GENTE? `pendente` ainda não é, `dispensado` nunca será. */
 function ehParecerHumano(veredito: string): boolean {
-  return veredito !== 'pendente' && veredito !== 'dispensado';
+  return veredito !== "pendente" && veredito !== "dispensado";
 }
 
 /**
@@ -105,9 +103,9 @@ function justificativaDispensaSheet(opts: {
 }): string {
   return [
     `Dispensado pelo sistema em ${dataBR(opts.decididoEm ?? null)}`,
-    (opts.comentario ?? '').trim() || MOTIVO_DISPENSA_CRITERIO,
-    'O parecer do líder deixou de ser necessário. Se a triagem reverter a reprovação, a fila pode ser reaberta pelo admin.',
-  ].join('\n');
+    (opts.comentario ?? "").trim() || MOTIVO_DISPENSA_CRITERIO,
+    "O parecer do líder deixou de ser necessário. Se a triagem reverter a reprovação, a fila pode ser reaberta pelo admin.",
+  ].join("\n");
 }
 
 // ─── Rótulos (Sheets + UI) ───────────────────────────────────────────────────
@@ -115,7 +113,7 @@ function justificativaDispensaSheet(opts: {
 function dataBR(iso?: string | null): string {
   const d = iso ? new Date(iso) : new Date();
   const valida = !Number.isNaN(d.getTime()) ? d : new Date();
-  return valida.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  return valida.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
 /**
@@ -128,10 +126,10 @@ function dataBR(iso?: string | null): string {
  * lado do líder. ⚠️ Isto NÃO toca a coluna `Status` (segue "Pendente" pela regra
  * temporária) e NÃO é parecer humano.
  */
-export function rotuloIsencaoSheet(motivo: ResultadoAbertura['motivo']): string {
+export function rotuloIsencaoSheet(motivo: ResultadoAbertura["motivo"]): string {
   // Liderança é o único caso sem fila que tem ESTADO: do lado do líder está liberado.
   // Os outros 2 não têm parecer nenhum — o porquê vai na justificativa.
-  return motivo === 'lideranca' ? 'Pré-aprovado' : '—';
+  return motivo === "lideranca" ? "Pré-aprovado" : "—";
 }
 
 /**
@@ -139,24 +137,24 @@ export function rotuloIsencaoSheet(motivo: ResultadoAbertura['motivo']): string 
  * É aqui que a auditoria distingue a isenção legítima de uma falha de integração (D12) —
  * antes isso morava no rótulo de estado e poluía o filtro da planilha.
  */
-export function justificativaIsencaoSheet(motivo: ResultadoAbertura['motivo']): string {
+export function justificativaIsencaoSheet(motivo: ResultadoAbertura["motivo"]): string {
   switch (motivo) {
-    case 'lideranca':
+    case "lideranca":
       // D20 (05/08/2026): a isenção é pelo CARGO (coordenador para cima), não por
       // aparecer como líder de um time — o texto diz qual dos dois, senão a triagem
       // lê "liderança" achando que a pessoa tem equipe.
-      return 'Autor tem cargo de liderança na TeamGuide (coordenador ou acima), isento de pré-aprovação (ninguém decidiu)';
-    case 'sem_lider':
-      return 'Sem líder na TeamGuide';
-    case 'teamguide_indisponivel':
-      return 'Aprovação indisponível (integração)';
+      return "Autor tem cargo de liderança na TeamGuide (coordenador ou acima), isento de pré-aprovação (ninguém decidiu)";
+    case "sem_lider":
+      return "Sem líder na TeamGuide";
+    case "teamguide_indisponivel":
+      return "Aprovação indisponível (integração)";
     // D27 (06/08/2026): projeto ESPECIAL não é pendência do líder. Ele não tem
     // memorial financeiro, então a 3ª pergunta do checklist ("o saving faz sentido?")
     // não teria o que julgar — e o destino dele sempre foi a validação humana da RPA.
-    case 'especial':
-      return 'Projeto especial — sem pré-aprovação do líder (vai direto à validação da RPA)';
+    case "especial":
+      return "Projeto especial — sem pré-aprovação do líder (vai direto à validação da RPA)";
     default:
-      return '—';
+      return "—";
   }
 }
 
@@ -164,19 +162,19 @@ export function justificativaIsencaoSheet(motivo: ResultadoAbertura['motivo']): 
  * Texto da coluna "Aprovação do Líder" do Sheets. Função PURA — é o único lugar que
  * redige esses rótulos (não redigitar em outro ponto).
  */
-export function rotuloAprovacaoSheet(linhas: Pick<AprovacaoRow, 'veredito'>[]): string {
-  if (!linhas.length) return '—';
+export function rotuloAprovacaoSheet(linhas: Pick<AprovacaoRow, "veredito">[]): string {
+  if (!linhas.length) return "—";
   // ⚠️ O parecer HUMANO vence a dispensa do sistema, em QUALQUER ordem das linhas — e a
   // busca é por `ehParecerHumano`, não por "!== 'pendente'": com o fall-through antigo,
   // uma fila dispensada saía como **"Pré-reprovado"** e a planilha afirmaria que o líder
   // reprovou um projeto que ele nunca abriu, com o nome dele na célula do lado.
   const decidida = linhas.find((l) => ehParecerHumano(l.veredito));
   if (decidida) {
-    if (decidida.veredito === 'aprovado') return 'Pré-aprovado';
-    return decidida.veredito === 'ajuste' ? 'Ajuste pedido' : 'Pré-reprovado';
+    if (decidida.veredito === "aprovado") return "Pré-aprovado";
+    return decidida.veredito === "ajuste" ? "Ajuste pedido" : "Pré-reprovado";
   }
-  if (linhas.some((l) => l.veredito === 'dispensado')) return 'Dispensado';
-  return 'Pré-pendente';
+  if (linhas.some((l) => l.veredito === "dispensado")) return "Dispensado";
+  return "Pré-pendente";
 }
 
 /**
@@ -191,14 +189,14 @@ export function rotuloComentarioSheet(
   veredito: string,
   respostas: Partial<Record<ChaveChecklist, string | null>>,
 ): string {
-  if (veredito === 'ajuste') return 'O que precisa ser ajustado';
-  if (veredito === 'reprovado') return 'Motivo da reprovação';
+  if (veredito === "ajuste") return "O que precisa ser ajustado";
+  if (veredito === "reprovado") return "Motivo da reprovação";
   const chaves = chavesQueExigemJustificativa(respostas);
   if (chaves.length) {
-    const nomes = chaves.map(rotuloChecklist).filter(Boolean).join(' e ');
+    const nomes = chaves.map(rotuloChecklist).filter(Boolean).join(" e ");
     return `Justificativa do "não" em ${nomes}`;
   }
-  return 'Comentário do líder';
+  return "Comentário do líder";
 }
 
 /**
@@ -219,61 +217,61 @@ export function rotuloComentarioSheet(
 export function justificativaAprovacaoSheet(
   linhas: Pick<
     AprovacaoRow,
-    | 'veredito'
-    | 'aprovador_nome'
-    | 'aprovador_email'
-    | 'comentario'
-    | 'decidido_por'
-    | 'decidido_em'
-    | 'resp_move_kpi'
-    | 'resp_sente_falta'
-    | 'resp_saving_coerente'
+    | "veredito"
+    | "aprovador_nome"
+    | "aprovador_email"
+    | "comentario"
+    | "decidido_por"
+    | "decidido_em"
+    | "resp_move_kpi"
+    | "resp_sente_falta"
+    | "resp_saving_coerente"
   >[],
 ): string {
-  if (!linhas.length) return '—';
+  if (!linhas.length) return "—";
   const decidida = linhas.find((l) => ehParecerHumano(l.veredito));
   if (!decidida) {
     // Fila DISPENSADA (D29): ninguém decidiu nada, então não há assinatura de gente aqui —
     // e "Aguardando …" seria falso, porque a fila não espera mais ninguém. O texto diz de
     // quem foi a recusa e como a fila volta, para a triagem que reverter a reprovação.
-    const dispensada = linhas.find((l) => l.veredito === 'dispensado');
+    const dispensada = linhas.find((l) => l.veredito === "dispensado");
     if (dispensada) {
       return justificativaDispensaSheet({
         decididoEm: dispensada.decidido_em,
         comentario: dispensada.comentario,
       });
     }
-    const nomes = linhas.map((l) => l.aprovador_nome || l.aprovador_email).join(', ');
+    const nomes = linhas.map((l) => l.aprovador_nome || l.aprovador_email).join(", ");
     return `Aguardando ${nomes}`;
   }
   // Quem decidiu pode ser outro líder da mesma fila (D4) — o `decidido_por` manda. Na
   // pré-visualização de admin (`?como=`) o e-mail não é de nenhum líder da fila: cai no
   // nome derivado do e-mail, e o e-mail fica registrado do lado (é a auditoria).
-  const email = (decidida.decidido_por || decidida.aprovador_email || '').trim();
+  const email = (decidida.decidido_por || decidida.aprovador_email || "").trim();
   const nome =
-    linhas.find((l) => (l.aprovador_email ?? '').toLowerCase() === email.toLowerCase())
+    linhas.find((l) => (l.aprovador_email ?? "").toLowerCase() === email.toLowerCase())
       ?.aprovador_nome ||
     decidida.aprovador_nome ||
-    (email ? derivarNomeDeEmail(email) : '');
-  const assinatura = [nome, email && nome !== email ? `(${email})` : '']
-    .filter(Boolean)
-    .join(' ');
+    (email ? derivarNomeDeEmail(email) : "");
+  const assinatura = [nome, email && nome !== email ? `(${email})` : ""].filter(Boolean).join(" ");
 
   const respostas = {
     move_kpi: decidida.resp_move_kpi,
     sente_falta: decidida.resp_sente_falta,
     saving_coerente: decidida.resp_saving_coerente,
   };
-  const comentario = (decidida.comentario ?? '').trim();
+  const comentario = (decidida.comentario ?? "").trim();
 
   const partes = [
     // O estado sai do MESMO lugar que a coluna de estado (não redigitar rótulos).
-    `${rotuloAprovacaoSheet([decidida])}${assinatura ? ` por ${assinatura}` : ''} em ${dataBR(decidida.decidido_em)}`,
+    `${rotuloAprovacaoSheet([decidida])}${assinatura ? ` por ${assinatura}` : ""} em ${dataBR(decidida.decidido_em)}`,
     // Uma linha por pergunta respondida (parecer antigo, sem checklist → nenhuma).
     ...detalharChecklist(respostas),
-    ...(comentario ? [`${rotuloComentarioSheet(decidida.veredito, respostas)}: ${comentario}`] : []),
+    ...(comentario
+      ? [`${rotuloComentarioSheet(decidida.veredito, respostas)}: ${comentario}`]
+      : []),
   ];
-  return partes.join('\n');
+  return partes.join("\n");
 }
 
 /**
@@ -285,18 +283,22 @@ export function justificativaAprovacaoSheet(
  * com o próprio e-mail: o aviso nunca sai sem assinatura.
  */
 export function assinaturaDoParecer(
-  linhas: Pick<AprovacaoRow, 'veredito' | 'aprovador_nome' | 'aprovador_email' | 'decidido_por' | 'decidido_em'>[],
+  linhas: Pick<
+    AprovacaoRow,
+    "veredito" | "aprovador_nome" | "aprovador_email" | "decidido_por" | "decidido_em"
+  >[],
   quemDecidiu: string,
 ): { por: string; em: string } {
-  const alvo = (quemDecidiu ?? '').trim().toLowerCase();
+  const alvo = (quemDecidiu ?? "").trim().toLowerCase();
   const decidida =
-    linhas.find((l) => (l.decidido_por ?? '').trim().toLowerCase() === alvo && ehParecerHumano(l.veredito)) ??
-    linhas.find((l) => ehParecerHumano(l.veredito));
+    linhas.find(
+      (l) => (l.decidido_por ?? "").trim().toLowerCase() === alvo && ehParecerHumano(l.veredito),
+    ) ?? linhas.find((l) => ehParecerHumano(l.veredito));
   const nome =
-    linhas.find((l) => (l.aprovador_email ?? '').trim().toLowerCase() === alvo)?.aprovador_nome ||
+    linhas.find((l) => (l.aprovador_email ?? "").trim().toLowerCase() === alvo)?.aprovador_nome ||
     decidida?.aprovador_nome ||
-    (alvo ? derivarNomeDeEmail(alvo) : '');
-  return { por: nome || alvo || '—', em: dataBR(decidida?.decidido_em) };
+    (alvo ? derivarNomeDeEmail(alvo) : "");
+  return { por: nome || alvo || "—", em: dataBR(decidida?.decidido_em) };
 }
 
 // ─── Abertura da fila (chamada na submissão) ─────────────────────────────────
@@ -304,7 +306,7 @@ export function assinaturaDoParecer(
 export type ResultadoAbertura = {
   /** Nenhuma fila aberta porque o autor É liderança (D11) ou não tem líder (D6). */
   isento: boolean;
-  motivo: 'lideranca' | 'sem_lider' | 'teamguide_indisponivel' | 'especial' | null;
+  motivo: "lideranca" | "sem_lider" | "teamguide_indisponivel" | "especial" | null;
   aprovadores: { email: string; nome: string | null }[];
   /** Estado pronto para a coluna "Aprovação do Líder". */
   rotuloSheet: string;
@@ -323,7 +325,7 @@ export async function abrirPreAprovacao(
   projetoId: string,
   opts?: { versao?: number; nomeProjeto?: string | null },
 ): Promise<ResultadoAbertura> {
-  const semFila = (motivo: ResultadoAbertura['motivo']): ResultadoAbertura => ({
+  const semFila = (motivo: ResultadoAbertura["motivo"]): ResultadoAbertura => ({
     isento: true,
     motivo,
     aprovadores: [],
@@ -333,21 +335,21 @@ export async function abrirPreAprovacao(
 
   try {
     const projeto = await getProjetoById(projetoId);
-    if (!projeto) return semFila('sem_lider');
-    const autor = (projeto.responsavel_email ?? '').trim().toLowerCase();
-    if (!autor) return semFila('sem_lider');
+    if (!projeto) return semFila("sem_lider");
+    const autor = (projeto.responsavel_email ?? "").trim().toLowerCase();
+    if (!autor) return semFila("sem_lider");
 
     // D27 — projeto ESPECIAL não abre fila (decisão do Luis, 06/08/2026). Vem ANTES
     // da TeamGuide: é um flag do próprio projeto, não depende de integração externa.
     if (Number(projeto.especial) === 1) {
       console.log(`[aprovacoes] ${projetoId} é ESPECIAL → sem fila de pré-aprovação (D27).`);
-      return semFila('especial');
+      return semFila("especial");
     }
 
     // D11 — liderança é isenta: não faz sentido o líder do líder aprovar.
     if (await ehLideranca(autor)) {
       console.log(`[aprovacoes] ${autor} é liderança na TeamGuide → isento de pré-aprovação.`);
-      return semFila('lideranca');
+      return semFila("lideranca");
     }
 
     // Só líderes COM e-mail cadastrado podem receber a fila (sem e-mail não há login).
@@ -363,18 +365,21 @@ export async function abrirPreAprovacao(
       // tem líder. Com o espelho populado (regime normal) isto é sempre `true`.
       if (!(await espelhoTeamGuideDisponivel())) {
         console.log(`[aprovacoes] espelho da TeamGuide vazio → teamguide_indisponivel (${autor}).`);
-        return semFila('teamguide_indisponivel');
+        return semFila("teamguide_indisponivel");
       }
       console.log(`[aprovacoes] ${autor} sem líder na TeamGuide → sem fila de aprovação (D6).`);
-      return semFila('sem_lider');
+      return semFila("sem_lider");
     }
 
-    const aprovadores = lideres.map((l) => ({ email: l.email!.toLowerCase(), nome: l.nome || null }));
+    const aprovadores = lideres.map((l) => ({
+      email: l.email!.toLowerCase(),
+      nome: l.nome || null,
+    }));
     const versao = opts?.versao ?? (await getUltimaVersaoNum(projetoId));
     await abrirAprovacoesPendentes(projetoId, versao, autor, aprovadores);
 
     const pendentes = aprovadores.map((a) => ({
-      veredito: 'pendente' as const,
+      veredito: "pendente" as const,
       aprovador_nome: a.nome,
       aprovador_email: a.email,
       comentario: null,
@@ -393,8 +398,8 @@ export async function abrirPreAprovacao(
     // é responsabilidade de QUEM MONTA esse payload — não deste caminho.
     return { isento: false, motivo: null, aprovadores, rotuloSheet, justificativaSheet };
   } catch (e) {
-    console.error('[aprovacoes] falha ao abrir a pré-aprovação (não-fatal):', e);
-    return semFila('teamguide_indisponivel');
+    console.error("[aprovacoes] falha ao abrir a pré-aprovação (não-fatal):", e);
+    return semFila("teamguide_indisponivel");
   }
 }
 
@@ -417,49 +422,52 @@ export type ResultadoAberturaPai = {
   /** Estágio 2 satisfeito sem fila (dono do pai é liderança / sem líder / sem pai). */
   isento: boolean;
   motivo:
-    | 'sem_pai'
-    | 'pai_inexistente'
-    | 'sem_dono'
-    | 'lideranca'
-    | 'sem_lider'
-    | 'ja_aberto'
-    | 'teamguide_indisponivel'
+    | "sem_pai"
+    | "pai_inexistente"
+    | "sem_dono"
+    | "lideranca"
+    | "sem_lider"
+    | "ja_aberto"
+    | "teamguide_indisponivel"
     | null;
   aprovadores: { email: string; nome: string | null }[];
 };
 
-export async function abrirPreAprovacaoProjetoPai(
-  filhoId: string,
-): Promise<ResultadoAberturaPai> {
+export async function abrirPreAprovacaoProjetoPai(filhoId: string): Promise<ResultadoAberturaPai> {
   const semEstagio2 = (
-    motivo: ResultadoAberturaPai['motivo'],
+    motivo: ResultadoAberturaPai["motivo"],
     isento: boolean,
   ): ResultadoAberturaPai => ({ aberto: false, isento, motivo, aprovadores: [] });
 
   try {
     const filho = await getProjetoById(filhoId);
-    const paiId = (filho?.projeto_pai_id ?? '').trim();
-    if (!filho || !paiId) return semEstagio2('sem_pai', false);
+    const paiId = (filho?.projeto_pai_id ?? "").trim();
+    if (!filho || !paiId) return semEstagio2("sem_pai", false);
 
     // Idempotência: já existe fila do estágio 2 (o gatilho disparou antes) → não reabre.
     const jaTem = (await getAprovacoesDoProjeto(filhoId)).some((l) => Number(l.estagio) === 2);
-    if (jaTem) return semEstagio2('ja_aberto', false);
+    if (jaTem) return semEstagio2("ja_aberto", false);
 
     const pai = await getProjetoById(paiId);
-    if (!pai) return semEstagio2('pai_inexistente', true);
-    const dono = (pai.responsavel_email ?? '').trim().toLowerCase();
-    if (!dono) return semEstagio2('sem_dono', true);
+    if (!pai) return semEstagio2("pai_inexistente", true);
+    const dono = (pai.responsavel_email ?? "").trim().toLowerCase();
+    if (!dono) return semEstagio2("sem_dono", true);
 
     // Isenção por CARGO do dono do pai (independente do estágio 1).
     if (await ehLideranca(dono)) {
-      console.log(`[aprovacoes] dono do pai ${dono} é liderança → estágio 2 isento (feature ${filhoId}).`);
-      return semEstagio2('lideranca', true);
+      console.log(
+        `[aprovacoes] dono do pai ${dono} é liderança → estágio 2 isento (feature ${filhoId}).`,
+      );
+      return semEstagio2("lideranca", true);
     }
 
     const lideres = (await getLideresDe(dono)).filter((l) => !!l.email);
-    if (!lideres.length) return semEstagio2('sem_lider', true);
+    if (!lideres.length) return semEstagio2("sem_lider", true);
 
-    const aprovadores = lideres.map((l) => ({ email: l.email!.toLowerCase(), nome: l.nome || null }));
+    const aprovadores = lideres.map((l) => ({
+      email: l.email!.toLowerCase(),
+      nome: l.nome || null,
+    }));
     const versao = await getUltimaVersaoNum(filhoId);
     await abrirAprovacoesPendentes(filhoId, versao, dono, aprovadores, {
       estagio: 2,
@@ -469,12 +477,12 @@ export async function abrirPreAprovacaoProjetoPai(
     // Aviso ao líder do pai (Gomoon, copy própria) — fire-and-forget, nunca derruba nada.
     runBackground(
       notificarLiderDoProjetoPai(filhoId, aprovadores, {
-        autorNome: filho.responsavel_nome ?? '',
-        autorEmail: filho.responsavel_email ?? '',
-        projetoPaiNome: pai.nome ?? '',
-        featureNome: filho.nome ?? '',
+        autorNome: filho.responsavel_nome ?? "",
+        autorEmail: filho.responsavel_email ?? "",
+        projetoPaiNome: pai.nome ?? "",
+        featureNome: filho.nome ?? "",
       }).catch((e) =>
-        console.error('[aprovacoes] aviso feature ao líder do pai falhou (não-fatal):', e),
+        console.error("[aprovacoes] aviso feature ao líder do pai falhou (não-fatal):", e),
       ),
     );
 
@@ -483,8 +491,8 @@ export async function abrirPreAprovacaoProjetoPai(
     );
     return { aberto: true, isento: false, motivo: null, aprovadores };
   } catch (e) {
-    console.error('[aprovacoes] falha ao abrir o estágio 2 (não-fatal):', e);
-    return semEstagio2('teamguide_indisponivel', false);
+    console.error("[aprovacoes] falha ao abrir o estágio 2 (não-fatal):", e);
+    return semEstagio2("teamguide_indisponivel", false);
   }
 }
 
@@ -516,7 +524,7 @@ export async function dispensarPreAprovacao(projetoId: string): Promise<Resultad
   let gravou = false;
   try {
     const linhas = await getAprovacoesDoProjeto(projetoId);
-    if (!linhas.some((l) => l.veredito === 'pendente')) return { dispensou: false };
+    if (!linhas.some((l) => l.veredito === "pendente")) return { dispensou: false };
 
     // Dispensa AMBOS os estágios pendentes (o projeto foi reprovado — Q6): o
     // `dispensarAprovacoesPendentes` não filtra estágio, então fecha estágio 1 e 2.
@@ -537,7 +545,7 @@ export async function dispensarPreAprovacao(projetoId: string): Promise<Resultad
       justificativaSheet: justificativaAprovacaoSheet(atualizadas),
     };
   } catch (e) {
-    console.error('[aprovacoes] falha ao dispensar a fila (não-fatal):', e);
+    console.error("[aprovacoes] falha ao dispensar a fila (não-fatal):", e);
     // ⚠️ Falha DEPOIS de gravar não pode virar "não fez nada": devolver `dispensou:false`
     // aqui omitiria as 2 colunas e a planilha ficaria em "Pré-pendente" com a fila já
     // fechada no SQLite — o projeto morto seguiria contando no relatório de espera do
@@ -548,7 +556,7 @@ export async function dispensarPreAprovacao(projetoId: string): Promise<Resultad
     if (gravou) {
       return {
         dispensou: true,
-        rotuloSheet: rotuloAprovacaoSheet([{ veredito: 'dispensado' }]),
+        rotuloSheet: rotuloAprovacaoSheet([{ veredito: "dispensado" }]),
         justificativaSheet: justificativaDispensaSheet({}),
       };
     }
@@ -583,7 +591,7 @@ const reabrirSchema = z
     dry: z.boolean().optional(),
   })
   .refine((v) => (v.projetoIds?.length ?? 0) > 0 || !!v.autorEmail, {
-    message: 'Informe projetoIds ou autorEmail — não existe reabrir tudo.',
+    message: "Informe projetoIds ou autorEmail — não existe reabrir tudo.",
   });
 
 export type ResultadoReabertura = {
@@ -598,7 +606,13 @@ export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReab
   const { projetoIds, autorEmail, limite, forcar, dry } = reabrirSchema.parse(body);
   const seco = dry !== false; // ⚠️ dry é o DEFAULT: escrever exige `dry:false` explícito.
 
-  const out: ResultadoReabertura = { ok: true, dry: seco, reabertos: [], isentos: [], ignorados: [] };
+  const out: ResultadoReabertura = {
+    ok: true,
+    dry: seco,
+    reabertos: [],
+    isentos: [],
+    ignorados: [],
+  };
 
   // Alvos: lista explícita OU os projetos submetidos de um autor (mais recentes primeiro).
   let ids = projetoIds ?? [];
@@ -606,8 +620,8 @@ export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReab
     const alvo = autorEmail.trim().toLowerCase();
     const doAutor = (await getProjetosByOwnerEmail(alvo)).filter(
       (p) =>
-        (p.responsavel_email ?? '').trim().toLowerCase() === alvo &&
-        (p.status ?? '') !== 'rascunho' &&
+        (p.responsavel_email ?? "").trim().toLowerCase() === alvo &&
+        (p.status ?? "") !== "rascunho" &&
         Number(p.descontinuado ?? 0) !== 1,
     );
     ids = doAutor.slice(0, limite ?? 10).map((p) => p.id);
@@ -616,12 +630,12 @@ export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReab
   for (const id of ids) {
     const projeto = await getProjetoById(id);
     if (!projeto) {
-      out.ignorados.push({ projeto_id: id, nome: null, motivo: 'projeto não existe no SQLite' });
+      out.ignorados.push({ projeto_id: id, nome: null, motivo: "projeto não existe no SQLite" });
       continue;
     }
     const nome = projeto.nome ?? null;
-    if ((projeto.status ?? '') === 'rascunho') {
-      out.ignorados.push({ projeto_id: id, nome, motivo: 'rascunho (nunca entra em fila)' });
+    if ((projeto.status ?? "") === "rascunho") {
+      out.ignorados.push({ projeto_id: id, nome, motivo: "rascunho (nunca entra em fila)" });
       continue;
     }
     if (!forcar) {
@@ -629,12 +643,12 @@ export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReab
       // Fila TODA dispensada (D29) é reabrível SEM `forcar`: a dispensa é do SISTEMA, não
       // parecer humano — não há veredito de ninguém a preservar, e este é justamente o
       // remédio para a triagem que reverte a reprovação do analisador.
-      const soDispensadas = jaTem.length > 0 && jaTem.every((a) => a.veredito === 'dispensado');
+      const soDispensadas = jaTem.length > 0 && jaTem.every((a) => a.veredito === "dispensado");
       if (jaTem.length && !soDispensadas) {
         out.ignorados.push({
           projeto_id: id,
           nome,
-          motivo: `já tem fila (${jaTem.map((a) => a.veredito).join(', ')}) — use forcar:true para recriar`,
+          motivo: `já tem fila (${jaTem.map((a) => a.veredito).join(", ")}) — use forcar:true para recriar`,
         });
         continue;
       }
@@ -642,14 +656,14 @@ export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReab
 
     if (seco) {
       // Sem escrever: só diz quem SERIA o aprovador (mesma régua do abrirPreAprovacao).
-      const autor = (projeto.responsavel_email ?? '').trim().toLowerCase();
+      const autor = (projeto.responsavel_email ?? "").trim().toLowerCase();
       if (!autor) {
-        out.isentos.push({ projeto_id: id, nome, motivo: 'sem_lider' });
+        out.isentos.push({ projeto_id: id, nome, motivo: "sem_lider" });
       } else if (await ehLideranca(autor)) {
-        out.isentos.push({ projeto_id: id, nome, motivo: 'lideranca' });
+        out.isentos.push({ projeto_id: id, nome, motivo: "lideranca" });
       } else {
         const lideres = (await getLideresDe(autor, { projetoId: id })).filter((l) => !!l.email);
-        if (!lideres.length) out.isentos.push({ projeto_id: id, nome, motivo: 'sem_lider' });
+        if (!lideres.length) out.isentos.push({ projeto_id: id, nome, motivo: "sem_lider" });
         else
           out.reabertos.push({
             projeto_id: id,
@@ -662,7 +676,7 @@ export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReab
 
     const r = await abrirPreAprovacao(id, { nomeProjeto: nome });
     if (r.isento) {
-      out.isentos.push({ projeto_id: id, nome, motivo: r.motivo ?? 'isento' });
+      out.isentos.push({ projeto_id: id, nome, motivo: r.motivo ?? "isento" });
     } else {
       out.reabertos.push({ projeto_id: id, nome, aprovadores: r.aprovadores.map((a) => a.email) });
     }
@@ -670,13 +684,13 @@ export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReab
     // ⚠️ E remenda o ESPELHO junto: a coluna "Pré-status" da triagem é lida de lá, então
     // sem isto o parecer só apareceria no /dashboard no próximo cron.
     const colunasLider = {
-      'Aprovação do Líder': r.rotuloSheet,
-      'Justificativa Aprovação do Líder': r.justificativaSheet,
+      "Aprovação do Líder": r.rotuloSheet,
+      "Justificativa Aprovação do Líder": r.justificativaSheet,
     } as const;
     runBackground(
       updateRowByProjectId(id, colunasLider)
         .then(() => espelharEscrita(id, colunasLider))
-        .catch((e) => console.error('[aprovacoes/reabrir] falha ao gravar no Sheets:', e)),
+        .catch((e) => console.error("[aprovacoes/reabrir] falha ao gravar no Sheets:", e)),
     );
   }
 
@@ -765,12 +779,12 @@ export type EdicaoAprovacao = {
 
 /** Rótulo do papel do participante (mesmos 3 papéis da Etapa 1). */
 const PAPEL_LABEL: Record<string, string> = {
-  coexecutor: 'Coautor',
-  planejador: 'Participante',
-  contribuidor: 'Contribuidor',
+  coexecutor: "Coautor",
+  planejador: "Participante",
+  contribuidor: "Contribuidor",
   // Papéis LEGADO de uma feature anterior — a Etapa 1 já não os oferece.
-  idealizador: 'Contribuidor',
-  referencia_tecnica: 'Contribuidor',
+  idealizador: "Contribuidor",
+  referencia_tecnica: "Contribuidor",
 };
 
 /**
@@ -785,17 +799,19 @@ export function montarParticipantes(
 ): ParticipanteAprovacao[] {
   const lista = parseJson<string[]>(membrosJson, []);
   const papeis = parseJson<Record<string, string>>(papeisJson, {});
-  const autor = (autorEmail ?? '').trim().toLowerCase();
+  const autor = (autorEmail ?? "").trim().toLowerCase();
   const vistos = new Set<string>();
   const out: ParticipanteAprovacao[] = [];
   for (const bruto of lista) {
-    const email = String(bruto ?? '').trim().toLowerCase();
+    const email = String(bruto ?? "")
+      .trim()
+      .toLowerCase();
     if (!email || email === autor || vistos.has(email)) continue;
     vistos.add(email);
     out.push({
       nome: derivarNomeDeEmail(email),
       email,
-      papel: PAPEL_LABEL[papeis[email] ?? ''] ?? 'Coautor',
+      papel: PAPEL_LABEL[papeis[email] ?? ""] ?? "Coautor",
     });
   }
   return out;
@@ -866,7 +882,9 @@ export function montarEdicao(
 
   const ordenadas = [...versoes].sort((a, b) => Number(b.versao_num) - Number(a.versao_num));
   const atual = ordenadas.find((v) => Number(v.versao_num) === versao) ?? ordenadas[0] ?? null;
-  const anterior = ordenadas.find((v) => Number(v.versao_num) < Number(atual?.versao_num ?? versao));
+  const anterior = ordenadas.find(
+    (v) => Number(v.versao_num) < Number(atual?.versao_num ?? versao),
+  );
 
   const snapAtual = lerSnapshotVersao(atual);
   const snapAnterior = lerSnapshotVersao(anterior);
@@ -889,9 +907,9 @@ export function montarEdicao(
 function lerSnapshotVersao(v: VersaoParaComparacao | null | undefined): SnapshotVersao | null {
   if (!v) return null;
   const projeto = parseJson<Record<string, unknown> | null>(v.snapshot_projeto, null);
-  if (!projeto || typeof projeto !== 'object' || Object.keys(projeto).length === 0) return null;
+  if (!projeto || typeof projeto !== "object" || Object.keys(projeto).length === 0) return null;
   const doc = parseJson<Record<string, unknown> | null>(v.snapshot_doc, null);
-  return { projeto, doc: doc && typeof doc === 'object' ? doc : null };
+  return { projeto, doc: doc && typeof doc === "object" ? doc : null };
 }
 
 /**
@@ -903,19 +921,44 @@ function lerSnapshotVersao(v: VersaoParaComparacao | null | undefined): Snapshot
  * (*"o saving está coerente?"*) olhando campo em branco. Com as categorias em mãos, a tela diz
  * "ganho sem valor financeiro (Ganho imensurável)" em vez de não dizer nada.
  */
-function ganhoDoCard(linha: Record<string, string> | null): ResumoGanho | null {
-  if (!linha) return null;
-  const resumo = resumirGanhoDaPlanilha(linha);
-  if (resumo) return resumo;
-  const categorias = rotularCategoriasGanho(linha['Tipos de Ganho']);
-  if (!categorias) return null;
-  return { geracao: 'planilha', categorias, destaque: null, detalhe: [], textos: [], semNumero: true };
+function ganhoDoCard(
+  linha: Record<string, string> | null,
+  projeto: Parameters<typeof resumirGanhoV2>[0],
+): ResumoGanho | null {
+  if (linha) {
+    const resumo = resumirGanhoDaPlanilha(linha);
+    if (resumo) return resumo;
+    const categorias = rotularCategoriasGanho(linha["Tipos de Ganho"]);
+    if (categorias) {
+      return {
+        geracao: "planilha",
+        categorias,
+        destaque: null,
+        detalhe: [],
+        textos: [],
+        semNumero: true,
+      };
+    }
+  }
+  // ⚠️ **Rede: as colunas da v2 no SQLITE, não os campos da v1** (14/09/2026).
+  //
+  // O caminho preferido é o espelho da planilha, mas ele pode não ter a linha ainda: a DM
+  // ao líder sai na SUBMISSÃO (D26, imediata) e a escrita no Sheets vai por `runBackground`,
+  // que o Godeploy **cancela** quando o isolate acaba. O líder abria a fila minutos depois
+  // e caía na rede ANTIGA — os campos `saving_horas`/`saving_reais`/`ganho_total_mensal`,
+  // que a v2 **nunca escreve**. Resultado: card sem número nenhum, que é o que os líderes
+  // relataram ("as informações não aparecem, não consigo validar se aprovo").
+  //
+  // As colunas v2 de `projetos` são gravadas pelo `updateProjeto` da própria submissão,
+  // SÍNCRONO, antes de qualquer trabalho de fundo: elas existem mesmo quando o espelho
+  // ainda não tem a linha.
+  return resumirGanhoV2(projeto);
 }
 
 export async function listarAprovacoesPendentes(
   email: string,
 ): Promise<{ lidera: boolean; itens: ItemAprovacao[]; congelada: boolean }> {
-  const alvo = (email ?? '').trim().toLowerCase();
+  const alvo = (email ?? "").trim().toLowerCase();
   const rows = await getAprovacoesPendentesDe(alvo);
 
   // As 2 últimas versões de CADA reenvio da fila, em UMA consulta. "Uma consulta por item
@@ -933,7 +976,7 @@ export async function listarAprovacoesPendentes(
     } catch (e) {
       // Sem as versões o card cai no modo "não comparável" (que a tela explica). A fila
       // NUNCA deixa de abrir por causa da comparação.
-      console.error('[aprovacoes] falha ao ler versões para o card de edição:', e);
+      console.error("[aprovacoes] falha ao ler versões para o card de edição:", e);
     }
   }
 
@@ -948,7 +991,7 @@ export async function listarAprovacoesPendentes(
       }
     }
   } catch (e) {
-    console.error('[aprovacoes] falha ao ler o espelho para o ganho do card:', e);
+    console.error("[aprovacoes] falha ao ler o espelho para o ganho do card:", e);
   }
 
   const itens: ItemAprovacao[] = rows.map((r) => {
@@ -956,31 +999,34 @@ export async function listarAprovacoesPendentes(
       ? normalizarMarcadoresMemorial(r.memorial_calculo)
       : null;
     return {
-    projeto_id: r.projeto_id,
-    projeto_nome: r.projeto_nome,
-    autor_nome: r.autor_nome,
-    autor_email: r.autor_email,
-    area: r.area,
-    submitted_at: r.submitted_at,
-    tipos_projeto: parseJson<string[]>(r.tipos_projeto, []),
-    especial: r.especial === 1,
-    criado_em: r.criado_em,
-    // Projeto especial não tem memorial financeiro — o contexto ocupa esse lugar.
-    descricao_breve: r.descricao_breve?.trim() || r.contexto_especial?.trim() || null,
-    participantes: montarParticipantes(r.membros, r.membros_papeis, r.autor_email),
-    ganho: ganhoDoCard(linhasPorId.get(String(r.projeto_id).toLowerCase()) ?? null),
-    saving_horas: r.saving_horas ?? null,
-    saving_reais: r.saving_reais ?? null,
-    tipo_saving: r.tipo_saving ?? null,
-    ganho_total: r.ganho_total_mensal ?? null,
-    custo_externo_mensal: r.custo_externo_mensal ?? null,
-    // O resumo do MEMORIAL ([1.2]) é mais abrangente que o da análise automática — o
-    // líder lê aquele; a análise entra só quando o memorial não tem a seção (projeto
-    // especial, legado antigo sem o ponto [1.2]).
-    resumo: extrairResumoMemorial(memorial) ?? (r.resumo_ia?.trim() || null),
-    ...extrairNumeros(r),
-    memorial,
-    edicao: montarEdicao(Number(r.versao) || 1, porProjeto.get(r.projeto_id) ?? []),
+      projeto_id: r.projeto_id,
+      projeto_nome: r.projeto_nome,
+      autor_nome: r.autor_nome,
+      autor_email: r.autor_email,
+      area: r.area,
+      submitted_at: r.submitted_at,
+      tipos_projeto: parseJson<string[]>(r.tipos_projeto, []),
+      especial: r.especial === 1,
+      criado_em: r.criado_em,
+      // Projeto especial não tem memorial financeiro — o contexto ocupa esse lugar.
+      descricao_breve: r.descricao_breve?.trim() || r.contexto_especial?.trim() || null,
+      participantes: montarParticipantes(r.membros, r.membros_papeis, r.autor_email),
+      ganho: ganhoDoCard(
+        linhasPorId.get(String(r.projeto_id).toLowerCase()) ?? null,
+        r as unknown as Parameters<typeof resumirGanhoV2>[0],
+      ),
+      saving_horas: r.saving_horas ?? null,
+      saving_reais: r.saving_reais ?? null,
+      tipo_saving: r.tipo_saving ?? null,
+      ganho_total: r.ganho_total_mensal ?? null,
+      custo_externo_mensal: r.custo_externo_mensal ?? null,
+      // O resumo do MEMORIAL ([1.2]) é mais abrangente que o da análise automática — o
+      // líder lê aquele; a análise entra só quando o memorial não tem a seção (projeto
+      // especial, legado antigo sem o ponto [1.2]).
+      resumo: extrairResumoMemorial(memorial) ?? (r.resumo_ia?.trim() || null),
+      ...extrairNumeros(r),
+      memorial,
+      edicao: montarEdicao(Number(r.versao) || 1, porProjeto.get(r.projeto_id) ?? []),
     };
   });
 
@@ -988,18 +1034,18 @@ export async function listarAprovacoesPendentes(
   try {
     lidera = lidera || (await getLideradosDe(alvo)).length > 0;
   } catch (e) {
-    console.error('[aprovacoes] TeamGuide indisponível ao checar liderança:', e);
+    console.error("[aprovacoes] TeamGuide indisponível ao checar liderança:", e);
   }
   return { lidera, itens, congelada: preAprovacaoCongelada() };
 }
 
 // ─── Decisão ─────────────────────────────────────────────────────────────────
 
-const simNao = z.enum(['sim', 'nao']);
+const simNao = z.enum(["sim", "nao"]);
 
 const decidirSchema = z.object({
   projeto_id: z.string().min(1),
-  veredito: z.enum(['aprovado', 'ajuste', 'reprovado']),
+  veredito: z.enum(["aprovado", "ajuste", "reprovado"]),
   comentario: z.string().trim().max(2000).optional().nullable(),
   // Checklist do gestor — OBRIGATÓRIO nos dois vereditos (pedido do Lucas, 03/08/2026).
   // É o que transforma o parecer em informação para a triagem, então o servidor cobra:
@@ -1031,29 +1077,29 @@ export async function decidirAprovacao(
   if (preAprovacaoCongelada()) {
     throw Object.assign(new Error(COPY_CONGELAMENTO_PREAPROVACAO), { status: 423 });
   }
-  const alvo = (email ?? '').trim().toLowerCase();
+  const alvo = (email ?? "").trim().toLowerCase();
   const parsed = decidirSchema.safeParse(body);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    const doChecklist = issue?.path?.[0] === 'respostas';
+    const doChecklist = issue?.path?.[0] === "respostas";
     throw Object.assign(
       new Error(
         doChecklist
-          ? 'Responda as 3 perguntas do checklist antes de registrar o parecer.'
-          : (issue?.message ?? 'Dados inválidos.'),
+          ? "Responda as 3 perguntas do checklist antes de registrar o parecer."
+          : (issue?.message ?? "Dados inválidos."),
       ),
       { status: 400 },
     );
   }
   const { projeto_id, veredito, respostas } = parsed.data;
-  const comentario = (parsed.data.comentario ?? '').trim() || null;
+  const comentario = (parsed.data.comentario ?? "").trim() || null;
 
-  if (veredito !== 'aprovado' && !comentario) {
+  if (veredito !== "aprovado" && !comentario) {
     throw Object.assign(
       new Error(
-        veredito === 'ajuste'
-          ? 'Para pedir ajuste, escreva o que precisa mudar — o autor recebe esse texto.'
-          : 'Para reprovar, escreva o motivo — o autor recebe esse texto.',
+        veredito === "ajuste"
+          ? "Para pedir ajuste, escreva o que precisa mudar — o autor recebe esse texto."
+          : "Para reprovar, escreva o motivo — o autor recebe esse texto.",
       ),
       { status: 400 },
     );
@@ -1061,14 +1107,18 @@ export async function decidirAprovacao(
 
   // Saving incoerente NÃO se justifica, se corrige (Lucas, 04/08/2026): número errado
   // volta para o autor. A tela já esconde o "Pré-aprovar"; aqui é a garantia.
-  if (veredito === 'aprovado' && bloqueiaPreAprovacao(respostas)) {
+  if (veredito === "aprovado" && bloqueiaPreAprovacao(respostas)) {
     throw Object.assign(new Error(AVISO_SAVING_INCOERENTE), { status: 400 });
   }
 
   // Pré-aprovar COM um "não" no checklist exige a explicação (04/08/2026): a contradição
   // "não move KPI / o saving não é coerente, mas pré-aprovo" é justamente o que a triagem
   // precisa entender. Mesma régua da tela (`exigeJustificativa`), cobrada aqui.
-  if (veredito === 'aprovado' && chavesQueExigemJustificativa(respostas).length > 0 && !comentario) {
+  if (
+    veredito === "aprovado" &&
+    chavesQueExigemJustificativa(respostas).length > 0 &&
+    !comentario
+  ) {
     throw Object.assign(
       new Error(
         'Você respondeu "não" em alguma pergunta. Explique por que ainda assim pré-aprova — a explicação vai junto para a triagem da RPA.',
@@ -1079,13 +1129,12 @@ export async function decidirAprovacao(
 
   const linhas = await getAprovacoesDoProjeto(projeto_id);
   const minha = linhas.find(
-    (l) => (l.aprovador_email ?? '').toLowerCase() === alvo && l.veredito === 'pendente',
+    (l) => (l.aprovador_email ?? "").toLowerCase() === alvo && l.veredito === "pendente",
   );
   if (!minha) {
-    throw Object.assign(
-      new Error('Você não tem uma pré-aprovação pendente para este projeto.'),
-      { status: 403 },
-    );
+    throw Object.assign(new Error("Você não tem uma pré-aprovação pendente para este projeto."), {
+      status: 403,
+    });
   }
 
   // `decidido_por` guarda quem CLICOU. Na pré-visualização de admin (validação da tela)
@@ -1095,7 +1144,7 @@ export async function decidirAprovacao(
   // (o estágio 1 é o líder do autor; o 2 é o líder do dono do pai). Sem isto, aprovar o
   // estágio 2 fecharia a fila do estágio 1 (e vice-versa). Legado = estágio 1.
   const estagioDecisor = Number(minha.estagio) || 1;
-  const quemDecidiu = (opts?.atorReal ?? '').trim().toLowerCase() || alvo;
+  const quemDecidiu = (opts?.atorReal ?? "").trim().toLowerCase() || alvo;
   const linhasGravadas = await decidirAprovacoesDoProjeto(
     projeto_id,
     veredito,
@@ -1112,10 +1161,14 @@ export async function decidirAprovacao(
   if (opts?.atorReal && linhasGravadas) {
     const proj = await getProjetoById(projeto_id).catch(() => null);
     const rotulo =
-      veredito === 'aprovado' ? 'Pré-aprovado' : veredito === 'ajuste' ? 'Ajuste pedido' : 'Reprovado';
+      veredito === "aprovado"
+        ? "Pré-aprovado"
+        : veredito === "ajuste"
+          ? "Ajuste pedido"
+          : "Reprovado";
     await registrarAtividade({
       ator_email: quemDecidiu,
-      acao: 'lider_decisao',
+      acao: "lider_decisao",
       projeto_id,
       projeto_nome: proj?.nome ?? null,
       detalhe: `${rotulo} (como ${alvo})`,
@@ -1151,15 +1204,15 @@ export async function decidirAprovacao(
   const colunasLiderDecidido = {
     // A coluna do parecer é mantida como AUDITORIA: ela diz quem liberou, e a justificativa
     // ao lado traz o checklist inteiro. O que ela deixou de ser é a régua do funil.
-    'Aprovação do Líder': rotuloAprovacaoSheet(estagio1),
-    'Justificativa Aprovação do Líder': justificativaAprovacaoSheet(estagio1),
+    "Aprovação do Líder": rotuloAprovacaoSheet(estagio1),
+    "Justificativa Aprovação do Líder": justificativaAprovacaoSheet(estagio1),
     ...(moveStatus ? { Status: novoStatus } : {}),
   } as const;
   runBackground(
     updateRowByProjectId(projeto_id, colunasLiderDecidido)
       // Remenda o espelho: é dele que a coluna "Pré-status" da triagem é lida.
       .then(() => espelharEscrita(projeto_id, colunasLiderDecidido))
-      .catch((e) => console.error('[aprovacoes] falha ao gravar no Sheets (não-fatal):', e)),
+      .catch((e) => console.error("[aprovacoes] falha ao gravar no Sheets (não-fatal):", e)),
   );
 
   // ── Aviso ao grupo do Chat (11/08/2026) ──
@@ -1191,10 +1244,10 @@ export async function decidirAprovacao(
   // ⚠️ O alerta do grupo (D30) é do ESTÁGIO 1: sai UMA vez por projeto, quando o líder do
   // autor pré-aprova. Uma aprovação do estágio 2 (líder do dono do pai) NÃO reavisa o
   // grupo — seria uma 2ª mensagem para o mesmo projeto.
-  const avisaGrupo = veredito === 'aprovado' && estagioDecisor === 1;
+  const avisaGrupo = veredito === "aprovado" && estagioDecisor === 1;
   if (avisaGrupo && !deveNotificarDecisao(linhasGravadas)) {
     console.warn(
-      '[aprovacoes] UPDATE gravou 0 linhas — outro parecer chegou antes; grupo NÃO avisado',
+      "[aprovacoes] UPDATE gravou 0 linhas — outro parecer chegou antes; grupo NÃO avisado",
       { projeto_id, quemDecidiu },
     );
   }
@@ -1202,14 +1255,16 @@ export async function decidirAprovacao(
     // Nomeia o regime do adaptador no 1º deploy: `null` = o `env.DB` não reportou o
     // número e estamos notificando pelo default invertido, não por ter ganhado a corrida.
     if (linhasGravadas === null) {
-      console.info('[aprovacoes] adaptador não reportou rowsWritten — avisando o grupo pelo default seguro');
+      console.info(
+        "[aprovacoes] adaptador não reportou rowsWritten — avisando o grupo pelo default seguro",
+      );
     }
     const parecer = assinaturaDoParecer(estagio1, quemDecidiu);
     runBackground(
       Promise.resolve()
         .then(() => notificarChatPreAprovacao(projeto_id, parecer))
         .then(() => undefined)
-        .catch((e) => console.error('[aprovacoes] falha ao avisar o Chat (não-fatal):', e)),
+        .catch((e) => console.error("[aprovacoes] falha ao avisar o Chat (não-fatal):", e)),
     );
   }
 
@@ -1218,7 +1273,7 @@ export async function decidirAprovacao(
   // a fila do líder do dono do PAI. `ajuste`/`reprovado` NÃO chegam ao estágio 2 (o
   // requisito: "se o 1º reprova, não chega ao 2º"). `abrirPreAprovacaoProjetoPai` confere
   // internamente se há pai e se o estágio 2 já foi aberto (idempotente) e NUNCA lança.
-  if (veredito === 'aprovado' && estagioDecisor === 1 && deveNotificarDecisao(linhasGravadas)) {
+  if (veredito === "aprovado" && estagioDecisor === 1 && deveNotificarDecisao(linhasGravadas)) {
     await abrirPreAprovacaoProjetoPai(projeto_id);
   }
 
@@ -1252,14 +1307,14 @@ const SEM_ACESSO: AcessoAprovador = { aprovador: false, pendente: false };
  * acesso a um projeto que a pessoa já tinha em mãos.
  */
 export function resolverAcessoAprovador(
-  linhas: Pick<AprovacaoRow, 'aprovador_email' | 'veredito'>[],
+  linhas: Pick<AprovacaoRow, "aprovador_email" | "veredito">[],
   email: string,
 ): AcessoAprovador {
-  const alvo = (email ?? '').trim().toLowerCase();
+  const alvo = (email ?? "").trim().toLowerCase();
   if (!alvo) return SEM_ACESSO;
-  const minhas = linhas.filter((l) => (l.aprovador_email ?? '').trim().toLowerCase() === alvo);
+  const minhas = linhas.filter((l) => (l.aprovador_email ?? "").trim().toLowerCase() === alvo);
   if (!minhas.length) return SEM_ACESSO;
-  return { aprovador: true, pendente: minhas.some((l) => l.veredito === 'pendente') };
+  return { aprovador: true, pendente: minhas.some((l) => l.veredito === "pendente") };
 }
 
 /** Versão I/O do predicado acima (1 leitura no SQLite, sem rede). */
@@ -1267,13 +1322,13 @@ export async function acessoDeAprovador(
   projetoId: string,
   email: string,
 ): Promise<AcessoAprovador> {
-  const alvo = (email ?? '').trim().toLowerCase();
+  const alvo = (email ?? "").trim().toLowerCase();
   if (!alvo) return SEM_ACESSO;
   try {
     return resolverAcessoAprovador(await getAprovacoesDoProjeto(projetoId), alvo);
   } catch (e) {
     // Falha de leitura não pode virar acesso concedido — nem 500 na tela do autor.
-    console.error('[aprovacoes] falha ao checar o acesso do aprovador:', e);
+    console.error("[aprovacoes] falha ao checar o acesso do aprovador:", e);
     return SEM_ACESSO;
   }
 }
@@ -1303,16 +1358,16 @@ export type ParecerEstagio2 = { estado: string; justificativa: string };
 export function parecerEstagio2ParaFicha(
   linhas: Pick<
     AprovacaoRow,
-    | 'estagio'
-    | 'veredito'
-    | 'aprovador_nome'
-    | 'aprovador_email'
-    | 'comentario'
-    | 'decidido_por'
-    | 'decidido_em'
-    | 'resp_move_kpi'
-    | 'resp_sente_falta'
-    | 'resp_saving_coerente'
+    | "estagio"
+    | "veredito"
+    | "aprovador_nome"
+    | "aprovador_email"
+    | "comentario"
+    | "decidido_por"
+    | "decidido_em"
+    | "resp_move_kpi"
+    | "resp_sente_falta"
+    | "resp_saving_coerente"
   >[],
 ): ParecerEstagio2 | null {
   const e2 = linhas.filter((l) => Number(l.estagio) === 2);
@@ -1334,7 +1389,7 @@ export async function resumoAprovacaoPorProjeto(
     const nome = r.aprovador_nome || r.aprovador_email;
     if (!atual) {
       out[r.projeto_id] = {
-        veredito: (r.veredito as Veredito) ?? 'pendente',
+        veredito: (r.veredito as Veredito) ?? "pendente",
         aprovadores: [nome],
         decidido_por: r.decidido_por,
         comentario: r.comentario,
@@ -1351,7 +1406,7 @@ export async function resumoAprovacaoPorProjeto(
     // fica explícita porque ela é uma só e vive nas 3 funções deste arquivo.)
     const mandaNoResumo =
       ehParecerHumano(r.veredito) ||
-      (r.veredito !== 'pendente' && !ehParecerHumano(atual.veredito));
+      (r.veredito !== "pendente" && !ehParecerHumano(atual.veredito));
     if (mandaNoResumo) {
       atual.veredito = r.veredito as Veredito;
       atual.decidido_por = r.decidido_por;
