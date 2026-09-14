@@ -12,6 +12,11 @@ import { resolve } from 'node:path';
 const ler = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 
 const dashboard = ler('src/routes/_authenticated/dashboard.tsx');
+// ⚠️ Os CONTROLES de filtro saíram da tela e foram para o painel que abre (14/09/2026):
+// eram oito campos sempre visíveis, ocupando quatro linhas antes do primeiro projeto. A
+// tela segue dona do ESTADO e da composição (`aplicarFiltros`, as contagens); o painel é
+// dono dos campos. Cada guard abaixo aponta para o arquivo onde a coisa guardada MORA.
+const painel = ler('src/components/dashboard/painel-filtros.tsx');
 // ⚠️ O campo de data do formulário MUDOU DE LUGAR na v2: a "data de criação" da
 // Etapa 2 saiu (a data que vale passa a ser a de SUBMISSÃO) e quem usa o calendário
 // agora é o "desde quando" do saving efetivado, na Etapa 3. O guard é o mesmo — o campo
@@ -32,25 +37,38 @@ describe('/dashboard — barra de filtros', () => {
     expect(dashboard).toContain('totalSemStatus(projetos, filtros)');
   });
 
-  it('oferece as cinco dimensões novas', () => {
-    expect(dashboard).toContain('<SeletorPeriodo');
-    expect(dashboard).toMatch(/especial: v as FiltroEspecial/);
+  it('oferece as dimensões do painel', () => {
+    expect(painel).toContain('<SeletorPeriodo');
+    // ⚠️ A dimensão "natureza" (Especiais × Padrão) SAIU em 14/09/2026 — todo projeto tem
+    // nota agora, então separar por natureza não responde pergunta de triagem nenhuma.
+    expect(painel).not.toMatch(/especial: v as FiltroEspecial/);
+    // ⚠️ As categorias de ganho vêm EXPANDIDAS: pílula que abre popover dentro de um painel
+    // já aberto é um clique a mais para revelar 4 caixas que cabem na tela.
+    expect(painel).toMatch(/<FiltroCategorias\s+expandido/);
     // ⚠️ O Segmentado "Ganho" ("Com saving" × "Com receita", escolha única da v1) SAIU em
     // 09/09/2026 e foi SUBSTITUÍDO pela pílula das 4 categorias da v2, multi-seleção que soma.
     // Decisão do Luis: "Era so mudar os que ja tinha e adaptalos devidamente" — não é pílula nova
     // ao lado da velha, é troca.
-    expect(dashboard).toContain('<FiltroCategorias');
-    expect(dashboard).toMatch(/categorias: proximas/);
-    expect(dashboard).not.toMatch(/ganho: v as FiltroGanho/);
-    expect(dashboard).toContain('Todas as áreas');
-    expect(dashboard).toContain('Qualquer pré-status');
-    // ⚠️ O rótulo do estado sai da fonte única que o chip da linha usa — filtro e célula
-    // não podem chamar o mesmo estado por nomes diferentes.
-    expect(dashboard).toContain('ROTULO_ESTADO_PARECER[estado]');
+    expect(painel).toContain('<FiltroCategorias');
+    expect(painel).toMatch(/categorias: proximas/);
+    expect(painel).not.toMatch(/ganho: v as FiltroGanho/);
+    expect(painel).toContain('Todas as áreas');
+    // ⚠️ O filtro de PRÉ-STATUS saiu em 14/09/2026: `Pré-aprovado` virou um STATUS, então
+    // filtrar por "Pré-pendente" passou a ser filtrar por "Pendente". O parecer inteiro do
+    // líder segue na ficha.
+    expect(painel).not.toContain('Qualquer pré-status');
   });
 
   it('"Limpar filtros" preserva a fila de status escolhida', () => {
-    expect(dashboard).toContain('...FILTROS_VAZIOS, status: f.status');
+    expect(painel).toContain('...FILTROS_VAZIOS, status: f.status');
+  });
+
+  // ⚠️ Com os campos fechados num painel, recorte ligado vira recorte INVISÍVEL: a lista
+  // encolhe e ninguém sabe por quê. As pílulas do que está ligado são o que impede isso,
+  // e cada uma desliga a própria dimensão.
+  it('o que está filtrando aparece em pílulas, e cada uma desliga a sua dimensão', () => {
+    expect(painel).toContain('descreverFiltrosAtivos(filtros)');
+    expect(painel).toContain('limparDimensao(f, c.chave)');
   });
 
   it('a paginação volta ao início quando qualquer filtro muda', () => {
@@ -121,7 +139,7 @@ describe('carregamento do admin', () => {
   });
 
   it('a página visível semeia as fichas em UMA requisição', () => {
-    expect(dashboard).toContain('semearLote(idsVisiveis.split(\',\'))');
+    expect(dashboard).toMatch(/semearLote\(idsVisiveis\.split\(["']{1},["']{1}\)\)/);
     // ⚠️ Depende dos IDS, não do array: reordenar a mesma página não pode refazer o lote.
     expect(dashboard).toMatch(/\}, \[idsVisiveis\]\)/);
   });

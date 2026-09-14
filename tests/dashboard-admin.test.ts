@@ -33,6 +33,12 @@ vi.mock('@/integrations/db/client.server', async () => ({
   getReenviosPorIds: vi.fn(async () => new Map()),
   // Avaliação em SOMBRA (teste sombra) — tabelas INTERNAS; por padrão sem recomendação/voto.
   getAvaliacoesNormaisPorIds: vi.fn(async () => new Map()),
+  // ⚠️ Os dois leitores da LISTAGEM são outros: sem `IN` e sem blob, para poderem rodar em
+  // paralelo com a leitura do espelho (ver `listarProjetosDashboard`).
+  getResumoAvaliacoesNormais: vi.fn(async () => new Map()),
+  getTodosFeedbacks: vi.fn(async () => new Map()),
+  // A marca de "ajuste pedido já foi feito" — coluna INTERNA, por isso mapa lateral.
+  getIdsComAjusteRealizado: vi.fn(async () => new Set<string>()),
   getAvaliacaoNormal: vi.fn(async () => null),
   getDeliberacao: vi.fn(async () => null),
   getDeliberacoesPorIds: vi.fn(async () => new Map()),
@@ -198,20 +204,23 @@ describe('mapResumo', () => {
 describe('filas de triagem', () => {
   const base = mapResumo(linha())!;
 
-  it('conta por status e agrupa os sem status', () => {
+  // ⚠️ Célula VAZIA conta como `pendente` desde 14/09/2026 (coluna única): "ninguém escreveu"
+  // e "ninguém decidiu ainda" são o MESMO estado do funil, e uma fila só para o vazio dividia
+  // a mesma pergunta em duas pílulas.
+  it('conta por status, e a célula vazia entra em Pendente', () => {
     const c = contarPorStatus([
       { ...base, statusChave: 'aprovado' },
       { ...base, statusChave: 'aprovado' },
       { ...base, statusChave: 'reprovado' },
       { ...base, statusChave: null },
     ]);
-    expect(c).toEqual({ aprovado: 2, reprovado: 1, sem_status: 1 });
+    expect(c).toEqual({ aprovado: 2, reprovado: 1, pendente: 1 });
   });
 
   it('rótulos legados caem na pílula equivalente', () => {
-    expect(pilulaDe('rejeitado')).toBe('reenvio pendente');
+    expect(pilulaDe('rejeitado')).toBe('ajuste pedido');
     expect(pilulaDe('validado')).toBe('aprovado');
-    expect(pilulaDe(null)).toBe('sem_status');
+    expect(pilulaDe(null)).toBe('pendente');
     expect(pilulaDe('aprovado')).toBe('aprovado');
   });
 
@@ -271,6 +280,35 @@ describe('listarProjetosDashboard', () => {
     expect(r.projetos.map((p) => p.id)).toEqual(['b', 'a']);
     expect(r.total).toBe(2);
     expect(r.contagem).toEqual({ pendente: 2 });
+  });
+
+  // ⚠️ Medido em prod (14/09/2026): a coluna do agente vinha de `getAvaliacoesNormaisPorIds`,
+  // que precisa dos ids e por isso só podia rodar DEPOIS do espelho — e, com a base inteira,
+  // virava 8 consultas `SELECT *` arrastando o JSON dos pareceres. Eram ~1,4 s de servidor
+  // numa resposta que precisa caber em 2 s de tela. Os leitores da listagem não dependem de
+  // id, o que é o que permite rodá-los EM PARALELO com a leitura do espelho.
+  it('a coluna do agente não depende dos ids — é o que a tira do caminho crítico', async () => {
+    const db = await import('@/integrations/db/client.server');
+    (db.getAvaliacoesNormaisPorIds as unknown as { mockClear: () => void }).mockClear();
+    (db.getResumoAvaliacoesNormais as unknown as { mockClear: () => void }).mockClear();
+    await semearEspelho([linha({ 'ID Projeto': 'a' })]);
+    await listarProjetosDashboard();
+    expect(db.getResumoAvaliacoesNormais).toHaveBeenCalled();
+    expect(db.getTodosFeedbacks).toHaveBeenCalled();
+    // O leitor por `IN` continua existindo (a FICHA em lote o usa), mas não na listagem.
+    expect(db.getAvaliacoesNormaisPorIds).not.toHaveBeenCalled();
+  });
+
+  it('falha na leitura do agente NÃO derruba a listagem', async () => {
+    const db = await import('@/integrations/db/client.server');
+    const original = db.getResumoAvaliacoesNormais as unknown as {
+      mockRejectedValueOnce: (e: Error) => void;
+    };
+    original.mockRejectedValueOnce(new Error('banco fora'));
+    await semearEspelho([linha({ 'ID Projeto': 'a' })]);
+    const r = await listarProjetosDashboard();
+    expect(r.projetos).toHaveLength(1);
+    expect(r.avaliacoes).toEqual({});
   });
 
   it('NUNCA lê a planilha na listagem — o dado vem do espelho', async () => {
@@ -609,7 +647,7 @@ describe('definirStatusProjeto', () => {
     await definirStatusProjeto(
       {
         projeto_id: 'legado-148',
-        status: 'Reenvio Pendente',
+        status: 'Ajuste pedido',
         motivo_reenvio: 'projeto parado, em manutenção; reenviar com os fixes',
       },
       'admin@gocase.com',
@@ -705,7 +743,6 @@ describe('definirStatusProjeto', () => {
   it('a lista de status graváveis cobre as filas que a triagem usa', () => {
     expect(STATUS_GRAVAVEIS).toContain('Aprovado');
     expect(STATUS_GRAVAVEIS).toContain('Reprovado');
-    expect(STATUS_GRAVAVEIS).toContain('Reenvio Pendente');
-    expect(STATUS_GRAVAVEIS).toContain('Em validação');
-  });
+    expect(STATUS_GRAVAVEIS).toContain('Ajuste pedido');
+      });
 });

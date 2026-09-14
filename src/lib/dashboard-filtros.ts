@@ -16,10 +16,24 @@
 import type { ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 import { pilulaDe } from "@/components/dashboard/status-triagem";
 import { msDeIso, type Intervalo } from "@/lib/calendario-datas";
-import { ORDEM_ESTADO_PARECER, chaveDoEstado, type EstadoParecer } from "@/lib/aprovacoes-parecer";
+import {
+  ORDEM_ESTADO_PARECER,
+  ROTULO_ESTADO_PARECER,
+  chaveDoEstado,
+  type EstadoParecer,
+} from "@/lib/aprovacoes-parecer";
 
-/** Recorte por natureza do projeto. `sem` = só os padrão (o inverso de `apenas`). */
-export type FiltroEspecial = "todos" | "apenas" | "sem";
+/**
+ * ⚠️ **A dimensão "natureza" (Especiais × Padrão) SAIU em 14/09/2026.**
+ *
+ * Ela existia porque só o projeto ESPECIAL recebia nota: os especiais tinham tela própria
+ * (`/especiais`) e a triagem precisava isolá-los para pontuar. Hoje **todo projeto tem
+ * nota** — e `0` é nota, a caixa «Experimenta», não "não avaliado" —, então separar por
+ * natureza deixou de responder pergunta nenhuma de triagem (decisão do Luis).
+ *
+ * O conceito de projeto especial continua vivo (`Especial?` na planilha, o fluxo que pula o
+ * memorial, o ícone no cartão): o que saiu foi o FILTRO.
+ */
 
 /**
  * Recorte por tipo de ganho declarado. A régua é o VALOR gravado na planilha, não o rótulo
@@ -135,7 +149,6 @@ export type FiltroParecer = typeof TODOS_OS_PARECERES | EstadoParecer;
 export type FiltrosDashboard = {
   /** Chave da pílula de status (`pilulaDe`) ou `'todos'`. */
   status: string;
-  especial: FiltroEspecial;
   ganho: FiltroGanho;
   /** Nome exato da área, ou `TODAS_AS_AREAS`. */
   area: string;
@@ -168,7 +181,6 @@ export type FiltrosDashboard = {
 
 export const FILTROS_VAZIOS: FiltrosDashboard = {
   status: "todos",
-  especial: "todos",
   ganho: "todos",
   agente: "todos",
   area: TODAS_AS_AREAS,
@@ -179,17 +191,6 @@ export const FILTROS_VAZIOS: FiltrosDashboard = {
   soMultiplos: false,
   categorias: [],
 };
-
-/** Um valor só conta como ganho quando é positivo (célula vazia e 0 não entram na fila). */
-function temValor(v: number | null): boolean {
-  return v != null && v > 0;
-}
-
-export function casaEspecial(p: ProjetoDashboardResumo, filtro: FiltroEspecial): boolean {
-  if (filtro === "apenas") return p.especial;
-  if (filtro === "sem") return !p.especial;
-  return true;
-}
 
 export function casaGanho(p: ProjetoDashboardResumo, filtro: FiltroGanho): boolean {
   if (filtro === "saving") return temValor(p.savingReais);
@@ -254,6 +255,11 @@ export function rotuloFaixaEstrelas(min: number | null, max: number | null): str
   return `${min}–${max}`;
 }
 
+/** Um valor só conta como ganho quando é positivo (célula vazia e 0 não entram na fila). */
+function temValor(v: number | null): boolean {
+  return v != null && v > 0;
+}
+
 /** A mesma faixa em frase — é o que o painel mostra sob a fileira de estrelas. */
 export function descreverFaixaEstrelas(min: number | null, max: number | null): string {
   if (min == null && max == null) return "Qualquer nota, inclusive sem nota.";
@@ -288,7 +294,6 @@ export function casaAgente(p: ProjetoDashboardResumo, f: FiltroAgente): boolean 
 
 export type DimensaoFiltro =
   | "status"
-  | "especial"
   | "ganho"
   | "area"
   | "parecer"
@@ -312,7 +317,6 @@ export function casaFiltrosExceto(
 ): boolean {
   return (
     (exceto === "status" || casaStatus(p, f.status)) &&
-    (exceto === "especial" || casaEspecial(p, f.especial)) &&
     (exceto === "ganho" || casaGanho(p, f.ganho)) &&
     (exceto === "area" || casaArea(p, f.area)) &&
     (exceto === "parecer" || casaParecer(p, f.parecer)) &&
@@ -331,7 +335,6 @@ export function aplicarFiltros(
   return projetos.filter(
     (p) =>
       casaStatus(p, f.status) &&
-      casaEspecial(p, f.especial) &&
       casaGanho(p, f.ganho) &&
       casaArea(p, f.area) &&
       casaParecer(p, f.parecer) &&
@@ -380,7 +383,6 @@ export function rotuloCategorias(selecionadas: readonly CategoriaFiltroGanho[]):
  */
 export function contarFiltrosAtivos(f: FiltrosDashboard): number {
   return (
-    (f.especial !== "todos" ? 1 : 0) +
     (f.ganho !== "todos" ? 1 : 0) +
     (f.area !== TODAS_AS_AREAS ? 1 : 0) +
     (f.parecer !== TODOS_OS_PARECERES ? 1 : 0) +
@@ -430,9 +432,10 @@ export function pareceresDisponiveis(
     contagem.set(k, (contagem.get(k) ?? 0) + 1);
   }
   const selecionado = f.parecer !== TODOS_OS_PARECERES ? f.parecer : null;
-  return ORDEM_ESTADO_PARECER.filter(
-    (e) => contagem.has(e) || e === selecionado,
-  ).map((e) => ({ estado: e, total: contagem.get(e) ?? 0 }));
+  return ORDEM_ESTADO_PARECER.filter((e) => contagem.has(e) || e === selecionado).map((e) => ({
+    estado: e,
+    total: contagem.get(e) ?? 0,
+  }));
 }
 
 /**
@@ -464,4 +467,71 @@ export function totalSemStatus(projetos: ProjetoDashboardResumo[], f: FiltrosDas
     (a, [k, v]) => (k === "descontinuado" ? a : a + v),
     0,
   );
+}
+
+/**
+ * Uma dimensão de filtro LIGADA, escrita para caber numa pílula que a pessoa pode desligar.
+ *
+ * Existe porque os filtros saíram da barra e foram para um painel que fica FECHADO: sem
+ * isto, recorte ligado vira recorte invisível — a lista encolhe e ninguém sabe por quê.
+ * A `chave` é a dimensão (a mesma palavra de `casaFiltrosExceto`), para o botão de fechar
+ * saber o que zerar.
+ */
+export type ChipFiltro = { chave: DimensaoFiltro | "multiplos"; rotulo: string };
+
+/**
+ * As dimensões ligadas, na ordem em que aparecem no painel. PURA.
+ *
+ * ⚠️ O STATUS fica de fora de propósito: ele é a faixa de pílulas, sempre visível e com
+ * contagem própria — repeti-lo como chip diria duas vezes a mesma coisa.
+ */
+export function descreverFiltrosAtivos(f: FiltrosDashboard): ChipFiltro[] {
+  const chips: ChipFiltro[] = [];
+  if (f.categorias.length > 0)
+    chips.push({ chave: "categorias", rotulo: rotuloCategorias(f.categorias) });
+  if (f.periodo) chips.push({ chave: "periodo", rotulo: `${f.periodo.inicio} a ${f.periodo.fim}` });
+  if (f.estrelasMin != null || f.estrelasMax != null) {
+    chips.push({ chave: "estrelas", rotulo: rotuloFaixaEstrelas(f.estrelasMin, f.estrelasMax) });
+  }
+  if (f.area !== TODAS_AS_AREAS) chips.push({ chave: "area", rotulo: f.area });
+  if (f.parecer !== TODOS_OS_PARECERES) {
+    chips.push({
+      chave: "parecer",
+      rotulo: ROTULO_ESTADO_PARECER[f.parecer as EstadoParecer] ?? f.parecer,
+    });
+  }
+  if (f.agente !== "todos") {
+    chips.push({
+      chave: "agente",
+      rotulo: f.agente === "sem" ? "Sem análise do agente" : "Com análise do agente",
+    });
+  }
+  if (f.soMultiplos) chips.push({ chave: "multiplos", rotulo: "Autores com 2 ou mais" });
+  return chips;
+}
+
+/** Zera UMA dimensão, preservando as outras (o X de cada pílula ativa). PURA. */
+export function limparDimensao(f: FiltrosDashboard, chave: ChipFiltro["chave"]): FiltrosDashboard {
+  switch (chave) {
+    case "categorias":
+      return { ...f, categorias: [] };
+    case "periodo":
+      return { ...f, periodo: null };
+    case "estrelas":
+      return { ...f, estrelasMin: null, estrelasMax: null };
+    case "area":
+      return { ...f, area: TODAS_AS_AREAS };
+    case "parecer":
+      return { ...f, parecer: TODOS_OS_PARECERES };
+    case "agente":
+      return { ...f, agente: "todos" };
+    case "multiplos":
+      return { ...f, soMultiplos: false };
+    // `ganho` é a dimensão LEGADA (substituída por `categorias`) — nunca vira chip, mas o
+    // `switch` a cobre para o TypeScript exigir revisão quando uma dimensão nova nascer.
+    case "ganho":
+      return { ...f, ganho: "todos" };
+    case "status":
+      return { ...f, status: "todos" };
+  }
 }

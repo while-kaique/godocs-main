@@ -329,7 +329,10 @@ export function ordenarPorDataDesc(a: ProjetoDashboardResumo, b: ProjetoDashboar
 export function contarPorStatus(projetos: ProjetoDashboardResumo[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const p of projetos) {
-    const k = p.statusChave ?? 'sem_status';
+    // ⚠️ Célula VAZIA conta como `pendente` desde 14/09/2026 (coluna única de status):
+    // "ninguém escreveu nada" e "ninguém decidiu ainda" são o MESMO estado do funil, e uma
+    // fila `sem_status` separada dividia a mesma pergunta em duas pílulas.
+    const k = p.statusChave ?? 'pendente';
     out[k] = (out[k] ?? 0) + 1;
   }
   return out;

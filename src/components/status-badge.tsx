@@ -5,6 +5,7 @@ import {
   XCircle,
   FileText,
   Archive,
+  ShieldCheck,
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<
@@ -44,8 +45,33 @@ const STATUS_CONFIG: Record<
     color: "var(--go-blue)",
     icon: <Clock className="h-3.5 w-3.5" />,
   },
+  // ⚠️ **`Ajuste pedido` é o nome novo (14/09/2026)** — o mesmo verbo que o líder já usava,
+  // agora valendo também para a devolução da triagem. `Reenvio Pendente` e `Rejeitado` são
+  // o vocabulário ANTERIOR e seguem mapeados: há linhas assim na planilha.
+  "ajuste pedido": {
+    label: "Ajuste pedido",
+    bg: "rgba(215,219,0,0.08)",
+    border: "rgba(215,219,0,0.25)",
+    color: "#8a7d00",
+    icon: <RotateCcw className="h-3.5 w-3.5" />,
+  },
+  // O líder liberou (ou o projeto não passa por líder). É o estado em que o agente decide.
+  "pré-aprovado": {
+    label: "Pré-aprovado",
+    bg: "rgba(14,165,233,0.08)",
+    border: "rgba(14,165,233,0.22)",
+    color: "#0369a1",
+    icon: <ShieldCheck className="h-3.5 w-3.5" />,
+  },
+  "pre-aprovado": {
+    label: "Pré-aprovado",
+    bg: "rgba(14,165,233,0.08)",
+    border: "rgba(14,165,233,0.22)",
+    color: "#0369a1",
+    icon: <ShieldCheck className="h-3.5 w-3.5" />,
+  },
   "reenvio pendente": {
-    label: "Reenvio Pendente",
+    label: "Ajuste pedido",
     bg: "rgba(215,219,0,0.08)",
     border: "rgba(215,219,0,0.25)",
     color: "#8a7d00",
@@ -66,7 +92,7 @@ const STATUS_CONFIG: Record<
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
   },
   rejeitado: {
-    label: "Reenvio Pendente",
+    label: "Ajuste pedido",
     bg: "rgba(215,219,0,0.08)",
     border: "rgba(215,219,0,0.25)",
     color: "#8a7d00",
@@ -94,7 +120,9 @@ const STATUS_CONFIG: Record<
 
 export function StatusBadge({ status }: { status: string | null }) {
   const cfg = STATUS_CONFIG[status ?? ""] ?? {
-    label: status ?? "—",
+    // ⚠️ Sem status, o rótulo é a PALAVRA (14/09/2026). O travessão saiu das telas: ele
+    // não dizia nada que "Sem status" não diga, e num badge se lia como falha de render.
+    label: status ?? "Sem status",
     bg: "rgba(0,0,0,0.03)",
     border: "rgba(0,0,0,0.1)",
     color: "#6b7280",

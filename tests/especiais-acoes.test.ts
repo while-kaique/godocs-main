@@ -48,7 +48,7 @@ describe('ações de triagem', () => {
 describe('ações disponíveis por estado', () => {
   it('some a ação que o projeto JÁ é — "Aprovar" num aprovado só gera ruído de auditoria', () => {
     expect(acoesDisponiveis('aprovado')).toEqual(['reenviar', 'reprovar']);
-    expect(acoesDisponiveis('reenvio pendente')).toEqual(['aprovar', 'reprovar']);
+    expect(acoesDisponiveis('ajuste pedido')).toEqual(['aprovar', 'reprovar']);
     expect(acoesDisponiveis('reprovado')).toEqual(['aprovar', 'reenviar']);
   });
 

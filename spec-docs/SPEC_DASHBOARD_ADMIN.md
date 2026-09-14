@@ -181,3 +181,285 @@ em `localStorage`, mudança de range/colunas lidas, paginação server-side.
 Editar dados do projeto pela tela (memorial, horas, saving) · e-mail automático ao mudar status (já
 existe `/email-legados`) · paginação/busca server-side · mexer na regra TEMPORÁRIA que grava "Pendente"
 na IDA.
+
+---
+
+## 7. Fusão das 3 telas de triagem (14/09/2026)
+
+**Pedido (Luis):** *"A tela de especiais + aprovação de pendentes podem ser fundidas a tela de
+dashboard. Vai ser uma view de kanban e uma view de lista, dinâmica, rápida de carregamento. O
+skeleton loading vai ser de no máximo 2 segundos. Na tela só deve aparecer os novos nomes da
+coluna de v2. Filtros bem organizados e de fácil acesso, mas sem poluir a tela. Evitar textos
+poluindo a tela, sem traços nos textos. Remover do menu lateral 'Áreas', 'Disparo de e-mails' e
+'Testes', e fazer com que ele encolha e expanda."*
+
+### D11 — o eixo do quadro é DADO, não rota
+
+As três telas (`/dashboard`, `/especiais`, `/aprovacoes-pendentes`) liam o **mesmo** espelho da
+planilha, com o **mesmo** `mapResumo`, gravavam status pela **mesma** rota e abriam a **mesma**
+ficha. O que as distinguia era o `groupBy` e o recorte de escopo. Isso virou uma tabela de eixos
+em `src/lib/dashboard-kanban.ts` (PURO): `status` · `fila` · `nota` · `autor` · `area`, onde
+**`nota` é a antiga `/especiais`** e **`autor` a antiga `/aprovacoes-pendentes`**. Acrescentar um
+eixo passa a ser uma entrada, não uma tela.
+
+**O que NÃO foi reescrito, de propósito:** a régua de fila/espera/urgência continua em
+`especiais-view.ts` e o agrupamento por autor em `aprovacao-pendentes-view.ts`. Os dois já eram
+puros e testados; redigitá-los criaria duas verdades sobre "de quem é a bola".
+
+**As rotas antigas continuam de pé.** O que saiu foi a porta no menu. Links para `/especiais` e
+`/aprovacoes-pendentes` circulam em conversa e e-mail, e o comparador por **âncora** e a
+**divisão de áreas por validador** (`especial_referencia`, `POST /api/admin/especiais/dono`)
+seguem morando lá: não foram portados.
+
+### D12 — colunas que aparecem MESMO VAZIAS
+
+No eixo `status`, os **3 status do funil** (`pendente`/`aprovado`/`reprovado`) aparecem sempre; no
+eixo `nota`, os **níveis 0 a 5**. Motivo: coluna que some faz "não há reprovado hoje" ser lido como
+"reprovar não existe", e a régua da nota com buraco no 4 diz que 4 não existe. Acima de 5 a escala
+é **aberta** (há 7, 8 e 10 na planilha) e o nível só ganha coluna quando tem projeto. `sem-nota`
+(célula vazia) continua sendo coluna **própria**, diferente de `0`.
+
+### D13 — o quadro não custa rede
+
+Ele reagrupa a listagem que já está no cache do React Query. Trocar de vista ou de eixo é `useMemo`,
+não requisição. Canário em `tests/dashboard-kanban.test.ts` conta os `apiFetch` da tela (são 4: a
+listagem, o fallback sem prefetch, o "Atualizar" e a gravação de status) — nenhum deles depende de
+vista nem de eixo.
+
+### D14 — filtros: painel que abre, pílulas do que está ligado
+
+Eram 8 controles sempre visíveis, ocupando 4 linhas antes do primeiro projeto. Agora a barra tem
+**busca + botão "Filtros" (com a contagem) + as pílulas ativas**, e os campos moram num painel
+fechado por padrão (`painel-filtros.tsx`).
+
+⚠️ **Com os campos escondidos, recorte ligado vira recorte invisível** — a lista encolhe e ninguém
+sabe por quê. As pílulas são o que impede isso, e cada uma desliga a própria dimensão. Régua nas
+puras `descreverFiltrosAtivos` e `limparDimensao` (`dashboard-filtros.ts`): **filtro novo entra nas
+duas no mesmo commit**, senão ele recorta a lista sem aparecer em lugar nenhum.
+
+⚠️ O painel é **inline, não popover**: dentro dele há três controles que já usam portal (período,
+nota, categorias), e popover dentro de popover fecha um ao abrir o outro.
+
+⚠️ O **status fica de fora** das pílulas: ele é a faixa de cima, com contagem própria e sempre
+visível. Repeti-lo diria duas vezes a mesma coisa.
+
+### D15 — a lentidão era uma consulta, não a planilha
+
+Medido em 14/09/2026, 6 chamadas quentes de cada lado com base equivalente (782 × 770 projetos):
+`GET /api/admin/dashboard/projetos` tinha **mediana 1,74 s** em prod. Não era a planilha (a listagem lê o espelho desde 11/08) nem o payload (o edge já comprime em zstd:
+620 KB viram ~87 KB no fio). Era a **coluna do agente**: vinha de `carregarSombraDaListagem(ids)` →
+`getAvaliacoesNormaisPorIds`, que **precisa dos ids** e por isso só podia começar depois de o
+espelho chegar — e, com a base inteira, virava **8 consultas** `SELECT *` (o `IN` quebrado no teto
+de 100 variáveis do Godeploy) arrastando o `votos` de cada linha: o JSON com os pareceres dos 4
+agentes, que a tabela nunca desenha.
+
+Trocada por **`getResumoAvaliacoesNormais`** + **`getTodosFeedbacks`** (uma consulta cada, só os
+escalares, sem `IN`), que por não dependerem de id nenhum entram no **mesmo `Promise.all`** da
+leitura do espelho. Na staging, com o código novo: **mediana 1,22 s** — cerca de 0,5 s (30%) a menos.
+
+⚠️ **Honestidade da medida:** a primeira leitura isolada deu 2,5 s em prod e sugeria ~1 s de ganho;
+com 6 amostras quentes o ganho real é ~0,5 s. ⚠️ **Isolate FRIO continua custando 20 s+** nos dois
+ambientes — é comportamento da plataforma (já registrado na seção 6) e nenhum skeleton o esconde.
+O alvo de "skeleton de no máximo 2 s" vale para o caminho quente, que é onde a triagem vive.
+
+⚠️ É o **gotcha 4 desta spec aplicado a uma segunda tabela**: campo que a tela não desenha não
+viaja — e aqui ele nem era campo, era blob. ⚠️ O leitor por `IN` **continua existindo** (a ficha em
+lote o usa); o canário em `tests/dashboard-admin.test.ts` proíbe a **listagem** de voltar a chamá-lo.
+⚠️ Não procurar ganho no tamanho do payload de novo: a compressão já resolve isso.
+
+### D16 — vocabulário: só v2 na tela
+
+A migração renomeou 19 colunas, mas quatro ficaram com o nome da v1 porque renomeá-las quebraria o
+casamento por nome de quem as escreve. Elas ganharam **rótulo de exibição** em `rotuloColuna`
+(`src/lib/coluna-rotulo.ts`, a mesma fonte única dos papéis): `Saving Horas Real`/`Escalado` →
+"Horas liberadas: carga real / ganho por escala", `Memorial de Saving` → "Memorial do impacto",
+`Diff …` → "Diferença de …". Os dois títulos de grupo da ficha passaram a nomear os braços do ganho
+("Custo evitado (horas liberadas)" e "Saving efetivado, receita e custo para rodar"), e
+**`Custo Externo Mensal` saiu** da ficha: a coluna não existe na planilha desde 03/09/2026.
+
+⚠️ É **rótulo, nunca chave**. Nada aqui muda como a célula é lida ou escrita.
+
+### D17 — o travessão saiu das telas
+
+Célula vazia é vazia; `StatusBadge` sem status diz **"Sem status"**; `ChipAgente` sem análise vira
+`sr-only`. Multiplicado por 600 linhas, o traço competia com o dado real e não dizia nada que o
+cabeçalho da coluna já não dissesse.
+
+⚠️ Isso é **apresentação**. `ouTraco` (`dashboard-resumo.ts`) continua gravando `—` na planilha, e
+isso **não muda**: lá o travessão é o padrão de "texto vazio" da própria base.
+
+### D18 — menu lateral: 4 itens, e recolhe
+
+Ficaram **Triagem · Aglutinação · Investigador · Fluxos** (`src/lib/admin-nav.ts`, PURO). Saíram
+**Áreas**, **Disparo de e-mails** e **Testes** (não são trabalho de rotina da triagem) e as duas
+telas absorvidas.
+
+⚠️ **Sair do menu não é deixar de existir**: as cinco rotas continuam no ar, alcançáveis por URL, e
+`tests/admin-nav.test.ts` cobra os arquivos no repo. ⚠️ O **Dashboard segue sendo o único
+`preload={false}`**, pela razão de sempre: hover num link com preload dispara
+`iniciarPrefetchDashboard()` no `beforeLoad` do layout, e a cota de leitura é compartilhada com
+produção. Recolhido, o rótulo vai para `sr-only` e o `title` carrega rótulo + descrição; a
+preferência mora em `localStorage` e **nunca lança** (aba anônima, armazenamento bloqueado).
+
+### D19 — smoke de render
+
+O repo não tem harness de render (sem jsdom), então os guards de UI eram feitos sobre o **fonte** —
+o que pega fiação e não pega componente que explode ao montar. `tests/quadro-render.test.ts` renderiza
+o quadro com `renderToStaticMarkup` (não precisa de DOM) nos **5 eixos**, com dado real, e prova que
+o travessão não voltou. Sem JSX de propósito: a suíte só coleta `tests/**/*.test.ts`.
+
+---
+
+## 8. A coluna ÚNICA de status (14/09/2026)
+
+**Pedido (Luis):** *"No backend podemos unificar a coluna de pre-status e status. O agente so
+vai aprovar/reprovar quando status for pre-aprovado, que indica que o lider pre aprovou. Se
+for pendente nao teve pre-aprovaçao."* → *"Pendente, pre-aprovado, aprovado, ajuste pedido e
+reprovado sao os unicos status possiveis agora. Depois que o ajuste pedido tiver tido seu
+ajuste feito, ele volta para pendente com flag de ajuste realizado (log tracking)."*
+
+### O problema, medido
+
+As duas colunas eram **ortogonais no dado e contraditórias na prática**. Nas 782 linhas de
+produção, em 14/09/2026:
+
+| Status | Pré-status | n |
+|---|---|---|
+| Aprovado | vazio | 434 |
+| Aprovado | Pré-aprovado | 161 |
+| Reprovado | vazio | 104 |
+| Reprovado | **Pré-aprovado** | 36 |
+| Aprovado | **Pré-pendente** | 14 |
+| Aprovado/Reprovado | **Ajuste pedido** | 9 |
+| Pendente | vazio | 3 |
+
+**71% tinha pré-status vazio** (nunca entrou em fila de líder) e as linhas em negrito são
+combinações que o modelo não deveria permitir: 36 projetos reprovados que o líder havia
+pré-aprovado, 14 aprovados que o líder nunca tinha olhado.
+
+### D20 — os cinco, e o que ficou de fora
+
+`Pendente` · `Pré-aprovado` · `Ajuste pedido` · `Aprovado` · `Reprovado`, em
+`src/lib/status-funil.ts` (PURO).
+
+⚠️ **`Descontinuado` continua existindo e segue FORA do funil.** É o dono arquivando
+(`projetos.descontinuado` é a fonte da verdade, a coluna só reflete), não uma etapa entre
+submissão e decisão — a mesma decisão que já valia em `funil-status.ts`. Tirá-lo da coluna
+apagaria a marca de 19 projetos em produção.
+
+Saíram: **`Em validação`** (dizia "esperando", que é `Pendente`) e **`Reenvio Pendente`** (virou
+`Ajuste pedido`, o mesmo verbo que o líder já usava — os dois caminhos de devolução ao autor
+passam a falar a mesma língua).
+
+⚠️ **O vocabulário antigo continua sendo LIDO** (`statusDoTexto`, mapa `LEGADO`): a planilha
+tem as duas gerações, e nenhuma linha pode virar `null` por estar escrita no idioma velho.
+Texto **desconhecido** devolve `null`, nunca um palpite — é a lição do `Dispensado` que
+virava `Pré-reprovado` num fall-through.
+
+### D21 — o portão do agente
+
+`podeAgenteDecidir(status)` é verdadeiro **só em `Pré-aprovado`**. É a regra inteira, e é o
+motivo de a coluna ter virado uma só: antes essa pergunta exigia cruzar duas colunas que se
+contradiziam. `drenarFilaDoFunil` deixou de filtrar `Status = Pendente` e passa a usar este
+predicado.
+
+⚠️ **Corolário operacional:** depois do deploy a fila do cron nasce **vazia** (nenhuma linha
+está em `Pré-aprovado`) e enche conforme chegam submissões novas e conforme os líderes
+decidem as antigas. Isso é o comportamento pedido, não um defeito.
+
+⚠️ **`Pré-aprovado` não conta como decisão humana** (`ehStatusIndeciso`). Ele é o líder
+dizendo "por mim pode seguir", e é literalmente o estado em que o agente foi convocado. Se a
+trava de decisão humana (10/09) o tratasse como decisão, ela barraria o agente exatamente
+onde ele deve agir, e o funil pararia inteiro.
+
+### D22 — quem nunca passa por líder nasce Pré-aprovado
+
+71% da base não entra em fila: coordenador para cima submetendo, projeto especial (D27),
+pessoa sem líder na TeamGuide, integração fora. Eles já recebiam o rótulo `Pré-aprovado
+(liderança)` e afins; o que muda é o **Status** dizer o mesmo (`statusDeSubmissao`). Sem isto,
+a régua do D21 pararia o funil para a maioria dos projetos, esperando um líder que não existe.
+O porquê da isenção continua na justificativa (D12).
+
+### D23 — quem move o Status, e quem não move
+
+| Quem | Quando | Para |
+|---|---|---|
+| Líder (`decidirAprovacao`) | veredito `aprovado` | `Pré-aprovado` |
+| Líder | veredito `ajuste` | `Ajuste pedido` |
+| Líder | veredito `reprovado` | `Reprovado` |
+| Submissão | sempre | `Pendente` ou `Pré-aprovado` (D22) |
+| Triagem (`definirStatusProjeto`) | clique na ficha ou no cartão | qualquer gravável |
+| Time de agentes (junta) | só a partir de `Pré-aprovado` | `Aprovado`/`Reprovado`/`Pendente` |
+
+⚠️ O líder só move o Status **no estágio 1** (líder do autor). O estágio 2 (líder do dono do
+projeto pai) nunca teve coluna no Sheets e continua sem: mover o funil por ele faria a decisão
+de um líder que não é o do autor sobrescrever a do que é.
+
+⚠️ O líder **nunca rebaixa um status FINAL.** A análise e a triagem decidem depois dele; se a
+linha já está `Aprovado`/`Reprovado`, um parecer que chega atrasado não a desfaz. A checagem
+lê o Status do **espelho** (nunca do Sheets — cota compartilhada com prod) e falha de leitura
+devolve `null`, que faz o código **não encostar**.
+
+⚠️ `pendente` (fila aberta) e `dispensado` (fila fechada pelo sistema) **não movem nada**:
+dispensar fecha a FILA, não decide o projeto.
+
+### D24 — `Ajuste pedido` volta a `Pendente`, com marca
+
+O reenvio do autor devolve o projeto a `Pendente` pelo caminho normal da IDA e grava
+**`projetos.ajuste_realizado_em`**.
+
+⚠️ Coluna **INTERNA**: não existe no Sheets, fica fora de `SAFE_UPDATE_FIELDS` e o sync
+reverso não a toca (mesma disciplina de `editores_delegados`). A tela a recebe por **mapa
+lateral** na listagem (`ajustesRealizados`), como as avaliações do agente.
+
+⚠️ Sem a marca, o projeto ajustado reentra na fila **indistinguível de quem nunca saiu dela**,
+e quem tria perde a informação de que já houve uma volta — que é justamente o que muda como se
+lê o projeto. Na tela é o chip "Ajuste realizado" (ícone + texto, nunca só cor).
+
+⚠️ `ehReenvioDeAjuste` só dispara em `Ajuste pedido`: reenvio de um projeto já `Aprovado`
+**não** o rebaixa (desfazer decisão da triagem é de gente).
+
+### D25 — a coluna `Aprovação do Líder` fica, congelada
+
+Ela **continua sendo escrita** como auditoria (quem liberou), e a `Justificativa Aprovação do
+Líder` segue trazendo o checklist inteiro, que a ficha lê e o parser do D19 desmonta. O que
+ela deixou de ser é a **régua do funil**.
+
+Por isso saiu da TELA: a coluna "Pré-status" da tabela, o chip do cartão do quadro e o filtro
+de pré-status. Com `Pré-aprovado` no Status, filtrar por "Pré-pendente" é filtrar por
+"Pendente".
+
+⚠️ **Não apagar a coluna da planilha** sem decisão explícita: 782 linhas, irreversível, e o
+histórico de quem pré-aprovou o quê some.
+
+### D26 — a migração é um no-op, e isso foi medido
+
+`POST /api/admin/migrar-status-unico` (`requireAdmin`, **`dry` é o DEFAULT**), régua na pura
+`unificarStatus`. Ela recalcula `Status` a partir do par antigo e **não** toca `Atualizado Em`
+nem a coluna do líder. Falha numa linha não derruba as outras.
+
+A precedência resolve as contradições sozinha: **arquivo vence tudo** → **decisão final vence
+o parecer do líder** → **pedido de ajuste** → **parecer do líder** → **Pendente**.
+
+**Medido em 14/09/2026: ZERO linhas mudariam** — nem nas 782 de produção, nem nas 770 da
+staging (rodado em `dry`). Porque 778 das 782 já estão em `Aprovado`/`Reprovado`/
+`Descontinuado`, e decisão final vence parecer. **O que muda é o fluxo daqui para frente, não
+o passado.** Uma migração que reescrevesse tudo seria o risco; esta encosta no mínimo.
+
+⚠️ **Pendência de OPERAÇÃO:** o dropdown da coluna `Status` nas 3 abas precisa receber
+`Pré-aprovado` e `Ajuste pedido`. Escrever fora do dropdown funciona, mas marca a célula como
+inválida para quem abre a planilha.
+
+### D27 — célula vazia é `Pendente`
+
+`pilulaDe` e `contarPorStatus` passaram a contar célula vazia como `pendente`, e a pílula
+`sem_status` deixou de existir: com a coluna única, "ninguém escreveu nada" e "ninguém decidiu
+ainda" são o mesmo estado do funil, e duas pílulas dividiam a mesma pergunta.
+
+### D28 — o filtro de NATUREZA saiu
+
+Especiais × Padrão existia porque só o projeto especial recebia nota, e a triagem precisava
+isolá-los para pontuar. Hoje **todo projeto tem nota**, e `0` é nota (a caixa «Experimenta»),
+então a dimensão deixou de responder pergunta nenhuma de triagem. O conceito de projeto
+especial continua vivo (`Especial?` na planilha, o fluxo que pula o memorial, o ícone no
+cartão): o que saiu foi o recorte.

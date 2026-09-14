@@ -62,10 +62,24 @@ export type EscritaDeStatus = {
   status?: string | null;
 };
 
-/** `Pendente`/`Em validação` = "ninguém decidiu ainda" — não bloqueia o agente. */
+/**
+ * "Ninguém decidiu ainda" — não bloqueia o agente.
+ *
+ * ⚠️ **`Pré-aprovado` entra aqui (14/09/2026), e é o ponto todo da coluna única.** Ele é o
+ * líder dizendo "por mim pode seguir", não a triagem dizendo "aprovado": é literalmente o
+ * estado em que o agente DEVE agir (`podeAgenteDecidir`). Tratá-lo como decisão humana faria
+ * a trava barrar o agente exatamente onde ele foi convocado — o funil pararia inteiro.
+ */
 export function ehStatusIndeciso(status: string | null | undefined): boolean {
   const s = String(status ?? '').trim().toLowerCase();
-  return s === 'pendente' || s === 'em validação' || s === 'em validacao' || s === 'em_validacao';
+  return (
+    s === 'pendente' ||
+    s === 'em validação' ||
+    s === 'em validacao' ||
+    s === 'em_validacao' ||
+    s.startsWith('pré-aprovado') ||
+    s.startsWith('pre-aprovado')
+  );
 }
 
 /**

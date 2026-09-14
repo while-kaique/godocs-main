@@ -26,26 +26,36 @@
  * `SeletorPeriodo`: ativo = preenchido em `--go-blue` com o "×" embutido. Estado **nunca só por
  * cor** — cada linha tem caixa de check visível, rótulo e contagem.
  */
-import { useRef, useState } from 'react';
-import { Coins, X } from 'lucide-react';
-import { Popover } from '@/components/calendario/calendario';
+import { useRef, useState } from "react";
+import { Coins, X } from "lucide-react";
+import { Popover } from "@/components/calendario/calendario";
 import {
   ROTULO_CATEGORIA_GANHO,
   rotuloCategorias,
   type CategoriaFiltroGanho,
-} from '@/lib/dashboard-filtros';
+} from "@/lib/dashboard-filtros";
 
-const AZUL = 'var(--go-blue)';
+const AZUL = "var(--go-blue)";
 
 export function FiltroCategorias({
   selecionadas,
   disponiveis,
   onChange,
+  expandido = false,
 }: {
   selecionadas: CategoriaFiltroGanho[];
   /** Categorias presentes no recorte, com a contagem — de `categoriasDisponiveis`. */
   disponiveis: { categoria: CategoriaFiltroGanho; total: number }[];
   onChange: (proximas: CategoriaFiltroGanho[]) => void;
+  /**
+   * Desenha as opções DIRETO, sem pílula e sem popover.
+   *
+   * ⚠️ Existe porque este filtro passou a morar dentro do painel de filtros, que já é um
+   * espaço aberto: pílula que abre popover DENTRO de um painel aberto é um clique a mais
+   * para revelar quatro caixas que cabiam na tela (pedido do Luis, 14/09/2026). A forma de
+   * pílula continua valendo onde ela é o gatilho de verdade.
+   */
+  expandido?: boolean;
 }) {
   const [aberto, setAberto] = useState(false);
   const gatilho = useRef<HTMLButtonElement>(null);
@@ -59,8 +69,61 @@ export function FiltroCategorias({
   }
 
   function alternar(c: CategoriaFiltroGanho) {
-    onChange(
-      selecionadas.includes(c) ? selecionadas.filter((x) => x !== c) : [...selecionadas, c],
+    onChange(selecionadas.includes(c) ? selecionadas.filter((x) => x !== c) : [...selecionadas, c]);
+  }
+
+  const lista = (
+    <div role="group" aria-label="Categorias de ganho" className="flex flex-col gap-0.5">
+      {disponiveis.length === 0 && (
+        <p className="py-2 text-[12px] text-muted-foreground">Nenhuma categoria neste recorte.</p>
+      )}
+      {disponiveis.map(({ categoria, total }) => {
+        const marcada = selecionadas.includes(categoria);
+        return (
+          <label
+            key={categoria}
+            className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-black/[0.04] motion-reduce:transition-none"
+          >
+            <input
+              type="checkbox"
+              checked={marcada}
+              onChange={() => alternar(categoria)}
+              className="h-3.5 w-3.5 shrink-0 rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+              style={{ accentColor: "var(--go-blue)", ["--tw-ring-color" as string]: AZUL }}
+            />
+            <span
+              className="flex-1 text-[12.5px] leading-snug"
+              style={{
+                color: marcada ? AZUL : "var(--foreground)",
+                fontWeight: marcada ? 600 : 400,
+              }}
+            >
+              {ROTULO_CATEGORIA_GANHO[categoria]}
+            </span>
+            {/* A contagem é do recorte: ela é o que impede a pílula dizer 8 e a lista abrir 2. */}
+            <span className="text-[11px] tabular-nums text-muted-foreground">{total}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+
+  if (expandido) {
+    // `w-full`: a contagem de cada categoria é alinhada à direita, então esta é a única
+    // coisa do painel que PRECISA da largura da coluna (ver o `items-start` do `Campo`).
+    return (
+      <div className="w-full">
+        {lista}
+        {ativo && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="mt-1 rounded-md px-1.5 py-1 text-[11.5px] font-semibold text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+          >
+            Limpar categorias
+          </button>
+        )}
+      </div>
     );
   }
 
@@ -75,16 +138,16 @@ export function FiltroCategorias({
           aria-haspopup="dialog"
           aria-label={
             ativo
-              ? `Filtro de ganhos: ${selecionadas.map((c) => ROTULO_CATEGORIA_GANHO[c]).join(', ')}`
-              : 'Filtrar por categoria de ganho'
+              ? `Filtro de ganhos: ${selecionadas.map((c) => ROTULO_CATEGORIA_GANHO[c]).join(", ")}`
+              : "Filtrar por categoria de ganho"
           }
           className="inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 motion-reduce:transition-none"
           style={{
-            background: ativo ? AZUL : 'var(--card)',
-            color: ativo ? '#fff' : 'var(--foreground)',
-            borderColor: ativo ? AZUL : 'var(--border)',
+            background: ativo ? AZUL : "var(--card)",
+            color: ativo ? "#fff" : "var(--foreground)",
+            borderColor: ativo ? AZUL : "var(--border)",
             paddingRight: ativo ? 30 : undefined,
-            ['--tw-ring-color' as string]: AZUL,
+            ["--tw-ring-color" as string]: AZUL,
           }}
         >
           <Coins className="h-3.5 w-3.5" aria-hidden />
@@ -96,7 +159,7 @@ export function FiltroCategorias({
             onClick={() => onChange([])}
             aria-label="Limpar o filtro de ganhos"
             className="absolute right-1.5 rounded-full p-1 transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white motion-reduce:transition-none"
-            style={{ color: '#fff' }}
+            style={{ color: "#fff" }}
           >
             <X className="h-3 w-3" />
           </button>
@@ -105,48 +168,17 @@ export function FiltroCategorias({
       {aberto && (
         <Popover ancoraRef={gatilho} onFechar={fechar} rotulo="Filtrar por categoria de ganho">
           <div className="w-[286px] p-3.5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.09em]" style={{ color: AZUL }}>
+            <p
+              className="text-[10px] font-bold uppercase tracking-[0.09em]"
+              style={{ color: AZUL }}
+            >
               Categorias de ganho
             </p>
             <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
               Marque quantas quiser. Marcando duas, a lista traz quem tem qualquer uma delas.
             </p>
 
-            <div role="group" aria-label="Categorias de ganho" className="mt-2.5 flex flex-col gap-0.5">
-              {disponiveis.length === 0 && (
-                <p className="py-2 text-[12px] text-muted-foreground">
-                  Nenhuma categoria neste recorte.
-                </p>
-              )}
-              {disponiveis.map(({ categoria, total }) => {
-                const marcada = selecionadas.includes(categoria);
-                return (
-                  <label
-                    key={categoria}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-black/[0.04] motion-reduce:transition-none"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={marcada}
-                      onChange={() => alternar(categoria)}
-                      className="h-3.5 w-3.5 shrink-0 rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
-                      style={{ accentColor: 'var(--go-blue)', ['--tw-ring-color' as string]: AZUL }}
-                    />
-                    <span
-                      className="flex-1 text-[12.5px] leading-snug"
-                      style={{
-                        color: marcada ? AZUL : 'var(--foreground)',
-                        fontWeight: marcada ? 600 : 400,
-                      }}
-                    >
-                      {ROTULO_CATEGORIA_GANHO[categoria]}
-                    </span>
-                    {/* A contagem é do recorte: ela é o que impede a pílula dizer 8 e a lista abrir 2. */}
-                    <span className="text-[11px] tabular-nums text-muted-foreground">{total}</span>
-                  </label>
-                );
-              })}
-            </div>
+            <div className="mt-2.5">{lista}</div>
           </div>
         </Popover>
       )}

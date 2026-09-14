@@ -24,6 +24,7 @@
  */
 import { z } from "zod";
 import { updateRowByProjectId, type SheetRow } from "@/lib/google/sheets";
+import { STATUS_GRAVAVEIS_PROJETO } from "@/lib/status-funil";
 import { registrarAtividade } from "@/lib/atividades.functions";
 // A discordância da ficha vira LIÇÃO pelo módulo puro das correções: o eixo, o piso e o teto do
 // motivo saem de lá para a tela e o servidor cobrarem exatamente o que o prompt vai aceitar.
@@ -48,6 +49,10 @@ import {
   getAprovacoesDeProjetos,
   type ReenvioResumo,
   getAvaliacoesNormaisPorIds,
+  getResumoAvaliacoesNormais,
+  getTodosFeedbacks,
+  getIdsComAjusteRealizado,
+  type ResumoAvaliacaoNormal,
   getAvaliacaoNormal,
   getDeliberacao,
   getDeliberacoesPorIds,
@@ -127,14 +132,10 @@ export type { ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
  * "Status" — escrever um valor fora do dropdown não falha, mas deixa a célula
  * marcada como inválida para quem abre a planilha.
  */
-export const STATUS_GRAVAVEIS = [
-  "Pendente",
-  "Em validação",
-  "Aprovado",
-  "Reenvio Pendente",
-  "Reprovado",
-  "Descontinuado",
-] as const;
+// ⚠️ Reexporta a FONTE ÚNICA (`status-funil.ts`): os 5 do funil + `Descontinuado`, que é
+// arquivo do dono e não etapa. Saíram `Em validação` (dizia "esperando", que é `Pendente`) e
+// `Reenvio Pendente` (virou `Ajuste pedido`, o mesmo vocabulário do líder).
+export const STATUS_GRAVAVEIS = STATUS_GRAVAVEIS_PROJETO;
 export type StatusGravavel = (typeof STATUS_GRAVAVEIS)[number];
 
 /**
@@ -151,7 +152,7 @@ export type AvaliacaoSombraResumo = {
 
 export type ListagemDashboard = {
   projetos: ProjetoDashboardResumo[];
-  contagem: Record<string, number>; // statusChave → total ('sem_status' quando vazio)
+  contagem: Record<string, number>; // statusChave → total (célula vazia conta como 'pendente')
   total: number;
   /**
    * Recomendação em SOMBRA do agregador por projeto (coluna "Sombra"), chaveada por id. Vem
@@ -161,6 +162,14 @@ export type ListagemDashboard = {
   avaliacoes: Record<string, AvaliacaoSombraResumo>;
   /** Voto 👍/👎 já dado pelo admin, por id (indicador na coluna; o voto acontece na ficha). */
   feedbacks: Record<string, "like" | "dislike">;
+  /**
+   * Ids que já VOLTARAM de um "Ajuste pedido" — o autor fez o ajuste e reenviou.
+   *
+   * ⚠️ Vem do SQLite (`projetos.ajuste_realizado_em`), não do espelho: é coluna INTERNA e
+   * não existe no Sheets. Sem esta marca, o projeto que voltou reentra na fila
+   * indistinguível de quem nunca saiu dela.
+   */
+  ajustesRealizados: string[];
   /** ISO — quando a planilha foi lida pela última vez (a idade do ESPELHO, não do request). */
   lidoEm: string;
   /** O espelho passou de `ESPELHO_VELHO_MS` sem sincronizar → a tela avisa. */
@@ -367,42 +376,6 @@ function normalizarVoto(v: string | null | undefined): "like" | "dislike" | null
   return v === "like" || v === "dislike" ? v : null;
 }
 
-/**
- * Recomendação do agregador + voto do admin da PÁGINA inteira, em duas consultas por `IN`.
- * ⚠️ NUNCA lança — o teste sombra é acessório e não pode derrubar a triagem. Falha → mapas
- * vazios (a coluna "Sombra" mostra "—").
- */
-async function carregarSombraDaListagem(ids: string[]): Promise<{
-  avaliacoes: Record<string, AvaliacaoSombraResumo>;
-  feedbacks: Record<string, "like" | "dislike">;
-}> {
-  const avaliacoes: Record<string, AvaliacaoSombraResumo> = {};
-  const feedbacks: Record<string, "like" | "dislike"> = {};
-  if (ids.length === 0) return { avaliacoes, feedbacks };
-  try {
-    const [mesas, votos] = await Promise.all([
-      getAvaliacoesNormaisPorIds(ids),
-      getFeedbacksPorIds(ids),
-    ]);
-    for (const id of ids) {
-      const chave = id.trim().toLowerCase();
-      const m = mesas.get(chave);
-      if (m) {
-        avaliacoes[id] = {
-          veredito: m.veredito,
-          confianca: m.confianca,
-          divergencia: m.divergencia === 1,
-          aplicar: m.aplicar === 1,
-        };
-      }
-      const voto = normalizarVoto(votos.get(chave)?.voto);
-      if (voto) feedbacks[id] = voto;
-    }
-  } catch (e) {
-    console.error("[dashboard-admin] falha ao ler avaliação em sombra da listagem:", e);
-  }
-  return { avaliacoes, feedbacks };
-}
 
 /**
  * Interpreta o `historico` da deliberação (JSON gravado por `upsertDeliberacao`) num array tipado
@@ -600,16 +573,60 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     }
   }
 
-  const [{ linhas, lidoEmMs }, saude] = await Promise.all([lerResumosEspelho(), statusEspelho()]);
+  // ⚠️ **As quatro leituras são PARALELAS, e isso é o ponto** (medido em prod, 14/09/2026).
+  // A coluna do agente vinha de `carregarSombraDaListagem(ids)`, que só podia começar DEPOIS
+  // de o espelho chegar — e, com a base inteira, virava **8 consultas** `SELECT *` (o `IN`
+  // quebrado no teto de 100 variáveis do Godeploy) arrastando o `votos` de cada linha, o JSON
+  // com os pareceres dos 4 agentes que a tabela nunca desenha. Era ~1,4 s de trabalho de
+  // servidor numa resposta que precisa caber em 2 s de tela.
+  //
+  // Os dois leitores novos não dependem de id nenhum (`getResumoAvaliacoesNormais`,
+  // `getTodosFeedbacks`): uma consulta cada, só os escalares, fora do caminho crítico.
+  const [{ linhas, lidoEmMs }, saude, mesas, votos, comAjuste] = await Promise.all([
+    lerResumosEspelho(),
+    statusEspelho(),
+    // Falha aqui NÃO derruba a listagem (a superfície do agente é acessória): a coluna fica
+    // vazia e a triagem segue decidindo.
+    getResumoAvaliacoesNormais().catch((e) => {
+      console.error("[dashboard-admin] falha ao ler a avaliação do agente:", e);
+      return new Map<string, ResumoAvaliacaoNormal>();
+    }),
+    getTodosFeedbacks().catch((e) => {
+      console.error("[dashboard-admin] falha ao ler os votos do admin:", e);
+      return new Map<string, string>();
+    }),
+    // A marca de "o ajuste pedido já foi feito" — coluna INTERNA, por isso mapa lateral.
+    getIdsComAjusteRealizado().catch((e) => {
+      console.error("[dashboard-admin] falha ao ler a marca de ajuste realizado:", e);
+      return new Set<string>();
+    }),
+  ]);
   const projetos = linhas
     .map(mapResumo)
     .filter((p): p is ProjetoDashboardResumo => p != null)
     .sort(ordenarPorDataDesc);
 
-  // Superfície SOMBRA: a recomendação do agregador e o voto do admin vêm de tabelas INTERNAS
-  // (não do espelho), num mapa lateral chaveado por id — mesmo padrão da `/especiais`. Falha
-  // aqui NÃO derruba a listagem (o teste sombra é acessório): a coluna só mostra "—".
-  const { avaliacoes, feedbacks } = await carregarSombraDaListagem(projetos.map((p) => p.id));
+  // ⚠️ Varre os PROJETOS, nunca os mapas: avaliação de projeto que saiu da planilha não pode
+  // virar campo a mais na resposta.
+  const avaliacoes: Record<string, AvaliacaoSombraResumo> = {};
+  const feedbacks: Record<string, "like" | "dislike"> = {};
+  /** Ids que já voltaram de um "Ajuste pedido" — a tela desenha um chip para eles. */
+  const ajustesRealizados: string[] = [];
+  for (const p of projetos) {
+    const chave = p.id.trim().toLowerCase();
+    const m = mesas.get(chave);
+    if (m) {
+      avaliacoes[p.id] = {
+        veredito: m.veredito,
+        confianca: m.confianca,
+        divergencia: m.divergencia === 1,
+        aplicar: m.aplicar === 1,
+      };
+    }
+    const voto = normalizarVoto(votos.get(chave));
+    if (voto) feedbacks[p.id] = voto;
+    if (comAjuste.has(chave)) ajustesRealizados.push(p.id);
+  }
 
   // A idade é do dado: preferimos o carimbo da última corrida OK e caímos no `lido_em` das
   // linhas (o espelho pode ter linhas de antes de `sync_runs` existir).
@@ -620,6 +637,7 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     total: projetos.length,
     avaliacoes,
     feedbacks,
+    ajustesRealizados,
     lidoEm: new Date(idadeRef ?? Date.now()).toISOString(),
     espelhoVelho: idadeRef != null && Date.now() - idadeRef > ESPELHO_VELHO_MS,
     syncFalhou: saude.ultimaFalhou,

@@ -10,20 +10,20 @@ import {
   excluirProjetoCascade,
   updateProjeto,
   parseJson,
-} from '@/integrations/db/client.server';
-import type { ProjetoRow } from '@/integrations/db/client.server';
-import { syncOwnerRowsFromSheet, syncSheetsToSqlite } from '@/lib/google/sync-reverse';
-import { lerLinhasDoDono, invalidarLinhasDoDono } from '@/lib/meus-projetos-cache';
-import { updateRowByProjectId } from '@/lib/google/sheets';
-import { lerLinhasEspelho, espelharEscrita, statusEspelho } from '@/lib/sheet-espelho';
-import { runBackground } from '@/lib/background';
-import { isAdmin } from '@/lib/auth.functions';
+} from "@/integrations/db/client.server";
+import type { ProjetoRow } from "@/integrations/db/client.server";
+import { syncOwnerRowsFromSheet, syncSheetsToSqlite } from "@/lib/google/sync-reverse";
+import { lerLinhasDoDono, invalidarLinhasDoDono } from "@/lib/meus-projetos-cache";
+import { updateRowByProjectId } from "@/lib/google/sheets";
+import { lerLinhasEspelho, espelharEscrita, statusEspelho } from "@/lib/sheet-espelho";
+import { runBackground } from "@/lib/background";
+import { isAdmin } from "@/lib/auth.functions";
 import {
   resumoAprovacaoPorProjeto,
   acessoDeAprovador,
   type ResumoAprovacao,
   type Veredito,
-} from '@/lib/aprovacoes.functions';
+} from "@/lib/aprovacoes.functions";
 
 export type MeuProjetoItem = {
   id: string;
@@ -83,7 +83,7 @@ export type MeuProjetoItem = {
 };
 
 // Prazo para regularizar legados (editar/reenviar até deixar de ter "Atualizado Em" vazio).
-export const PRAZO_LEGADO = '30/06/2026';
+export const PRAZO_LEGADO = "30/06/2026";
 
 export type VersaoSnapshot = {
   versao_num: number;
@@ -140,6 +140,35 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   custo_evitado: string | null;
   custo_evitado_justificativa: string | null;
   custo_evitado_itens: string | null;
+  /**
+   * ── Bloco da v2: o que a Etapa 3 do formulário semeia na EDIÇÃO ──
+   *
+   * ⚠️ **Sem eles a edição reabria os ganhos EM BRANCO** e salvar zerava o impacto do
+   * projeto (achado de 14/09/2026). O `submeter.tsx` já lia estes nomes; o que faltava era
+   * este retorno, que é CURADO, devolvê-los. Mesma razão dos campos de custo evitado acima.
+   *
+   * ⚠️ Projeto da **v1** volta com eles nulos, e é o correto: a v1 não tem o par
+   * antes/agora. Quem edita um projeto v1 preenche os números na linguagem da v2, e a
+   * Etapa 2 cobra as categorias — inventar uma conversão automática afirmaria um "antes"
+   * que ninguém declarou.
+   */
+  ganho_categorias: string | null;
+  saving_efetivado_valor_antes: number | null;
+  saving_efetivado_valor_agora: number | null;
+  saving_efetivado_frequencia: string | null;
+  saving_efetivado_evidencia: string | null;
+  custo_evitado_frequencia: string | null;
+  custo_evitado_horas_linhas: string | null;
+  custo_evitado_nao_contratado: number | null;
+  custo_evitado_racional: string | null;
+  receita_incremental_valor: number | null;
+  receita_incremental_frequencia: string | null;
+  receita_incremental_racional: string | null;
+  ganho_imensuravel_racional: string | null;
+  custo_rodar_itens: string | null;
+  /** Vínculo de feature e link do app: também lidos pelo form e também omitidos. */
+  projeto_pai_id: string | null;
+  url_godeploy: string | null;
   // Custos do projeto: idem custo evitado — necessários para o seed da EDIÇÃO.
   custo_projeto: string | null;
   custo_projeto_itens: string | null;
@@ -152,7 +181,7 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
 
 // OWNER = quem submeteu (responsavel_email). Só o owner edita.
 export function ehOwner(projeto: ProjetoRow, email: string): boolean {
-  return (projeto.responsavel_email ?? '').trim().toLowerCase() === email.trim().toLowerCase();
+  return (projeto.responsavel_email ?? "").trim().toLowerCase() === email.trim().toLowerCase();
 }
 
 // PARTICIPANTE = está na lista de membros, mas NÃO é o owner. Só visualiza.
@@ -188,13 +217,13 @@ export function ehEditorDelegado(projeto: ProjetoRow, email: string): boolean {
 // `projeto_aprovacoes`). Lê o detalhe, NUNCA edita — o poder de edição é do owner e dos
 // `editores_delegados`. Só o DETALHE (`getMeuProjeto`) usa este papel: a listagem de
 // "Meus Projetos" segue owner/participante (a fila do líder mora em `/aprovacoes`).
-export type Papel = 'owner' | 'participante' | 'aprovador';
+export type Papel = "owner" | "participante" | "aprovador";
 
 // "Atualizado Em" preenchido? Trata vazio/"—"/"-" como ausente (= legado pendente).
 export function temAtualizadoEm(v: string | null | undefined): boolean {
   if (!v) return false;
   const s = String(v).trim();
-  return s !== '' && s !== '—' && s !== '-';
+  return s !== "" && s !== "—" && s !== "-";
 }
 
 // Resolve o "Atualizado Em" efetivo de um projeto: prefere o carimbo da PLANILHA
@@ -214,7 +243,7 @@ export function resolverAtualizadoEm(
 // contam como pendentes. Projetos submetidos pelo app têm id aleatório (hex) e NUNCA
 // são pendentes, mesmo sem "Atualizado Em" — a pendência só vale para regularizar legado.
 function ehLegado(id: string): boolean {
-  return id.toLowerCase().includes('legado');
+  return id.toLowerCase().includes("legado");
 }
 
 export function mapItem(
@@ -224,12 +253,12 @@ export function mapItem(
   podeEditar: boolean,
   statusSheet?: string | null,
   motivos?: { reprovado?: string | null; reenvio?: string | null },
-  aprovacao?: MeuProjetoItem['aprovacao'],
+  aprovacao?: MeuProjetoItem["aprovacao"],
 ): MeuProjetoItem {
   // Célula vazia / "—" / "-" → null (o card simplesmente não mostra o bloco).
   const motivo = (v: string | null | undefined): string | null => {
-    const t = (v ?? '').trim();
-    return t === '' || t === '—' || t === '-' ? null : t;
+    const t = (v ?? "").trim();
+    return t === "" || t === "—" || t === "-" ? null : t;
   };
   const at = temAtualizadoEm(atualizadoEm) ? atualizadoEm : null;
   return {
@@ -246,10 +275,10 @@ export function mapItem(
     // verdade (o "Status" do Sheets não volta pelo sync reverso), então o badge reflete
     // "Descontinuado" na hora, mesmo que a escrita na planilha tenha atrasado/falhado.
     status:
-      p.status === 'rascunho'
-        ? 'rascunho'
+      p.status === "rascunho"
+        ? "rascunho"
         : p.descontinuado === 1
-          ? 'descontinuado'
+          ? "descontinuado"
           : statusSheet && statusSheet.trim()
             ? statusSheet.trim().toLowerCase()
             : null,
@@ -305,8 +334,8 @@ async function curarEspelhoSePreciso(): Promise<void> {
   // promise quando a Response retorna. E o sync NÃO é aguardado de propósito — a tela não
   // pode voltar a esperar uma leitura da planilha (foi o que esta fatia veio remover).
   runBackground(
-    syncSheetsToSqlite('sob-demanda')
-      .catch((e) => console.error('[meus-projetos] sync de cura falhou:', e))
+    syncSheetsToSqlite("sob-demanda")
+      .catch((e) => console.error("[meus-projetos] sync de cura falhou:", e))
       .finally(() => {
         syncDeCuraEmCurso = false;
       }),
@@ -333,21 +362,21 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   try {
     const linhas = await lerLinhasEspelho(rows.map((p) => p.id));
     for (const [id, r] of linhas) {
-      atualizadoMap.set(id, (r['Atualizado Em'] ?? '').trim());
-      statusMap.set(id, (r['Status'] ?? '').trim());
-      motivoReprovadoMap.set(id, (r['Motivo Reprovado'] ?? '').trim());
-      motivoReenvioMap.set(id, (r['Motivo Reenvio'] ?? '').trim());
+      atualizadoMap.set(id, (r["Atualizado Em"] ?? "").trim());
+      statusMap.set(id, (r["Status"] ?? "").trim());
+      motivoReprovadoMap.set(id, (r["Motivo Reprovado"] ?? "").trim());
+      motivoReenvioMap.set(id, (r["Motivo Reenvio"] ?? "").trim());
     }
   } catch (e) {
     // Espelho ilegível → a lista ainda sai (sem Status/motivos), como já acontecia quando
     // a leitura da planilha falhava. Nunca cai no `status` do SQLite (ver `mapItem`).
-    console.error('[meus-projetos] falha ao ler o espelho da planilha:', e);
+    console.error("[meus-projetos] falha ao ler o espelho da planilha:", e);
   }
   // Auto-cura, sempre por último e sem bloquear: se o espelho está estagnado, agenda um sync.
   try {
     await curarEspelhoSePreciso();
   } catch (e) {
-    console.error('[meus-projetos] falha ao avaliar a idade do espelho:', e);
+    console.error("[meus-projetos] falha ao avaliar a idade do espelho:", e);
   }
   // Refiltro em JS para evitar falso-positivo de LIKE com emails que são substring de outro.
   // "Status": usa o valor recém-lido da planilha (Sheets é a fonte da verdade).
@@ -361,7 +390,7 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   try {
     aprovacoes = await resumoAprovacaoPorProjeto(visiveis.map((p) => p.id));
   } catch (e) {
-    console.error('[meus-projetos] falha ao ler as pré-aprovações (seguindo sem):', e);
+    console.error("[meus-projetos] falha ao ler as pré-aprovações (seguindo sem):", e);
   }
 
   return visiveis.map((p) => {
@@ -369,7 +398,7 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
     return mapItem(
       p,
       resolverAtualizadoEm(atualizadoMap.get(p.id.toLowerCase()), p.atualizado_em),
-      ehOwner(p, email) ? 'owner' : 'participante',
+      ehOwner(p, email) ? "owner" : "participante",
       // Na lista (só owner/participante), pode editar = owner OU editor delegado.
       ehOwner(p, email) || ehEditorDelegado(p, email),
       statusMap.get(p.id.toLowerCase()) ?? null,
@@ -377,9 +406,7 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
         reprovado: motivoReprovadoMap.get(p.id.toLowerCase()) ?? null,
         reenvio: motivoReenvioMap.get(p.id.toLowerCase()) ?? null,
       },
-      ap
-        ? { veredito: ap.veredito, aprovadores: ap.aprovadores, comentario: ap.comentario }
-        : null,
+      ap ? { veredito: ap.veredito, aprovadores: ap.aprovadores, comentario: ap.comentario } : null,
     );
   });
 }
@@ -408,15 +435,16 @@ export async function contarPendentes(
       // ele deixou de servir a listagem, não deixou de ser útil.
       await lerLinhasDoDono(email);
     } catch (e) {
-      console.error('[contarPendentes] sync sob demanda falhou, usando SQLite:', e);
+      console.error("[contarPendentes] sync sob demanda falhou, usando SQLite:", e);
     }
   }
   const rows = await getProjetosByOwnerEmail(email);
   const count = rows
     .filter((p) => temAcesso(p, email)) // owner OU participante
     // Descontinuado sai da contagem — a automação não roda mais, não há o que regularizar.
-    .filter((p) => ehLegado(p.id) && !temAtualizadoEm(p.atualizado_em) && p.descontinuado !== 1)
-    .length;
+    .filter(
+      (p) => ehLegado(p.id) && !temAtualizadoEm(p.atualizado_em) && p.descontinuado !== 1,
+    ).length;
   return { count, prazo: PRAZO_LEGADO };
 }
 
@@ -426,11 +454,12 @@ export async function contarPendentes(
  */
 export async function excluirRascunho(email: string, projetoId: string): Promise<{ ok: true }> {
   const p = await getProjetoById(projetoId);
-  if (!p) throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
+  if (!p) throw Object.assign(new Error("Projeto não encontrado."), { status: 404 });
   // Só o owner exclui o próprio rascunho (participante não tem rascunho de terceiro).
-  if (!ehOwner(p, email)) throw Object.assign(new Error('Sem permissão para excluir este projeto.'), { status: 403 });
-  if (p.status !== 'rascunho') {
-    throw Object.assign(new Error('Apenas rascunhos podem ser excluídos.'), { status: 400 });
+  if (!ehOwner(p, email))
+    throw Object.assign(new Error("Sem permissão para excluir este projeto."), { status: 403 });
+  if (p.status !== "rascunho") {
+    throw Object.assign(new Error("Apenas rascunhos podem ser excluídos."), { status: 400 });
   }
   await excluirProjetoCascade(projetoId);
   return { ok: true };
@@ -457,18 +486,20 @@ export async function descontinuarProjeto(
   descontinuar: boolean,
 ): Promise<{ ok: true; descontinuado: boolean }> {
   const p = await getProjetoById(projetoId);
-  if (!p) throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
+  if (!p) throw Object.assign(new Error("Projeto não encontrado."), { status: 404 });
   const ehAdmin = await isAdmin(email);
   const podeEditar =
     ehOwner(p, email) || ehEditorDelegado(p, email) || (ehAdmin && !ehParticipante(p, email));
   if (!podeEditar) {
     throw Object.assign(
-      new Error('Apenas o autor, um editor delegado ou a equipe RPA pode descontinuar este projeto.'),
+      new Error(
+        "Apenas o autor, um editor delegado ou a equipe RPA pode descontinuar este projeto.",
+      ),
       { status: 403 },
     );
   }
-  if (p.status === 'rascunho') {
-    throw Object.assign(new Error('Rascunhos não podem ser descontinuados.'), { status: 400 });
+  if (p.status === "rascunho") {
+    throw Object.assign(new Error("Rascunhos não podem ser descontinuados."), { status: 400 });
   }
 
   await updateProjeto(projetoId, { descontinuado: descontinuar ? 1 : 0 });
@@ -476,7 +507,7 @@ export async function descontinuarProjeto(
   // Reflete na planilha (fonte que o time acompanha na aba). Reativar grava "Pendente"
   // — o valor que a regra TEMPORÁRIA usa hoje para todos os submetidos. Best-effort: a
   // flag no SQLite já governa o app, então falha aqui não trava a ação do usuário.
-  const statusSheet = descontinuar ? 'Descontinuado' : 'Pendente';
+  const statusSheet = descontinuar ? "Descontinuado" : "Pendente";
   try {
     await updateRowByProjectId(projetoId, { Status: statusSheet });
     // Remenda o espelho: é dele que a lista lê o Status, então sem isto o badge só mudaria
@@ -484,7 +515,7 @@ export async function descontinuarProjeto(
     // mas o espelho é o que a triagem vê no /dashboard.)
     await espelharEscrita(projetoId, { Status: statusSheet });
   } catch (e) {
-    console.error('[descontinuarProjeto] falha ao gravar Status no Sheets:', e);
+    console.error("[descontinuarProjeto] falha ao gravar Status no Sheets:", e);
   }
 
   // Acabamos de mudar a linha na planilha: o cache de 60 s do dono ficaria com o Status
@@ -510,26 +541,26 @@ export async function definirEditoresDelegados(
   editores: unknown,
 ): Promise<{ ok: true; editores_delegados: string[] }> {
   const p = await getProjetoById(projetoId);
-  if (!p) throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
+  if (!p) throw Object.assign(new Error("Projeto não encontrado."), { status: 404 });
   // Gate: só quem tem poder de edição pelo círculo de participantes — dono ou editor
   // já delegado (cascata). Admin-override NÃO gerencia delegação (não é participante).
   if (!ehOwner(p, email) && !ehEditorDelegado(p, email)) {
     throw Object.assign(
-      new Error('Apenas o dono ou um editor delegado pode distribuir o poder de edição.'),
+      new Error("Apenas o dono ou um editor delegado pode distribuir o poder de edição."),
       { status: 403 },
     );
   }
   if (!Array.isArray(editores)) {
-    throw Object.assign(new Error('Lista de editores inválida.'), { status: 400 });
+    throw Object.assign(new Error("Lista de editores inválida."), { status: 400 });
   }
   // Sanitiza: só participantes atuais (membros), sem duplicatas, nunca o dono.
   const membros = parseJson<string[]>(p.membros) ?? [];
   const membrosLower = new Set(membros.map((m) => m.trim().toLowerCase()));
-  const ownerLower = (p.responsavel_email ?? '').trim().toLowerCase();
+  const ownerLower = (p.responsavel_email ?? "").trim().toLowerCase();
   const vistos = new Set<string>();
   const limpos: string[] = [];
   for (const raw of editores) {
-    if (typeof raw !== 'string') continue;
+    if (typeof raw !== "string") continue;
     const e = raw.trim();
     const lower = e.toLowerCase();
     if (!lower || lower === ownerLower) continue;
@@ -542,13 +573,10 @@ export async function definirEditoresDelegados(
   return { ok: true, editores_delegados: limpos };
 }
 
-export async function getMeuProjeto(
-  id: string,
-  email: string,
-): Promise<MeuProjetoDetalhes> {
+export async function getMeuProjeto(id: string, email: string): Promise<MeuProjetoDetalhes> {
   const data = await getProjetoWithRelations(id);
   if (!data) {
-    throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
+    throw Object.assign(new Error("Projeto não encontrado."), { status: 404 });
   }
   // LEITURA: owner OU participante (membro) podem abrir. Admins (emails do RPA
   // cadastrados na tabela `admins`) podem abrir QUALQUER projeto.
@@ -559,9 +587,11 @@ export async function getMeuProjeto(
   // 06/08/2026, com 28 líderes já convidados para `/aprovacoes`). Só é consultada quando
   // as outras 2 portas falham: para owner/participante/admin é zero I/O extra.
   const acessoAprovador =
-    temAcesso(data, email) || ehAdmin ? { aprovador: false, pendente: false } : await acessoDeAprovador(id, email);
+    temAcesso(data, email) || ehAdmin
+      ? { aprovador: false, pendente: false }
+      : await acessoDeAprovador(id, email);
   if (!temAcesso(data, email) && !ehAdmin && !acessoAprovador.aprovador) {
-    throw Object.assign(new Error('Acesso negado.'), { status: 403 });
+    throw Object.assign(new Error("Acesso negado."), { status: 403 });
   }
   // EDIÇÃO: o owner (quem submeteu), um editor delegado (participante a quem o dono
   // delegou o poder) ou um admin RPA. Participante comum só visualiza — e ser
@@ -573,12 +603,14 @@ export async function getMeuProjeto(
   // primeiras falham), então `podeEditar` fica false sem cláusula nova. Líder que também
   // é admin/owner/delegado mantém exatamente o poder que já tinha (gotcha 8 da spec).
   const podeEditar =
-    ehOwner(data, email) || ehEditorDelegado(data, email) || (ehAdmin && !ehParticipante(data, email));
+    ehOwner(data, email) ||
+    ehEditorDelegado(data, email) ||
+    (ehAdmin && !ehParticipante(data, email));
   const papel: Papel = ehOwner(data, email)
-    ? 'owner'
+    ? "owner"
     : acessoAprovador.aprovador
-      ? 'aprovador'
-      : 'participante';
+      ? "aprovador"
+      : "participante";
 
   const docRow = data.documentacao?.[0];
   const docConteudo = docRow ? parseJson(docRow.conteudo) : null;
@@ -589,21 +621,22 @@ export async function getMeuProjeto(
     ultima_versao = {
       versao_num: ultimaVersaoRow.versao_num,
       acao: ultimaVersaoRow.acao,
-      snapshot_projeto: parseJson(ultimaVersaoRow.snapshot_projeto) ?? ({} as VersaoSnapshot['snapshot_projeto']),
+      snapshot_projeto:
+        parseJson(ultimaVersaoRow.snapshot_projeto) ?? ({} as VersaoSnapshot["snapshot_projeto"]),
       snapshot_doc: parseJson(ultimaVersaoRow.snapshot_doc ?? null),
       created_at: ultimaVersaoRow.created_at,
     };
   }
 
   // Pré-aprovação do líder (só SQLite — sem TeamGuide, sem Sheets). null = não se aplica.
-  let aprovacao: MeuProjetoItem['aprovacao'] = null;
+  let aprovacao: MeuProjetoItem["aprovacao"] = null;
   try {
     const ap = (await resumoAprovacaoPorProjeto([id]))[id];
     if (ap) {
       aprovacao = { veredito: ap.veredito, aprovadores: ap.aprovadores, comentario: ap.comentario };
     }
   } catch (e) {
-    console.error('[meus-projetos] falha ao ler a pré-aprovação do detalhe:', e);
+    console.error("[meus-projetos] falha ao ler a pré-aprovação do detalhe:", e);
   }
 
   // Detalhe não consulta o Sheets; usa o "Atualizado Em" espelhado no SQLite.
@@ -630,8 +663,7 @@ export async function getMeuProjeto(
     membros_papeis: parseJson<Record<string, string>>(data.membros_papeis) ?? {},
     // O que cada participante fez. {} = legado/projeto anterior a esta feature — o form
     // pede o texto na edição (a validação da Etapa 1 exige de todos).
-    membros_contribuicoes:
-      parseJson<Record<string, string>>(data.membros_contribuicoes) ?? {},
+    membros_contribuicoes: parseJson<Record<string, string>>(data.membros_contribuicoes) ?? {},
     nome_projeto: data.nome,
     data_criacao_projeto: data.data_criacao_projeto,
     descricao_breve: data.descricao_breve,
@@ -651,6 +683,38 @@ export async function getMeuProjeto(
     memorial_calculo: data.memorial_calculo,
     documentacao: docConteudo,
     ultima_versao,
+
+    // ── Bloco da v2: é o que a Etapa 3 do formulário SEMEIA na edição ──
+    //
+    // ⚠️ **Sem estes campos a edição abre com os ganhos EM BRANCO** (achado de 14/09/2026).
+    // O `submeter.tsx` lê `data.saving_efetivado_valor_antes` e companhia para repor os
+    // blocos; a consulta já traz tudo (`SELECT p.*`), mas este retorno é CURADO e os deixava
+    // de fora. Resultado: quem editava qualquer projeto — v1 ou v2 — reabria a Etapa 3 zerada
+    // e, ao salvar, **zerava o impacto** do projeto. É a resposta à pergunta "o casamento dos
+    // campos de antes e depois está bem feito?": não estava.
+    //
+    // ⚠️ Projeto da v1 volta com estes campos NULOS, e isso é o correto — a v1 não tem o par
+    // antes/agora, ela tem `saving_horas`/`saving_reais` (que seguem acima). A Etapa 2 cobra
+    // as categorias e a Etapa 3 pede os números na linguagem da v2; inventar uma conversão
+    // automática seria afirmar um "antes" que ninguém declarou.
+    ganho_categorias: data.ganho_categorias ?? null,
+    saving_efetivado_valor_antes: data.saving_efetivado_valor_antes ?? null,
+    saving_efetivado_valor_agora: data.saving_efetivado_valor_agora ?? null,
+    saving_efetivado_frequencia: data.saving_efetivado_frequencia ?? null,
+    saving_efetivado_evidencia: data.saving_efetivado_evidencia ?? null,
+    custo_evitado_frequencia: data.custo_evitado_frequencia ?? null,
+    custo_evitado_horas_linhas: data.custo_evitado_horas_linhas ?? null,
+    custo_evitado_nao_contratado: data.custo_evitado_nao_contratado ?? null,
+    custo_evitado_racional: data.custo_evitado_racional ?? null,
+    receita_incremental_valor: data.receita_incremental_valor ?? null,
+    receita_incremental_frequencia: data.receita_incremental_frequencia ?? null,
+    receita_incremental_racional: data.receita_incremental_racional ?? null,
+    ganho_imensuravel_racional: data.ganho_imensuravel_racional ?? null,
+    custo_rodar_itens: data.custo_rodar_itens ?? null,
+    // Etapa 1/2: o vínculo de feature e o link do app também eram lidos pelo form e não
+    // vinham — mesma omissão, mesmo efeito (o campo volta vazio e o dado se perde no salvar).
+    projeto_pai_id: data.projeto_pai_id ?? null,
+    url_godeploy: data.url_godeploy ?? null,
   };
 }
 
@@ -672,10 +736,10 @@ export async function getHistoricoMeuProjeto(
 > {
   const data = await getProjetoWithRelations(id);
   if (!data) {
-    throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
+    throw Object.assign(new Error("Projeto não encontrado."), { status: 404 });
   }
   if (!temAcesso(data, email) && !(await isAdmin(email))) {
-    throw Object.assign(new Error('Acesso negado.'), { status: 403 });
+    throw Object.assign(new Error("Acesso negado."), { status: 403 });
   }
   const msgs = await getChatMessages(id);
   return (
@@ -683,9 +747,9 @@ export async function getHistoricoMeuProjeto(
       // SÓ mensagens conversacionais. A role 'doc' guarda o TEXTO BRUTO dos arquivos
       // enviados (contexto do LLM, `=== arquivo === …`) e NUNCA pode ser exibida nem
       // trafegar ao cliente — na retomada sem snapshot local ela vazava como mensagem.
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .filter((m) => m.role === "user" || m.role === "assistant")
       .map((m) => {
-        if (m.role === 'assistant') {
+        if (m.role === "assistant") {
           // O assistant é persistido como JSON.stringify(resultado). Extrai o texto de
           // exibição e deriva os flags exatamente como o formatResponse faz na ida —
           // caso contrário o cliente renderizava o JSON cru como bolha de conversa.
@@ -698,18 +762,18 @@ export async function getHistoricoMeuProjeto(
               options?: string[];
             };
             return {
-              role: 'assistant',
-              content: parsed.content ?? parsed.question ?? '',
+              role: "assistant",
+              content: parsed.content ?? parsed.question ?? "",
               options:
                 parseJson<string[]>(m.options) ??
-                (parsed.type === 'options' ? parsed.options ?? null : null),
-              isPreview: parsed.type === 'preview',
-              isComplete: parsed.fase === 'completo',
+                (parsed.type === "options" ? (parsed.options ?? null) : null),
+              isPreview: parsed.type === "preview",
+              isComplete: parsed.fase === "completo",
               fase: parsed.fase ?? null,
             };
           } catch {
             return {
-              role: 'assistant',
+              role: "assistant",
               content: m.content,
               options: parseJson<string[]>(m.options),
               isPreview: false,
@@ -719,7 +783,7 @@ export async function getHistoricoMeuProjeto(
           }
         }
         return {
-          role: 'user',
+          role: "user",
           content: m.content,
           options: null,
           isPreview: false,

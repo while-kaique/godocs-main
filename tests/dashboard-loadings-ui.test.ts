@@ -17,7 +17,7 @@ const skeleton = ler('src/components/dashboard/skeleton-linhas.tsx');
 
 describe('T4 — skeleton no lugar do spinner', () => {
   it('a tabela renderiza SkeletonLinhas enquanto carrega', () => {
-    expect(dashboard).toContain("from '@/components/dashboard/skeleton-linhas'");
+    expect(dashboard).toMatch(/from ["']@\/components\/dashboard\/skeleton-linhas["']/);
     expect(dashboard).toMatch(/carregando \? \(\s*<SkeletonLinhas/);
   });
 
@@ -26,7 +26,7 @@ describe('T4 — skeleton no lugar do spinner', () => {
   });
 
   it('o estado de carregamento é anunciado por TEXTO na região aria-live', () => {
-    expect(dashboard).toMatch(/aria-live="polite"[\s\S]{0,200}Lendo a planilha/);
+    expect(dashboard).toMatch(/aria-live="polite"[\s\S]{0,200}Carregando os projetos/);
   });
 
   it('o skeleton é decorativo e respeita prefers-reduced-motion', () => {
@@ -65,7 +65,7 @@ describe('T9 — a UI avisa quando o espelho da planilha está velho', () => {
   });
 
   it('o botão "Atualizar" avisa que está sincronizando (o clique agora lê a planilha)', () => {
-    expect(dashboard).toContain("'Sincronizando…'");
+    expect(dashboard).toMatch(/["']Sincronizando…["']/);
   });
 });
 

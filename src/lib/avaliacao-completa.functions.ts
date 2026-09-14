@@ -30,6 +30,7 @@ import { juntarAnalises, type Juncao } from '@/lib/avaliacao/junta';
 import { justificativaDaReprovacao, agenteDecideFunil } from '@/lib/funil-status';
 import { getUltimosConsensosDoTimePorIds } from '@/integrations/db/client.server';
 import { definirStatusProjeto } from '@/lib/dashboard-admin.functions';
+import { podeAgenteDecidir } from '@/lib/status-funil';
 import {
   podeAgenteGravarStatus,
   podeAgenteEscreverNota,
@@ -672,8 +673,16 @@ export async function drenarFilaDoFunil(
     // vazia" (14/09/2026): 34 Pendentes tinham a coluna preenchida pelo porte da rodada de calibragem
     // (avaliados na STAGING) e nunca entravam na fila — e projeto que o time deixou Pendente precisa
     // voltar à fila depois de `REAVALIAR_PENDENTE_APOS_HORAS`, senão fica Pendente para sempre.
+    // ⚠️ **A fila é `Pré-aprovado`, não `Pendente` (14/09/2026).** Regra do dono do produto:
+    // *"O agente só vai aprovar/reprovar quando status for pré-aprovado, que indica que o líder
+    // pré aprovou. Se for pendente não teve pré-aprovação."* Em `Pendente` o agente estaria
+    // decidindo ANTES do líder — que é justamente o que a fila de pré-aprovação existe para
+    // impedir. Quem não tem líder para esperar (71% da base: coordenador para cima, especial,
+    // sem líder na TeamGuide) já nasce `Pré-aprovado` e entra aqui na submissão.
     const pendentes = linhas
-      .filter((r) => String((r as unknown as Record<string, string>)['Status'] ?? '').trim().toLowerCase() === 'pendente')
+      .filter((r) =>
+        podeAgenteDecidir((r as unknown as Record<string, string>)['Status'] ?? null),
+      )
       .map((r) => String((r as unknown as Record<string, string>)['ID Projeto'] ?? '').trim())
       .filter(Boolean);
     const consensos = await getUltimosConsensosDoTimePorIds(pendentes);

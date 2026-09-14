@@ -296,6 +296,27 @@ export async function lerLinhasEspelho(projetoIds: string[]): Promise<Map<string
   return out;
 }
 
+/**
+ * O Status que uma linha tem AGORA, do espelho. `null` quando a linha não existe.
+ *
+ * ⚠️ Lê o ESPELHO (SQLite), nunca o Sheets: os dois chamadores estão em caminho quente (a
+ * decisão do líder e o reenvio do autor), e a cota de 60 leituras/min da planilha é
+ * compartilhada com produção.
+ * ⚠️ **Nunca lança.** Falha devolve `null`, e `null` faz os chamadores NÃO mexerem no Status
+ * — o conservador aqui é não encostar, porque a alternativa é rebaixar um projeto já
+ * decidido por causa de um soluço de banco.
+ */
+export async function lerStatusDoEspelho(projetoId: string): Promise<string | null> {
+  try {
+    const linhas = await lerLinhasEspelho([projetoId]);
+    const linha = linhas.get(projetoId) ?? linhas.get(projetoId.toLowerCase());
+    return ((linha as Record<string, string> | undefined)?.['Status'] as string | undefined) ?? null;
+  } catch (e) {
+    console.error('[sheet-espelho] falha ao ler o Status atual (não-fatal):', e);
+    return null;
+  }
+}
+
 // ─── Saúde do espelho ────────────────────────────────────────────────────────
 
 export type StatusEspelho = {

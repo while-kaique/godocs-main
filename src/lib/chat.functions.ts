@@ -6,6 +6,8 @@ const log = (fn: string, ...args: unknown[]) => console.log(`[chat.functions/${f
 const err = (fn: string, ...args: unknown[]) => console.error(`[chat.functions/${fn}]`, ...args);
 
 import { agenteDecideFunil } from "@/lib/funil-status";
+import { statusDeSubmissao, ehReenvioDeAjuste } from '@/lib/status-funil';
+import { lerStatusDoEspelho } from '@/lib/sheet-espelho';
 import { z } from "zod";
 import {
   insertProjeto,
@@ -4189,8 +4191,18 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     projeto.alguem_fazia,
   );
 
+  // ⚠️ **A volta de um "Ajuste pedido" fica marcada** (pedido do dono do produto, 14/09/2026:
+  // *"depois que o ajuste pedido tiver tido seu ajuste feito, ele volta para pendente com flag
+  // de ajuste realizado"*). Sem a marca, o projeto reentra na fila indistinguível de quem
+  // nunca saiu dela, e quem tria perde a informação de que já houve uma volta.
+  // O Status em si volta a `Pendente` (ou `Pré-aprovado`, se o autor é isento) pelo caminho
+  // normal da IDA logo abaixo — aqui só se registra que a volta aconteceu.
+  const statusAntesDoReenvio = ehReenvio ? await lerStatusDoEspelho(projeto_id) : null;
+  const voltouDeAjuste = ehReenvioDeAjuste(statusAntesDoReenvio);
+
   await updateProjeto(projeto_id, {
     status,
+    ...(voltouDeAjuste ? { ajuste_realizado_em: now } : {}),
     // Área derivada do email vira a fonte de verdade. Zera area_id para que o
     // area_nome (join por area_id, fallback p.area) reflita a área derivada.
     area: areaFinal,
@@ -4326,11 +4338,17 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         membros,
         membrosPapeis,
         tiposProjeto,
-        // TEMPORÁRIO: durante a validação da eficácia do formulário, gravamos sempre
-        // "Pendente" na planilha — mesmo para projetos auto-aprovados (ex.: RPA). O
-        // status interno (SQLite/dashboard) continua correto. Reverter para
-        // `status === 'aprovado' ? 'Aprovado' : 'Pendente'` quando a validação terminar.
-        status: "Pendente",
+        // TEMPORÁRIO: durante a validação da eficácia do formulário, a submissão não grava
+        // veredito nenhum na planilha — mesmo para projetos auto-aprovados (ex.: RPA). O
+        // status interno (SQLite/dashboard) continua correto.
+        //
+        // ⚠️ **`Pré-aprovado` quando o projeto NÃO entra em fila de líder (14/09/2026).**
+        // São 71% da base (coordenador para cima submetendo, projeto especial, pessoa sem
+        // líder na TeamGuide) e eles nunca vão receber um parecer. Com a régua nova — *"o
+        // agente só aprova/reprova quando o status for pré-aprovado"* —, deixá-los em
+        // `Pendente` pararia o funil para a maioria dos projetos esperando um líder que não
+        // existe. O PORQUÊ da isenção continua na justificativa (D12).
+        status: statusDeSubmissao(preAprovacao.rotuloSheet),
         area: areaFinal ?? "—",
         memorialLimpo: memorialSavingLimpo ?? "—",
         receitaMemorialLimpo: receitaMemorialLimpo ?? "—",

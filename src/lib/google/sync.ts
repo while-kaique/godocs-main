@@ -9,6 +9,7 @@ import { appendRow, updateRowByProjectId, type SheetColumn } from './sheets';
 // pré-aprovação do líder (`notificacao-chat.ts`). Não reimplementar.
 import { sendChatNotification, buildSubmitMessage, ehProjetoTesteE2E } from './chat';
 import { resumirGanho, resumirGanhoDaPlanilha } from '@/lib/notificacao-ganho';
+import type { StatusProjeto } from '@/lib/status-funil';
 // Espelho da planilha: quem escreve no Sheets remenda o espelho na hora, senão o efeito da
 // escrita só apareceria na tela no próximo cron (as telas leem o espelho — `sheet-espelho.ts`).
 import { espelharEscrita } from '@/lib/sheet-espelho';
@@ -144,7 +145,14 @@ export type SubmitSyncParams = {
   // técnica). Opcional: ausente/vazio → todos entram como coexecutor (retrocompatível).
   membrosPapeis?: Record<string, string>;
   tiposProjeto: string[];
-  status: 'Aprovado' | 'Pendente';
+  /**
+   * O Status com que a linha nasce.
+   *
+   * ⚠️ O tipo era `'Aprovado' | 'Pendente'` e passou a ser o enum do funil (14/09/2026):
+   * submissão isenta de fila de líder nasce **`Pré-aprovado`**, que é o estado que autoriza
+   * o agente a decidir. Ver `src/lib/status-funil.ts`.
+   */
+  status: StatusProjeto;
   area: string;
   memorialLimpo: string;
   receitaMemorialLimpo: string;
