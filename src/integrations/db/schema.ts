@@ -1,9 +1,15 @@
 // Schema SQLite — cria todas as tabelas na primeira execução
 // Usa a interface GoDeployDB (compatível com env.DB do Godeploy e wrapper better-sqlite3 em dev)
 
-import type { GoDeployDB } from './db-adapter';
+import type { GoDeployDB } from "./db-adapter";
 
 const SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS schema_estado (
+    chave       TEXT PRIMARY KEY,
+    valor       TEXT NOT NULL,
+    aplicado_em TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS admins (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     email TEXT NOT NULL UNIQUE,
@@ -711,66 +717,66 @@ const SCHEMA_SQL = `
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.
 // Cada migração roda em try/catch: se a coluna já existir (banco novo), ignora silenciosamente.
 const MIGRATIONS = [
-  'ALTER TABLE analises ADD COLUMN resumo TEXT',
-  'ALTER TABLE projetos ADD COLUMN ganho_total_mensal REAL',
-  'ALTER TABLE projetos ADD COLUMN complexidade TEXT',
+  "ALTER TABLE analises ADD COLUMN resumo TEXT",
+  "ALTER TABLE projetos ADD COLUMN ganho_total_mensal REAL",
+  "ALTER TABLE projetos ADD COLUMN complexidade TEXT",
   // Saving: havia alguém fazendo o processo manualmente antes da automação? ('sim'|'nao')
   // Renomeado de tinha_pessoa_antes → alguem_fazia (mais descritivo). O RENAME cobre
   // bancos que já receberam a coluna antiga; o ADD é fallback para bancos novos.
   // Ambos em try/catch: o que não se aplicar é ignorado silenciosamente.
-  'ALTER TABLE projetos RENAME COLUMN tinha_pessoa_antes TO alguem_fazia',
-  'ALTER TABLE projetos ADD COLUMN alguem_fazia TEXT',
+  "ALTER TABLE projetos RENAME COLUMN tinha_pessoa_antes TO alguem_fazia",
+  "ALTER TABLE projetos ADD COLUMN alguem_fazia TEXT",
   // Observações da análise automática (parecer da IA) — só para staff, não exibido ao usuário.
-  'ALTER TABLE projetos ADD COLUMN observacoes TEXT',
+  "ALTER TABLE projetos ADD COLUMN observacoes TEXT",
   // Rastreamento de sincronização com n8n
-  'ALTER TABLE projetos ADD COLUMN webhook_sync TEXT',
-  'ALTER TABLE projetos ADD COLUMN webhook_error TEXT',
+  "ALTER TABLE projetos ADD COLUMN webhook_sync TEXT",
+  "ALTER TABLE projetos ADD COLUMN webhook_error TEXT",
   // Justificativa da classificação de complexidade (por que automacao/inteligencia/autonomia)
-  'ALTER TABLE analises ADD COLUMN complexidade_justificativa TEXT',
+  "ALTER TABLE analises ADD COLUMN complexidade_justificativa TEXT",
   // Corpos de request/response para debug no investigador
-  'ALTER TABLE api_logs ADD COLUMN request_body TEXT',
-  'ALTER TABLE api_logs ADD COLUMN response_body TEXT',
+  "ALTER TABLE api_logs ADD COLUMN request_body TEXT",
+  "ALTER TABLE api_logs ADD COLUMN response_body TEXT",
   // Projeto ESPECIAL ("estrela do Mario Kart"): altíssimo impacto que NÃO se encaixa
   // em saving nem receita incremental. Pula a análise financeira e o analisador IA —
   // validação é feita por um humano. `especial` é a flag; `contexto_especial` é a
   // descrição do contexto do projeto especial coletada na etapa 2.5.
-  'ALTER TABLE projetos ADD COLUMN especial INTEGER DEFAULT 0',
-  'ALTER TABLE projetos ADD COLUMN contexto_especial TEXT',
+  "ALTER TABLE projetos ADD COLUMN especial INTEGER DEFAULT 0",
+  "ALTER TABLE projetos ADD COLUMN contexto_especial TEXT",
   // Nomes dos arquivos enviados no upload (JSON array de strings) — exibidos na edição
-  'ALTER TABLE projetos ADD COLUMN arquivos_nomes TEXT',
-'ALTER TABLE projetos ADD COLUMN arquivos_links TEXT',
+  "ALTER TABLE projetos ADD COLUMN arquivos_nomes TEXT",
+  "ALTER TABLE projetos ADD COLUMN arquivos_links TEXT",
   // Custo evitado: a solução fez a empresa DEIXAR de pagar ferramentas/serviços
   // externos? `custo_evitado` = 'sim'|'nao'; `custo_evitado_justificativa` = texto
   // concatenado legível; `custo_evitado_itens` = JSON [{nome,valor,recorrencia,justificativa}].
   // O valor (pontual e mensal pelo valor cheio, sem ÷12) entra no saving_reais/ganho_total.
   // Coletado no formulário de saving (≠ custo_externo_mensal, que é o custo INCORRIDO).
-  'ALTER TABLE projetos ADD COLUMN custo_evitado TEXT',
-  'ALTER TABLE projetos ADD COLUMN custo_evitado_justificativa TEXT',
-  'ALTER TABLE projetos ADD COLUMN custo_evitado_itens TEXT',
+  "ALTER TABLE projetos ADD COLUMN custo_evitado TEXT",
+  "ALTER TABLE projetos ADD COLUMN custo_evitado_justificativa TEXT",
+  "ALTER TABLE projetos ADD COLUMN custo_evitado_itens TEXT",
   // Custos do projeto: serviços externos PAGOS que a solução INTERNA consome pra
   // rodar (chave de API, ElevenLabs…). `custo_projeto` = 'sim'|'nao'; justificativa =
   // texto legível; itens = JSON [{nome,valor,recorrencia,justificativa}]. O valor
   // (pontual e mensal pelo valor cheio, sem ÷12) SUBTRAI do saving_reais/ganho_total.
   // Distinto de custo_externo_mensal (escopo externo) e de custo_evitado (que SOMA).
-  'ALTER TABLE projetos ADD COLUMN custo_projeto TEXT',
-  'ALTER TABLE projetos ADD COLUMN custo_projeto_justificativa TEXT',
-  'ALTER TABLE projetos ADD COLUMN custo_projeto_itens TEXT',
+  "ALTER TABLE projetos ADD COLUMN custo_projeto TEXT",
+  "ALTER TABLE projetos ADD COLUMN custo_projeto_justificativa TEXT",
+  "ALTER TABLE projetos ADD COLUMN custo_projeto_itens TEXT",
   // Snapshot imutável da conversa (chat_messages) no momento de cada submissão/reenvio.
   // Os chat_messages são mutados/apagados in-place quando a pessoa volta etapas; este
   // snapshot preserva a conversa ORIGINAL de cada versão para o Investigador (abas
   // Submetidos × Edições). Forward-only: versões antigas (anteriores a esta coluna)
   // ficam com snapshot_chat NULL e caem no fallback do chat atual.
-  'ALTER TABLE projeto_versions ADD COLUMN snapshot_chat TEXT',
+  "ALTER TABLE projeto_versions ADD COLUMN snapshot_chat TEXT",
   // Procedência do snapshot: 'real' = gravado no caminho de submissão/reenvio;
   // 'reconciliado' = reconstruído do estado atual pelo cron reconciliarSnapshots
   // (fecha furos de submissões cujo snapshot falhou e de legados sem versão).
   // NULL = linha anterior a esta coluna, tratada como 'real' pelos leitores.
-  'ALTER TABLE projeto_versions ADD COLUMN origem TEXT',
+  "ALTER TABLE projeto_versions ADD COLUMN origem TEXT",
   // Espelho do "Atualizado Em" do Sheets (carimbo da última escrita do sistema na
   // planilha). NULL = o app nunca sincronizou este projeto p/ o Sheets = legado
   // pendente de regularização. Persistir no SQLite deixa a contagem de pendentes
   // (selo da home) instantânea, sem precisar ler a planilha a cada load.
-  'ALTER TABLE projetos ADD COLUMN atualizado_em TEXT',
+  "ALTER TABLE projetos ADD COLUMN atualizado_em TEXT",
   // Editores delegados (JSON array de emails). O dono pode distribuir o poder de
   // edição a participantes específicos (membros), que passam a editar/reenviar
   // "como se fossem o dono". Conceito INTERNO do app — NÃO existe coluna no Sheets,
@@ -783,8 +789,8 @@ const MIGRATIONS = [
   // ⚠️ INTERNO: não existe coluna no Sheets, então o sync reverso nunca o toca (mesma
   // disciplina de `editores_delegados` e `membros_contribuicoes`). NULL = nunca voltou de
   // ajuste. Ver `src/lib/status-funil.ts`.
-  'ALTER TABLE projetos ADD COLUMN ajuste_realizado_em TEXT',
-  'ALTER TABLE projetos ADD COLUMN editores_delegados TEXT',
+  "ALTER TABLE projetos ADD COLUMN ajuste_realizado_em TEXT",
+  "ALTER TABLE projetos ADD COLUMN editores_delegados TEXT",
   // Papel de cada PARTICIPANTE no projeto (JSON, mapa e-mail→papel). 3 papéis atuais:
   // 'coexecutor'("Coautor") | 'planejador'("Participante") | 'contribuidor'("Contribuidor").
   // `membros` continua sendo a lista PLANA de todos os participantes (base do ownership);
@@ -793,7 +799,7 @@ const MIGRATIONS = [
   // coexecutor/planejador foram mantidos ao renomear rótulos/colunas; os papéis legados
   // 'idealizador'/'referencia_tecnica' (feature anterior) caem em "Contribuidor" no sync.
   // NÃO se aplica ao autor (responsavel_email). Vazio/null = legado sem papéis (coexecutor).
-  'ALTER TABLE projetos ADD COLUMN membros_papeis TEXT',
+  "ALTER TABLE projetos ADD COLUMN membros_papeis TEXT",
   // O que CADA participante fez neste projeto (JSON, mapa e-mail→texto curto, 20–100
   // chars). Irmã de `membros_papeis`: o papel diz o "de que tamanho" e este campo diz o
   // "o quê". Coluna INTERNA — NÃO existe no Sheets (decisão de produto: é dado de gestão,
@@ -802,33 +808,33 @@ const MIGRATIONS = [
   // (responsavel_email), e nunca entra em prompt nenhum. A trava dos 20–100 chars é do
   // FORMULÁRIO (`validarEtapa1`); o zod do backend só limita o teto, para uma aba com JS
   // em cache (version skew) não levar 400 na submissão.
-  'ALTER TABLE projetos ADD COLUMN membros_contribuicoes TEXT',
+  "ALTER TABLE projetos ADD COLUMN membros_contribuicoes TEXT",
   // Governança de IA: o projeto usa o AI Proxy interno (ai-proxy.gogroupbr.com)?
   // 'sim'|'nao', resposta determinística do formulário (etapa 2). O agente de
   // documentação faz auto-detecção do uso na doc enviada e o analisador cruza
   // declaração × detecção. Vai para a coluna "Usa AI Proxy" do Sheets.
-  'ALTER TABLE projetos ADD COLUMN usa_ai_proxy TEXT',
+  "ALTER TABLE projetos ADD COLUMN usa_ai_proxy TEXT",
   // Link do app no GoDeploy (Etapa 2, OPCIONAL) → coluna `URL Godeploy` da planilha.
-  'ALTER TABLE projetos ADD COLUMN url_godeploy TEXT',
+  "ALTER TABLE projetos ADD COLUMN url_godeploy TEXT",
   // Split do saving em carga real × ganho por escala (só quando alguém fazia à mão).
   // horas_carga_real = trabalho humano de fato; horas_escala = volume incremental que
   // só a automação cobre. Somam o total (saving_horas), que continua sendo o que vira R$.
   // Transparência/auditoria → colunas "Saving Horas Real"/"Saving Horas Escalado" no Sheets.
-  'ALTER TABLE projetos ADD COLUMN horas_carga_real REAL',
-  'ALTER TABLE projetos ADD COLUMN horas_escala REAL',
+  "ALTER TABLE projetos ADD COLUMN horas_carga_real REAL",
+  "ALTER TABLE projetos ADD COLUMN horas_escala REAL",
   // Projeto DESCONTINUADO (marcado pelo dono/editor em "Meus Projetos"): a automação
   // não roda mais. Deixa de contar como pendência (regularização de legado / reenvio)
   // e o badge vira "Descontinuado". 1 = descontinuado; 0 = ativo. É a FONTE DA VERDADE
   // no app (o "Status" do Sheets não volta pelo sync reverso — regra TEMPORÁRIA grava
   // sempre "Pendente"); a IDA reflete "Descontinuado" na coluna Status da planilha.
-  'ALTER TABLE projetos ADD COLUMN descontinuado INTEGER DEFAULT 0',
+  "ALTER TABLE projetos ADD COLUMN descontinuado INTEGER DEFAULT 0",
   // Disparo de e-mail de legados em LOTES (chunks). `alvos` = JSON dos e-mails alvo
   // (congelado na criação do lote, p/ o cursor ser estável entre chunks); `processados`
   // = cursor (quantos já foram tratados = enviados + falhas + pulados). O envio deixou
   // de ser um loop único em background (que o runtime matava por tempo) e passou a ser
   // dirigido pelo front, um chunk por requisição.
-  'ALTER TABLE email_lotes ADD COLUMN alvos TEXT',
-  'ALTER TABLE email_lotes ADD COLUMN processados INTEGER NOT NULL DEFAULT 0',
+  "ALTER TABLE email_lotes ADD COLUMN alvos TEXT",
+  "ALTER TABLE email_lotes ADD COLUMN processados INTEGER NOT NULL DEFAULT 0",
   // Disparo de e-mails por SEGMENTO/público (a tela deixou de ser só "cobrança de
   // legados"): `audiencia` ∈ 'legado' | 'reenvio' | 'todos'. Tanto o lote quanto cada
   // disparo guardam o segmento (o selo "enviado em…" é escopado por segmento). `payload`
@@ -836,7 +842,7 @@ const MIGRATIONS = [
   // momento da criação do lote — o chunk lê desse snapshot, sem reler o Sheets/SQLite a
   // cada requisição (mais robusto e sem race com o status mudando no meio do envio).
   "ALTER TABLE email_lotes ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
-  'ALTER TABLE email_lotes ADD COLUMN payload TEXT',
+  "ALTER TABLE email_lotes ADD COLUMN payload TEXT",
   "ALTER TABLE email_disparos ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
   // ─── Critério de projeto (régua de recorrência · contrafactual · rastreabilidade) ──
   // O CONTRAFACTUAL é pergunta determinística da Etapa 2 (padrão `usa_ai_proxy`) e NÃO
@@ -852,10 +858,10 @@ const MIGRATIONS = [
   // colunas ficam pelos projetos submetidos enquanto as perguntas existiam no form; nada
   // as escreve nem as lê mais. O ALTER permanece só para o schema de bancos novos bater
   // com o de produção — não reintroduza as perguntas.
-  'ALTER TABLE projetos ADD COLUMN ponteiro_movido TEXT',
-  'ALTER TABLE projetos ADD COLUMN ponteiro_evidencia TEXT',
-  'ALTER TABLE projetos ADD COLUMN contrafactual_reclamacao TEXT',
-  'ALTER TABLE projetos ADD COLUMN contrafactual_afetados TEXT',
+  "ALTER TABLE projetos ADD COLUMN ponteiro_movido TEXT",
+  "ALTER TABLE projetos ADD COLUMN ponteiro_evidencia TEXT",
+  "ALTER TABLE projetos ADD COLUMN contrafactual_reclamacao TEXT",
+  "ALTER TABLE projetos ADD COLUMN contrafactual_afetados TEXT",
   // Classificação de ELEGIBILIDADE decidida pelo analisador ("isto é projeto?"),
   // independente do veredito de pontuação: 'claro_sim'|'claro_nao'|'zona_cinzenta'.
   // A justificativa é SEMPRE preenchida (fallback determinístico) → coluna
@@ -863,9 +869,9 @@ const MIGRATIONS = [
   // reprova sem motivo) → coluna "Motivo Reprovado". O discriminador da reprovação é
   // ESTA coluna, não o CHECK de projetos.status (que segue rascunho|em_validacao|
   // validado|rejeitado|aprovado — trocá-lo exigiria rebuild da tabela).
-  'ALTER TABLE projetos ADD COLUMN classificacao_avaliacao TEXT',
-  'ALTER TABLE projetos ADD COLUMN classificacao_justificativa TEXT',
-  'ALTER TABLE projetos ADD COLUMN motivo_reprovacao TEXT',
+  "ALTER TABLE projetos ADD COLUMN classificacao_avaliacao TEXT",
+  "ALTER TABLE projetos ADD COLUMN classificacao_justificativa TEXT",
+  "ALTER TABLE projetos ADD COLUMN motivo_reprovacao TEXT",
   // Checklist do gestor na pré-aprovação (3 perguntas de sim/não pedidas pelo Lucas em
   // 03/08/2026). São OBRIGATÓRIAS para registrar o parecer e ficam junto da decisão:
   // move_kpi = o projeto move um KPI da área  ·  sente_falta = a área sentiria falta se
@@ -886,10 +892,10 @@ const MIGRATIONS = [
   // (SPEC_FAQ D13). Bancos que já tinham as categorias recebem a coluna aqui, e o seed
   // faz o BACKFILL do texto só quando o corpo está vazio — corpo escrito pelo admin
   // nunca é sobrescrito.
-  'ALTER TABLE faq_categorias ADD COLUMN corpo TEXT',
+  "ALTER TABLE faq_categorias ADD COLUMN corpo TEXT",
   // Botão "Voltar à versão anterior" do FAQ (D14): snapshot JSON de UM nível
   // (titulo/resumo/corpo + quando/quem). Restaurar consome o slot — não é histórico.
-  'ALTER TABLE faq_categorias ADD COLUMN versao_anterior TEXT',
+  "ALTER TABLE faq_categorias ADD COLUMN versao_anterior TEXT",
   // ─────────────── GoDocs v2 — os 4 ganhos declarados (plano `godocs-v2-…`, T3) ───────────────
   // Modelo NOVO da submissão determinística: a pessoa marca as categorias de ganho na
   // Etapa 2 e preenche um bloco por categoria na Etapa 3. Os tipos e as regras puras
@@ -947,15 +953,15 @@ const MIGRATIONS = [
   // tem coluna de EVIDÊNCIA). Não, ia começar a sair → custo evitado (sem extrato
   // possível, pesa 50%, por isso NÃO tem evidência). Hora liberada de quem continua na
   // folha é capacidade que se deixou de comprar, não dinheiro no bolso: é custo evitado.
-  'ALTER TABLE projetos ADD COLUMN ganho_categorias TEXT',
+  "ALTER TABLE projetos ADD COLUMN ganho_categorias TEXT",
   // Saving efetivado — a despesa existia e ENCOLHEU (ou parou). ⚠️ São DOIS valores, não
   // um: a despesa pode ter caído de 20k para 5k, e o saving são os 15k da diferença
   // (`savingLiquido`, `ganhos.ts`). `evidencia` é o texto obrigatório que amarra o número
   // a esta solução.
-  'ALTER TABLE projetos ADD COLUMN saving_efetivado_valor REAL',
-  'ALTER TABLE projetos ADD COLUMN saving_efetivado_frequencia TEXT',
-  'ALTER TABLE projetos ADD COLUMN saving_efetivado_evidencia TEXT',
-  'ALTER TABLE projetos ADD COLUMN saving_efetivado_desde TEXT',
+  "ALTER TABLE projetos ADD COLUMN saving_efetivado_valor REAL",
+  "ALTER TABLE projetos ADD COLUMN saving_efetivado_frequencia TEXT",
+  "ALTER TABLE projetos ADD COLUMN saving_efetivado_evidencia TEXT",
+  "ALTER TABLE projetos ADD COLUMN saving_efetivado_desde TEXT",
   // ⚠️ As DUAS pontas do saving, acrescentadas em 02/09/2026 (decisão do Luis: "quanto era
   // e quanto é agora"). Elas são a fonte; o saving é a diferença, derivada — não há coluna
   // para ela.
@@ -970,41 +976,41 @@ const MIGRATIONS = [
   // proíbe tocar. Nada as lê e a T6 não as grava. **Não reaproveitar** nenhuma das três
   // para outro sentido — coluna com dois significados é o defeito que a v2 existe para
   // desfazer.
-  'ALTER TABLE projetos ADD COLUMN saving_efetivado_valor_antes REAL',
-  'ALTER TABLE projetos ADD COLUMN saving_efetivado_valor_agora REAL',
+  "ALTER TABLE projetos ADD COLUMN saving_efetivado_valor_antes REAL",
+  "ALTER TABLE projetos ADD COLUMN saving_efetivado_valor_agora REAL",
   // Custo evitado — a despesa nunca nasceu. Tem DOIS braços que somam antes do peso de
   // 50%: as horas liberadas (tabela antes/depois por função, em `_horas_linhas`, cujo R$
   // derivado fica em `_horas_valor`) e o que não chegou a ser contratado. A frequência é
   // do BLOCO, não de cada braço.
-  'ALTER TABLE projetos ADD COLUMN custo_evitado_frequencia TEXT',
-  'ALTER TABLE projetos ADD COLUMN custo_evitado_horas_linhas TEXT',
+  "ALTER TABLE projetos ADD COLUMN custo_evitado_frequencia TEXT",
+  "ALTER TABLE projetos ADD COLUMN custo_evitado_horas_linhas TEXT",
   // ⚠️ O R$ das horas mora AQUI, separado das linhas que o justificam (`_horas_linhas`).
   // Quando a T5 ligar o formulário, replicar a guarda log-only da v1
   // (`avisarDivergenciaMemorialLinhas`): valor de horas sem linhas que o expliquem é
   // divergência a avisar, não a bloquear — e a leitura de `_horas_linhas` descarta linha
   // malformada, então essa divergência pode nascer sozinha.
-  'ALTER TABLE projetos ADD COLUMN custo_evitado_horas_valor REAL',
-  'ALTER TABLE projetos ADD COLUMN custo_evitado_nao_contratado REAL',
-  'ALTER TABLE projetos ADD COLUMN custo_evitado_racional TEXT',
+  "ALTER TABLE projetos ADD COLUMN custo_evitado_horas_valor REAL",
+  "ALTER TABLE projetos ADD COLUMN custo_evitado_nao_contratado REAL",
+  "ALTER TABLE projetos ADD COLUMN custo_evitado_racional TEXT",
   // Receita incremental. ⚠️ Na v1 a receita NÃO tinha coluna em `projetos` — vivia só no
   // blob `documentacao.conteudo.receita`, e é por isso que o rollup do squad Intelli teve
   // de ler a PLANILHA em vez do banco. Aqui ela ganha coluna como os outros 3 blocos.
-  'ALTER TABLE projetos ADD COLUMN receita_incremental_valor REAL',
-  'ALTER TABLE projetos ADD COLUMN receita_incremental_frequencia TEXT',
-  'ALTER TABLE projetos ADD COLUMN receita_incremental_racional TEXT',
-  'ALTER TABLE projetos ADD COLUMN receita_incremental_tipo TEXT',
+  "ALTER TABLE projetos ADD COLUMN receita_incremental_valor REAL",
+  "ALTER TABLE projetos ADD COLUMN receita_incremental_frequencia TEXT",
+  "ALTER TABLE projetos ADD COLUMN receita_incremental_racional TEXT",
+  "ALTER TABLE projetos ADD COLUMN receita_incremental_tipo TEXT",
   // Ganho imensurável — projeto sem número. ⚠️ Fica FORA de toda conta de impacto (é o
   // que a estrela representa). ⚠️ Ele NÃO é mais exclusivo das outras 3 (02/09/2026): um
   // projeto pode declarar saving medido E um ganho sem número, e aí só o BLOCO sem número
   // fica fora da conta — o projeto tem impacto. `imensuravel: true` em `GanhosProjeto` só
   // quando ele é a ÚNICA categoria marcada.
-  'ALTER TABLE projetos ADD COLUMN ganho_imensuravel_racional TEXT',
+  "ALTER TABLE projetos ADD COLUMN ganho_imensuravel_racional TEXT",
   // Custo para rodar — a FUSÃO das duas linhas de custo da v1 (`custo_externo_mensal`, a
   // plataforma onde a solução roda, e `custo_projeto_itens`, API/SaaS por uso), que
   // economicamente sempre foram a mesma coisa. Lista incremental em JSON
   // `[{nome,valor,frequencia,o_que_e}]`. SUBTRAI com peso 100% — caixa saindo com a mesma
   // certeza do saving efetivado.
-  'ALTER TABLE projetos ADD COLUMN custo_rodar_itens TEXT',
+  "ALTER TABLE projetos ADD COLUMN custo_rodar_itens TEXT",
   // Impacto MATERIALIZADO (bruto · líquido · líquido mensal), para a planilha, o rollup e
   // as telas lerem sem recalcular. ⚠️ São valores DERIVADOS: sempre gravados a partir de
   // `src/lib/impacto.ts`, nunca computados à mão no call site — foi a fórmula redigitada
@@ -1025,13 +1031,13 @@ const MIGRATIONS = [
   // ⚠️ Separada de `arquivos_links` de propósito: `submeterParaValidacao` SOBRESCREVE
   // aquela com `[link]` do resumo da doc e usa o `[0]` para dar upsert no MESMO arquivo
   // do Drive — a evidência guardada lá seria apagada pela chamada seguinte do cliente.
-  'ALTER TABLE projetos ADD COLUMN ganho_anexos_links TEXT',
+  "ALTER TABLE projetos ADD COLUMN ganho_anexos_links TEXT",
   // Eixo TIPO da categorização (item 5.4) — slug de `TIPOS_PROJETO`
   // (@/lib/categoria-projeto). O eixo NÍVEL continua na coluna `complexidade`.
-  'ALTER TABLE projetos ADD COLUMN categoria_projeto TEXT',
-  'ALTER TABLE projetos ADD COLUMN impacto_bruto REAL',
-  'ALTER TABLE projetos ADD COLUMN impacto_liquido REAL',
-  'ALTER TABLE projetos ADD COLUMN impacto_liquido_mensal REAL',
+  "ALTER TABLE projetos ADD COLUMN categoria_projeto TEXT",
+  "ALTER TABLE projetos ADD COLUMN impacto_bruto REAL",
+  "ALTER TABLE projetos ADD COLUMN impacto_liquido REAL",
+  "ALTER TABLE projetos ADD COLUMN impacto_liquido_mensal REAL",
   // Projeto como FEATURE de outro projeto (vínculo pai↔filho). O FILHO guarda o id do
   // PAI em projeto_pai_id (marcado na Etapa 1, só na submissão NOVA); o PAI acumula os
   // ids dos filhos em projeto_filhos_ids (JSON array de strings). Colunas do Sheets:
@@ -1039,8 +1045,8 @@ const MIGRATIONS = [
   // (linha do pai, lista acumulada). O nome do filho ganha o prefixo "[feature de
   // <NOME do pai>]". INTERNO ao vínculo -- fora de SAFE_UPDATE_FIELDS (o valor mora no
   // SQLite e nas 2 colunas dedicadas do Sheets, escritas por nome).
-  'ALTER TABLE projetos ADD COLUMN projeto_pai_id TEXT',
-  'ALTER TABLE projetos ADD COLUMN projeto_filhos_ids TEXT',
+  "ALTER TABLE projetos ADD COLUMN projeto_pai_id TEXT",
+  "ALTER TABLE projetos ADD COLUMN projeto_filhos_ids TEXT",
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).
@@ -1061,72 +1067,136 @@ const SEED_PROJETOS_LEGADO_SQL = `
 
 const SEED_PROJETOS_LEGADO: (string | number | null)[][] = [
   [
-    /* id                    */ 'legado-270',
-    /* nome                  */ 'HRBP Workspace',
-    /* responsavel_nome      */ 'Erivania Apolonia Santos Martins',
-    /* responsavel_email     */ 'erivania.martins@gocase.com',
-    /* area                  */ 'Gente e Gestão',
-    /* ferramenta            */ 'Claude Code',
-    /* escopo                */ 'interno',
+    /* id                    */ "legado-270",
+    /* nome                  */ "HRBP Workspace",
+    /* responsavel_nome      */ "Erivania Apolonia Santos Martins",
+    /* responsavel_email     */ "erivania.martins@gocase.com",
+    /* area                  */ "Gente e Gestão",
+    /* ferramenta            */ "Claude Code",
+    /* escopo                */ "interno",
     /* membros               */ null,
-    /* status                */ 'aprovado',
+    /* status                */ "aprovado",
     /* chat_completo         */ 1,
-    /* data_criacao_projeto  */ '2026-05-15',
-    /* tipo_projeto          */ 'saving',
+    /* data_criacao_projeto  */ "2026-05-15",
+    /* tipo_projeto          */ "saving",
     /* tipos_projeto         */ '["saving"]',
-    /* descricao_breve       */ 'Workspace centralizado para HRBPs com dados e ferramentas de gestão de pessoas.',
+    /* descricao_breve       */ "Workspace centralizado para HRBPs com dados e ferramentas de gestão de pessoas.",
     /* saving_horas          */ 12,
     /* saving_reais          */ 661.8,
-    /* tipo_saving           */ 'mensal',
+    /* tipo_saving           */ "mensal",
     /* memorial_calculo      */
-      '12h × R$55,15 (Coord) = R$661,80.\n\n' +
-      '- Tempo semanal economizado: 3h, totalizando 12h mensais de um Especialista.\n\n' +
-      'Esse saving considera apenas o tempo direto de compilação e preparação de relatórios ' +
-      'semanais para liderança, que passou a ser gerado automaticamente pela plataforma. ' +
-      'Não estão incluídos ganhos adicionais como redução no tempo de atualização de organogramas, ' +
-      'gestão de vagas e acompanhamento de riscos de turnover — o que torna esse número conservador.',
+    "12h × R$55,15 (Coord) = R$661,80.\n\n" +
+      "- Tempo semanal economizado: 3h, totalizando 12h mensais de um Especialista.\n\n" +
+      "Esse saving considera apenas o tempo direto de compilação e preparação de relatórios " +
+      "semanais para liderança, que passou a ser gerado automaticamente pela plataforma. " +
+      "Não estão incluídos ganhos adicionais como redução no tempo de atualização de organogramas, " +
+      "gestão de vagas e acompanhamento de riscos de turnover — o que torna esse número conservador.",
     /* custo_externo_mensal  */ 0,
     /* ganho_total_mensal    */ 661.8,
-    /* alguem_fazia          */ 'sim',
-    /* complexidade          */ 'automacao',
+    /* alguem_fazia          */ "sim",
+    /* complexidade          */ "automacao",
     /* observacoes           */
-      'Projeto legado (código original: LEGADO-270), importado manualmente — anterior ao formulário GoDocs. ' +
+    "Projeto legado (código original: LEGADO-270), importado manualmente — anterior ao formulário GoDocs. " +
       'Parecer original: "Saving OK. R$55,15 ✓." ' +
-      'Documento: https://drive.google.com/file/d/1i_fwDL-_ME0InuR84eDWJHFkwDHVbrYe/view',
+      "Documento: https://drive.google.com/file/d/1i_fwDL-_ME0InuR84eDWJHFkwDHVbrYe/view",
     /* especial              */ 0,
-    /* submitted_at          */ '2026-06-09T12:00:00.000Z',
-    /* validated_at          */ '2026-06-09T12:00:00.000Z',
-    /* created_at            */ '2026-06-09T12:00:00.000Z',
-    /* updated_at            */ '2026-06-09T12:00:00.000Z',
+    /* submitted_at          */ "2026-06-09T12:00:00.000Z",
+    /* validated_at          */ "2026-06-09T12:00:00.000Z",
+    /* created_at            */ "2026-06-09T12:00:00.000Z",
+    /* updated_at            */ "2026-06-09T12:00:00.000Z",
   ],
 ];
 
 // Admins iniciais — INSERT OR IGNORE garante idempotência (se já existir, não duplica).
 const SEED_ADMINS = [
-  'lucas.queiroz@gocase.com',
-  'joao.gabriel@gocase.com',
-  'joaovictor.esteves@gocase.com',
-  'kaique.breno@gocase.com',
-  'luis.albuquerque@gocase.com',
+  "lucas.queiroz@gocase.com",
+  "joao.gabriel@gocase.com",
+  "joaovictor.esteves@gocase.com",
+  "kaique.breno@gocase.com",
+  "luis.albuquerque@gocase.com",
 ];
 
+/**
+ * Impressão digital do SCHEMA + das MIGRAÇÕES.
+ *
+ * ⚠️ É o que permite pular as ~150 idas ao banco quando nada mudou. Qualquer edição no
+ * `SCHEMA_SQL` ou em `MIGRATIONS` muda o hash e força UMA execução completa — ninguém
+ * precisa lembrar de bumpar um número à mão (que é exatamente o tipo de coisa que se
+ * esquece, e esquecer aqui significaria coluna faltando em produção).
+ *
+ * djb2, o mesmo algoritmo barato que já se usa no espelho: não é criptografia, é detecção
+ * de mudança.
+ */
+function impressaoDoSchema(): string {
+  const texto = SCHEMA_SQL + "\u0000" + MIGRATIONS.join("\u0000");
+  let h = 5381;
+  for (let i = 0; i < texto.length; i++) h = ((h << 5) + h + texto.charCodeAt(i)) | 0;
+  return `${(h >>> 0).toString(36)}-${texto.length}`;
+}
+
+/**
+ * O schema já está aplicado nesta versão? UMA consulta.
+ *
+ * ⚠️ **Fail-open para o lado CARO**: qualquer erro (tabela inexistente num banco novo,
+ * leitura falhando) devolve `false`, e `false` faz o init completo rodar. O erro que não se
+ * pode cometer aqui é pular a migração achando que ela já rodou.
+ */
+async function schemaJaAplicado(db: GoDeployDB, impressao: string): Promise<boolean> {
+  try {
+    const r = await db.query(
+      "SELECT valor FROM schema_estado WHERE chave = 'impressao' LIMIT 1;",
+      [],
+    );
+    const linhas = (r as { rows?: unknown[] })?.rows ?? [];
+    const primeira = linhas[0] as Record<string, unknown> | unknown[] | undefined;
+    if (!primeira) return false;
+    const valor = Array.isArray(primeira) ? primeira[0] : primeira.valor;
+    return String(valor ?? "") === impressao;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Cria (uma vez) o schema e roda as migrações.
+ *
+ * ## ⚠️ Por que existe o atalho da impressão digital (14/09/2026)
+ * Este corpo faz **~150 idas ao banco em série** — 70 statements do `SCHEMA_SQL`, 70
+ * `ALTER TABLE` de migração, os seeds — e ele roda no PRIMEIRO acesso ao banco de **cada
+ * isolate novo**. Com o round-trip do datasource do Godeploy na casa dos 100-150 ms, isso
+ * dá **15 a 22 segundos**, pagos pelo request que teve o azar de ser o primeiro.
+ *
+ * Foi medido: o `/dashboard` abria em ~21 s "na primeira vez" e em ~0,45 s na segunda, e o
+ * mesmo pico aparecia em `/api/auth/me` — uma rota que não faz trabalho nenhum, mas **toca o
+ * banco**. O `/favicon.svg`, que não passa pelo worker, nunca passou de 0,9 s. Não era a
+ * planilha, não era o volume de dados e não era cold start de JS: era esta função.
+ *
+ * Com a impressão digital, o custo passa a ser pago UMA vez por deploy (o primeiro isolate
+ * que roda o código novo), e não uma vez por isolate.
+ *
+ * ⚠️ **Idempotência continua sendo a rede**: `CREATE TABLE IF NOT EXISTS` e o `try/catch`
+ * dos `ALTER TABLE` seguem lá. O atalho é otimização, não substituto — se ele falhar de
+ * qualquer jeito, o caminho completo roda e o resultado é o mesmo.
+ */
 export async function initSchema(db: GoDeployDB) {
+  const impressao = impressaoDoSchema();
+  if (await schemaJaAplicado(db, impressao)) return;
+
   // env.DB.exec do Godeploy não suporta múltiplos statements em uma única chamada.
   // Dividimos o SQL por ';' e executamos cada statement separadamente.
   // O env.DB é assíncrono e exige o argumento de params sempre (mesmo []).
-  const statements = SCHEMA_SQL
-    .split(';')
+  const statements = SCHEMA_SQL.split(";")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
   for (const stmt of statements) {
-    await db.exec(stmt + ';', []);
+    await db.exec(stmt + ";", []);
   }
 
   // Migrações pós-schema (idempotentes)
   for (const migration of MIGRATIONS) {
     try {
-      await db.exec(migration + ';', []);
+      await db.exec(migration + ";", []);
     } catch {
       // Coluna já existe ou tabela não existe — ignorar silenciosamente
     }
@@ -1136,7 +1206,7 @@ export async function initSchema(db: GoDeployDB) {
   for (const email of SEED_ADMINS) {
     await db.exec(
       "INSERT OR IGNORE INTO admins (id, email) VALUES (lower(hex(randomblob(16))), ?);",
-      [email]
+      [email],
     );
   }
 
@@ -1145,7 +1215,22 @@ export async function initSchema(db: GoDeployDB) {
     try {
       await db.exec(SEED_PROJETOS_LEGADO_SQL, params);
     } catch (e) {
-      console.error('[schema] Falha ao inserir projeto legado:', e);
+      console.error("[schema] Falha ao inserir projeto legado:", e);
     }
+  }
+
+  // ⚠️ A marca é gravada **por último e só no caminho feliz**: se qualquer statement acima
+  // tiver lançado, a exceção sobe daqui e a marca NÃO é escrita — o próximo request tenta o
+  // init completo de novo, que é o comportamento que já existia. Marca gravada cedo demais
+  // transformaria uma migração pela metade em "está tudo certo" para sempre.
+  try {
+    await db.exec(
+      "INSERT INTO schema_estado (chave, valor, aplicado_em) VALUES ('impressao', ?, datetime('now'))" +
+        " ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor, aplicado_em = excluded.aplicado_em;",
+      [impressao],
+    );
+  } catch (e) {
+    // Sem a marca o init roda de novo no próximo isolate: lento, nunca incorreto.
+    console.error("[schema] não foi possível gravar a impressão do schema:", e);
   }
 }
