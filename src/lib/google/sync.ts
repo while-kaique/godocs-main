@@ -193,7 +193,14 @@ export type UpdateSyncParams = {
   projectName: string;
   complexidade: string;
   observacoes: string;
-  status: string;
+  /**
+   * `undefined` = NÃO encostar na coluna Status (14/09/2026). Com o TIME decidindo o funil, o
+   * analisador da v1 regravava "Pendente" por cima do Aprovado que o time tinha acabado de gravar —
+   * inclusive pelo cron `reanalisar-pendentes`, que re-roda o analisador para preencher Complexidade
+   * (medido em prod: «Painel e Matriz de CRO» Aprovado 19:04 → Pendente 19:15; «Reconhecimento dos
+   * Mantras», «Controle de Ocupação» idem). Mesma disciplina das colunas do líder.
+   */
+  status?: string;
   // Eixo TIPO da categorização (item 5.4) → coluna "Tipo de Projeto". Mesma disciplina
   // das colunas do líder: `undefined` = "não sei, não encoste" (a célula é OMITIDA do
   // update); `null` = "não se aplica" → "—". Sem isso, um chamador que não conhece a
@@ -726,7 +733,7 @@ export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
       const cells: Partial<Record<SheetColumn, string | number>> = {
         'Complexidade': p.complexidade,
         'Observações': p.observacoes,
-        'Status': p.status,
+        ...(p.status !== undefined ? { 'Status': p.status } : {}),
         'Atualizado Em': nowFortaleza(),
       };
       // Classificação de elegibilidade: só escreve quando o chamador a informou

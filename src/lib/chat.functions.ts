@@ -3431,7 +3431,9 @@ export async function analisarProjetoFn(rawData: unknown) {
       complexidade: resultado.complexidade,
       tipoProjeto: resultado.tipo_projeto ?? null,
       observacoes: observacoes ?? "",
-      status: statusLabel,
+      // ⚠️ Com o TIME decidindo o funil, o analisador NÃO encosta no Status da planilha (14/09/2026):
+      // ele re-roda pelo cron de Complexidade e regravava "Pendente" por cima do Aprovado do time.
+      status: timeDecide ? undefined : statusLabel,
       // Colunas "Classificação" (sempre com texto) e "Motivo Reprovado". A
       // "Motivo Reenvio" é MANUAL — o sistema nunca a escreve.
       // `undefined` = coluna OMITIDA do update (≠ null, que grava "—"): com o TIME decidindo o
