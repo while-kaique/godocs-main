@@ -22,13 +22,8 @@ import {
   chaveAutor,
   apenasAutoresComMultiplos,
   type ProjetoDashboardResumo,
-} from '@/lib/dashboard-resumo';
-import {
-  chaveArea,
-  donoDoProjeto,
-  ehDescontinuado,
-  type DonoDeArea,
-} from '@/lib/especiais-view';
+} from "@/lib/dashboard-resumo";
+import { chaveArea, donoDoProjeto, ehDescontinuado, type DonoDeArea } from "@/lib/especiais-view";
 
 // `chaveAutor`/`apenasAutoresComMultiplos` moram em `dashboard-resumo` (FONTE ÚNICA) porque o
 // filtro "2+ projetos" do /dashboard usa os MESMOS. Reexportados para o call site desta aba.
@@ -52,7 +47,7 @@ export {
   type DonoDeArea,
   type ValidadorEspeciais,
   type Fila,
-} from '@/lib/especiais-view';
+} from "@/lib/especiais-view";
 
 /**
  * Quem cai nesta esteira: pendente/pré-aprovado do fluxo normal.
@@ -65,8 +60,14 @@ export {
 export function ehDaFilaRpa(p: ProjetoDashboardResumo): boolean {
   if (p.especial) return false;
   if (ehDescontinuado(p)) return false;
-  const s = (p.statusChave ?? '').trim();
-  return s === '' || s === 'pendente';
+  const s = (p.statusChave ?? "").trim();
+  // ⚠️ **`Pré-aprovado` entrou aqui em 14/09/2026**, quando ele virou um STATUS (coluna única,
+  // ver `status-funil.ts`). Antes o pré-aprovado tinha `statusChave === 'pendente'` e o que o
+  // distinguia era a coluna do líder; agora ele tem status próprio — e sem esta linha os
+  // pré-aprovados, que são exatamente o que esta tela existe para mostrar, sumiriam dela.
+  return (
+    s === "" || s === "pendente" || s.startsWith("pré-aprovado") || s.startsWith("pre-aprovado")
+  );
 }
 
 /** Só os pendentes/pré-aprovados do fluxo normal. */
@@ -78,7 +79,7 @@ export function apenasFilaRpa(projetos: ProjetoDashboardResumo[]): ProjetoDashbo
 
 /** Nome legível do autor (nunca o e-mail cru quando há nome). */
 export function rotuloAutor(p: ProjetoDashboardResumo): string {
-  return (p.autor ?? '').trim() || (p.email ?? '').trim() || 'Sem autor';
+  return (p.autor ?? "").trim() || (p.email ?? "").trim() || "Sem autor";
 }
 
 export type ColunaAutor = {
@@ -100,7 +101,7 @@ function porData(
   maisAntigos: boolean,
 ): number {
   if (a.dataOrdenacao == null && b.dataOrdenacao == null) {
-    return (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR');
+    return (a.nome ?? "").localeCompare(b.nome ?? "", "pt-BR");
   }
   if (a.dataOrdenacao == null) return 1;
   if (b.dataOrdenacao == null) return -1;
@@ -131,12 +132,12 @@ export function agruparPorAutor(
       return {
         chave,
         nome: rotuloAutor(ref),
-        email: (ref.email ?? '').trim() || null,
+        email: (ref.email ?? "").trim() || null,
         projetos: ordenados,
         total: ordenados.length,
       };
     })
-    .sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, 'pt-BR'));
+    .sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
 // ─── Filtros ──────────────────────────────────────────────────────────────────
@@ -158,9 +159,9 @@ export type FiltrosPendentes = {
 };
 
 export const FILTROS_PENDENTES_VAZIOS: FiltrosPendentes = {
-  termo: '',
+  termo: "",
   dono: null,
-  fila: 'todos',
+  fila: "todos",
   periodo: null,
   soMultiplos: false,
 };
@@ -170,7 +171,7 @@ export function contarFiltrosPendentes(f: FiltrosPendentes): number {
   return (
     (f.termo.trim() ? 1 : 0) +
     (f.dono ? 1 : 0) +
-    (f.fila !== 'todos' ? 1 : 0) +
+    (f.fila !== "todos" ? 1 : 0) +
     (f.periodo ? 1 : 0) +
     (f.soMultiplos ? 1 : 0)
   );
@@ -199,6 +200,5 @@ export function casaDono(
 ): boolean {
   if (!dono) return true;
   const d = donoDoProjeto(p, donoPor);
-  return dono === 'sem-dono' ? d == null : d === dono;
+  return dono === "sem-dono" ? d == null : d === dono;
 }
-

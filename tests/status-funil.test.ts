@@ -27,6 +27,7 @@ import { pilulaDe, STATUS_TRIAGEM } from "@/components/dashboard/status-triagem"
 import { STATUS_GRAVAVEIS_ESPECIAIS } from "@/lib/especiais-acoes";
 import { ehStatusIndeciso } from "@/lib/decisao-humana";
 import { planejarMigracao } from "@/lib/migrar-status-unico";
+import { ehDaFilaRpa } from "@/lib/aprovacao-pendentes-view";
 
 describe("o vocabulário", () => {
   it("são cinco status de funil, nesta ordem", () => {
@@ -270,5 +271,33 @@ describe("planejar a migração", () => {
   it("célula de status vazia aparece como (vazio), não como string vazia no relatório", () => {
     const r = planejarMigracao([linha("a", "", "Pré-aprovado")]);
     expect(r.mudancas[0]).toMatchObject({ de: "(vazio)", para: "Pré-aprovado" });
+  });
+});
+
+// ─── A tela que ficou fora do menu não pode quebrar calada ───────────────────
+
+describe("a fila do RPA reconhece o status novo", () => {
+  const proj = (statusChave: string | null) =>
+    ({
+      id: "x",
+      statusChave,
+      especial: false,
+    }) as unknown as Parameters<typeof ehDaFilaRpa>[0];
+
+  it("⚠️ `Pré-aprovado` continua na fila: é o que a tela existe para mostrar", () => {
+    // Antes da coluna única o pré-aprovado tinha `statusChave === 'pendente'` e o que o
+    // distinguia era a coluna do líder. Sem reconhecer o status novo, os pré-aprovados
+    // sumiriam da `/aprovacoes-pendentes` — que saiu do menu, mas continua no ar.
+    expect(ehDaFilaRpa(proj("pré-aprovado"))).toBe(true);
+    expect(ehDaFilaRpa(proj("pré-aprovado (liderança)"))).toBe(true);
+    expect(ehDaFilaRpa(proj("pendente"))).toBe(true);
+    expect(ehDaFilaRpa(proj(""))).toBe(true);
+  });
+
+  it("quem já foi decidido continua fora", () => {
+    expect(ehDaFilaRpa(proj("aprovado"))).toBe(false);
+    expect(ehDaFilaRpa(proj("reprovado"))).toBe(false);
+    expect(ehDaFilaRpa(proj("descontinuado"))).toBe(false);
+    expect(ehDaFilaRpa(proj("ajuste pedido"))).toBe(false);
   });
 });
