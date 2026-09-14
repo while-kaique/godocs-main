@@ -93,34 +93,24 @@ describe('composição dos filtros (AND)', () => {
     expect(aplicarFiltros(base, filtros()).map((p) => p.id)).toEqual(['A', 'B', 'C']);
   });
 
-  it('todos + especiais = só os especiais, de qualquer fila', () => {
-    expect(aplicarFiltros(base, filtros({ especial: 'apenas' })).map((p) => p.id)).toEqual([
-      'A',
-      'C',
-    ]);
+  // ⚠️ A dimensão "natureza" (Especiais × Padrão) SAIU em 14/09/2026: ela existia porque só
+  // o especial recebia nota, e hoje todo projeto tem nota. Este teste existe para a volta
+  // ser uma DECISÃO — a flag `especial` continua no dado (ícone no cartão, fluxo próprio),
+  // o que não existe mais é o recorte.
+  it('natureza NÃO recorta mais: especial e padrão convivem em qualquer fila', () => {
+    const pendentes = aplicarFiltros(base, filtros({ status: 'pendente' }));
+    expect(pendentes.map((p) => p.id)).toEqual(['A', 'B']);
   });
 
-  it('pendentes + especiais recorta as DUAS dimensões (AND, nunca OR)', () => {
-    const r = aplicarFiltros(base, filtros({ status: 'pendente', especial: 'apenas' }));
-    expect(r.map((p) => p.id)).toEqual(['A']);
-  });
-
-  it('"Padrão" é o inverso de "Especiais", não um sinônimo de "Todos"', () => {
-    expect(aplicarFiltros(base, filtros({ especial: 'sem' })).map((p) => p.id)).toEqual(['B']);
-  });
-
-  it('área soma com status e natureza', () => {
-    const r = aplicarFiltros(
-      base,
-      filtros({ status: 'pendente', especial: 'apenas', area: 'Fiscal' }),
-    );
+  it('área soma com status', () => {
+    const r = aplicarFiltros(base, filtros({ status: 'pendente', area: 'Fiscal' }));
     expect(r.map((p) => p.id)).toEqual(['A']);
     expect(aplicarFiltros(base, filtros({ area: 'CX' })).map((p) => p.id)).toEqual(['B']);
   });
 
-  it('status legado cai na pílula equivalente (rejeitado → reenvio pendente)', () => {
+  it('status legado cai na pílula equivalente (rejeitado → ajuste pedido)', () => {
     const legado = [proj({ id: 'L', statusChave: 'rejeitado' })];
-    expect(aplicarFiltros(legado, filtros({ status: 'reenvio pendente' })).map((p) => p.id)).toEqual(
+    expect(aplicarFiltros(legado, filtros({ status: 'ajuste pedido' })).map((p) => p.id)).toEqual(
       ['L'],
     );
   });
@@ -179,14 +169,16 @@ describe('filtro de período', () => {
 
 describe('contagens da faixa de pílulas', () => {
   const base = [
-    proj({ id: 'A', especial: true, statusChave: 'pendente' }),
-    proj({ id: 'B', especial: false, statusChave: 'pendente' }),
-    proj({ id: 'C', especial: true, statusChave: 'aprovado' }),
+    proj({ id: 'A', area: 'Fiscal', statusChave: 'pendente' }),
+    proj({ id: 'B', area: 'CX', statusChave: 'pendente' }),
+    proj({ id: 'C', area: 'Fiscal', statusChave: 'aprovado' }),
   ];
 
   it('a contagem da pílula respeita os demais filtros', () => {
     expect(contarPorPilula(base, filtros())).toEqual({ pendente: 2, aprovado: 1 });
-    expect(contarPorPilula(base, filtros({ especial: 'apenas' }))).toEqual({
+    // Com a área recortando, a faixa conta DENTRO do recorte: é o que impede "Pendente 2"
+    // abrir uma lista de 1.
+    expect(contarPorPilula(base, filtros({ area: 'Fiscal' }))).toEqual({
       pendente: 1,
       aprovado: 1,
     });
@@ -201,7 +193,7 @@ describe('contagens da faixa de pílulas', () => {
 
   it('"Todos" mostra o total do recorte, não o da planilha', () => {
     expect(totalSemStatus(base, filtros())).toBe(3);
-    expect(totalSemStatus(base, filtros({ especial: 'apenas' }))).toBe(2);
+    expect(totalSemStatus(base, filtros({ area: 'Fiscal' }))).toBe(2);
   });
 });
 
@@ -211,9 +203,9 @@ describe('utilitários da barra', () => {
     expect(contarFiltrosAtivos(filtros({ status: 'pendente' }))).toBe(0);
     expect(
       contarFiltrosAtivos(
-        filtros({ especial: 'apenas', ganho: 'saving', area: 'CX', periodo: { inicio: 'a', fim: 'b' } }),
+        filtros({ ganho: 'saving', area: 'CX', periodo: { inicio: 'a', fim: 'b' } }),
       ),
-    ).toBe(4);
+    ).toBe(3);
   });
 
   it('lista as áreas presentes, sem repetir e em ordem', () => {
@@ -402,7 +394,7 @@ describe('filtro de pré-aprovação do líder', () => {
     ];
     const r = aplicarFiltros(
       misto,
-      filtros({ parecer: 'aprovado', status: 'pendente', especial: 'apenas' }),
+      filtros({ parecer: 'aprovado', status: 'pendente' }),
     );
     expect(r.map((p) => p.id)).toEqual(['A']);
   });
@@ -501,11 +493,6 @@ describe('contagem do campo de pré-status', () => {
       { estado: 'pendente', total: 2 },
       { estado: 'aprovado', total: 1 },
     ]);
-    // Com "Especiais" ligado, "Pré-pendente" tem 1 — e não 2, como antes.
-    expect(pareceresDisponiveis(base, filtros({ especial: 'apenas' }))).toEqual([
-      { estado: 'pendente', total: 1 },
-      { estado: 'aprovado', total: 1 },
-    ]);
     // Some junto com o recorte de status/estrelas.
     expect(pareceresDisponiveis(base, filtros({ status: 'aprovado' }))).toEqual([
       { estado: 'aprovado', total: 1 },
@@ -520,18 +507,15 @@ describe('contagem do campo de pré-status', () => {
   });
 
   it('o estado SELECIONADO nunca desaparece, mesmo com 0 no recorte', () => {
-    // Recorte sem nenhum "Pré-aprovado": o campo mantém a opção (com 0) para o select não
-    // renderizar em branco e a pessoa saber o que desfazer.
-    const r = pareceresDisponiveis(base, filtros({ parecer: 'aprovado', especial: 'sem' }));
-    expect(r).toEqual([
-      { estado: 'pendente', total: 1 },
-      { estado: 'aprovado', total: 0 },
-    ]);
+    // Recorte sem nenhum parecer "aprovado": o campo mantém a opção (com 0) para o select
+    // não renderizar em branco e a pessoa saber o que desfazer.
+    const r = pareceresDisponiveis(base, filtros({ parecer: 'aprovado', estrelasMin: 9 }));
+    expect(r).toEqual([{ estado: 'aprovado', total: 0 }]);
   });
 
   it('a contagem do campo CONCORDA com o tamanho da lista filtrada', () => {
     for (const estado of ['pendente', 'aprovado'] as const) {
-      const f = filtros({ parecer: estado, especial: 'apenas' });
+      const f = filtros({ parecer: estado });
       const doCampo = pareceresDisponiveis(base, f).find((e) => e.estado === estado)!.total;
       expect(aplicarFiltros(base, f).length).toBe(doCampo);
     }
@@ -546,7 +530,7 @@ describe('contagem do campo de pré-status', () => {
 
   it('casaFiltrosExceto é a fonte única do "ignora a própria dimensão"', () => {
     const p = proj({ statusChave: 'pendente', especial: true, estrelas: 4 });
-    const f = filtros({ status: 'aprovado', especial: 'apenas', estrelasMin: 4 });
+    const f = filtros({ status: 'aprovado', estrelasMin: 4 });
     expect(casaFiltrosExceto(p, f, 'status')).toBe(true); // só o status desencaixava
     expect(casaFiltrosExceto(p, f, 'estrelas')).toBe(false); // o status continua barrando
   });
@@ -808,14 +792,7 @@ describe('descreverFiltrosAtivos e limparDimensao', () => {
       soMultiplos: true,
     };
     const chips = descreverFiltrosAtivos(f);
-    expect(chips.map((c) => c.chave)).toEqual([
-      'especial',
-      'estrelas',
-      'area',
-      'agente',
-      'multiplos',
-    ]);
-    expect(chips.map((c) => c.rotulo)).toContain('Especiais');
+    expect(chips.map((c) => c.chave)).toEqual(['estrelas', 'area', 'agente', 'multiplos']);
     expect(chips.map((c) => c.rotulo)).toContain('FISCAL');
     expect(chips.map((c) => c.rotulo)).toContain('3+');
   });

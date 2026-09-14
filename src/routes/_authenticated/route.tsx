@@ -155,9 +155,10 @@ function AuthenticatedLayout() {
   const { user, verificacao } = Route.useRouteContext();
   const [confirmado, setConfirmado] = useState<CurrentUser | null>(user);
   // Menu recolhido: preferência por navegador, lida na montagem (ver `admin-nav.ts`).
-  // Nasce ABERTO para quem nunca escolheu — a versão só de ícones é opção de quem já
-  // sabe onde tudo está, não o primeiro contato.
-  const [recolhido, setRecolhido] = useState(false);
+  // ⚠️ O estado inicial é `true` (recolhido), que é o PADRÃO do produto — nascer `false` e
+  // corrigir no efeito faria o menu piscar aberto a cada navegação para quem nunca mudou
+  // a preferência, que é a maioria.
+  const [recolhido, setRecolhido] = useState(true);
   useEffect(() => setRecolhido(lerMenuRecolhido()), []);
 
   function alternarMenu() {
@@ -170,10 +171,19 @@ function AuthenticatedLayout() {
   return (
     <div className="flex min-h-screen bg-background">
       <aside
-        className="hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-3 transition-[width] duration-200 md:flex motion-reduce:transition-none"
-        style={{ width: recolhido ? 68 : 232 }}
+        className="hidden shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar p-2.5 transition-[width] duration-200 md:flex motion-reduce:transition-none"
+        style={{ width: recolhido ? 64 : 232 }}
       >
-        <div className="mb-6 flex items-center gap-2 px-1">
+        {/* ⚠️ Recolhido, o cabeçalho EMPILHA. Lado a lado, o selo (32 px) + gap + o botão
+            (28 px) não cabiam nos ~40 px úteis da coluna e o botão saía cortado pela borda
+            (bug visto na staging em 14/09/2026). */}
+        <div
+          className={
+            recolhido
+              ? "mb-5 flex flex-col items-center gap-2"
+              : "mb-5 flex items-center gap-2 px-1"
+          }
+        >
           <div
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-bold text-white"
             style={{ background: "var(--go-blue)" }}
@@ -189,7 +199,9 @@ function AuthenticatedLayout() {
             onClick={alternarMenu}
             aria-label={recolhido ? "Expandir o menu" : "Recolher o menu"}
             title={recolhido ? "Expandir o menu" : "Recolher o menu"}
-            className="ml-auto rounded-md p-1.5 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+            className={`shrink-0 rounded-md p-1.5 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none ${
+              recolhido ? "" : "ml-auto"
+            }`}
             style={{ ["--tw-ring-color" as string]: "var(--go-blue)" }}
           >
             {recolhido ? (
@@ -210,7 +222,9 @@ function AuthenticatedLayout() {
           <Link
             to="/"
             title="Ver plataforma"
-            className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+            className={`flex items-center rounded-lg py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none ${
+              recolhido ? "justify-center px-0" : "gap-2.5 px-2.5"
+            }`}
             style={{ ["--tw-ring-color" as string]: "var(--go-blue)" }}
           >
             <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
@@ -260,7 +274,9 @@ function NavItem({ item, recolhido }: { item: ItemNav; recolhido: boolean }) {
         className: "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
         style: { boxShadow: "inset 2px 0 0 var(--go-blue)" },
       }}
-      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+      className={`flex items-center rounded-lg py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none ${
+        recolhido ? "justify-center px-0" : "gap-2.5 px-2.5"
+      }`}
       style={{ ["--tw-ring-color" as string]: "var(--go-blue)" }}
     >
       <Icone className="h-4 w-4 shrink-0" aria-hidden />

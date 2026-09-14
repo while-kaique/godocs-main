@@ -3490,6 +3490,21 @@ export type ResumoAvaliacaoNormal = {
   divergencia: number;
 };
 
+/**
+ * Os ids que VOLTARAM de um "Ajuste pedido" — a marca de que o autor já fez o ajuste pedido.
+ *
+ * ⚠️ Mesma disciplina dos dois leitores acima: uma consulta, sem `IN`, só o id — ela roda em
+ * paralelo com a leitura do espelho e não entra no caminho crítico. A coluna é INTERNA
+ * (`ajuste_realizado_em`, ver `schema.ts`): não existe no Sheets e o sync reverso não a toca.
+ */
+export async function getIdsComAjusteRealizado(): Promise<Set<string>> {
+  const linhas = await queryAll<{ id: string }>(
+    `SELECT id FROM projetos WHERE ajuste_realizado_em IS NOT NULL`,
+    [],
+  );
+  return new Set(linhas.map((l) => String(l.id ?? "").toLowerCase()));
+}
+
 /** Os votos 👍/👎 da base inteira, só `projeto_id` + `voto`. Mesma razão da função acima. */
 export async function getTodosFeedbacks(): Promise<Map<string, string>> {
   const linhas = await queryAll<{ projeto_id: string; voto: string }>(

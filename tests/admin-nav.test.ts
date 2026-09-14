@@ -87,25 +87,33 @@ describe("o menu recolhe e a escolha fica", () => {
     };
   }
 
-  it("sem preferência gravada, nasce ABERTO", () => {
+  // ⚠️ O padrão virou RECOLHIDO em 14/09/2026 (decisão do Luis): são 4 destinos conhecidos,
+  // e a esteira ao lado ganha em largura. Só quem ABRIU (valor "0" gravado) recebe aberto.
+  it("sem preferência gravada, nasce RECOLHIDO", () => {
     const restaurar = comArmazenamento();
     globalThis.localStorage.removeItem(CHAVE_MENU_RECOLHIDO);
-    expect(lerMenuRecolhido()).toBe(false);
+    expect(lerMenuRecolhido()).toBe(true);
     restaurar();
   });
 
   it("grava e lê de volta", () => {
     const restaurar = comArmazenamento();
-    gravarMenuRecolhido(true);
-    expect(lerMenuRecolhido()).toBe(true);
     gravarMenuRecolhido(false);
     expect(lerMenuRecolhido()).toBe(false);
+    gravarMenuRecolhido(true);
+    expect(lerMenuRecolhido()).toBe(true);
     restaurar();
   });
 
   it("ambiente SEM localStorage (servidor, render inicial) devolve o padrão", () => {
-    expect(lerMenuRecolhido()).toBe(false);
+    expect(lerMenuRecolhido()).toBe(true);
     expect(() => gravarMenuRecolhido(true)).not.toThrow();
+  });
+
+  // ⚠️ O estado inicial do React tem de ser o MESMO padrão, senão o menu pisca aberto a
+  // cada navegação para quem nunca mudou a preferência (que é a maioria).
+  it("o layout nasce recolhido, sem esperar o efeito", () => {
+    expect(layout).toContain("useState(true)");
   });
 
   it("armazenamento indisponível não derruba o menu", () => {
@@ -117,7 +125,7 @@ describe("o menu recolhe e a escolha fica", () => {
       },
     });
     expect(() => lerMenuRecolhido()).not.toThrow();
-    expect(lerMenuRecolhido()).toBe(false);
+    expect(lerMenuRecolhido()).toBe(true);
     expect(() => gravarMenuRecolhido(true)).not.toThrow();
     if (original) Object.defineProperty(globalThis, "localStorage", original);
     else delete (globalThis as { localStorage?: unknown }).localStorage;

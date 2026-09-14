@@ -31,7 +31,6 @@ import {
   limparDimensao,
   type CategoriaFiltroGanho,
   type FiltroAgente,
-  type FiltroEspecial,
   type FiltroParecer,
   type FiltrosDashboard,
 } from "@/lib/dashboard-filtros";
@@ -164,20 +163,12 @@ export function BarraFiltros({
 
       {aberto && (
         <div className="mt-3 grid gap-x-6 gap-y-4 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Campo rotulo="Natureza">
-            <Segmentado
-              valor={filtros.especial}
-              opcoes={[
-                { valor: "todos", label: "Todos" },
-                { valor: "apenas", label: "Especiais" },
-                { valor: "sem", label: "Padrão" },
-              ]}
-              onChange={(v) => setFiltros((f) => ({ ...f, especial: v as FiltroEspecial }))}
-            />
-          </Campo>
-
-          <Campo rotulo="Categorias de ganho">
+          {/* ⚠️ Expandido, não pílula: este painel JÁ é um espaço aberto, e pílula que abre
+              popover dentro dele seria um clique a mais para revelar quatro caixas que cabem
+              na tela. Ocupa duas colunas da grade porque a lista é vertical. */}
+          <Campo rotulo="Categorias de ganho" className="sm:row-span-2">
             <FiltroCategorias
+              expandido
               selecionadas={filtros.categorias}
               disponiveis={categorias}
               onChange={(proximas: CategoriaFiltroGanho[]) =>
@@ -228,30 +219,10 @@ export function BarraFiltros({
             </select>
           </Campo>
 
-          <Campo rotulo="Pré-aprovação do líder">
-            <select
-              aria-label="Filtrar pela pré-aprovação do líder"
-              value={filtros.parecer}
-              onChange={(e) =>
-                setFiltros((f) => ({ ...f, parecer: e.target.value as FiltroParecer }))
-              }
-              className="h-9 w-full rounded-full border border-input bg-card px-3 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
-              style={{
-                ["--tw-ring-color" as string]: AZUL,
-                borderColor: filtros.parecer !== TODOS_OS_PARECERES ? AZUL : undefined,
-                color: filtros.parecer !== TODOS_OS_PARECERES ? AZUL : undefined,
-                fontWeight: filtros.parecer !== TODOS_OS_PARECERES ? 600 : 400,
-              }}
-            >
-              <option value={TODOS_OS_PARECERES}>Qualquer pré-status</option>
-              {pareceres.map(({ estado, total }) => (
-                <option key={estado} value={estado}>
-                  {ROTULO_ESTADO_PARECER[estado]} ({total})
-                </option>
-              ))}
-            </select>
-          </Campo>
-
+          {/* ⚠️ **O filtro de "Pré-status" SAIU em 14/09/2026.** Ele recortava a coluna
+              `Aprovação do Líder`, que virou redundante quando `Pré-aprovado` passou a ser um
+              STATUS: filtrar por "Pré-pendente" é filtrar por "Pendente". O parecer inteiro do
+              líder (checklist + justificativa) segue na ficha, que é onde ele é lido. */}
           <Campo rotulo="Análise do agente">
             <select
               aria-label="Filtrar por análise do agente"
@@ -296,49 +267,21 @@ export function BarraFiltros({
   );
 }
 
-function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+function Campo({
+  rotulo,
+  children,
+  className = "",
+}: {
+  rotulo: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className={`flex flex-col gap-1.5 ${className}`}>
       <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         {rotulo}
       </span>
       {children}
-    </div>
-  );
-}
-
-/** Escolha única em botões colados. Estado dito por fundo, peso e `aria-pressed`. */
-function Segmentado({
-  valor,
-  opcoes,
-  onChange,
-}: {
-  valor: string;
-  opcoes: { valor: string; label: string }[];
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="inline-flex h-9 items-center rounded-full border bg-card p-0.5 shadow-sm">
-      {opcoes.map((o) => {
-        const ativo = valor === o.valor;
-        return (
-          <button
-            key={o.valor}
-            type="button"
-            aria-pressed={ativo}
-            onClick={() => onChange(o.valor)}
-            className="inline-flex h-8 items-center rounded-full px-3 text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
-            style={{
-              background: ativo ? AZUL : "transparent",
-              color: ativo ? "#fff" : "var(--muted-foreground)",
-              fontWeight: ativo ? 600 : 400,
-              ["--tw-ring-color" as string]: AZUL,
-            }}
-          >
-            {o.label}
-          </button>
-        );
-      })}
     </div>
   );
 }

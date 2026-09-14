@@ -41,7 +41,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { HistoricoButton } from "@/components/historico/historico-button";
 import { StatusBadge } from "@/components/status-badge";
-import { ChipEstadoParecer } from "@/components/dashboard/parecer-lider";
+import { ChipAjusteFeito } from "@/components/dashboard/chip-ajuste-feito";
 import { ChipAgente, type AgenteChipDados } from "@/components/dashboard/chip-agente";
 import { BarraLoteAgente } from "@/components/dashboard/barra-lote-agente";
 import { ProjetoDetalheDialog } from "@/components/dashboard/projeto-detalhe-dialog";
@@ -117,6 +117,8 @@ type Listagem = {
   avaliacoes: Record<string, AgenteChipDados>;
   /** Voto 👍/👎 já dado pelo admin, por id. */
   feedbacks: Record<string, "like" | "dislike">;
+  /** Ids que já voltaram de um "Ajuste pedido" (o autor reenviou com o ajuste feito). */
+  ajustesRealizados?: string[];
   /** ISO da última sincronização com a planilha (a idade do espelho). */
   lidoEm: string;
   /** Passou de 20 min sem sincronizar = 4 corridas de cron perdidas → avisa. */
@@ -266,6 +268,8 @@ function Dashboard() {
   // dependência de vários `useMemo` abaixo, a lista inteira seria refiltrada e reordenada
   // a cada tecla digitada em qualquer campo da tela.
   const projetos = useMemo(() => dados?.projetos ?? [], [dados]);
+  /** Quem já voltou de um "Ajuste pedido". Vem do SQLite, num mapa lateral (ver a listagem). */
+  const ajusteFeito = useMemo(() => new Set(dados?.ajustesRealizados ?? []), [dados]);
   const hoje = hojeIso();
 
   // Deep-link ?projeto=<id>: quando a listagem chega, acha o resumo e abre a ficha direto.
@@ -610,6 +614,7 @@ function Dashboard() {
             eixo={eixo}
             avaliacoes={dados?.avaliacoes ?? {}}
             feedbacks={dados?.feedbacks ?? {}}
+            ajustesFeitos={ajusteFeito}
             selecionados={selecionados}
             salvandoId={salvandoId}
             agoraMs={agoraMs}
@@ -678,10 +683,11 @@ function Dashboard() {
                         junto — avalia se há impacto E dá a nota —, então mostrar as duas metades em
                         colunas separadas descrevia uma divisão que não existe. */}
                     <Th title="O que o time de agentes concluiu: veredito e nota">Agente</Th>
+                    {/* ⚠️ **UMA coluna de estado desde 14/09/2026.** A "Pré-status" vivia aqui
+                        ao lado, e as duas se contradiziam na base (36 Reprovados apareciam como
+                        "Pré-aprovado"). `Pré-aprovado` virou um STATUS — o que autoriza o agente
+                        a decidir. O parecer do líder segue inteiro na ficha. */}
                     <Th>Status</Th>
-                    {/* Pré-aprovação do líder ao lado do Status, para a triagem já chegar
-                        ciente do parecer sem abrir a ficha (pedido do Luis, 05/08/2026). */}
-                    <Th className="hidden md:table-cell">Pré-status</Th>
                     {/* A nota na tabela é o que torna o filtro conferível — sem ela, "de 3 a 5"
                         devolveria uma lista sem nada que a explique. */}
                     <Th
@@ -729,7 +735,7 @@ function Dashboard() {
                     <SkeletonLinhas />
                   ) : visiveis.length === 0 ? (
                     <tr>
-                      <td colSpan={13} className="p-10 text-center text-sm text-muted-foreground">
+                      <td colSpan={12} className="p-10 text-center text-sm text-muted-foreground">
                         {projetos.length === 0
                           ? "A planilha não devolveu nenhum projeto."
                           : "Nenhum projeto casa com esse filtro. Limpe a busca ou escolha outra fila."}
@@ -836,13 +842,12 @@ function Dashboard() {
                           />
                         </td>
                         <td className="px-3 py-2.5">
-                          <StatusBadge status={p.statusChave} />
+                          <div className="flex flex-wrap items-center gap-1">
+                            <StatusBadge status={p.statusChave} />
+                            {ajusteFeito.has(p.id) && <ChipAjusteFeito />}
+                          </div>
                         </td>
-                        <td className="hidden px-3 py-2.5 md:table-cell">
-                          {p.aprovacaoLider ? (
-                            <ChipEstadoParecer estado={p.aprovacaoLider} compacto />
-                          ) : null}
-                        </td>
+
                         {/* Nota como NÚMERO + uma estrela de rótulo: 12 estrelas desenhadas em
                             600 linhas ninguém conta (e a escala não tem teto). */}
                         <td className="hidden whitespace-nowrap px-3 py-2.5 text-[12.5px] md:table-cell">

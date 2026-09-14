@@ -37,6 +37,8 @@ vi.mock('@/integrations/db/client.server', async () => ({
   // paralelo com a leitura do espelho (ver `listarProjetosDashboard`).
   getResumoAvaliacoesNormais: vi.fn(async () => new Map()),
   getTodosFeedbacks: vi.fn(async () => new Map()),
+  // A marca de "ajuste pedido já foi feito" — coluna INTERNA, por isso mapa lateral.
+  getIdsComAjusteRealizado: vi.fn(async () => new Set<string>()),
   getAvaliacaoNormal: vi.fn(async () => null),
   getDeliberacao: vi.fn(async () => null),
   getDeliberacoesPorIds: vi.fn(async () => new Map()),
@@ -202,20 +204,23 @@ describe('mapResumo', () => {
 describe('filas de triagem', () => {
   const base = mapResumo(linha())!;
 
-  it('conta por status e agrupa os sem status', () => {
+  // ⚠️ Célula VAZIA conta como `pendente` desde 14/09/2026 (coluna única): "ninguém escreveu"
+  // e "ninguém decidiu ainda" são o MESMO estado do funil, e uma fila só para o vazio dividia
+  // a mesma pergunta em duas pílulas.
+  it('conta por status, e a célula vazia entra em Pendente', () => {
     const c = contarPorStatus([
       { ...base, statusChave: 'aprovado' },
       { ...base, statusChave: 'aprovado' },
       { ...base, statusChave: 'reprovado' },
       { ...base, statusChave: null },
     ]);
-    expect(c).toEqual({ aprovado: 2, reprovado: 1, sem_status: 1 });
+    expect(c).toEqual({ aprovado: 2, reprovado: 1, pendente: 1 });
   });
 
   it('rótulos legados caem na pílula equivalente', () => {
-    expect(pilulaDe('rejeitado')).toBe('reenvio pendente');
+    expect(pilulaDe('rejeitado')).toBe('ajuste pedido');
     expect(pilulaDe('validado')).toBe('aprovado');
-    expect(pilulaDe(null)).toBe('sem_status');
+    expect(pilulaDe(null)).toBe('pendente');
     expect(pilulaDe('aprovado')).toBe('aprovado');
   });
 
@@ -642,7 +647,7 @@ describe('definirStatusProjeto', () => {
     await definirStatusProjeto(
       {
         projeto_id: 'legado-148',
-        status: 'Reenvio Pendente',
+        status: 'Ajuste pedido',
         motivo_reenvio: 'projeto parado, em manutenção; reenviar com os fixes',
       },
       'admin@gocase.com',
@@ -738,7 +743,6 @@ describe('definirStatusProjeto', () => {
   it('a lista de status graváveis cobre as filas que a triagem usa', () => {
     expect(STATUS_GRAVAVEIS).toContain('Aprovado');
     expect(STATUS_GRAVAVEIS).toContain('Reprovado');
-    expect(STATUS_GRAVAVEIS).toContain('Reenvio Pendente');
-    expect(STATUS_GRAVAVEIS).toContain('Em validação');
-  });
+    expect(STATUS_GRAVAVEIS).toContain('Ajuste pedido');
+      });
 });

@@ -776,6 +776,14 @@ const MIGRATIONS = [
   // "como se fossem o dono". Conceito INTERNO do app — NÃO existe coluna no Sheets,
   // então o sync reverso nunca toca este campo (a delegação sobrevive aos syncs).
   // Permissão efetiva = interseção com `membros` (sai de membros → perde o poder).
+  // Carimbo do RETORNO de um "Ajuste pedido" (ISO). O líder ou a triagem devolve o projeto
+  // ao autor; quando o autor reenvia, o Status volta a `Pendente` e este campo marca que o
+  // ajuste FOI FEITO — senão o projeto volta para a fila indistinguível de quem nunca saiu
+  // dela, e quem tria perde a informação de que já houve uma volta.
+  // ⚠️ INTERNO: não existe coluna no Sheets, então o sync reverso nunca o toca (mesma
+  // disciplina de `editores_delegados` e `membros_contribuicoes`). NULL = nunca voltou de
+  // ajuste. Ver `src/lib/status-funil.ts`.
+  'ALTER TABLE projetos ADD COLUMN ajuste_realizado_em TEXT',
   'ALTER TABLE projetos ADD COLUMN editores_delegados TEXT',
   // Papel de cada PARTICIPANTE no projeto (JSON, mapa e-mail→papel). 3 papéis atuais:
   // 'coexecutor'("Coautor") | 'planejador'("Participante") | 'contribuidor'("Contribuidor").

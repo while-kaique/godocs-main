@@ -49,10 +49,10 @@ describe("eixo status", () => {
 
   it("status fora do trio só ganha coluna quando tem projeto", () => {
     const semNinguem = agruparKanban([], "status").map((c) => c.chave);
-    expect(semNinguem).not.toContain("reenvio pendente");
+    expect(semNinguem).not.toContain("descontinuado");
 
-    const com = agruparKanban([projeto({ statusChave: "reenvio pendente" })], "status");
-    expect(com.map((c) => c.chave)).toContain("reenvio pendente");
+    const com = agruparKanban([projeto({ statusChave: "descontinuado" })], "status");
+    expect(com.map((c) => c.chave)).toContain("descontinuado");
   });
 
   it("rótulo LEGADO cai na coluna equivalente, não numa coluna solta", () => {
@@ -64,7 +64,7 @@ describe("eixo status", () => {
       ],
       "status",
     );
-    expect(colunas.find((c) => c.chave === "reenvio pendente")?.total).toBe(1);
+    expect(colunas.find((c) => c.chave === "ajuste pedido")?.total).toBe(1);
     expect(colunas.find((c) => c.chave === "aprovado")?.total).toBe(1);
     expect(colunas.map((c) => c.chave)).not.toContain("rejeitado");
   });

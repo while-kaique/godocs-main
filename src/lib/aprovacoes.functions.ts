@@ -45,7 +45,7 @@ import {
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { notificarChatPreAprovacao } from '@/lib/notificacao-projeto.functions';
 import { notificarLiderDoProjetoPai } from '@/lib/gomoon-lideres.functions';
-import { lerLinhasEspelho } from '@/lib/sheet-espelho';
+import { lerLinhasEspelho, lerStatusDoEspelho } from '@/lib/sheet-espelho';
 import {
   resumirGanhoDaPlanilha,
   rotularCategoriasGanho,
@@ -54,6 +54,13 @@ import {
 import { deveNotificarDecisao } from '@/lib/notificacao-chat';
 import { espelharEscrita } from '@/lib/sheet-espelho';
 import { runBackground } from '@/lib/background';
+import {
+  STATUS_FINAIS,
+  ehArquivado,
+  statusDoParecerDoLider,
+  statusDoTexto,
+  type StatusProjeto,
+} from '@/lib/status-funil';
 import {
   abrirAprovacoesPendentes,
   decidirAprovacoesDoProjeto,
@@ -1123,9 +1130,30 @@ export async function decidirAprovacao(
   // /dashboard (lido do SQLite) e na tela/aviso do próprio líder do pai.
   const atualizadas = await getAprovacoesDoProjeto(projeto_id);
   const estagio1 = atualizadas.filter((l) => Number(l.estagio) === 1);
+  // ⚠️ **O parecer do líder passou a mover a coluna `Status` (14/09/2026).** Antes ele vivia
+  // só em `Aprovação do Líder`, e o funil precisava cruzar DUAS colunas para saber se o
+  // projeto estava liberado — o que produzia contradição na base (36 Reprovados com
+  // "Pré-aprovado" ao lado). Agora `Pré-aprovado` é um STATUS, e é ele que autoriza o agente
+  // (`podeAgenteDecidir`). Ver `src/lib/status-funil.ts`.
+  //
+  // ⚠️ **Só o ESTÁGIO 1 move o Status** (líder do autor). O estágio 2 (líder do dono do
+  // projeto PAI) nunca teve coluna no Sheets e continua sem: mover o funil por ele faria a
+  // decisão de um líder que não é o do autor sobrescrever a do que é.
+  //
+  // ⚠️ **Nunca rebaixa uma decisão FINAL.** A análise e a triagem decidem DEPOIS do líder; se
+  // a linha já está `Aprovado`/`Reprovado`, o parecer que chega atrasado não a desfaz.
+  const novoStatus = estagioDecisor === 1 ? statusDoParecerDoLider(veredito) : null;
+  const statusAtual = await lerStatusDoEspelho(projeto_id);
+  const moveStatus =
+    novoStatus != null &&
+    !ehArquivado(statusAtual) &&
+    !STATUS_FINAIS.includes(statusDoTexto(statusAtual) as StatusProjeto);
   const colunasLiderDecidido = {
+    // A coluna do parecer é mantida como AUDITORIA: ela diz quem liberou, e a justificativa
+    // ao lado traz o checklist inteiro. O que ela deixou de ser é a régua do funil.
     'Aprovação do Líder': rotuloAprovacaoSheet(estagio1),
     'Justificativa Aprovação do Líder': justificativaAprovacaoSheet(estagio1),
+    ...(moveStatus ? { Status: novoStatus } : {}),
   } as const;
   runBackground(
     updateRowByProjectId(projeto_id, colunasLiderDecidido)

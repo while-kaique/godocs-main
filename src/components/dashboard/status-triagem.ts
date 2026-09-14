@@ -6,7 +6,7 @@
  * compartilhado com "Meus Projetos" — a tela do admin NÃO redefine badge, só empresta
  * a mesma chave (o valor da coluna "Status" em minúsculas).
  */
-import { Clock, CheckCircle2, RotateCcw, XCircle, Archive, HelpCircle, Search } from 'lucide-react';
+import { Clock, CheckCircle2, RotateCcw, XCircle, Archive, ShieldCheck } from 'lucide-react';
 
 export type FiltroStatus = string; // chave em minúsculas, 'todos' ou 'sem_status'
 
@@ -33,16 +33,17 @@ export const STATUS_TRIAGEM: StatusTriagem[] = [
     icon: Clock,
   },
   {
-    chave: 'em validação',
-    label: 'Em validação',
-    curto: 'Em validação',
-    cor: '#7c3aed',
-    icon: Search,
+    // ⚠️ O estado que AUTORIZA o agente (`podeAgenteDecidir`). Ver `status-funil.ts`.
+    chave: 'pré-aprovado',
+    label: 'Pré-aprovado',
+    curto: 'Pré-aprovado',
+    cor: '#0ea5e9',
+    icon: ShieldCheck,
   },
   {
-    chave: 'reenvio pendente',
-    label: 'Reenvio pendente',
-    curto: 'Reenvio',
+    chave: 'ajuste pedido',
+    label: 'Ajuste pedido',
+    curto: 'Ajuste',
     cor: '#8a7d00',
     icon: RotateCcw,
   },
@@ -61,18 +62,13 @@ export const STATUS_TRIAGEM: StatusTriagem[] = [
     icon: XCircle,
   },
   {
+    // Fora do funil: é o dono arquivando, não uma etapa. Fica na faixa porque a triagem
+    // precisa alcançar a fila.
     chave: 'descontinuado',
     label: 'Descontinuado',
     curto: 'Descont.',
     cor: '#475569',
     icon: Archive,
-  },
-  {
-    chave: 'sem_status',
-    label: 'Sem status',
-    curto: 'Sem status',
-    cor: '#9ca3af',
-    icon: HelpCircle,
   },
 ];
 
@@ -82,15 +78,32 @@ export const STATUS_TRIAGEM: StatusTriagem[] = [
  * uma coluna solta).
  */
 const EQUIVALENTES: Record<string, string> = {
-  rejeitado: 'reenvio pendente',
+  // Vocabulário ANTERIOR à coluna única (14/09/2026), ainda presente em linhas da planilha.
+  rejeitado: 'ajuste pedido',
+  'reenvio pendente': 'ajuste pedido',
   validado: 'aprovado',
-  'em validacao': 'em validação',
+  'em validacao': 'pendente',
+  'em validação': 'pendente',
+  'pré-pendente': 'pendente',
+  'pre-pendente': 'pendente',
+  'pre-aprovado': 'pré-aprovado',
+  'pré-reprovado': 'reprovado',
+  'pre-reprovado': 'reprovado',
 };
 
-/** Chave da pílula à qual um status da planilha pertence. */
+/**
+ * Chave da pílula à qual um status da planilha pertence.
+ *
+ * ⚠️ Célula VAZIA cai em `pendente`, não numa pílula "Sem status" própria (14/09/2026): com a
+ * coluna única, "ninguém escreveu nada" e "ninguém decidiu ainda" são o mesmo estado do funil,
+ * e uma fila só para o vazio dividia a mesma pergunta em duas pílulas.
+ * ⚠️ A isenção vem com o porquê colado ("Pré-aprovado (liderança)"), por isso o prefixo.
+ */
 export function pilulaDe(statusChave: string | null): string {
-  if (!statusChave) return 'sem_status';
-  return EQUIVALENTES[statusChave] ?? statusChave;
+  const s = (statusChave ?? '').trim().toLowerCase();
+  if (!s || s === '—' || s === '-') return 'pendente';
+  if (s.startsWith('pré-aprovado') || s.startsWith('pre-aprovado')) return 'pré-aprovado';
+  return EQUIVALENTES[s] ?? s;
 }
 
 export function metaStatus(chave: string): StatusTriagem | undefined {

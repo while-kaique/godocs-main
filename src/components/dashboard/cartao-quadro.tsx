@@ -19,7 +19,7 @@ import { useState } from "react";
 import { Ban, Check, Loader2, RotateCcw, Sparkles, Star, Clock, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
-import { ChipEstadoParecer } from "@/components/dashboard/parecer-lider";
+import { ChipAjusteFeito } from "@/components/dashboard/chip-ajuste-feito";
 import { ChipAgente, type AgenteChipDados } from "@/components/dashboard/chip-agente";
 import {
   PERGUNTA_MOTIVO,
@@ -54,6 +54,7 @@ export function CartaoQuadro({
   projeto,
   agente,
   voto,
+  ajusteFeito,
   agoraMs,
   salvando,
   selecionado,
@@ -65,6 +66,8 @@ export function CartaoQuadro({
   projeto: ProjetoDashboardResumo;
   agente: AgenteChipDados | null;
   voto: "like" | "dislike" | null;
+  /** O autor já voltou de um "Ajuste pedido" neste projeto. */
+  ajusteFeito: boolean;
   agoraMs: number;
   salvando: boolean;
   selecionado: boolean;
@@ -133,7 +136,10 @@ export function CartaoQuadro({
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-[22px]">
         <StatusBadge status={projeto.statusChave} />
-        {projeto.aprovacaoLider && <ChipEstadoParecer estado={projeto.aprovacaoLider} compacto />}
+        {/* ⚠️ O chip do PARECER do líder saiu daqui em 14/09/2026: `Pré-aprovado` virou um
+            STATUS, então o badge acima já diz o que ele dizia. O que sobra de informação
+            nova é a VOLTA de um ajuste, que o status sozinho não conta. */}
+        {ajusteFeito && <ChipAjusteFeito />}
         {dias != null && (
           <span
             className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums"

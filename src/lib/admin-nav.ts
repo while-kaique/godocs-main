@@ -64,14 +64,19 @@ export const CHAVE_MENU_RECOLHIDO = "godocs:menu-recolhido-v1";
  * Lê o estado recolhido do `localStorage`.
  *
  * ⚠️ Nunca lança: aba anônima, armazenamento bloqueado e captura de miniatura fazem o
- * acessor jogar, e o menu tem de desenhar do mesmo jeito. Sem preferência gravada, o menu
- * nasce ABERTO — quem nunca escolheu não deve receber a versão só de ícones.
+ * acessor jogar, e o menu tem de desenhar do mesmo jeito.
+ *
+ * ⚠️ **Sem preferência gravada, o menu nasce RECOLHIDO** (decisão do Luis, 14/09/2026). São
+ * 4 itens de destino conhecido, e a tela ao lado é uma esteira que ganha em largura: a
+ * navegação aberta cobra 232 px permanentes de quem já sabe onde clicar. Quem quiser os
+ * rótulos abre uma vez e a escolha fica. Por isso o padrão é `true`, e só o valor `"0"`
+ * explícito (alguém que ABRIU) devolve aberto.
  */
 export function lerMenuRecolhido(): boolean {
   try {
-    return globalThis.localStorage?.getItem(CHAVE_MENU_RECOLHIDO) === "1";
+    return globalThis.localStorage?.getItem(CHAVE_MENU_RECOLHIDO) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 

@@ -17,7 +17,10 @@ export type AcaoTriagem = 'aprovar' | 'reenviar' | 'reprovar';
 /** Status gravado por cada ação — os mesmos rótulos do dropdown da planilha. */
 export const STATUS_GRAVAVEIS_ESPECIAIS: Record<AcaoTriagem, string> = {
   aprovar: 'Aprovado',
-  reenviar: 'Reenvio Pendente',
+  // ⚠️ `Ajuste pedido` desde 14/09/2026 — antes era `Reenvio Pendente`, que dizia a MESMA
+  // coisa que o veredito `ajuste` do líder com outro nome. Com a coluna de status única, os
+  // dois caminhos de devolução ao autor (líder e triagem) passam a falar a mesma língua.
+  reenviar: 'Ajuste pedido',
   reprovar: 'Reprovado',
 };
 

@@ -53,6 +53,7 @@ function quadro(eixo: Parameters<typeof agruparKanban>[1], projetos = [PROJETO])
         abc: { veredito: "aprovar", confianca: 0.9, divergencia: true, aplicar: false },
       },
       feedbacks: {},
+      ajustesFeitos: new Set(["abc"]),
       selecionados: new Set(["abc"]),
       salvandoId: null,
       agoraMs: Date.parse("2026-09-14T00:00:00Z"),
@@ -72,6 +73,8 @@ describe("o quadro monta", () => {
     expect(html).toContain("Pedir reenvio");
     expect(html).toContain("Reprovar");
     expect(html).toContain("dias esperando");
+    // A volta de um "Ajuste pedido" tem marca própria: o status sozinho não a conta.
+    expect(html).toContain("Ajuste realizado");
   });
 
   it("⚠️ sem travessão: o traço saiu das telas (pedido do Luis, 14/09/2026)", () => {
@@ -91,6 +94,7 @@ describe("o quadro monta", () => {
         eixo: "status",
         avaliacoes: {},
         feedbacks: {},
+        ajustesFeitos: new Set<string>(),
         selecionados: new Set<string>(),
         salvandoId: null,
         agoraMs: 0,
@@ -114,7 +118,7 @@ describe("a barra de filtros monta", () => {
   it("com as pílulas do que está ligado", () => {
     const html = renderToStaticMarkup(
       h(BarraFiltros, {
-        filtros: { ...FILTROS_VAZIOS, especial: "apenas", area: "FISCAL" },
+        filtros: { ...FILTROS_VAZIOS, area: "FISCAL" },
         setFiltros: () => {},
         busca: "",
         setBusca: () => {},
@@ -129,7 +133,6 @@ describe("a barra de filtros monta", () => {
       }),
     );
     expect(html).toContain("Filtros");
-    expect(html).toContain("Especiais");
     expect(html).toContain("FISCAL");
     // Painel FECHADO por padrão: os campos não ocupam a tela antes de alguém pedir.
     expect(html).not.toContain("Pré-aprovação do líder");

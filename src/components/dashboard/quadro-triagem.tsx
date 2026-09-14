@@ -25,6 +25,7 @@ export function QuadroTriagem({
   eixo,
   avaliacoes,
   feedbacks,
+  ajustesFeitos,
   selecionados,
   salvandoId,
   agoraMs,
@@ -38,6 +39,8 @@ export function QuadroTriagem({
   eixo: string;
   avaliacoes: Record<string, AgenteChipDados>;
   feedbacks: Record<string, "like" | "dislike">;
+  /** Ids que já voltaram de um "Ajuste pedido". */
+  ajustesFeitos: Set<string>;
   selecionados: Set<string>;
   salvandoId: string | null;
   agoraMs: number;
@@ -60,6 +63,14 @@ export function QuadroTriagem({
   }
 
   return (
+    /**
+     * ⚠️ **As colunas CRESCEM para preencher o espaço livre** (pedido do Luis, 14/09/2026).
+     * Com largura fixa, o eixo "Status" desenhava 3 colunas de 286 px e deixava metade da
+     * tela vazia. O `flex: 1 1 <base>` com `minWidth` faz as duas coisas com uma regra só:
+     * poucas colunas esticam até o teto; muitas (eixo "Autor", dezenas) param no mínimo e o
+     * quadro passa a rolar na horizontal, que é o comportamento de quadro mesmo.
+     * ⚠️ O teto existe para 2 colunas não virarem dois painéis de meia tela cada.
+     */
     <div className="mt-4 flex gap-3 overflow-x-auto pb-3">
       {colunas.map((coluna) => {
         const teto = tetos[coluna.chave] ?? CARTOES_INICIAIS;
@@ -69,7 +80,8 @@ export function QuadroTriagem({
           <section
             key={coluna.chave}
             aria-label={`${coluna.rotulo}: ${coluna.total} ${coluna.total === 1 ? "projeto" : "projetos"}`}
-            className="flex w-[286px] shrink-0 flex-col rounded-xl bg-muted/40"
+            className="flex flex-col rounded-xl bg-muted/40"
+            style={{ flex: "1 1 286px", minWidth: 286, maxWidth: 420 }}
           >
             <header
               className="sticky top-0 z-10 rounded-t-xl border-b bg-card/95 px-3 py-2.5 backdrop-blur"
@@ -93,7 +105,7 @@ export function QuadroTriagem({
               )}
             </header>
 
-            <div className="flex max-h-[calc(100vh-320px)] flex-col gap-2 overflow-y-auto p-2">
+            <div className="flex max-h-[calc(100vh-300px)] min-h-[220px] flex-col gap-2 overflow-y-auto p-2">
               {coluna.total === 0 ? (
                 <p className="px-1 py-6 text-center text-[11.5px] text-muted-foreground">
                   Nada nesta coluna
@@ -105,6 +117,7 @@ export function QuadroTriagem({
                     projeto={p}
                     agente={avaliacoes[p.id] ?? avaliacoes[p.id.toLowerCase()] ?? null}
                     voto={feedbacks[p.id] ?? feedbacks[p.id.toLowerCase()] ?? null}
+                    ajusteFeito={ajustesFeitos.has(p.id)}
                     agoraMs={agoraMs}
                     salvando={salvandoId === p.id}
                     selecionado={selecionados.has(p.id)}
@@ -144,7 +157,11 @@ export function QuadroEsqueleto() {
   return (
     <div className="mt-4 flex gap-3 overflow-hidden pb-3" aria-hidden>
       {[0, 1, 2, 3].map((c) => (
-        <div key={c} className="flex w-[286px] shrink-0 flex-col rounded-xl bg-muted/40">
+        <div
+          key={c}
+          className="flex flex-col rounded-xl bg-muted/40"
+          style={{ flex: "1 1 286px", minWidth: 286, maxWidth: 420 }}
+        >
           <div className="rounded-t-xl border-b bg-card px-3 py-2.5">
             <div className="h-3 w-24 animate-pulse rounded bg-muted motion-reduce:animate-none" />
           </div>

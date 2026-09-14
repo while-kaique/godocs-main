@@ -24,6 +24,7 @@
  */
 import { z } from "zod";
 import { updateRowByProjectId, type SheetRow } from "@/lib/google/sheets";
+import { STATUS_GRAVAVEIS_PROJETO } from "@/lib/status-funil";
 import { registrarAtividade } from "@/lib/atividades.functions";
 // A discordância da ficha vira LIÇÃO pelo módulo puro das correções: o eixo, o piso e o teto do
 // motivo saem de lá para a tela e o servidor cobrarem exatamente o que o prompt vai aceitar.
@@ -50,6 +51,7 @@ import {
   getAvaliacoesNormaisPorIds,
   getResumoAvaliacoesNormais,
   getTodosFeedbacks,
+  getIdsComAjusteRealizado,
   type ResumoAvaliacaoNormal,
   getAvaliacaoNormal,
   getDeliberacao,
@@ -130,14 +132,10 @@ export type { ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
  * "Status" — escrever um valor fora do dropdown não falha, mas deixa a célula
  * marcada como inválida para quem abre a planilha.
  */
-export const STATUS_GRAVAVEIS = [
-  "Pendente",
-  "Em validação",
-  "Aprovado",
-  "Reenvio Pendente",
-  "Reprovado",
-  "Descontinuado",
-] as const;
+// ⚠️ Reexporta a FONTE ÚNICA (`status-funil.ts`): os 5 do funil + `Descontinuado`, que é
+// arquivo do dono e não etapa. Saíram `Em validação` (dizia "esperando", que é `Pendente`) e
+// `Reenvio Pendente` (virou `Ajuste pedido`, o mesmo vocabulário do líder).
+export const STATUS_GRAVAVEIS = STATUS_GRAVAVEIS_PROJETO;
 export type StatusGravavel = (typeof STATUS_GRAVAVEIS)[number];
 
 /**
@@ -154,7 +152,7 @@ export type AvaliacaoSombraResumo = {
 
 export type ListagemDashboard = {
   projetos: ProjetoDashboardResumo[];
-  contagem: Record<string, number>; // statusChave → total ('sem_status' quando vazio)
+  contagem: Record<string, number>; // statusChave → total (célula vazia conta como 'pendente')
   total: number;
   /**
    * Recomendação em SOMBRA do agregador por projeto (coluna "Sombra"), chaveada por id. Vem
@@ -164,6 +162,14 @@ export type ListagemDashboard = {
   avaliacoes: Record<string, AvaliacaoSombraResumo>;
   /** Voto 👍/👎 já dado pelo admin, por id (indicador na coluna; o voto acontece na ficha). */
   feedbacks: Record<string, "like" | "dislike">;
+  /**
+   * Ids que já VOLTARAM de um "Ajuste pedido" — o autor fez o ajuste e reenviou.
+   *
+   * ⚠️ Vem do SQLite (`projetos.ajuste_realizado_em`), não do espelho: é coluna INTERNA e
+   * não existe no Sheets. Sem esta marca, o projeto que voltou reentra na fila
+   * indistinguível de quem nunca saiu dela.
+   */
+  ajustesRealizados: string[];
   /** ISO — quando a planilha foi lida pela última vez (a idade do ESPELHO, não do request). */
   lidoEm: string;
   /** O espelho passou de `ESPELHO_VELHO_MS` sem sincronizar → a tela avisa. */
@@ -576,7 +582,7 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
   //
   // Os dois leitores novos não dependem de id nenhum (`getResumoAvaliacoesNormais`,
   // `getTodosFeedbacks`): uma consulta cada, só os escalares, fora do caminho crítico.
-  const [{ linhas, lidoEmMs }, saude, mesas, votos] = await Promise.all([
+  const [{ linhas, lidoEmMs }, saude, mesas, votos, comAjuste] = await Promise.all([
     lerResumosEspelho(),
     statusEspelho(),
     // Falha aqui NÃO derruba a listagem (a superfície do agente é acessória): a coluna fica
@@ -589,6 +595,11 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
       console.error("[dashboard-admin] falha ao ler os votos do admin:", e);
       return new Map<string, string>();
     }),
+    // A marca de "o ajuste pedido já foi feito" — coluna INTERNA, por isso mapa lateral.
+    getIdsComAjusteRealizado().catch((e) => {
+      console.error("[dashboard-admin] falha ao ler a marca de ajuste realizado:", e);
+      return new Set<string>();
+    }),
   ]);
   const projetos = linhas
     .map(mapResumo)
@@ -599,6 +610,8 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
   // virar campo a mais na resposta.
   const avaliacoes: Record<string, AvaliacaoSombraResumo> = {};
   const feedbacks: Record<string, "like" | "dislike"> = {};
+  /** Ids que já voltaram de um "Ajuste pedido" — a tela desenha um chip para eles. */
+  const ajustesRealizados: string[] = [];
   for (const p of projetos) {
     const chave = p.id.trim().toLowerCase();
     const m = mesas.get(chave);
@@ -612,6 +625,7 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     }
     const voto = normalizarVoto(votos.get(chave));
     if (voto) feedbacks[p.id] = voto;
+    if (comAjuste.has(chave)) ajustesRealizados.push(p.id);
   }
 
   // A idade é do dado: preferimos o carimbo da última corrida OK e caímos no `lido_em` das
@@ -623,6 +637,7 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     total: projetos.length,
     avaliacoes,
     feedbacks,
+    ajustesRealizados,
     lidoEm: new Date(idadeRef ?? Date.now()).toISOString(),
     espelhoVelho: idadeRef != null && Date.now() - idadeRef > ESPELHO_VELHO_MS,
     syncFalhou: saude.ultimaFalhou,

@@ -37,9 +37,14 @@ describe('/dashboard — barra de filtros', () => {
     expect(dashboard).toContain('totalSemStatus(projetos, filtros)');
   });
 
-  it('oferece as cinco dimensões novas', () => {
+  it('oferece as dimensões do painel', () => {
     expect(painel).toContain('<SeletorPeriodo');
-    expect(painel).toMatch(/especial: v as FiltroEspecial/);
+    // ⚠️ A dimensão "natureza" (Especiais × Padrão) SAIU em 14/09/2026 — todo projeto tem
+    // nota agora, então separar por natureza não responde pergunta de triagem nenhuma.
+    expect(painel).not.toMatch(/especial: v as FiltroEspecial/);
+    // ⚠️ As categorias de ganho vêm EXPANDIDAS: pílula que abre popover dentro de um painel
+    // já aberto é um clique a mais para revelar 4 caixas que cabem na tela.
+    expect(painel).toMatch(/<FiltroCategorias\s+expandido/);
     // ⚠️ O Segmentado "Ganho" ("Com saving" × "Com receita", escolha única da v1) SAIU em
     // 09/09/2026 e foi SUBSTITUÍDO pela pílula das 4 categorias da v2, multi-seleção que soma.
     // Decisão do Luis: "Era so mudar os que ja tinha e adaptalos devidamente" — não é pílula nova
@@ -48,10 +53,10 @@ describe('/dashboard — barra de filtros', () => {
     expect(painel).toMatch(/categorias: proximas/);
     expect(painel).not.toMatch(/ganho: v as FiltroGanho/);
     expect(painel).toContain('Todas as áreas');
-    expect(painel).toContain('Qualquer pré-status');
-    // ⚠️ O rótulo do estado sai da fonte única que o chip da linha usa — filtro e célula
-    // não podem chamar o mesmo estado por nomes diferentes.
-    expect(painel).toContain('ROTULO_ESTADO_PARECER[estado]');
+    // ⚠️ O filtro de PRÉ-STATUS saiu em 14/09/2026: `Pré-aprovado` virou um STATUS, então
+    // filtrar por "Pré-pendente" passou a ser filtrar por "Pendente". O parecer inteiro do
+    // líder segue na ficha.
+    expect(painel).not.toContain('Qualquer pré-status');
   });
 
   it('"Limpar filtros" preserva a fila de status escolhida', () => {

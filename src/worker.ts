@@ -133,6 +133,7 @@ import {
   descontinuarProjeto,
 } from "@/lib/meus-projetos.functions";
 import { assessDocsBackfill } from "@/lib/docs-backfill";
+import { migrarStatusUnico } from "@/lib/migrar-status-unico";
 import { reconciliarFinanceiroDoSheet } from "@/lib/reconciliar-financeiro";
 import { converterParaCustoEvitadoPuro } from "@/lib/converter-custo-evitado-puro";
 import {
@@ -1434,6 +1435,16 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // financeiras + itens de custo evitado/projeto), que o sync reverso não cobre.
     // Sem isso o formulário de edição seeda do SQLite antigo e o próximo reenvio
     // REVERTE a correção. Não escreve nada no Sheets. `dry: true` só devolve o diff.
+    // ── Migração para a coluna ÚNICA de status (admin) ──
+    // Recalcula `Status` a partir do par antigo (`Status`, `Aprovação do Líder`) pela régua
+    // de `status-funil.ts`. NÃO apaga a coluna do líder (fica congelada como histórico) e
+    // NÃO toca "Atualizado Em". ⚠️ `dry` é o DEFAULT — gravar exige `{"dry":false}`.
+    if (pathname === "/api/admin/migrar-status-unico" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody<{ dry?: boolean; limite?: number }>(request);
+      return json(await migrarStatusUnico({ dry: body?.dry, limite: body?.limite }));
+    }
+
     if (pathname === "/api/admin/reconciliar-financeiro" && method === "POST") {
       await requireAdmin(request);
       const body = await readBody<{ projetoId?: string; dry?: boolean }>(request);
