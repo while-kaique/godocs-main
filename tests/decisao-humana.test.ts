@@ -197,4 +197,20 @@ describe('⚠️ decisaoDeAdminBloqueia — o buraco que a 1ª trava deixou', ()
       podeAgenteGravarStatus({ statusAtual: 'Pendente', alvo: 'Aprovado', atorDoStatusAtual: 'luis.albuquerque@gocase.com', historico, ultimoReenvioEm: null }).pode,
     ).toBe(false);
   });
+
+  it('⚠️ `Pendente` gravado por GENTE não é decisão: o agente pode decidir (caso Teste / Seo Gocase, 14/09/2026)', () => {
+    const historico = [
+      { ator: 'luis.albuquerque@gocase.com', quando: '2026-09-10 21:27:12', status: 'Pendente' },
+      { ator: 'time-de-agentes@godocs', quando: '2026-09-10 17:36:19', status: 'Reprovado' },
+    ];
+    expect(
+      podeAgenteGravarStatus({ statusAtual: 'Pendente', alvo: 'Reprovado', atorDoStatusAtual: 'luis.albuquerque@gocase.com', historico, ultimoReenvioEm: null }),
+    ).toEqual({ pode: true, motivo: null });
+    // mas Reprovado/Aprovado de gente no histórico seguem valendo (sem reenvio depois)
+    const comDecisao = [{ ator: 'luis.albuquerque@gocase.com', quando: '2026-09-10 21:27:12', status: 'Reprovado' }];
+    expect(podeAgenteGravarStatus({ statusAtual: 'Pendente', alvo: 'Aprovado', atorDoStatusAtual: 'time-de-agentes@godocs', historico: comDecisao, ultimoReenvioEm: null }).pode).toBe(false);
+    // escrita sem `status` (registro antigo) continua contando como decisão — conservador
+    const semStatus = [{ ator: 'luis.albuquerque@gocase.com', quando: '2026-09-10 21:27:12' }];
+    expect(podeAgenteGravarStatus({ statusAtual: 'Pendente', alvo: 'Aprovado', atorDoStatusAtual: 'time-de-agentes@godocs', historico: semStatus, ultimoReenvioEm: null }).pode).toBe(false);
+  });
 });

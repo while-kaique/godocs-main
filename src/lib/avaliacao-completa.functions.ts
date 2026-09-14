@@ -28,6 +28,7 @@ import { numero } from '@/lib/dashboard-resumo';
 import { ESTRELA_LIMITE_REPROVAVEL } from '@/lib/materialidade-piso';
 import { juntarAnalises, type Juncao } from '@/lib/avaliacao/junta';
 import { justificativaDaReprovacao, agenteDecideFunil } from '@/lib/funil-status';
+import { getUltimosConsensosDoTimePorIds } from '@/integrations/db/client.server';
 import { definirStatusProjeto } from '@/lib/dashboard-admin.functions';
 import {
   podeAgenteGravarStatus,
@@ -479,8 +480,9 @@ async function historicoDeStatus(
     const logs = (await getAdminStatusLogs(projetoId, 50)) as {
       admin_email?: string | null;
       created_at?: string | null;
+      status_novo?: string | null;
     }[];
-    out.historico = logs.map((l) => ({ ator: l.admin_email ?? null, quando: l.created_at ?? null }));
+    out.historico = logs.map((l) => ({ ator: l.admin_email ?? null, quando: l.created_at ?? null, status: l.status_novo ?? null }));
   } catch {
     /* sem histórico, valem só as travas duras */
   }
@@ -645,6 +647,8 @@ export async function avaliarLoteComTime(
  * 5 min, dá **12 por hora** — mais que o fluxo de submissão do dia.
  */
 export const CRON_AVALIACAO_POR_CORRIDA = 1;
+/** Pendente que o time já avaliou volta à fila depois deste prazo (o material pode ter mudado; reenvio também reabre). */
+export const REAVALIAR_PENDENTE_APOS_HORAS = 72;
 
 /**
  * Roda o time no projeto mais antigo que está **Pendente sem decisão do agente**.
@@ -664,15 +668,22 @@ export async function drenarFilaDoFunil(
   const limite = Math.max(1, Math.min(opts.limite ?? CRON_AVALIACAO_POR_CORRIDA, 3));
   try {
     const { linhas } = await lerResumosEspelho();
-    const fila = linhas
-      .filter((r) => {
-        const l = r as unknown as Record<string, string>;
-        const status = String(l['Status'] ?? '').trim().toLowerCase();
-        if (status !== 'pendente') return false;
-        return vazioNaPlanilha(l['Estrela Agente']);
-      })
+    // ⚠️ A fila é "Pendente SEM consenso do time em PROD (ou consenso velho)", não "Estrela Agente
+    // vazia" (14/09/2026): 34 Pendentes tinham a coluna preenchida pelo porte da rodada de calibragem
+    // (avaliados na STAGING) e nunca entravam na fila — e projeto que o time deixou Pendente precisa
+    // voltar à fila depois de `REAVALIAR_PENDENTE_APOS_HORAS`, senão fica Pendente para sempre.
+    const pendentes = linhas
+      .filter((r) => String((r as unknown as Record<string, string>)['Status'] ?? '').trim().toLowerCase() === 'pendente')
       .map((r) => String((r as unknown as Record<string, string>)['ID Projeto'] ?? '').trim())
       .filter(Boolean);
+    const consensos = await getUltimosConsensosDoTimePorIds(pendentes);
+    const corte = Date.now() - REAVALIAR_PENDENTE_APOS_HORAS * 3600_000;
+    const fila = pendentes.filter((id) => {
+      const c = consensos.get(id.toLowerCase());
+      if (!c) return true; // nunca avaliado em prod
+      const quando = Date.parse(String(c.created_at ?? '').replace(' ', 'T') + 'Z');
+      return !Number.isFinite(quando) || quando < corte;
+    });
     const avaliados: string[] = [];
     for (const id of fila.slice(0, limite)) {
       const r = await avaliarProjetoComTimeCompleto(id, { dry: opts.dry });

@@ -54,7 +54,19 @@ export type EscritaDeStatus = {
   ator?: string | null;
   /** Carimbo comparável como texto ISO/`YYYY-MM-DD HH:MM:SS` (é o formato do log). */
   quando?: string | null;
+  /**
+   * O status que a escrita gravou. ⚠️ `Pendente` (e `Em validação`) escrito por GENTE **não é
+   * decisão** (14/09/2026): é a triagem dizendo "ainda não decidi", e o funil existe para o time
+   * decidir justamente isso. Ausente → tratado como decisão (conservador).
+   */
+  status?: string | null;
 };
+
+/** `Pendente`/`Em validação` = "ninguém decidiu ainda" — não bloqueia o agente. */
+export function ehStatusIndeciso(status: string | null | undefined): boolean {
+  const s = String(status ?? '').trim().toLowerCase();
+  return s === 'pendente' || s === 'em validação' || s === 'em validacao' || s === 'em_validacao';
+}
 
 /**
  * Existe decisão de admin que o agente não pode desfazer? PURA.
@@ -78,13 +90,14 @@ export function decisaoDeAdminBloqueia(args: {
   const hist = args.historico ?? [];
   if (!hist.length) return false;
   const humanas = hist
-    .filter((h) => ehAtorHumano(h.ator))
+    // escrita humana de `Pendente` não decide nada (ver `ehStatusIndeciso`); status ausente conta
+    .filter((h) => ehAtorHumano(h.ator) && !(h.status !== undefined && h.status !== null && ehStatusIndeciso(h.status)))
     .map((h) => String(h.quando ?? '').trim())
     .filter(Boolean)
     .sort();
   if (!humanas.length) {
     // Há histórico, todo do agente, sem carimbo legível: nada a proteger aqui.
-    return hist.some((h) => ehAtorHumano(h.ator));
+    return hist.some((h) => ehAtorHumano(h.ator) && !(h.status !== undefined && h.status !== null && ehStatusIndeciso(h.status)));
   }
   const ultimaHumana = humanas[humanas.length - 1];
   const reenvio = String(args.ultimoReenvioEm ?? '').trim();
@@ -148,8 +161,13 @@ export function podeAgenteGravarStatus(args: {
     !!args.historico?.length &&
     !!String(args.ultimoReenvioEm ?? '').trim() &&
     !decisaoDeAdminBloqueia({ historico: args.historico, ultimoReenvioEm: args.ultimoReenvioEm });
+  // ⚠️ Status atual `Pendente` gravado por gente NÃO é decisão (14/09/2026): «Teste» e «Seo Gocase»
+  // foram movidos Reprovado → Pendente pela triagem e o time, concluindo Reprovado, ficava barrado
+  // para sempre — o funil existe para decidir exatamente o que está em Pendente.
+  const atualIndeciso = ehStatusIndeciso(atual);
   if (
     !reabertoPorReenvio &&
+    !atualIndeciso &&
     args.atorDoStatusAtual !== undefined &&
     args.atorDoStatusAtual !== null &&
     ehAtorHumano(args.atorDoStatusAtual)
