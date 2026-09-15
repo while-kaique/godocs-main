@@ -4348,7 +4348,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         // agente só aprova/reprova quando o status for pré-aprovado"* —, deixá-los em
         // `Pendente` pararia o funil para a maioria dos projetos esperando um líder que não
         // existe. O PORQUÊ da isenção continua na justificativa (D12).
-        status: statusDeSubmissao(preAprovacao.rotuloSheet),
+        status: statusDeSubmissao(preAprovacao),
         area: areaFinal ?? "—",
         memorialLimpo: memorialSavingLimpo ?? "—",
         receitaMemorialLimpo: receitaMemorialLimpo ?? "—",

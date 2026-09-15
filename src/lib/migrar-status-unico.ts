@@ -30,6 +30,7 @@ import { lerResumosEspelho, espelharEscrita } from "@/lib/sheet-espelho";
 import { updateRowByProjectId } from "@/lib/google/sheets";
 import { COLUNA_ESTADO_LIDER } from "@/lib/aprovacoes-parecer";
 import { unificarStatus } from "@/lib/status-funil";
+import { getIdsComFilaPendente } from "@/integrations/db/client.server";
 
 /** Uma linha que a migração mudaria (ou mudou). */
 export type MudancaStatus = {
@@ -59,7 +60,15 @@ export type RelatorioMigracao = {
  * ⚠️ Linha sem `ID Projeto` é DESCARTADA, nunca "migrada para Pendente": sem id não há o que
  * endereçar, e inventar um destino para ela seria escrever na linha errada.
  */
-export function planejarMigracao(linhas: readonly Record<string, string>[]): {
+export function planejarMigracao(
+  linhas: readonly Record<string, string>[],
+  /**
+   * Ids que têm ALGUÉM para decidir (linha `pendente` em `projeto_aprovacoes`). Omitir
+   * desliga o 2º passo — é o comportamento da 1ª versão, mantido para os testes que só
+   * exercitam a unificação das duas colunas.
+   */
+  comFilaPendente?: ReadonlySet<string>,
+): {
   mudancas: MudancaStatus[];
   inalteradas: number;
 } {
@@ -70,7 +79,22 @@ export function planejarMigracao(linhas: readonly Record<string, string>[]): {
     if (!id) continue;
     const de = String(linha["Status"] ?? "").trim();
     const parecer = String(linha[COLUNA_ESTADO_LIDER] ?? "").trim();
-    const para = unificarStatus(de, parecer);
+    let para: string = unificarStatus(de, parecer);
+
+    // ── 2º passo: destrava quem NINGUÉM vai decidir ──
+    //
+    // ⚠️ Projeto em `Pendente` **sem fila aberta** está preso: o portão do agente só age em
+    // `Pré-aprovado` e nenhum líder virá. São os isentos — especial (D27 não abre fila),
+    // autor sem líder na TeamGuide, integração fora na submissão — e o legado anterior à
+    // fila. A coluna do líder NÃO os distingue (`rotuloIsencaoSheet` devolve "—" para os
+    // três), e é por isso que a régua aqui é a FILA, não o rótulo: foi confiar no rótulo
+    // que prendeu os projetos em produção.
+    //
+    // ⚠️ Só mexe em quem está em `Pendente`. Decisão final e `Ajuste pedido` não se tocam.
+    if (comFilaPendente && para === "Pendente" && !comFilaPendente.has(id.toLowerCase())) {
+      para = "Pré-aprovado";
+    }
+
     if (de === para) {
       inalteradas += 1;
       continue;
@@ -94,9 +118,13 @@ export async function migrarStatusUnico(
 ): Promise<RelatorioMigracao> {
   const dry = opts.dry !== false;
   try {
-    const { linhas } = await lerResumosEspelho();
+    const [{ linhas }, comFilaPendente] = await Promise.all([
+      lerResumosEspelho(),
+      getIdsComFilaPendente(),
+    ]);
     const { mudancas, inalteradas } = planejarMigracao(
       linhas as unknown as Record<string, string>[],
+      comFilaPendente,
     );
     const alvo = opts.limite ? mudancas.slice(0, opts.limite) : mudancas;
     const falhas: string[] = [];

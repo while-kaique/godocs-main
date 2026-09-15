@@ -10,6 +10,7 @@
  * resolve (36 Reprovados marcados como "Pré-aprovado", 14 Aprovados como "Pré-pendente").
  */
 import { describe, it, expect } from "vitest";
+import { rotuloIsencaoSheet } from "@/lib/aprovacoes.functions";
 import {
   STATUS_PROJETO,
   STATUS_GRAVAVEIS_PROJETO,
@@ -168,11 +169,33 @@ describe("quem move o status", () => {
   });
 
   it("a submissão: quem entra em fila nasce Pendente, quem é isento nasce Pré-aprovado", () => {
-    expect(statusDeSubmissao("Pré-pendente")).toBe("Pendente");
-    expect(statusDeSubmissao("Pré-aprovado (liderança)")).toBe("Pré-aprovado");
-    expect(statusDeSubmissao("Pré-aprovado (sem líder)")).toBe("Pré-aprovado");
-    expect(statusDeSubmissao("—")).toBe("Pendente");
-    expect(statusDeSubmissao(null)).toBe("Pendente");
+    expect(statusDeSubmissao({ isento: false })).toBe("Pendente");
+    expect(statusDeSubmissao({ isento: true })).toBe("Pré-aprovado");
+  });
+
+  /**
+   * ⚠️ REGRESSÃO REAL (15/09/2026). A 1ª versão desta régua lia o `rotuloSheet`, e
+   * `rotuloIsencaoSheet` devolve "Pré-aprovado" em UM dos quatro casos de isenção e "—" nos
+   * outros três — de propósito (D12: aqueles três não têm ESTADO, o porquê vai na
+   * justificativa). Resultado em produção: **projeto especial nascia `Pendente` e ficava
+   * preso para sempre**, porque especial não entra em fila (D27) e o portão só deixa o
+   * agente agir em `Pré-aprovado`. Três dos oito Pendentes de prod estavam nessa situação.
+   *
+   * Este teste percorre os QUATRO motivos usando a MESMA função que monta o rótulo, então
+   * ele quebra se alguém voltar a derivar o funil daquela coluna.
+   */
+  it("⚠️ os QUATRO motivos de isenção nascem Pré-aprovado, não só o de liderança", () => {
+    const motivos = ["lideranca", "sem_lider", "teamguide_indisponivel", "especial"] as const;
+    for (const motivo of motivos) {
+      const rotulo = rotuloIsencaoSheet(motivo);
+      expect(
+        statusDeSubmissao({ isento: true }),
+        `isenção por "${motivo}" (rótulo "${rotulo}") tem de nascer Pré-aprovado`,
+      ).toBe("Pré-aprovado");
+    }
+    // E a prova de que o rótulo NÃO servia como régua: 3 dos 4 não dizem "Pré-aprovado".
+    const rotulos = motivos.map(rotuloIsencaoSheet);
+    expect(rotulos.filter((r) => r === "Pré-aprovado")).toHaveLength(1);
   });
 
   it("o reenvio só reabre quem estava em Ajuste pedido", () => {
@@ -298,5 +321,64 @@ describe("a fila do RPA reconhece o status novo", () => {
     expect(ehDaFilaRpa(proj("reprovado"))).toBe(false);
     expect(ehDaFilaRpa(proj("descontinuado"))).toBe(false);
     expect(ehDaFilaRpa(proj("ajuste pedido"))).toBe(false);
+  });
+});
+
+// ─── O 2º passo da migração: destravar quem ninguém vai decidir ──────────────
+
+describe("migração destrava quem não tem fila", () => {
+  const linha = (id: string, status: string, parecer = "") => ({
+    "ID Projeto": id,
+    Status: status,
+    "Aprovação do Líder": parecer,
+  });
+
+  it("⚠️ Pendente SEM fila aberta vira Pré-aprovado: ninguém virá decidir", () => {
+    // O caso real de prod: 3 especiais e 1 legado, todos com a coluna do líder vazia.
+    const r = planejarMigracao([linha("especial-1", "Pendente", "")], new Set());
+    expect(r.mudancas).toEqual([
+      { id: "especial-1", de: "Pendente", para: "Pré-aprovado", parecer: "(vazio)" },
+    ]);
+  });
+
+  it("Pendente COM fila aberta continua Pendente: o líder ainda vai olhar", () => {
+    const r = planejarMigracao(
+      [linha("esperando", "Pendente", "Pré-pendente")],
+      new Set(["esperando"]),
+    );
+    expect(r.mudancas).toEqual([]);
+    expect(r.inalteradas).toBe(1);
+  });
+
+  it("o casamento do id ignora a CAIXA (legado é MAIÚSCULO na planilha)", () => {
+    const r = planejarMigracao([linha("LEGADO-042", "Pendente", "")], new Set(["legado-042"]));
+    expect(r.mudancas, "tem fila aberta, não pode ser destravado").toEqual([]);
+  });
+
+  it("⚠️ o 2º passo NÃO toca quem já foi decidido nem quem está em ajuste", () => {
+    const r = planejarMigracao(
+      [
+        linha("a", "Aprovado", ""),
+        linha("b", "Reprovado", ""),
+        linha("c", "Ajuste pedido", ""),
+        linha("d", "Descontinuado", ""),
+      ],
+      new Set(),
+    );
+    expect(r.mudancas).toEqual([]);
+    expect(r.inalteradas).toBe(4);
+  });
+
+  it("sem o conjunto, o comportamento é o da 1ª versão (só unifica as 2 colunas)", () => {
+    const r = planejarMigracao([linha("a", "Pendente", "")]);
+    expect(r.mudancas).toEqual([]);
+  });
+
+  it("é IDEMPOTENTE com o 2º passo ligado", () => {
+    const antes = [linha("sem-fila", "Pendente", "")];
+    const r1 = planejarMigracao(antes, new Set());
+    expect(r1.mudancas).toHaveLength(1);
+    const depois = antes.map((l) => ({ ...l, Status: r1.mudancas[0].para }));
+    expect(planejarMigracao(depois, new Set()).mudancas).toEqual([]);
   });
 });

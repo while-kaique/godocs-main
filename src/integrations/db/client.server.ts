@@ -614,10 +614,7 @@ export function updateProjeto(id: string, fields: Record<string, unknown>) {
  * "ID Feature" do pai) ou `null` se o pai não existir. Best-effort: o vínculo do lado do
  * filho (`projeto_pai_id`) é a fonte primária — esta é a visão do pai.
  */
-export async function vincularFilhoAoPai(
-  paiId: string,
-  filhoId: string,
-): Promise<string[] | null> {
+export async function vincularFilhoAoPai(paiId: string, filhoId: string): Promise<string[] | null> {
   const pai = await queryOne<{ projeto_filhos_ids: string | null }>(
     "SELECT projeto_filhos_ids FROM projetos WHERE id = ?",
     [paiId],
@@ -758,9 +755,7 @@ export function lerRollupMensal() {
  * para o cron detectar divergência entre o estado atual e a última versão. Uma consulta.
  * Chaves batem com `CHAVES_*` de `snapshot-projeto.ts`.
  */
-export async function getUltimosSnapshotsResumo(): Promise<
-  Map<string, Record<string, unknown>>
-> {
+export async function getUltimosSnapshotsResumo(): Promise<Map<string, Record<string, unknown>>> {
   const rows = await queryAll<Record<string, unknown> & { projeto_id: string }>(`
     SELECT v.projeto_id,
            json_extract(v.snapshot_projeto, '$.saving_reais')          AS saving_reais,
@@ -900,8 +895,16 @@ export async function getReenviosPorIds(
   for (const l of linhas) {
     const k = String(l.projeto_id ?? "").toLowerCase();
     const atual = out.get(k);
-    if (atual) atual.push({ versao_num: l.versao_num, submetido_por: l.submetido_por, created_at: l.created_at });
-    else out.set(k, [{ versao_num: l.versao_num, submetido_por: l.submetido_por, created_at: l.created_at }]);
+    if (atual)
+      atual.push({
+        versao_num: l.versao_num,
+        submetido_por: l.submetido_por,
+        created_at: l.created_at,
+      });
+    else
+      out.set(k, [
+        { versao_num: l.versao_num, submetido_por: l.submetido_por, created_at: l.created_at },
+      ]);
   }
   return out;
 }
@@ -1772,6 +1775,32 @@ export async function abrirAprovacoesPendentes(
  * Quantos projetos estão pendentes para este aprovador. Só a CONTAGEM (a DM usa para
  * dizer "3 projetos esperando você"); a fila em si é a `getAprovacoesPendentesDe`.
  */
+/**
+ * Os ids que têm ALGUÉM para decidir: pelo menos uma linha `pendente` em `projeto_aprovacoes`.
+ *
+ * ⚠️ Serve à régua "ninguém vai decidir este projeto". O complemento disto — projeto em
+ * `Pendente` que NÃO está aqui — é quem ficou preso: especial (D27 não abre fila), autor sem
+ * líder na TeamGuide, integração fora na hora da submissão, e legado anterior à fila. Sem
+ * ninguém para pré-aprovar, o portão `podeAgenteDecidir` os deixaria em `Pendente` para
+ * sempre.
+ *
+ * ⚠️ UMA consulta, sem `IN`: a migração varre a base inteira e um round-trip por projeto é o
+ * padrão que já derrubou o Investigador.
+ */
+export async function getIdsComFilaPendente(): Promise<Set<string>> {
+  const rows = await queryAll<{ projeto_id: string }>(
+    `SELECT DISTINCT projeto_id FROM projeto_aprovacoes WHERE veredito = 'pendente'`,
+    [],
+  );
+  return new Set(
+    rows.map((r) =>
+      String(r.projeto_id ?? "")
+        .trim()
+        .toLowerCase(),
+    ),
+  );
+}
+
 export async function contarAprovacoesPendentesDe(email: string): Promise<number> {
   const rows = await queryAll<{ n: number }>(
     // ⚠️ O JOIN existe para os MESMOS filtros da `getAprovacoesPendentesDe`: o número
@@ -2640,7 +2669,11 @@ export function getAlertaEstado(chave: string) {
 }
 
 /** Grava (ou substitui) o estado de cooldown de uma fonte de alerta. */
-export function upsertAlertaEstado(v: { chave: string; ultimo_em: number | null; contagem: number }) {
+export function upsertAlertaEstado(v: {
+  chave: string;
+  ultimo_em: number | null;
+  contagem: number;
+}) {
   return exec(
     "INSERT OR REPLACE INTO alerta_estado (chave, ultimo_em, contagem) VALUES (?, ?, ?)",
     [v.chave, v.ultimo_em, v.contagem],
@@ -2965,7 +2998,7 @@ export type EspecialReferenciaRow = {
 
 export async function getReferenciasEspeciais(): Promise<EspecialReferenciaRow[]> {
   return queryAll<EspecialReferenciaRow>(
-    'SELECT projeto_id, nota, motivo, definido_por, definido_em FROM especial_referencia ORDER BY nota ASC',
+    "SELECT projeto_id, nota, motivo, definido_por, definido_em FROM especial_referencia ORDER BY nota ASC",
     [],
   );
 }
@@ -2994,7 +3027,7 @@ export async function upsertReferenciaEspecial(dados: {
 }
 
 export async function deleteReferenciaEspecial(projetoId: string): Promise<void> {
-  await exec('DELETE FROM especial_referencia WHERE projeto_id = ?', [projetoId]);
+  await exec("DELETE FROM especial_referencia WHERE projeto_id = ?", [projetoId]);
 }
 
 /**
@@ -3080,11 +3113,11 @@ export type AglutinacaoRow = {
 export async function getAglutinacoes(estado?: string): Promise<AglutinacaoRow[]> {
   return estado
     ? queryAll<AglutinacaoRow>(
-        'SELECT * FROM projeto_aglutinacao WHERE estado = ? ORDER BY confianca DESC, similaridade DESC',
+        "SELECT * FROM projeto_aglutinacao WHERE estado = ? ORDER BY confianca DESC, similaridade DESC",
         [estado],
       )
     : queryAll<AglutinacaoRow>(
-        'SELECT * FROM projeto_aglutinacao ORDER BY confianca DESC, similaridade DESC',
+        "SELECT * FROM projeto_aglutinacao ORDER BY confianca DESC, similaridade DESC",
         [],
       );
 }
@@ -3128,7 +3161,7 @@ export async function upsertAglutinacao(dados: {
 export async function decidirAglutinacao(
   filho_id: string,
   pai_id: string,
-  estado: 'aceito' | 'rejeitado',
+  estado: "aceito" | "rejeitado",
   adminEmail: string,
 ): Promise<void> {
   await exec(
@@ -3172,7 +3205,7 @@ export async function getProjetosParaAglutinacao(): Promise<
 }
 
 export async function getAvaliacoesEspeciais(): Promise<EspecialAvaliacaoRow[]> {
-  return queryAll<EspecialAvaliacaoRow>('SELECT * FROM especial_avaliacao', []);
+  return queryAll<EspecialAvaliacaoRow>("SELECT * FROM especial_avaliacao", []);
 }
 
 /**
@@ -3188,7 +3221,7 @@ export async function getAvaliacaoEspecialPorId(
   projetoId: string,
 ): Promise<EspecialAvaliacaoRow | null> {
   const rows = await queryAll<EspecialAvaliacaoRow>(
-    'SELECT * FROM especial_avaliacao WHERE LOWER(projeto_id) = LOWER(?)',
+    "SELECT * FROM especial_avaliacao WHERE LOWER(projeto_id) = LOWER(?)",
     [projetoId],
   );
   return rows[0] ?? null;
@@ -3262,7 +3295,7 @@ export type EspecialEmbeddingRow = {
 
 /** Todos os embeddings (vetor incluso). Usado pela recuperação — o corpus é pequeno (dezenas). */
 export async function getEmbeddingsEspeciais(): Promise<EspecialEmbeddingRow[]> {
-  return queryAll<EspecialEmbeddingRow>('SELECT * FROM especial_embedding', []);
+  return queryAll<EspecialEmbeddingRow>("SELECT * FROM especial_embedding", []);
 }
 
 /**
@@ -3275,7 +3308,7 @@ export async function getEmbeddingEspecial(
   projetoId: string,
 ): Promise<EspecialEmbeddingRow | null> {
   const rows = await queryAll<EspecialEmbeddingRow>(
-    'SELECT * FROM especial_embedding WHERE projeto_id = ?',
+    "SELECT * FROM especial_embedding WHERE projeto_id = ?",
     [projetoId],
   );
   return rows[0] ?? null;
@@ -3291,7 +3324,7 @@ export async function getEmbeddingsEspeciaisPagina(
   limite: number,
 ): Promise<EspecialEmbeddingRow[]> {
   return queryAll<EspecialEmbeddingRow>(
-    'SELECT * FROM especial_embedding ORDER BY projeto_id LIMIT ? OFFSET ?',
+    "SELECT * FROM especial_embedding ORDER BY projeto_id LIMIT ? OFFSET ?",
     [limite, offset],
   );
 }
@@ -3304,7 +3337,7 @@ export async function getHashesEmbeddingsEspeciais(): Promise<
   { projeto_id: string; texto_hash: string | null }[]
 > {
   return queryAll<{ projeto_id: string; texto_hash: string | null }>(
-    'SELECT projeto_id, texto_hash FROM especial_embedding',
+    "SELECT projeto_id, texto_hash FROM especial_embedding",
     [],
   );
 }
@@ -3347,15 +3380,13 @@ export type ProjetoEmbeddingRow = {
 
 /** Todos os embeddings de normais (vetor incluso). Corpus por cosseno-em-JS na fatia B. */
 export async function getEmbeddingsProjetos(): Promise<ProjetoEmbeddingRow[]> {
-  return queryAll<ProjetoEmbeddingRow>('SELECT * FROM projeto_embedding', []);
+  return queryAll<ProjetoEmbeddingRow>("SELECT * FROM projeto_embedding", []);
 }
 
 /** O embedding de UM projeto normal — o vetor do ALVO, sem puxar a tabela toda. */
-export async function getEmbeddingProjeto(
-  projetoId: string,
-): Promise<ProjetoEmbeddingRow | null> {
+export async function getEmbeddingProjeto(projetoId: string): Promise<ProjetoEmbeddingRow | null> {
   const rows = await queryAll<ProjetoEmbeddingRow>(
-    'SELECT * FROM projeto_embedding WHERE projeto_id = ?',
+    "SELECT * FROM projeto_embedding WHERE projeto_id = ?",
     [projetoId],
   );
   return rows[0] ?? null;
@@ -3396,14 +3427,12 @@ export type ProjetoAvaliacaoRow = {
 };
 
 export async function getAvaliacoesNormais(): Promise<ProjetoAvaliacaoRow[]> {
-  return queryAll<ProjetoAvaliacaoRow>('SELECT * FROM projeto_avaliacao', []);
+  return queryAll<ProjetoAvaliacaoRow>("SELECT * FROM projeto_avaliacao", []);
 }
 
-export async function getAvaliacaoNormal(
-  projetoId: string,
-): Promise<ProjetoAvaliacaoRow | null> {
+export async function getAvaliacaoNormal(projetoId: string): Promise<ProjetoAvaliacaoRow | null> {
   const rows = await queryAll<ProjetoAvaliacaoRow>(
-    'SELECT * FROM projeto_avaliacao WHERE projeto_id = ?',
+    "SELECT * FROM projeto_avaliacao WHERE projeto_id = ?",
     [projetoId],
   );
   return rows[0] ?? null;
@@ -3519,7 +3548,7 @@ export async function getTodosFeedbacks(): Promise<Map<string, string>> {
 /** id + veredito (sem votos) — para o backfill saber quem já foi avaliado sem puxar os blobs. */
 export async function getIdsAvaliacoesNormais(): Promise<string[]> {
   const rows = await queryAll<{ projeto_id: string }>(
-    'SELECT projeto_id FROM projeto_avaliacao',
+    "SELECT projeto_id FROM projeto_avaliacao",
     [],
   );
   return rows.map((r) => r.projeto_id);
@@ -3581,11 +3610,9 @@ export type DeliberacaoAvaliacaoRow = {
   atualizado_em: string | null;
 };
 
-export async function getDeliberacao(
-  projetoId: string,
-): Promise<DeliberacaoAvaliacaoRow | null> {
+export async function getDeliberacao(projetoId: string): Promise<DeliberacaoAvaliacaoRow | null> {
   const rows = await queryAll<DeliberacaoAvaliacaoRow>(
-    'SELECT * FROM deliberacao_avaliacao WHERE projeto_id = ?',
+    "SELECT * FROM deliberacao_avaliacao WHERE projeto_id = ?",
     [projetoId],
   );
   return rows[0] ?? null;
@@ -3632,7 +3659,7 @@ export async function getDeliberacoesAbertas(
 /** ids com deliberação registrada (qualquer estado) — para o cron saber quem já está na mesa. */
 export async function getIdsDeliberacoes(): Promise<string[]> {
   const rows = await queryAll<{ projeto_id: string }>(
-    'SELECT projeto_id FROM deliberacao_avaliacao',
+    "SELECT projeto_id FROM deliberacao_avaliacao",
     [],
   );
   return rows.map((r) => r.projeto_id);
@@ -3709,7 +3736,7 @@ export type AvaliacaoRetroativaRow = {
 };
 
 export async function getAvaliacoesRetroativas(): Promise<AvaliacaoRetroativaRow[]> {
-  return queryAll<AvaliacaoRetroativaRow>('SELECT * FROM avaliacao_retroativa', []);
+  return queryAll<AvaliacaoRetroativaRow>("SELECT * FROM avaliacao_retroativa", []);
 }
 
 /** A medição retroativa de UM projeto — a ficha SOMBRA mostra "confere com o humano?". */
@@ -3756,7 +3783,7 @@ export async function getMedicoesRetroativas(): Promise<
   { projeto_id: string; veredito_humano: string | null }[]
 > {
   return await queryAll<{ projeto_id: string; veredito_humano: string | null }>(
-    'SELECT projeto_id, veredito_humano FROM avaliacao_retroativa',
+    "SELECT projeto_id, veredito_humano FROM avaliacao_retroativa",
     [],
   );
 }
@@ -3777,7 +3804,12 @@ export async function getMedicoesRetroativas(): Promise<
  */
 export async function getUltimoConsensoDoTime(
   projetoId: string,
-): Promise<{ saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null } | null> {
+): Promise<{
+  saida: string | null;
+  confianca: string | null;
+  veredito: string | null;
+  created_at: string | null;
+} | null> {
   const rows = await queryAll<{
     saida: string | null;
     confianca: string | null;
@@ -3805,9 +3837,27 @@ export async function getUltimoConsensoDoTime(
  */
 export async function getUltimosConsensosDoTimePorIds(
   ids: string[],
-): Promise<Map<string, { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null }>> {
+): Promise<
+  Map<
+    string,
+    {
+      saida: string | null;
+      confianca: string | null;
+      veredito: string | null;
+      created_at: string | null;
+    }
+  >
+> {
   const chaves = [...new Set(ids.map((i) => i.trim().toLowerCase()).filter(Boolean))];
-  const out = new Map<string, { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null }>();
+  const out = new Map<
+    string,
+    {
+      saida: string | null;
+      confianca: string | null;
+      veredito: string | null;
+      created_at: string | null;
+    }
+  >();
   if (chaves.length === 0) return out;
   const linhas = await queryEmLotesPorIds<{
     projeto_id: string;
@@ -3844,7 +3894,7 @@ export async function getCalibragemRetroativa(): Promise<
   { grau: string | null; resultado: string | null; n: number }[]
 > {
   return await queryAll<{ grau: string | null; resultado: string | null; n: number }>(
-    'SELECT grau, resultado, COUNT(*) AS n FROM avaliacao_retroativa GROUP BY grau, resultado',
+    "SELECT grau, resultado, COUNT(*) AS n FROM avaliacao_retroativa GROUP BY grau, resultado",
     [],
   );
 }
@@ -3958,7 +4008,7 @@ export type EspecialAreaDonoRow = {
 };
 
 export async function getDonosDeArea(): Promise<EspecialAreaDonoRow[]> {
-  return queryAll<EspecialAreaDonoRow>('SELECT * FROM especial_area_dono ORDER BY area', []);
+  return queryAll<EspecialAreaDonoRow>("SELECT * FROM especial_area_dono ORDER BY area", []);
 }
 
 /** Define (ou troca) o dono de uma área. UPSERT: redistribuir é o gesto normal. */
@@ -3982,7 +4032,7 @@ export async function upsertDonoDeArea(dados: {
 
 /** Tira o dono de uma área (volta para "sem dono"). */
 export async function deleteDonoDeArea(area: string): Promise<void> {
-  await exec('DELETE FROM especial_area_dono WHERE area = ?', [area]);
+  await exec("DELETE FROM especial_area_dono WHERE area = ?", [area]);
 }
 
 // ─── Memória e LOG dos agentes em ÁRVORE (T21) ─────────────────────────────────────────
@@ -4037,7 +4087,14 @@ export async function insertAvaliacaoCiclo(reg: {
   await exec(
     `INSERT INTO avaliacao_ciclos (id, gatilho, status, amostra, modelos, variante, created_at)
      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
-    [reg.id, reg.gatilho, reg.status, reg.amostra ?? null, reg.modelos ?? null, reg.variante ?? null],
+    [
+      reg.id,
+      reg.gatilho,
+      reg.status,
+      reg.amostra ?? null,
+      reg.modelos ?? null,
+      reg.variante ?? null,
+    ],
   );
 }
 
@@ -4105,10 +4162,26 @@ export async function insertAgenteLog(reg: {
         tools_chamadas, confianca, veredito, modelo, tokens_in, tokens_out, custo_usd, duracao_ms, erro, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))`,
     [
-      reg.id, reg.ciclo_id, reg.pai_id, reg.caminho, reg.profundidade, reg.projeto_id, reg.agente, reg.tipo,
-      reg.rodada ?? null, reg.entrada ?? null, reg.saida ?? null, reg.tools_chamadas ?? null,
-      reg.confianca ?? null, reg.veredito ?? null, reg.modelo ?? null, reg.tokens_in ?? null,
-      reg.tokens_out ?? null, reg.custo_usd ?? null, reg.duracao_ms ?? null, reg.erro ?? null,
+      reg.id,
+      reg.ciclo_id,
+      reg.pai_id,
+      reg.caminho,
+      reg.profundidade,
+      reg.projeto_id,
+      reg.agente,
+      reg.tipo,
+      reg.rodada ?? null,
+      reg.entrada ?? null,
+      reg.saida ?? null,
+      reg.tools_chamadas ?? null,
+      reg.confianca ?? null,
+      reg.veredito ?? null,
+      reg.modelo ?? null,
+      reg.tokens_in ?? null,
+      reg.tokens_out ?? null,
+      reg.custo_usd ?? null,
+      reg.duracao_ms ?? null,
+      reg.erro ?? null,
     ],
   );
 }
@@ -4120,7 +4193,10 @@ export async function getAgenteLogNo(
   return queryOne(`SELECT id, ciclo_id, caminho, profundidade FROM agente_log WHERE id = ?`, [id]);
 }
 
-export async function queryAgenteLogPorCiclo(cicloId: string, projetoId?: string): Promise<AgenteLogRow[]> {
+export async function queryAgenteLogPorCiclo(
+  cicloId: string,
+  projetoId?: string,
+): Promise<AgenteLogRow[]> {
   if (projetoId) {
     return queryAll<AgenteLogRow>(
       `SELECT * FROM agente_log WHERE ciclo_id = ? AND projeto_id = ? ORDER BY created_at, id LIMIT 2000`,
@@ -4128,9 +4204,10 @@ export async function queryAgenteLogPorCiclo(cicloId: string, projetoId?: string
     );
   }
   // Teto explícito: ciclo multi-projeto (cron/retroativo) sem LIMIT bateria no teto de 32 MiB de RPC.
-  return queryAll<AgenteLogRow>(`SELECT * FROM agente_log WHERE ciclo_id = ? ORDER BY created_at, id LIMIT 2000`, [
-    cicloId,
-  ]);
+  return queryAll<AgenteLogRow>(
+    `SELECT * FROM agente_log WHERE ciclo_id = ? ORDER BY created_at, id LIMIT 2000`,
+    [cicloId],
+  );
 }
 
 export async function queryAgenteLog(filtros: {
@@ -4145,18 +4222,33 @@ export async function queryAgenteLog(filtros: {
 }): Promise<AgenteLogRow[]> {
   const where: string[] = [];
   const params: unknown[] = [];
-  if (filtros.agente) { where.push(`agente = ?`); params.push(filtros.agente); }
-  if (filtros.desde) { where.push(`created_at >= ?`); params.push(filtros.desde); }
-  if (filtros.veredito) { where.push(`veredito = ?`); params.push(filtros.veredito); }
-  if (filtros.projeto) { where.push(`projeto_id = ?`); params.push(filtros.projeto); }
-  if (filtros.ciclo) { where.push(`ciclo_id = ?`); params.push(filtros.ciclo); }
+  if (filtros.agente) {
+    where.push(`agente = ?`);
+    params.push(filtros.agente);
+  }
+  if (filtros.desde) {
+    where.push(`created_at >= ?`);
+    params.push(filtros.desde);
+  }
+  if (filtros.veredito) {
+    where.push(`veredito = ?`);
+    params.push(filtros.veredito);
+  }
+  if (filtros.projeto) {
+    where.push(`projeto_id = ?`);
+    params.push(filtros.projeto);
+  }
+  if (filtros.ciclo) {
+    where.push(`ciclo_id = ?`);
+    params.push(filtros.ciclo);
+  }
   if (filtros.cursor_created_at && filtros.cursor_id) {
     where.push(`(created_at < ? OR (created_at = ? AND id < ?))`);
     params.push(filtros.cursor_created_at, filtros.cursor_created_at, filtros.cursor_id);
   }
   params.push(filtros.limit);
   return queryAll<AgenteLogRow>(
-    `SELECT * FROM agente_log ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    `SELECT * FROM agente_log ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY created_at DESC, id DESC LIMIT ?`,
     params,
   );
