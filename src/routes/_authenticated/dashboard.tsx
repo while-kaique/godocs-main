@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HistoricoButton } from "@/components/historico/historico-button";
+import { PainelAgentes } from "@/components/dashboard/painel-agentes";
 import { StatusBadge } from "@/components/status-badge";
 import { ChipAjusteFeito } from "@/components/dashboard/chip-ajuste-feito";
 import { ChipAgente, type AgenteChipDados } from "@/components/dashboard/chip-agente";
@@ -464,6 +465,7 @@ function Dashboard() {
                   })}`}
             </span>
           )}
+          <PainelAgentes />
           <HistoricoButton />
           <Button variant="outline" onClick={() => void atualizar()} disabled={atualizando}>
             {atualizando ? <Loader2 className="animate-spin" /> : <RefreshCw />}
