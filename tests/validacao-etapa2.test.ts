@@ -3,43 +3,44 @@
 // um arquivo já enviado exige re-upload, pois o servidor guarda a doc como texto único
 // concatenado) e os campos mínimos que liberam o disparo em background (F2). Funções puras
 // extraídas de submeter.tsx.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from "vitest";
 import {
   validarEtapa2,
   validarSelecaoGanho,
   camposMinimosDocProntos,
   serializarAfetados,
   desserializarAfetados,
+  AFETADO_EMPRESA,
   type FormData,
-} from '@/lib/submeter/constants';
+} from "@/lib/submeter/constants";
 
-const HOJE = '2026-07-22';
+const HOJE = "2026-07-22";
 
 // Form base VÁLIDO na Etapa 2 (campos preenchidos). Arquivos/existentes são passados à parte.
 function baseForm(over: Partial<FormData> = {}): FormData {
   return {
-    escopo: 'interno',
-    prodStatus: 'sim',
-    nome: '',
-    email: 'dono@gocase.com',
-    ferramentas: ['Python'],
-    ferramentaOutra: '',
-    servicoExterno: '',
-    emEquipe: 'nao',
+    escopo: "interno",
+    prodStatus: "sim",
+    nome: "",
+    email: "dono@gocase.com",
+    ferramentas: ["Python"],
+    ferramentaOutra: "",
+    servicoExterno: "",
+    emEquipe: "nao",
     participantes: [],
     participantesPapeis: {},
     participantesContribuicoes: {},
-    nomeProjeto: 'Automação de Relatórios',
-    ganhoCategorias: ['saving_efetivado'],
-    descricaoBreve: 'x'.repeat(60),
-    usaAiProxy: 'sim',
-    contrafactualAfetadosTipo: 'pessoa',
-    contrafactualAfetados: ['maria@gocase.com'],
-    temAppGodeploy: '',
-    urlGodeploy: '',
-    vinculo: 'novo',
-    paiId: '',
-    paiNome: '',
+    nomeProjeto: "Automação de Relatórios",
+    ganhoCategorias: ["saving_efetivado"],
+    descricaoBreve: "x".repeat(60),
+    usaAiProxy: "sim",
+    contrafactualAfetadosTipo: "pessoa",
+    contrafactualAfetados: ["maria@gocase.com"],
+    temAppGodeploy: "",
+    urlGodeploy: "",
+    vinculo: "novo",
+    paiId: "",
+    paiNome: "",
     ...over,
   };
 }
@@ -54,23 +55,23 @@ function opts(over: Partial<Parameters<typeof validarEtapa2>[1]> = {}) {
   };
 }
 
-describe('validarEtapa2 — campos', () => {
-  it('form completo com 1 arquivo novo passa sem erros', () => {
+describe("validarEtapa2 — campos", () => {
+  it("form completo com 1 arquivo novo passa sem erros", () => {
     expect(validarEtapa2(baseForm(), opts())).toEqual({});
   });
 
-  it('nome curto bloqueia', () => {
-    const errs = validarEtapa2(baseForm({ nomeProjeto: 'ab' }), opts());
+  it("nome curto bloqueia", () => {
+    const errs = validarEtapa2(baseForm({ nomeProjeto: "ab" }), opts());
     expect(errs.nomeProjeto).toBeTruthy();
   });
 
-  it('contexto com menos de 60 chars bloqueia', () => {
-    const errs = validarEtapa2(baseForm({ descricaoBreve: 'curto' }), opts());
+  it("contexto com menos de 60 chars bloqueia", () => {
+    const errs = validarEtapa2(baseForm({ descricaoBreve: "curto" }), opts());
     expect(errs.descricaoBreve).toBeTruthy();
   });
 
-  it('AI Proxy não respondido bloqueia', () => {
-    const errs = validarEtapa2(baseForm({ usaAiProxy: '' }), opts());
+  it("AI Proxy não respondido bloqueia", () => {
+    const errs = validarEtapa2(baseForm({ usaAiProxy: "" }), opts());
     expect(errs.usaAiProxy).toBeTruthy();
   });
 
@@ -82,14 +83,14 @@ describe('validarEtapa2 — campos', () => {
   // ⚠️ As categorias de ganho SAÍRAM desta etapa (02/09/2026): viraram TELA PRÓPRIA na
   // Etapa 3 e o portão passou a ser `validarSelecaoGanho`, testado abaixo. Cobrar aqui um
   // campo que a Etapa 2 não mostra faria o "Próximo" sacudir sem erro visível.
-  it('NÃO cobra mais os tipos de ganho (o campo saiu da etapa)', () => {
+  it("NÃO cobra mais os tipos de ganho (o campo saiu da etapa)", () => {
     const errs = validarEtapa2(baseForm({ ganhoCategorias: [] }), opts());
     expect(errs.ganhoCategorias).toBeUndefined();
   });
 });
 
-describe('validarSelecaoGanho — a 1ª tela da Etapa 3', () => {
-  it('nenhuma categoria marcada bloqueia', () => {
+describe("validarSelecaoGanho — a 1ª tela da Etapa 3", () => {
+  it("nenhuma categoria marcada bloqueia", () => {
     const errs = validarSelecaoGanho(baseForm({ ganhoCategorias: [] }));
     expect(errs.ganhoCategorias).toBeTruthy();
   });
@@ -97,28 +98,28 @@ describe('validarSelecaoGanho — a 1ª tela da Etapa 3', () => {
   // ⚠️ Era bloqueio até 02/09/2026 (RF-202 "imensurável XOR o resto"). O Luis liberou: as
   // 4 combinam, porque um projeto pode ter saving medido E um ganho sem número — e marcar
   // os dois é insumo para o agente investigar, não contradição.
-  it('imensurável junto com mensurável PASSA (as 4 combinam)', () => {
+  it("imensurável junto com mensurável PASSA (as 4 combinam)", () => {
     const errs = validarSelecaoGanho(
-      baseForm({ ganhoCategorias: ['saving_efetivado', 'imensuravel'] }),
+      baseForm({ ganhoCategorias: ["saving_efetivado", "imensuravel"] }),
     );
     expect(errs.ganhoCategorias).toBeUndefined();
   });
 
-  it('as três mensuráveis combinam livremente', () => {
+  it("as três mensuráveis combinam livremente", () => {
     const errs = validarSelecaoGanho(
-      baseForm({ ganhoCategorias: ['saving_efetivado', 'custo_evitado', 'receita_incremental'] }),
+      baseForm({ ganhoCategorias: ["saving_efetivado", "custo_evitado", "receita_incremental"] }),
     );
     expect(errs.ganhoCategorias).toBeUndefined();
   });
 
-  it('só o imensurável passa', () => {
-    const errs = validarSelecaoGanho(baseForm({ ganhoCategorias: ['imensuravel'] }));
+  it("só o imensurável passa", () => {
+    const errs = validarSelecaoGanho(baseForm({ ganhoCategorias: ["imensuravel"] }));
     expect(errs.ganhoCategorias).toBeUndefined();
   });
 
   // Rascunho salvo em localStorage ANTES desta feature não tem a chave. Ler
   // `undefined.length` derrubava /submeter inteira ("This page didn't load").
-  it('rascunho antigo sem a chave não derruba a validação', () => {
+  it("rascunho antigo sem a chave não derruba a validação", () => {
     const semChave = baseForm();
     delete (semChave as Partial<typeof semChave>).ganhoCategorias;
     expect(() => validarSelecaoGanho(semChave)).not.toThrow();
@@ -126,13 +127,13 @@ describe('validarSelecaoGanho — a 1ª tela da Etapa 3', () => {
   });
 });
 
-describe('validarEtapa2 — regra de arquivos (F1)', () => {
-  it('sem arquivos novos e sem existentes → exige selecionar', () => {
+describe("validarEtapa2 — regra de arquivos (F1)", () => {
+  it("sem arquivos novos e sem existentes → exige selecionar", () => {
     const errs = validarEtapa2(baseForm(), opts({ arquivosCount: 0, nomesExistentesCount: 0 }));
-    expect(errs.documentacao).toContain('Selecione');
+    expect(errs.documentacao).toContain("Selecione");
   });
 
-  it('só arquivos existentes (edição, nada removido) → passa', () => {
+  it("só arquivos existentes (edição, nada removido) → passa", () => {
     const errs = validarEtapa2(
       baseForm(),
       opts({ arquivosCount: 0, nomesExistentesCount: 1, docExistenteInvalidado: false }),
@@ -140,15 +141,15 @@ describe('validarEtapa2 — regra de arquivos (F1)', () => {
     expect(errs.documentacao).toBeUndefined();
   });
 
-  it('existentes ainda listados MAS invalidados (removeu 1 de vários) e sem upload → exige re-upload', () => {
+  it("existentes ainda listados MAS invalidados (removeu 1 de vários) e sem upload → exige re-upload", () => {
     const errs = validarEtapa2(
       baseForm(),
       opts({ arquivosCount: 0, nomesExistentesCount: 1, docExistenteInvalidado: true }),
     );
-    expect(errs.documentacao).toContain('removeu');
+    expect(errs.documentacao).toContain("removeu");
   });
 
-  it('invalidado mas com upload novo → passa (a doc será regerada)', () => {
+  it("invalidado mas com upload novo → passa (a doc será regerada)", () => {
     const errs = validarEtapa2(
       baseForm(),
       opts({ arquivosCount: 2, nomesExistentesCount: 0, docExistenteInvalidado: true }),
@@ -157,28 +158,28 @@ describe('validarEtapa2 — regra de arquivos (F1)', () => {
   });
 });
 
-describe('camposMinimosDocProntos — gatilho do background (F2, gatilho enxuto)', () => {
-  it('form completo → pronto', () => {
+describe("camposMinimosDocProntos — gatilho do background (F2, gatilho enxuto)", () => {
+  it("form completo → pronto", () => {
     expect(camposMinimosDocProntos(baseForm())).toBe(true);
   });
 
-  it('sem escopo (Etapa 1 incompleta) → não pronto', () => {
-    expect(camposMinimosDocProntos(baseForm({ escopo: '' }))).toBe(false);
+  it("sem escopo (Etapa 1 incompleta) → não pronto", () => {
+    expect(camposMinimosDocProntos(baseForm({ escopo: "" }))).toBe(false);
   });
 
-  it('nome curto → não pronto', () => {
-    expect(camposMinimosDocProntos(baseForm({ nomeProjeto: 'ab' }))).toBe(false);
+  it("nome curto → não pronto", () => {
+    expect(camposMinimosDocProntos(baseForm({ nomeProjeto: "ab" }))).toBe(false);
   });
 
   // "Adiantar o background": o gatilho deliberadamente NÃO espera pelos campos da Etapa 2
   // (descrição e AI Proxy), que a pessoa digita/responde por último — assim o processamento
   // arranca assim que o arquivo é anexado, com folga para terminar antes do clique em avançar.
-  it('descrição ainda curta, mas Etapa 1 pronta → PRONTO (não segura o disparo)', () => {
-    expect(camposMinimosDocProntos(baseForm({ descricaoBreve: 'curto' }))).toBe(true);
+  it("descrição ainda curta, mas Etapa 1 pronta → PRONTO (não segura o disparo)", () => {
+    expect(camposMinimosDocProntos(baseForm({ descricaoBreve: "curto" }))).toBe(true);
   });
 
-  it('AI Proxy ainda não respondido, mas Etapa 1 pronta → PRONTO (não segura o disparo)', () => {
-    expect(camposMinimosDocProntos(baseForm({ usaAiProxy: '' }))).toBe(true);
+  it("AI Proxy ainda não respondido, mas Etapa 1 pronta → PRONTO (não segura o disparo)", () => {
+    expect(camposMinimosDocProntos(baseForm({ usaAiProxy: "" }))).toBe(true);
   });
 });
 
@@ -186,23 +187,23 @@ describe('camposMinimosDocProntos — gatilho do background (F2, gatilho enxuto)
 // Invariante central: obrigatório RESPONDER ≠ barrar a submissão (a reprovação é
 // pós-envio, decidida pelo analisador). O PONTEIRO movido saiu do formulário — quem
 // pergunta e constrói o racional é o AGENTE, na seção do memorial.
-describe('validarEtapa2 — contrafactual (quem reclama)', () => {
-  it('exige ao menos uma pessoa quando o filtro é por pessoa', () => {
+describe("validarEtapa2 — contrafactual (quem reclama)", () => {
+  it("exige ao menos uma pessoa quando o filtro é por pessoa", () => {
     const errs = validarEtapa2(baseForm({ contrafactualAfetados: [] }), opts());
     expect(errs.contrafactualAfetados).toMatch(/pessoa/i);
   });
 
-  it('exige ao menos um time quando o filtro é por time', () => {
+  it("exige ao menos um time quando o filtro é por time", () => {
     const errs = validarEtapa2(
-      baseForm({ contrafactualAfetadosTipo: 'time', contrafactualAfetados: [] }),
+      baseForm({ contrafactualAfetadosTipo: "time", contrafactualAfetados: [] }),
       opts(),
     );
     expect(errs.contrafactualAfetados).toMatch(/time/i);
   });
 
-  it('um time inteiro selecionado passa (não precisa marcar pessoa por pessoa)', () => {
+  it("um time inteiro selecionado passa (não precisa marcar pessoa por pessoa)", () => {
     const errs = validarEtapa2(
-      baseForm({ contrafactualAfetadosTipo: 'time', contrafactualAfetados: ['Fiscal'] }),
+      baseForm({ contrafactualAfetadosTipo: "time", contrafactualAfetados: ["Fiscal"] }),
       opts(),
     );
     expect(errs).toEqual({});
@@ -213,44 +214,71 @@ describe('validarEtapa2 — contrafactual (quem reclama)', () => {
   it('NÃO exige mais o "o que piora" (pergunta removida do formulário)', () => {
     const errs = validarEtapa2(baseForm(), opts());
     expect(errs).toEqual({});
-    expect(Object.keys(errs)).not.toContain('contrafactualReclamacao');
+    expect(Object.keys(errs)).not.toContain("contrafactualReclamacao");
   });
 
-  it('NÃO exige mais nada sobre ponteiro/evidência (saiu do formulário)', () => {
+  it("NÃO exige mais nada sobre ponteiro/evidência (saiu do formulário)", () => {
     const errs = validarEtapa2(baseForm(), opts());
     expect(errs).toEqual({});
-    expect(Object.keys(errs)).not.toContain('ponteiroMovido');
+    expect(Object.keys(errs)).not.toContain("ponteiroMovido");
   });
 
-  it('a pergunta nova NÃO entra no gatilho do processamento em background', () => {
-    expect(
-      camposMinimosDocProntos(
-        baseForm({ contrafactualAfetados: [] }),
-      ),
-    ).toBe(true);
+  /**
+   * ⚠️ "A empresa inteira" é a própria RESPOSTA — não há o que selecionar depois dela, e
+   * cobrar uma lista seria pedir que a pessoa enumere a empresa. Quem grava o valor é a tela,
+   * ao escolher a opção; a validação só não pode barrar.
+   */
+  it("a empresa inteira se responde sozinha — não cobra lista", () => {
+    const errs = validarEtapa2(
+      baseForm({ contrafactualAfetadosTipo: "empresa", contrafactualAfetados: [] }),
+      opts(),
+    );
+    expect(errs).toEqual({});
+  });
+
+  it("a empresa inteira com o valor gravado também passa", () => {
+    const errs = validarEtapa2(
+      baseForm({ contrafactualAfetadosTipo: "empresa", contrafactualAfetados: [AFETADO_EMPRESA] }),
+      opts(),
+    );
+    expect(errs).toEqual({});
+  });
+
+  it("a pergunta nova NÃO entra no gatilho do processamento em background", () => {
+    expect(camposMinimosDocProntos(baseForm({ contrafactualAfetados: [] }))).toBe(true);
   });
 });
 
 // ── Serialização dos afetados (banco ↔ formulário) ──────────────────────────
-describe('serializarAfetados / desserializarAfetados', () => {
-  it('faz o round-trip de pessoas e de times', () => {
+describe("serializarAfetados / desserializarAfetados", () => {
+  it("faz o round-trip de pessoas e de times", () => {
     for (const [tipo, lista] of [
-      ['pessoa', ['a@gocase.com', 'b@gocase.com']],
-      ['time', ['Fiscal', 'CX']],
+      ["pessoa", ["a@gocase.com", "b@gocase.com"]],
+      ["time", ["Fiscal", "CX"]],
+      ["empresa", [AFETADO_EMPRESA]],
     ] as const) {
       const bruto = serializarAfetados(tipo, [...lista]);
       expect(desserializarAfetados(bruto)).toEqual({ tipo, lista: [...lista] });
     }
   });
 
-  it('lista vazia → string vazia (nada é gravado)', () => {
-    expect(serializarAfetados('time', [])).toBe('');
-    expect(serializarAfetados('pessoa', ['  '])).toBe('');
+  it("lista vazia → string vazia (nada é gravado)", () => {
+    expect(serializarAfetados("time", [])).toBe("");
+    expect(serializarAfetados("pessoa", ["  "])).toBe("");
   });
 
-  it('valor ausente/legado desserializa para pessoa + lista vazia', () => {
-    expect(desserializarAfetados(null)).toEqual({ tipo: 'pessoa', lista: [] });
-    expect(desserializarAfetados('')).toEqual({ tipo: 'pessoa', lista: [] });
-    expect(desserializarAfetados('lixo-sem-prefixo')).toEqual({ tipo: 'pessoa', lista: [] });
+  // A grafia da marca é `Gogroup` — o valor gravado não é texto livre.
+  it("a empresa inteira grava a marca, e volta como empresa", () => {
+    expect(serializarAfetados("empresa", [AFETADO_EMPRESA])).toBe("empresa:Gogroup");
+    expect(desserializarAfetados("empresa:Gogroup")).toEqual({
+      tipo: "empresa",
+      lista: ["Gogroup"],
+    });
+  });
+
+  it("valor ausente/legado desserializa para pessoa + lista vazia", () => {
+    expect(desserializarAfetados(null)).toEqual({ tipo: "pessoa", lista: [] });
+    expect(desserializarAfetados("")).toEqual({ tipo: "pessoa", lista: [] });
+    expect(desserializarAfetados("lixo-sem-prefixo")).toEqual({ tipo: "pessoa", lista: [] });
   });
 });
