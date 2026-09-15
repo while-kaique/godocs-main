@@ -71,7 +71,6 @@ import {
   avaliarComTimeCompletoEmBackground,
   avaliarLoteComTime,
   avaliarProjetoComTimeCompleto,
-  atividadeDoAgente,
   drenarFilaDoFunil,
 } from "@/lib/avaliacao-completa.functions";
 import {
@@ -1162,12 +1161,6 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // eram dois cliques e dois caminhos (decisão do Luis, 08/09/2026: "é um TIME agindo JUNTO e
     // classificando JUNTO"). SÍNCRONA: são ~5 chamadas de LLM, cabem num request — e o caminho
     // em background morreu no `waitUntil` do Godeploy, prometendo estrela que nunca chegava.
-    // View TEMPORAL do agente: o que ele decidiu hoje, ontem e nesta semana. Só leitura.
-    if (pathname === "/api/admin/agentes/atividade" && method === "GET") {
-      await requireAdmin(request);
-      return json(await atividadeDoAgente());
-    }
-
     if (pathname === "/api/admin/avaliacao/time-completo" && method === "POST") {
       await requireAdmin(request);
       const body = (await readBody(request)) as {

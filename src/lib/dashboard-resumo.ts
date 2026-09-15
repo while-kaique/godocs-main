@@ -13,10 +13,11 @@
  * mostra o valor. O teste de ida-e-volta (`mapResumo(linhaCheia)` == `mapResumo(recorte)`)
  * existe para essa omissão falhar no CI em vez de degradar a tela em silêncio.
  */
-import type { SheetRow } from '@/lib/google/sheets';
-import { parseDataFlexivel } from '@/lib/format-date';
-import { valorDaColuna, chaveColuna, NOME_LEGADO } from '@/lib/coluna-chave';
-import { COLUNA_ESTADO_LIDER } from '@/lib/aprovacoes-parecer';
+import type { SheetRow } from "@/lib/google/sheets";
+import { parseDataFlexivel } from "@/lib/format-date";
+import { valorDaColuna, chaveColuna, NOME_LEGADO } from "@/lib/coluna-chave";
+import { COLUNA_ESTADO_LIDER } from "@/lib/aprovacoes-parecer";
+import type { MarcaDecisaoAgente } from "@/lib/agentes-atividade";
 
 // ─── Parsers de célula ───────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ import { COLUNA_ESTADO_LIDER } from '@/lib/aprovacoes-parecer';
 export function texto(valor: string | undefined): string | null {
   if (valor == null) return null;
   const s = String(valor).trim();
-  return s === '' || s === '—' || s === '-' ? null : s;
+  return s === "" || s === "—" || s === "-" ? null : s;
 }
 
 /**
@@ -34,7 +35,7 @@ export function texto(valor: string | undefined): string | null {
  * motivo deixava a célula suja/vazia, fora do padrão da planilha. Pura.
  */
 export function ouTraco(valor: string | null | undefined): string {
-  return texto(valor ?? undefined) ?? '—';
+  return texto(valor ?? undefined) ?? "—";
 }
 
 /**
@@ -45,10 +46,10 @@ export function numero(valor: string | undefined): number | null {
   if (valor == null) return null;
   let s = String(valor)
     .trim()
-    .replace(/r\$\s*/gi, '')
-    .replace(/\s/g, '');
-  if (s === '' || s === '—' || s === '-') return null;
-  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    .replace(/r\$\s*/gi, "")
+    .replace(/\s/g, "");
+  if (s === "" || s === "—" || s === "-") return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : null;
 }
@@ -61,13 +62,13 @@ export function numero(valor: string | undefined): number | null {
 export function chaveStatus(valor: string | null | undefined): string | null {
   if (valor == null) return null;
   const s = String(valor).trim();
-  if (s === '' || s === '—' || s === '-') return null;
+  if (s === "" || s === "—" || s === "-") return null;
   return s.toLowerCase();
 }
 
 function ehSim(valor: string | undefined): boolean {
-  const s = texto(valor)?.toLowerCase() ?? '';
-  return s === 'sim' || s === 's' || s === 'true' || s === '1';
+  const s = texto(valor)?.toLowerCase() ?? "";
+  return s === "sim" || s === "s" || s === "true" || s === "1";
 }
 
 /**
@@ -78,10 +79,10 @@ function ehSim(valor: string | undefined): boolean {
 export function chaveBusca(...partes: (string | null | undefined)[]): string {
   return partes
     .filter(Boolean)
-    .join(' ')
+    .join(" ")
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 // ─── Tipos expostos ao frontend ──────────────────────────────────────────────
@@ -146,6 +147,19 @@ export type ProjetoDashboardResumo = {
   /** O GRAU de confiança do agente (alta/média/baixa) — nunca percentual. */
   confiancaAgente: string | null;
   busca: string;
+  /**
+   * Quando o TIME DE AGENTES decidiu (aprovou/reprovou) este projeto, e em que janelas isso
+   * cai (hoje · ontem · esta semana).
+   *
+   * ⚠️ **NÃO vem da planilha e NÃO viaja no `linha_resumo`.** A fonte é o `admin_status_log`
+   * (tabela INTERNA), e o campo é pendurado NO CLIENTE a partir do mapa lateral
+   * `decisoesAgente` da listagem — o gotcha "campo que a tabela não desenha não entra no
+   * resumo" fica intacto, e nada é multiplicado por ~750 linhas no payload.
+   *
+   * ⚠️ As janelas vêm PRONTAS (`indexarDecisoes`) para o predicado do filtro ser puro e não
+   * precisar saber que dia é hoje nem em que fuso.
+   */
+  decisaoAgente?: MarcaDecisaoAgente | null;
 };
 
 // ─── Recorte para o espelho ──────────────────────────────────────────────────
@@ -160,27 +174,27 @@ export type ProjetoDashboardResumo = {
  * mesmo commit (o teste de ida-e-volta cobra).
  */
 export const COLUNAS_RESUMO: readonly string[] = [
-  'ID Projeto',
-  'Projeto',
-  'Nome Completo',
-  'Email',
-  'Área',
-  'Ferramenta',
-  'Data Submissão',
-  'Status',
-  'Impacto Líquido',
-  'Impacto Bruto',
-  'Receita Incremental',
+  "ID Projeto",
+  "Projeto",
+  "Nome Completo",
+  "Email",
+  "Área",
+  "Ferramenta",
+  "Data Submissão",
+  "Status",
+  "Impacto Líquido",
+  "Impacto Bruto",
+  "Receita Incremental",
   // Lida pelo rollup histórico (`rollup-backfill.ts`), NÃO pelo `mapResumo` — é a cadência
   // (mensal/pontual/tri/semestral) que o grão do rollup usa e que o Gabriel normaliza. Fica
   // aqui, como `Ferramenta`, para existir no `linha_resumo` do espelho sem virar campo do
   // payload da listagem (não entra em `ProjetoDashboardResumo`).
-  'Freq. Custo Evitado',
+  "Freq. Custo Evitado",
   // Lida pelo rollup histórico (`rollup-backfill.ts`) como DISCRIMINADOR de geração: só o
   // caminho v2 escreve esta coluna, e é ela que diz se a receita já está dentro do
   // "Impacto Bruto". Não vira campo do payload da listagem (não entra em
   // `ProjetoDashboardResumo`), como `Ferramenta` e `Freq. Custo Evitado`.
-  'Impacto Líquido Mensal',
+  "Impacto Líquido Mensal",
   // Lidas pela MESA de avaliação (`avaliacao-normais.functions.ts`), NÃO pelo `mapResumo` —
   // como `Ferramenta` e `Freq. Custo Evitado`, existem no `linha_resumo` do espelho sem virar
   // campo do payload da listagem.
@@ -191,16 +205,16 @@ export const COLUNAS_RESUMO: readonly string[] = [
   // `materialidade` dava **0**, o financeiro devolvia "sem dados financeiros" e o piso de impacto
   // **nunca disparava**. Medido no retroativo de prod: **41,4% de erro grave** (12 de 29), o
   // agente aprovando o que a triagem reprovou — porque não via número algum.
-  'Custo Evitado Horas',
-  'Saving Efetivado',
-  'Complexidade',
-  'Tipo de Projeto',
-  'Tipos de Ganho',
-  'Especial?',
-  'Estrelas',
+  "Custo Evitado Horas",
+  "Saving Efetivado",
+  "Complexidade",
+  "Tipo de Projeto",
+  "Tipos de Ganho",
+  "Especial?",
+  "Estrelas",
   // A recomendação do agente viaja no resumo porque a TABELA a desenha (ao lado da nota humana).
-  'Estrela Agente',
-  'Confiança Agente',
+  "Estrela Agente",
+  "Confiança Agente",
   COLUNA_ESTADO_LIDER,
 ];
 
@@ -263,18 +277,18 @@ export function recortarResumo(row: SheetRow): Record<string, string> {
 // ─── Mapeamento ──────────────────────────────────────────────────────────────
 
 export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
-  const id = texto(row['ID Projeto']);
+  const id = texto(row["ID Projeto"]);
   if (!id) return null; // linha sem ID não é projeto (separador, rodapé, lixo)
 
-  const nome = texto(row['Projeto']);
-  const autor = texto(row['Nome Completo']);
-  const email = texto(row['Email']);
-  const area = texto(row['Área']);
+  const nome = texto(row["Projeto"]);
+  const autor = texto(row["Nome Completo"]);
+  const email = texto(row["Email"]);
+  const area = texto(row["Área"]);
   // ⚠️ Lida, mas NÃO devolvida: a ferramenta só serve ao índice de busca (é por isso que
   // "n8n" acha o projeto), e mandá-la também como campo próprio custava 18 KB por listagem
   // sem nenhuma célula na tabela. Por isso `Ferramenta` continua em `COLUNAS_RESUMO`.
-  const ferramenta = texto(row['Ferramenta']);
-  const dataSubmissao = texto(row['Data Submissão']);
+  const ferramenta = texto(row["Ferramenta"]);
+  const dataSubmissao = texto(row["Data Submissão"]);
   const d = parseDataFlexivel(dataSubmissao);
 
   return {
@@ -283,13 +297,13 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
     autor,
     email,
     area,
-    status: texto(row['Status']),
-    statusChave: chaveStatus(row['Status']),
+    status: texto(row["Status"]),
+    statusChave: chaveStatus(row["Status"]),
     dataSubmissao,
     dataOrdenacao: d ? d.getTime() : null,
-    ganhoTotal: numero(row['Impacto Líquido']),
-    savingReais: numero(row['Impacto Bruto']),
-    receitaMensal: numero(row['Receita Incremental']),
+    ganhoTotal: numero(row["Impacto Líquido"]),
+    savingReais: numero(row["Impacto Bruto"]),
+    receitaMensal: numero(row["Receita Incremental"]),
     // ⚠️ Os DOIS números que decidem a CATEGORIA de ganho da v2 no filtro do /dashboard. As colunas
     // já estavam em `COLUNAS_RESUMO` (entraram para a mesa ler o financeiro), então isto não pede
     // bump de `VERSAO_RECORTE_RESUMO` — o recorte do espelho já as carrega.
@@ -297,20 +311,20 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
     // valores foram realocados para as colunas da v2, mas o RÓTULO ficou em vocabulário da v1 em
     // 647 das 750 linhas ("saving"). Filtrar pelo rótulo devolveria a base errada — é o mesmo
     // princípio que o filtro de ganho anterior já seguia.
-    savingEfetivado: numero(row['Saving Efetivado']),
-    custoEvitadoHoras: numero(row['Custo Evitado Horas']),
-    complexidade: texto(row['Complexidade']),
-    tipoProjeto: texto(row['Tipo de Projeto']),
-    tipos: texto(row['Tipos de Ganho']),
-    especial: ehSim(row['Especial?']),
+    savingEfetivado: numero(row["Saving Efetivado"]),
+    custoEvitadoHoras: numero(row["Custo Evitado Horas"]),
+    complexidade: texto(row["Complexidade"]),
+    tipoProjeto: texto(row["Tipo de Projeto"]),
+    tipos: texto(row["Tipos de Ganho"]),
+    especial: ehSim(row["Especial?"]),
     // ⚠️ Casamento TOLERANTE: o cabeçalho real de prod/staging é "Aprovação do Lider"
     // (sem acento) e `row['Aprovação do Líder']` devolveria `undefined` — a coluna
     // nasceria vazia para todo projeto. Ver `coluna-chave.ts`.
     aprovacaoLider: texto(valorDaColuna(row as Record<string, string>, COLUNA_ESTADO_LIDER)),
     // Nota crua, sem teto: "8" na planilha vale 8 (a escala é aberta desde 17/08/2026).
-    estrelas: numero(row['Estrelas']),
-    estrelaAgente: texto(row['Estrela Agente']),
-    confiancaAgente: texto(row['Confiança Agente']),
+    estrelas: numero(row["Estrelas"]),
+    estrelaAgente: texto(row["Estrela Agente"]),
+    confiancaAgente: texto(row["Confiança Agente"]),
     // O que a busca alcança: nome do projeto, autor, e-mail, id, área e ferramenta.
     busca: chaveBusca(nome, autor, email, id, area, ferramenta),
   };
@@ -319,7 +333,7 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
 /** Ordena por data de submissão (mais recente primeiro); sem data vai para o fim. */
 export function ordenarPorDataDesc(a: ProjetoDashboardResumo, b: ProjetoDashboardResumo): number {
   if (a.dataOrdenacao == null && b.dataOrdenacao == null) {
-    return (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR');
+    return (a.nome ?? "").localeCompare(b.nome ?? "", "pt-BR");
   }
   if (a.dataOrdenacao == null) return 1;
   if (b.dataOrdenacao == null) return -1;
@@ -332,7 +346,7 @@ export function contarPorStatus(projetos: ProjetoDashboardResumo[]): Record<stri
     // ⚠️ Célula VAZIA conta como `pendente` desde 14/09/2026 (coluna única de status):
     // "ninguém escreveu nada" e "ninguém decidiu ainda" são o MESMO estado do funil, e uma
     // fila `sem_status` separada dividia a mesma pergunta em duas pílulas.
-    const k = p.statusChave ?? 'pendente';
+    const k = p.statusChave ?? "pendente";
     out[k] = (out[k] ?? 0) + 1;
   }
   return out;
@@ -346,9 +360,9 @@ export function contarPorStatus(projetos: ProjetoDashboardResumo[]): Record<stri
  * FONTE ÚNICA — usada pela aba `/aprovacoes-pendentes` e pelo filtro "2+ projetos" do dashboard.
  */
 export function chaveAutor(p: ProjetoDashboardResumo): string {
-  const email = (p.email ?? '').trim().toLowerCase();
+  const email = (p.email ?? "").trim().toLowerCase();
   if (email) return email;
-  return (p.autor ?? '').trim().toLowerCase() || 'sem-autor';
+  return (p.autor ?? "").trim().toLowerCase() || "sem-autor";
 }
 
 /**

@@ -11,7 +11,8 @@ import {
   diaBrasilia,
   diaDaDecisao,
   naJanela,
-  resumirPorJanela,
+  indexarDecisoes,
+  desdeParaJanelas,
   segundaDaSemana,
   type DecisaoDoAgente,
 } from "@/lib/agentes-atividade";
@@ -89,60 +90,93 @@ describe("as janelas", () => {
   });
 });
 
-describe("o resumo", () => {
+describe("a marca que o filtro lê", () => {
   const agora = new Date("2026-09-15T18:00:00Z"); // 15h de Brasília, terça
-  const base = [
-    dec("a", "Aprovado", "2026-09-15 12:00:00"),
-    dec("b", "Reprovado", "2026-09-15 13:00:00"),
-    dec("c", "Aprovado", "2026-09-14 12:00:00"),
-    dec("d", "Aprovado", "2026-09-10 12:00:00"), // quinta da semana passada
-  ];
 
-  it("conta aprovados e reprovados por janela", () => {
-    const [hoje, ontem, semana] = resumirPorJanela(base, agora);
-    expect([hoje.aprovados, hoje.reprovados]).toEqual([1, 1]);
-    expect([ontem.aprovados, ontem.reprovados]).toEqual([1, 0]);
-    // A semana (segunda 14 até hoje 15) tem os 3, e NÃO o da semana passada.
-    expect([semana.aprovados, semana.reprovados]).toEqual([2, 1]);
-  });
-
-  it("as três janelas vêm sempre, mesmo vazias", () => {
-    const r = resumirPorJanela([], agora);
-    expect(r.map((j) => j.janela)).toEqual(["hoje", "ontem", "semana"]);
-    expect(r.every((j) => j.itens.length === 0)).toBe(true);
-  });
-
-  it("os itens vêm do mais recente para o mais antigo", () => {
-    const [hoje] = resumirPorJanela(base, agora);
-    expect(hoje.itens.map((i) => i.projeto_id)).toEqual(["b", "a"]);
-  });
-
-  it("projeto sem nome cai no id, nunca em branco", () => {
-    const r = resumirPorJanela(
-      [{ ...dec("xyz", "Aprovado", "2026-09-15 12:00:00"), projeto_nome: null }],
-      agora,
-    );
-    expect(r[0].itens[0].nome).toBe("xyz");
-  });
-
-  /**
-   * ⚠️ O agente só grava `Aprovado`/`Reprovado` (`agenteDeveGravar`). Um status diferente aqui
-   * significa que a régua mudou sem este módulo saber — ele aparece na LISTA mas fica fora das
-   * duas contagens, visível em vez de somado na caixa errada.
-   */
-  it("⚠️ o que NÃO é decisão fica fora da lista e das contagens", () => {
-    // Escritas antigas (antes da trava de 15/09) gravaram `Pendente`/`Pré-aprovado` com o
-    // ator do agente. O painel promete "decisões": mostrá-las ali seria chamar de decisão o
-    // que não é. Elas continuam no `admin_status_log`, que é a auditoria.
-    const r = resumirPorJanela(
+  it("marca cada projeto com as janelas em que a decisão dele cai", () => {
+    const m = indexarDecisoes(
       [
-        dec("z", "Pendente", "2026-09-15 12:00:00"),
-        dec("w", "Pré-aprovado", "2026-09-15 12:30:00"),
-        dec("ok", "Aprovado", "2026-09-15 13:00:00"),
+        { id: "a", status: "Aprovado", quando: "2026-09-15 13:00:00" },
+        { id: "c", status: "Aprovado", quando: "2026-09-14 10:00:00" },
+        { id: "d", status: "Reprovado", quando: "2026-09-10 10:00:00" },
       ],
       agora,
     );
-    expect(r[0].itens.map((i) => i.projeto_id)).toEqual(["ok"]);
-    expect(r[0].aprovados).toBe(1);
+    // Hoje também é "esta semana" — as janelas se sobrepõem de propósito.
+    expect(m.get("a")?.janelas).toEqual(["hoje", "semana"]);
+    expect(m.get("c")?.janelas).toEqual(["ontem", "semana"]);
+    // Semana passada: decidido, mas fora das três janelas.
+    expect(m.get("d")?.janelas).toEqual([]);
+  });
+
+  it("id de legado casa por chave canônica (o log guarda em MAIÚSCULA)", () => {
+    const m = indexarDecisoes(
+      [{ id: "LEGADO-233", status: "Aprovado", quando: "2026-09-15 13:00:00" }],
+      agora,
+    );
+    expect(m.get("legado-233")?.status).toBe("Aprovado");
+  });
+
+  /**
+   * ⚠️ Rerodada e correção existem: o filtro tem de concordar com a coluna, e a coluna mostra
+   * a ÚLTIMA escrita.
+   */
+  it("com mais de uma decisão no período, vale a mais recente", () => {
+    const m = indexarDecisoes(
+      [
+        { id: "a", status: "Reprovado", quando: "2026-09-15 09:00:00" },
+        { id: "a", status: "Aprovado", quando: "2026-09-15 17:00:00" },
+      ],
+      agora,
+    );
+    expect(m.get("a")?.status).toBe("Aprovado");
+  });
+
+  it("a ordem de chegada não muda o resultado", () => {
+    const linhas = [
+      { id: "a", status: "Aprovado", quando: "2026-09-15 17:00:00" },
+      { id: "a", status: "Reprovado", quando: "2026-09-15 09:00:00" },
+    ];
+    expect(indexarDecisoes(linhas, agora).get("a")?.status).toBe("Aprovado");
+    expect(indexarDecisoes([...linhas].reverse(), agora).get("a")?.status).toBe("Aprovado");
+  });
+
+  /**
+   * ⚠️ O agente só grava `Aprovado`/`Reprovado` (`agenteDeveGravar`). As escritas de
+   * `Pendente`/`Pré-aprovado` com o ator do time são anteriores à trava de 15/09 e são o
+   * defeito que ela fechou: recortar a lista por elas as carimbaria como veredito. Elas
+   * continuam no `admin_status_log`, que é a auditoria.
+   */
+  it("⚠️ o que NÃO é decisão não vira marca", () => {
+    const m = indexarDecisoes(
+      [
+        { id: "z", status: "Pendente", quando: "2026-09-15 12:00:00" },
+        { id: "w", status: "Pré-aprovado", quando: "2026-09-15 12:30:00" },
+        { id: "ok", status: "Aprovado", quando: "2026-09-15 13:00:00" },
+      ],
+      agora,
+    );
+    expect([...m.keys()]).toEqual(["ok"]);
+  });
+
+  it("⚠️ status antigo não apaga a decisão real do mesmo projeto", () => {
+    // O time gravou `Pendente` de manhã (pré-trava) e `Aprovado` à tarde: a marca é a decisão.
+    const m = indexarDecisoes(
+      [
+        { id: "a", status: "Aprovado", quando: "2026-09-15 09:00:00" },
+        { id: "a", status: "Pendente", quando: "2026-09-15 18:00:00" },
+      ],
+      agora,
+    );
+    expect(m.get("a")?.status).toBe("Aprovado");
+  });
+
+  it("carimbo ilegível não vira janela nenhuma, e não lança", () => {
+    const m = indexarDecisoes([{ id: "a", status: "Aprovado", quando: "ontem" }], agora);
+    expect(m.get("a")?.janelas).toEqual([]);
+  });
+
+  it("desdeParaJanelas devolve o formato do created_at do SQLite, 10 dias atrás", () => {
+    expect(desdeParaJanelas(new Date("2026-09-15T18:00:00Z"))).toBe("2026-09-05 18:00:00");
   });
 });

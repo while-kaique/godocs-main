@@ -1,8 +1,12 @@
 /**
  * O que o TIME DE AGENTES decidiu, por janela de tempo — módulo PURO.
  *
- * Pedido do dono do produto (15/09/2026): *"quero uma view temporal dos agentes no frontend
- * também: quero saber o que foi aprovado pelos agentes hoje, ontem e esta semana"*.
+ * Pedido do dono do produto (15/09/2026): *"quero saber o que foi aprovado pelos agentes hoje,
+ * ontem e esta semana"* — e, depois de ver a 1ª versão em popover, a forma foi fechada: *"eu
+ * acho melhor uma view em lista, vai ser um filtro para que eu consiga ter a visão completa e
+ * fácil do que o agente aprovou e reprovou no tempo"*. Por isso o que este módulo entrega é a
+ * MARCA por projeto (em que janelas a decisão dele cai), consumida como mais uma dimensão de
+ * `dashboard-filtros` — a lista inteira, com todas as colunas, em vez de um resumo à parte.
  *
  * A fonte é o `admin_status_log`, que já registra TODA escrita de status com o ator e o
  * carimbo — não há dado novo a coletar, só a leitura certa. O ator do agente é o
@@ -14,6 +18,18 @@
  * mostraria as decisões da noite como "amanhã" — ou, pior, esvaziaria o "hoje" no fim da
  * tarde. É a mesma régua que o disparo do Gomoon já usa para a chave do dia.
  */
+
+/**
+ * O ator com que o time grava no `admin_status_log`.
+ *
+ * ⚠️ Mora AQUI, num módulo puro, e não no `.functions.ts` do time: quem precisa dele é também
+ * a listagem do `/dashboard`, e importar o arquivo do time de lá arrastaria o LLM inteiro para
+ * o caminho quente da triagem. O `avaliacao-completa.functions.ts` re-exporta.
+ *
+ * ⚠️ É um e-mail que não é de ninguém, de propósito: atribuir a decisão da máquina a uma pessoa
+ * apaga a resposta que o log existe para dar.
+ */
+export const ATOR_TIME_AGENTES = "time-de-agentes@godocs";
 
 /** Janelas que a tela oferece. `semana` é a semana CORRENTE, começando na segunda. */
 export type JanelaAgente = "hoje" | "ontem" | "semana";
@@ -91,53 +107,74 @@ export function ehDecisao(status: string | null | undefined): boolean {
   return t === "Aprovado" || t === "Reprovado";
 }
 
-export type ResumoJanela = {
-  janela: JanelaAgente;
-  rotulo: string;
-  aprovados: number;
-  reprovados: number;
-  /** Os projetos da janela, do mais recente para o mais antigo. */
-  itens: { projeto_id: string; nome: string; status: string; quando: string }[];
+/**
+ * Em quais janelas a decisão daquele dia cai. PURA.
+ *
+ * ⚠️ **As janelas se SOBREPÕEM de propósito**: "esta semana" inclui hoje e ontem. A pergunta
+ * "o que foi aprovado esta semana" quer o total da semana; fatias exclusivas produziriam um
+ * número que ninguém pediu e que não bate com relatório nenhum.
+ */
+export function janelasDaDecisao(dia: string | null, hoje: string): JanelaAgente[] {
+  if (!dia) return [];
+  return JANELAS.map((j) => j.chave).filter((chave) => naJanela(dia, chave, hoje));
+}
+
+/** O que a listagem recebe por projeto decidido — mapa lateral, nunca campo do espelho. */
+export type DecisaoDoAgenteResumo = { id: string; status: string; quando: string };
+
+/** A marca que a tela pendura em cada projeto para o filtro temporal poder ser PURO. */
+export type MarcaDecisaoAgente = {
+  status: string;
+  quando: string;
+  janelas: JanelaAgente[];
 };
 
 /**
- * Agrupa as decisões nas três janelas. PURA — é o que os testes exercitam.
+ * Indexa as decisões por id de projeto, já com as janelas resolvidas. PURA.
  *
- * ⚠️ **"Esta semana" INCLUI hoje e ontem, de propósito.** Não são fatias exclusivas: a
- * pergunta "o que foi aprovado esta semana" quer o total da semana, e subtrair hoje dela
- * produziria um número que ninguém pediu e que não bate com nenhum relatório.
+ * ⚠️ **Só `Aprovado` e `Reprovado` entram.** É o que o agente grava hoje (`agenteDeveGravar`),
+ * e o filtro promete "o que o agente DECIDIU": as escritas de `Pré-aprovado`/`Pendente` com o
+ * ator do time (anteriores à trava de 15/09) são justamente o defeito que a trava fechou —
+ * recortar a lista por elas as carimbaria como veredito. Elas continuam no `admin_status_log`,
+ * que é a auditoria; este filtro é um recorte.
  *
- * ⚠️ **Só `Aprovado` e `Reprovado` entram — nas contagens E na lista.** É o que o agente
- * grava hoje (`agenteDeveGravar`), e o painel promete "decisões": mostrar ali um
- * `Pré-aprovado` ou um `Pendente` de escrita antiga (as que existiam antes da trava de
- * 15/09) seria chamar de decisão o que não é. Eles continuam no `admin_status_log`, que é a
- * auditoria — esta view é um recorte, não o log.
+ * ⚠️ Quando o mesmo projeto foi decidido mais de uma vez na janela (rerodada, correção), vale
+ * a decisão MAIS RECENTE — é a que está na tela, e o filtro tem de concordar com a coluna.
+ * A chave é canonizada (`trim`+`lower`) porque o log guarda id de legado em MAIÚSCULA.
  */
-export function resumirPorJanela(
-  decisoes: readonly DecisaoDoAgente[],
+export function indexarDecisoes(
+  decisoes: readonly DecisaoDoAgenteResumo[],
   agora: Date,
-): ResumoJanela[] {
+): Map<string, MarcaDecisaoAgente> {
   const hoje = diaBrasilia(agora);
-  const comDia = decisoes.map((d) => ({ d, dia: diaDaDecisao(d) }));
+  const mapa = new Map<string, MarcaDecisaoAgente>();
+  for (const d of decisoes) {
+    if (!ehDecisao(d.status)) continue;
+    const chave = String(d.id ?? "")
+      .trim()
+      .toLowerCase();
+    if (!chave) continue;
+    const anterior = mapa.get(chave);
+    if (anterior && anterior.quando >= d.quando) continue;
+    const dia = diaDaDecisao({
+      projeto_id: chave,
+      projeto_nome: null,
+      status_novo: d.status,
+      created_at: d.quando,
+    });
+    mapa.set(chave, { status: d.status, quando: d.quando, janelas: janelasDaDecisao(dia, hoje) });
+  }
+  return mapa;
+}
 
-  return JANELAS.map(({ chave, rotulo }) => {
-    const daJanela = comDia.filter(
-      ({ d, dia }) => naJanela(dia, chave, hoje) && ehDecisao(d.status_novo),
-    );
-    const itens = daJanela
-      .map(({ d }) => ({
-        projeto_id: d.projeto_id,
-        nome: (d.projeto_nome ?? "").trim() || d.projeto_id,
-        status: d.status_novo,
-        quando: String(d.created_at ?? ""),
-      }))
-      .sort((a, b) => b.quando.localeCompare(a.quando));
-    return {
-      janela: chave,
-      rotulo,
-      aprovados: itens.filter((i) => i.status === "Aprovado").length,
-      reprovados: itens.filter((i) => i.status === "Reprovado").length,
-      itens,
-    };
-  });
+/**
+ * O `desde` (formato do `created_at` do SQLite, UTC) que cobre as três janelas com folga.
+ *
+ * ⚠️ 10 dias, não 7: a semana corrente começa na segunda, então num domingo o recorte já pede
+ * 6 dias para trás — e o fuso de Brasília empurra a fronteira mais 3h. A folga é barata
+ * (dezenas de linhas) e a alternativa, calcular a fronteira exata em UTC, erraria no dia da
+ * virada sem ninguém perceber.
+ */
+export function desdeParaJanelas(agora: Date = new Date()): string {
+  return new Date(agora.getTime() - 10 * 86_400_000).toISOString().slice(0, 19).replace("T", " ");
 }

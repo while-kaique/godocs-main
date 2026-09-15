@@ -25,6 +25,12 @@
 import { z } from "zod";
 import { updateRowByProjectId, type SheetRow } from "@/lib/google/sheets";
 import { STATUS_GRAVAVEIS_PROJETO } from "@/lib/status-funil";
+import {
+  ATOR_TIME_AGENTES,
+  desdeParaJanelas,
+  ehDecisao,
+  type DecisaoDoAgenteResumo,
+} from "@/lib/agentes-atividade";
 import { registrarAtividade } from "@/lib/atividades.functions";
 // A discordância da ficha vira LIÇÃO pelo módulo puro das correções: o eixo, o piso e o teto do
 // motivo saem de lá para a tela e o servidor cobrarem exatamente o que o prompt vai aceitar.
@@ -52,6 +58,7 @@ import {
   getResumoAvaliacoesNormais,
   getTodosFeedbacks,
   getIdsComAjusteRealizado,
+  getDecisoesDoAgenteDesde,
   type ResumoAvaliacaoNormal,
   getAvaliacaoNormal,
   getDeliberacao,
@@ -69,10 +76,7 @@ import {
   type AvaliacaoFeedbackRow,
   type AprovacaoRow,
 } from "@/integrations/db/client.server";
-import {
-  desserializarAfetados,
-  type AfetadoTipo,
-} from "@/lib/submeter/constants";
+import { desserializarAfetados, type AfetadoTipo } from "@/lib/submeter/constants";
 import { parecerEstagio2ParaFicha, type ParecerEstagio2 } from "@/lib/aprovacoes.functions";
 // A frase do parecer que o eixo da discordância contesta — a MESMA função que a tela usa.
 import { linhaDoEixo, partirParecerMesa } from "@/lib/mesa-parecer";
@@ -170,6 +174,14 @@ export type ListagemDashboard = {
    * indistinguível de quem nunca saiu dela.
    */
   ajustesRealizados: string[];
+  /**
+   * O que o TIME DE AGENTES decidiu (Aprovado/Reprovado) na última semana e meia, cru.
+   *
+   * ⚠️ Vem do `admin_status_log` (INTERNA), não do espelho — daí o mapa LATERAL, mesmo padrão
+   * de `ajustesRealizados`. Só entram ids que estão na tela, e as JANELAS são resolvidas no
+   * cliente: "hoje" é o dia de quem lê, não o do servidor (que roda em UTC).
+   */
+  decisoesAgente: DecisaoDoAgenteResumo[];
   /** ISO — quando a planilha foi lida pela última vez (a idade do ESPELHO, não do request). */
   lidoEm: string;
   /** O espelho passou de `ESPELHO_VELHO_MS` sem sincronizar → a tela avisa. */
@@ -296,7 +308,12 @@ export type DetalheDashboard = {
        * listagem fica `[]` de propósito (o `historico` NÃO é selecionado em lote — teto de 32 MiB
        * de RPC). Vazio quando não há deliberação ou quando veio pelo lote.
        */
-      historico: { rodada: number; estado: string | null; confianca: number | null; motivo: string | null }[];
+      historico: {
+        rodada: number;
+        estado: string | null;
+        confianca: number | null;
+        motivo: string | null;
+      }[];
     } | null;
     /** Medição retroativa contra o humano (fatia C). */
     retroativo: {
@@ -376,7 +393,6 @@ function normalizarVoto(v: string | null | undefined): "like" | "dislike" | null
   return v === "like" || v === "dislike" ? v : null;
 }
 
-
 /**
  * Interpreta o `historico` da deliberação (JSON gravado por `upsertDeliberacao`) num array tipado
  * de rodadas. FAIL-SOFT: entrada ausente/ilegível → `[]` (a seção só não mostra as rodadas).
@@ -430,7 +446,8 @@ export function pareceresDosVotos(
       dimensao,
       preocupa: p.preocupa === true,
       argumento: typeof p.argumento === "string" ? p.argumento : "",
-      confianca: typeof p.confianca === "number" && Number.isFinite(p.confianca) ? p.confianca : null,
+      confianca:
+        typeof p.confianca === "number" && Number.isFinite(p.confianca) ? p.confianca : null,
     });
   }
   return out;
@@ -441,13 +458,22 @@ export function pareceresDosVotos(
  * mudar de forma, a seção some em vez de a ficha cair).
  */
 export function interpretarConsensoDoTime(
-  no: { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null } | null | undefined,
+  no:
+    | {
+        saida: string | null;
+        confianca: string | null;
+        veredito: string | null;
+        created_at: string | null;
+      }
+    | null
+    | undefined,
 ): NonNullable<DetalheDashboard["avaliacaoSombra"]>["time"] {
   if (!no) return null;
   let c: Record<string, unknown> = {};
   try {
     const parsed = no.saida ? JSON.parse(no.saida) : null;
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) c = parsed as Record<string, unknown>;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+      c = parsed as Record<string, unknown>;
   } catch {
     c = {};
   }
@@ -497,7 +523,12 @@ export function montarAvaliacaoSombra(
     motivo: string | null;
   } | null,
   /** O último consenso do TIME (nó `tipo='consenso'` do log em árvore), quando houver. */
-  time?: { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null } | null,
+  time?: {
+    saida: string | null;
+    confianca: string | null;
+    veredito: string | null;
+    created_at: string | null;
+  } | null,
   /** A recomendação de estrela do classificador de 1 agente (`especial_avaliacao`). */
   estrela?: {
     estrelas_recomendada: number;
@@ -582,7 +613,7 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
   //
   // Os dois leitores novos não dependem de id nenhum (`getResumoAvaliacoesNormais`,
   // `getTodosFeedbacks`): uma consulta cada, só os escalares, fora do caminho crítico.
-  const [{ linhas, lidoEmMs }, saude, mesas, votos, comAjuste] = await Promise.all([
+  const [{ linhas, lidoEmMs }, saude, mesas, votos, comAjuste, decisoes] = await Promise.all([
     lerResumosEspelho(),
     statusEspelho(),
     // Falha aqui NÃO derruba a listagem (a superfície do agente é acessória): a coluna fica
@@ -599,6 +630,13 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     getIdsComAjusteRealizado().catch((e) => {
       console.error("[dashboard-admin] falha ao ler a marca de ajuste realizado:", e);
       return new Set<string>();
+    }),
+    // O que o TIME decidiu na última semana e meia — alimenta o filtro temporal da lista.
+    // ⚠️ Janela CURTA de propósito: o filtro só oferece hoje/ontem/esta semana, e varrer o
+    // log inteiro seria pagar auditoria de meses para responder 7 dias.
+    getDecisoesDoAgenteDesde(ATOR_TIME_AGENTES, desdeParaJanelas()).catch((e) => {
+      console.error("[dashboard-admin] falha ao ler as decisões do agente:", e);
+      return [] as Awaited<ReturnType<typeof getDecisoesDoAgenteDesde>>;
     }),
   ]);
   const projetos = linhas
@@ -628,6 +666,26 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     if (comAjuste.has(chave)) ajustesRealizados.push(p.id);
   }
 
+  // ⚠️ Mapa LATERAL, não campo por projeto: a régua do payload enxuto vale aqui também, e são
+  // ~50 decisões por semana contra ~750 linhas. Vai cru (status + carimbo); quem resolve as
+  // janelas é o CLIENTE, no fuso de quem lê (`indexarDecisoes`).
+  // ⚠️ Vai UMA linha por projeto, a mais RECENTE — e só o que é decisão. A consulta já volta
+  // `created_at DESC`, então a primeira ocorrência de cada id é a que vale (a mesma régua que
+  // o cliente aplica). Sem isso, uma rodada de reavaliação em lote enche a resposta: medido na
+  // staging, 719 linhas de log para ~50 decisões distintas.
+  const idsNaTela = new Set(projetos.map((p) => p.id.trim().toLowerCase()));
+  const vistos = new Set<string>();
+  const decisoesAgente: DecisaoDoAgenteResumo[] = [];
+  for (const d of decisoes) {
+    const id = String(d.projeto_id ?? "")
+      .trim()
+      .toLowerCase();
+    if (!id || vistos.has(id) || !idsNaTela.has(id)) continue;
+    if (!ehDecisao(d.status_novo)) continue;
+    vistos.add(id);
+    decisoesAgente.push({ id, status: d.status_novo, quando: String(d.created_at ?? "") });
+  }
+
   // A idade é do dado: preferimos o carimbo da última corrida OK e caímos no `lido_em` das
   // linhas (o espelho pode ter linhas de antes de `sync_runs` existir).
   const idadeRef = saude.ultimoSyncOkMs ?? lidoEmMs;
@@ -638,6 +696,7 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     avaliacoes,
     feedbacks,
     ajustesRealizados,
+    decisoesAgente,
     lidoEm: new Date(idadeRef ?? Date.now()).toISOString(),
     espelhoVelho: idadeRef != null && Date.now() - idadeRef > ESPELHO_VELHO_MS,
     syncFalhou: saude.ultimaFalhou,
@@ -664,8 +723,16 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
   //
   // O contrafactual ("quem sentiria falta") mora SÓ no SQLite (`projetos.contrafactual_afetados`),
   // nunca na planilha — por isso a leitura à parte, por PK. Falha dele → seção só não aparece.
-  const [alvo, historicoStatus, reenvios, contrafactual, pessoas, sombra, feedback, preAprovacaoPai] =
-    await Promise.all([
+  const [
+    alvo,
+    historicoStatus,
+    reenvios,
+    contrafactual,
+    pessoas,
+    sombra,
+    feedback,
+    preAprovacaoPai,
+  ] = await Promise.all([
     lerLinhaEspelho(id),
     getAdminStatusLogs(id)
       .then((logs) =>
@@ -853,7 +920,15 @@ export async function getProjetosDashboardLote(
       .then(() => getUltimosConsensosDoTimePorIds(alvos))
       .catch((e) => {
         console.error("[dashboard-admin] falha ao ler consenso do time em lote:", e);
-        return new Map<string, { saida: string | null; confianca: string | null; veredito: string | null; created_at: string | null }>();
+        return new Map<
+          string,
+          {
+            saida: string | null;
+            confianca: string | null;
+            veredito: string | null;
+            created_at: string | null;
+          }
+        >();
       }),
     // A estrela sugerida (classificador de 1 agente) — uma consulta por `IN`. Acessório.
     Promise.resolve()

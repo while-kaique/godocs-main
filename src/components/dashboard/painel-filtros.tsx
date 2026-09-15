@@ -31,10 +31,12 @@ import {
   limparDimensao,
   type CategoriaFiltroGanho,
   type FiltroAgente,
+  type FiltroDecididoEm,
   type FiltroParecer,
   type FiltrosDashboard,
 } from "@/lib/dashboard-filtros";
 import type { EstadoParecer } from "@/lib/aprovacoes-parecer";
+import { JANELAS, type JanelaAgente } from "@/lib/agentes-atividade";
 
 const AZUL = "var(--go-blue)";
 
@@ -47,6 +49,7 @@ export function BarraFiltros({
   pareceres,
   categorias,
   contagemAgente,
+  contagemDecidido,
   hoje,
   ordenarMaisAntigos,
   onOrdenarMaisAntigos,
@@ -60,6 +63,8 @@ export function BarraFiltros({
   pareceres: { estado: EstadoParecer; total: number }[];
   categorias: { categoria: CategoriaFiltroGanho; total: number }[];
   contagemAgente: { sem: number; com: number };
+  /** Por janela: quantos o agente decidiu, e o par aprovados/reprovados. */
+  contagemDecidido: Record<JanelaAgente, { total: number; aprovados: number; reprovados: number }>;
   hoje: string;
   ordenarMaisAntigos: boolean;
   onOrdenarMaisAntigos: (v: boolean) => void;
@@ -243,6 +248,39 @@ export function BarraFiltros({
               <option value="todos">Qualquer</option>
               <option value="sem">Ainda sem análise ({contagemAgente.sem})</option>
               <option value="com">Já analisados ({contagemAgente.com})</option>
+            </select>
+          </Campo>
+
+          {/* ⚠️ Dimensão DIFERENTE da de cima: aquela pergunta "o agente já rodou aqui?", esta
+              pergunta "QUANDO ele decidiu". Projeto analisado semana passada tem análise e não
+              entra em "Hoje". Foi o pedido do Luis de ver, na LISTA, o que o agente aprovou e
+              reprovou no tempo — um popover com o resumo não dava a visão completa.
+              O rótulo de cada opção traz o par aprovados/reprovados porque é a pergunta que a
+              pessoa veio fazer; o total sozinho esconderia metade da resposta. */}
+          <Campo rotulo="Decidido pelo agente">
+            <select
+              aria-label="Filtrar por quando o agente decidiu"
+              value={filtros.decididoEm}
+              onChange={(e) =>
+                setFiltros((f) => ({ ...f, decididoEm: e.target.value as FiltroDecididoEm }))
+              }
+              className="h-9 w-auto max-w-full rounded-full border border-input bg-card pl-3 pr-8 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+              style={{
+                ["--tw-ring-color" as string]: AZUL,
+                borderColor: filtros.decididoEm !== "todos" ? AZUL : undefined,
+                color: filtros.decididoEm !== "todos" ? AZUL : undefined,
+                fontWeight: filtros.decididoEm !== "todos" ? 600 : 400,
+              }}
+            >
+              <option value="todos">Qualquer data</option>
+              {JANELAS.map(({ chave, rotulo }) => {
+                const c = contagemDecidido[chave];
+                return (
+                  <option key={chave} value={chave}>
+                    {rotulo} · {c.aprovados} aprovados, {c.reprovados} reprovados
+                  </option>
+                );
+              })}
             </select>
           </Campo>
 

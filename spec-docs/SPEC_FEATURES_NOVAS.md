@@ -2217,18 +2217,19 @@ que responde certo — só com o anti-feedback-loop mais fraco).
 **aborta a rodada** quando o cache de vetores nasce vazio — relatório bonito sobre RAG morto é pior
 que rodada que falha.
 
-## Feature adicional — Painel "Agentes" (view temporal das decisões)
+## Feature adicional — Filtro "Decidido pelo agente" (view temporal na lista)
 
-**Pedido (Luis, 15/09/2026):** *"eu quero uma view temporal dos agentes no frontend também: quero saber o que foi aprovado pelos agentes hoje, ontem e esta semana"*.
+**Pedido (Luis, 15/09/2026):** *"quero saber o que foi aprovado pelos agentes hoje, ontem e esta semana"* — e, vendo a 1ª versão: *"eu acho melhor uma view em lista, vai ser um filtro para que eu consiga ter a visão completa e fácil do que o agente aprovou e reprovou no tempo"*.
 
-**O que é:** botão "Agentes" ao lado de "Histórico" no cabeçalho do `/dashboard`, abrindo um popover com 3 janelas (Hoje · Ontem · Esta semana), cada uma com o par aprovados/reprovados e a lista dos projetos.
+**O que é:** uma dimensão a mais na barra de filtros do `/dashboard` — Hoje · Ontem · Esta semana —, cada opção rotulada com o par aprovados/reprovados do recorte atual.
 
 **Decisões fechadas:**
 
-- **D1 — a lista é de DECISÕES, não de escritas.** Só `Aprovado` e `Reprovado` entram, nas contagens e na lista. O agente só decide aprovando ou reprovando (`agenteDeveGravar`); as escritas de `Pré-aprovado`/`Pendente` que existiram antes da trava de 15/09 são exatamente o defeito que a trava fechou, e exibi-las sob um título que promete decisões seria carimbá-las como veredito. Elas continuam no `admin_status_log`. _(A 1ª versão as mostrava na lista e as excluía só das contagens — "Hoje: 9 decisões, 4 aprovações" não fecha para quem lê.)_
-- **D2 — o dia é o de Brasília, e a semana começa na segunda.** O `created_at` do SQLite é UTC sem sufixo; `diaDaDecisao` concatena `"Z"` antes de converter. Sem isso toda decisão a partir das 21h cairia no dia seguinte — a mesma lição das chaves de disparo do Gomoon.
-- **D3 — status inesperado não derruba nem inventa.** Um valor fora do par conhecido fica fora das contagens e fora da lista; o módulo não lança.
-- **D4 — leitura barata.** `getDecisoesDoAgenteDesde(ator, desde)` filtra o ator no SQL sobre o índice de `created_at`, com janela de 10 dias. Nada de varrer o log inteiro no request.
-- **D5 — recarrega a cada abertura do popover** (é um recorte de "agora", não estado de página) e **`atividadeDoAgente()` nunca lança** (painel de diagnóstico que derruba a rota do admin é pior que nenhum — mesma régua de `saudeDosAgentes`).
+- **D1 — filtro na LISTA, não painel à parte.** A 1ª versão era um popover com as contagens e os nomes. Respondia "quantos"; a pergunta era "quais", e na lista as outras dimensões somam (área, status, busca) e todas as colunas estão à vista. O popover, a rota `GET /api/admin/agentes/atividade` e `resumirPorJanela` foram REMOVIDOS — não reintroduzir.
+- **D2 — é dimensão distinta de "Análise do agente".** Aquela pergunta *se* o agente rodou; esta, *quando* ele decidiu. Fundi-las esconderia a base analisada em semanas anteriores.
+- **D3 — a marca é de DECISÃO.** Só `Aprovado`/`Reprovado`. As escritas de `Pré-aprovado`/`Pendente` com o ator do time são pré-trava de 15/09 e continuam no `admin_status_log`.
+- **D4 — uma linha por PROJETO, a mais recente.** O filtro recorta projetos e tem de concordar com a coluna, que mostra a última escrita. Efeito medido: 48 escritas de ontem = 37 projetos.
+- **D5 — as janelas são resolvidas no cliente**, no fuso de quem lê (Brasília; semana na segunda). É o que mantém `casaDecididoEm` puro.
+- **D6 — mapa lateral, não campo por projeto** no payload — a régua do payload enxuto do `/dashboard` vale aqui.
 
-Arquivos: `src/lib/agentes-atividade.ts` (PURO), `src/components/dashboard/painel-agentes.tsx`, `atividadeDoAgente()` em `avaliacao-completa.functions.ts`, rota `GET /api/admin/agentes/atividade`. Testes: `tests/agentes-atividade.test.ts`.
+Arquivos: `src/lib/agentes-atividade.ts` (PURO), `casaDecididoEm` em `dashboard-filtros.ts`, campo em `painel-filtros.tsx`, leitura em `dashboard-admin.functions.ts`. Testes: `tests/agentes-atividade.test.ts`, `tests/dashboard-filtros.test.ts`.

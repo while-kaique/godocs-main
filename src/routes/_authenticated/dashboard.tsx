@@ -28,6 +28,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  indexarDecisoes,
+  type JanelaAgente,
+  type DecisaoDoAgenteResumo,
+} from "@/lib/agentes-atividade";
+import {
   RefreshCw,
   Loader2,
   ChevronRight,
@@ -40,7 +45,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HistoricoButton } from "@/components/historico/historico-button";
-import { PainelAgentes } from "@/components/dashboard/painel-agentes";
 import { StatusBadge } from "@/components/status-badge";
 import { ChipAjusteFeito } from "@/components/dashboard/chip-ajuste-feito";
 import { ChipAgente, type AgenteChipDados } from "@/components/dashboard/chip-agente";
@@ -68,6 +72,7 @@ import {
   pareceresDisponiveis,
   totalSemStatus,
   casaAgente,
+  casaDecididoEm,
   casaFiltrosExceto,
   type FiltrosDashboard,
 } from "@/lib/dashboard-filtros";
@@ -120,6 +125,12 @@ type Listagem = {
   feedbacks: Record<string, "like" | "dislike">;
   /** Ids que já voltaram de um "Ajuste pedido" (o autor reenviou com o ajuste feito). */
   ajustesRealizados?: string[];
+  /**
+   * O que o time decidiu (Aprovado/Reprovado) na última semana e meia, cru — alimenta o
+   * filtro "Decidido pelo agente". Opcional: build antigo do cliente não pode quebrar com
+   * payload novo, nem o contrário (version skew é real neste app).
+   */
+  decisoesAgente?: DecisaoDoAgenteResumo[];
   /** ISO da última sincronização com a planilha (a idade do espelho). */
   lidoEm: string;
   /** Passou de 20 min sem sincronizar = 4 corridas de cron perdidas → avisa. */
@@ -268,7 +279,19 @@ function Dashboard() {
   // ⚠️ Memoizado: `dados?.projetos ?? []` cria um array novo a cada render, e como ele é
   // dependência de vários `useMemo` abaixo, a lista inteira seria refiltrada e reordenada
   // a cada tecla digitada em qualquer campo da tela.
-  const projetos = useMemo(() => dados?.projetos ?? [], [dados]);
+  // ⚠️ Pendura em cada projeto QUANDO o agente o decidiu, para o filtro temporal ser um
+  // predicado puro como os outros. As janelas são resolvidas AQUI, no fuso de quem lê: "hoje"
+  // é o dia do navegador, não o do servidor (que roda em UTC e viraria o dia às 21h).
+  const projetos = useMemo(() => {
+    const brutos = dados?.projetos ?? [];
+    const decisoes = dados?.decisoesAgente ?? [];
+    if (decisoes.length === 0) return brutos;
+    const marcas = indexarDecisoes(decisoes, new Date());
+    return brutos.map((p) => {
+      const marca = marcas.get(p.id.trim().toLowerCase());
+      return marca ? { ...p, decisaoAgente: marca } : p;
+    });
+  }, [dados]);
   /** Quem já voltou de um "Ajuste pedido". Vem do SQLite, num mapa lateral (ver a listagem). */
   const ajusteFeito = useMemo(() => new Set(dados?.ajustesRealizados ?? []), [dados]);
   const hoje = hojeIso();
@@ -306,6 +329,21 @@ function Dashboard() {
     const base = projetos.filter((p) => casaFiltrosExceto(p, filtros, "agente"));
     const com = base.filter((p) => casaAgente(p, "com")).length;
     return { sem: base.length - com, com };
+  }, [projetos, filtros]);
+
+  // ⚠️ Mesma régua das pílulas e do campo do agente: conta o RECORTE, ignorando a PRÓPRIA
+  // dimensão — senão escolher "Hoje" zeraria "Ontem" e "Esta semana" no campo.
+  const contagemDecidido = useMemo(() => {
+    const base = projetos.filter((p) => casaFiltrosExceto(p, filtros, "decididoEm"));
+    const conta = (janela: JanelaAgente) => {
+      const dela = base.filter((p) => casaDecididoEm(p, janela));
+      return {
+        total: dela.length,
+        aprovados: dela.filter((p) => p.decisaoAgente?.status === "Aprovado").length,
+        reprovados: dela.filter((p) => p.decisaoAgente?.status === "Reprovado").length,
+      };
+    };
+    return { hoje: conta("hoje"), ontem: conta("ontem"), semana: conta("semana") };
   }, [projetos, filtros]);
 
   const maisAntigos = ordem === "data" && direcao === "asc";
@@ -465,7 +503,6 @@ function Dashboard() {
                   })}`}
             </span>
           )}
-          <PainelAgentes />
           <HistoricoButton />
           <Button variant="outline" onClick={() => void atualizar()} disabled={atualizando}>
             {atualizando ? <Loader2 className="animate-spin" /> : <RefreshCw />}
@@ -530,6 +567,7 @@ function Dashboard() {
         pareceres={pareceres}
         categorias={categorias}
         contagemAgente={contagemAgente}
+        contagemDecidido={contagemDecidido}
         hoje={hoje}
         ordenarMaisAntigos={maisAntigos}
         onOrdenarMaisAntigos={(v) => {

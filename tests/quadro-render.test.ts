@@ -126,6 +126,11 @@ describe("a barra de filtros monta", () => {
         pareceres: [],
         categorias: [],
         contagemAgente: { sem: 1, com: 2 },
+        contagemDecidido: {
+          hoje: { total: 2, aprovados: 2, reprovados: 0 },
+          ontem: { total: 3, aprovados: 2, reprovados: 1 },
+          semana: { total: 5, aprovados: 4, reprovados: 1 },
+        },
         hoje: "2026-09-14",
         ordenarMaisAntigos: false,
         onOrdenarMaisAntigos: () => {},

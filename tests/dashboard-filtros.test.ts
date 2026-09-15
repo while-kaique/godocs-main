@@ -21,6 +21,7 @@ import {
   totalSemStatus,
   type FiltrosDashboard,
   casaAgente,
+  casaDecididoEm,
 } from "@/lib/dashboard-filtros";
 import {
   categoriasDeGanho,
@@ -47,6 +48,7 @@ import {
   ultimoDiaDoMes,
 } from "@/lib/calendario-datas";
 import type { ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
+import type { JanelaAgente } from "@/lib/agentes-atividade";
 
 function proj(over: Partial<ProjetoDashboardResumo> = {}): ProjetoDashboardResumo {
   return {
@@ -886,5 +888,71 @@ describe("descreverFiltrosAtivos e limparDimensao", () => {
     for (const chip of descreverFiltrosAtivos(cheio)) atual = limparDimensao(atual, chip.chave);
     expect(descreverFiltrosAtivos(atual)).toEqual([]);
     expect(contarFiltrosAtivos(atual)).toBe(0);
+  });
+});
+
+/**
+ * A dimensão temporal: "o que o agente decidiu hoje/ontem/esta semana".
+ *
+ * ⚠️ É DIFERENTE de `agente` ("ele já rodou aqui?") e as duas somam. O que estes testes
+ * seguram é que a dimensão nova entrou nos TRÊS lugares que uma dimensão precisa ocupar
+ * (`aplicarFiltros`, `casaFiltrosExceto` e a contagem de ativos) — esquecer o segundo recorta
+ * a lista sem recortar as contagens, que é um defeito que este arquivo já pegou antes.
+ */
+describe("o filtro por QUANDO o agente decidiu", () => {
+  const decidido = (janelas: JanelaAgente[], status = "Aprovado") =>
+    proj({ decisaoAgente: { status, quando: "2026-09-15 12:00:00", janelas } });
+
+  it("recorta pela janela pedida", () => {
+    const lista = [
+      decidido(["hoje", "semana"]),
+      decidido(["ontem", "semana"]),
+      decidido([]), // decidido fora das janelas
+      proj(), // o agente nunca decidiu
+    ];
+    expect(aplicarFiltros(lista, filtros({ decididoEm: "hoje" })).length).toBe(1);
+    expect(aplicarFiltros(lista, filtros({ decididoEm: "ontem" })).length).toBe(1);
+    // "Esta semana" INCLUI hoje e ontem — as janelas se sobrepõem de propósito.
+    expect(aplicarFiltros(lista, filtros({ decididoEm: "semana" })).length).toBe(2);
+    expect(aplicarFiltros(lista, filtros({ decididoEm: "todos" })).length).toBe(4);
+  });
+
+  it("projeto que o agente nunca decidiu fica FORA de qualquer janela", () => {
+    expect(casaDecididoEm(proj(), "hoje")).toBe(false);
+    expect(casaDecididoEm(proj(), "semana")).toBe(false);
+    expect(casaDecididoEm(proj(), "todos")).toBe(true);
+  });
+
+  /**
+   * ⚠️ As duas dimensões respondem perguntas diferentes: um projeto analisado na semana
+   * passada TEM análise do agente e não entra em "hoje". Fundi-las esconderia metade da base.
+   */
+  it("soma (AND) com o filtro de 'já tem análise'", () => {
+    const lista = [
+      proj({
+        id: "A",
+        estrelaAgente: "3",
+        decisaoAgente: { status: "Aprovado", quando: "x", janelas: ["hoje"] },
+      }),
+      proj({ id: "B", estrelaAgente: "2" }), // analisado, mas não decidido hoje
+    ];
+    const r = aplicarFiltros(lista, filtros({ agente: "com", decididoEm: "hoje" }));
+    expect(r.map((p) => p.id)).toEqual(["A"]);
+  });
+
+  it("entrou em casaFiltrosExceto — a contagem da PRÓPRIA dimensão a ignora", () => {
+    const p = decidido(["hoje", "semana"]);
+    // Com "ontem" escolhido, o campo ainda precisa CONTAR este projeto para oferecer "hoje".
+    expect(casaFiltrosExceto(p, filtros({ decididoEm: "ontem" }), "decididoEm")).toBe(true);
+    // E, fora do "exceto", ele é recortado normalmente.
+    expect(casaFiltrosExceto(p, filtros({ decididoEm: "ontem" }), "area")).toBe(false);
+  });
+
+  it("conta como UMA dimensão ativa e sai pelo X do chip", () => {
+    const f = filtros({ decididoEm: "hoje" });
+    expect(contarFiltrosAtivos(f)).toBe(1);
+    const chip = descreverFiltrosAtivos(f).find((c) => c.chave === "decididoEm");
+    expect(chip?.rotulo).toBe("Agente decidiu: hoje");
+    expect(limparDimensao(f, "decididoEm").decididoEm).toBe("todos");
   });
 });

@@ -39,6 +39,7 @@ vi.mock('@/integrations/db/client.server', async () => ({
   getTodosFeedbacks: vi.fn(async () => new Map()),
   // A marca de "ajuste pedido já foi feito" — coluna INTERNA, por isso mapa lateral.
   getIdsComAjusteRealizado: vi.fn(async () => new Set<string>()),
+  getDecisoesDoAgenteDesde: vi.fn(async () => []),
   getAvaliacaoNormal: vi.fn(async () => null),
   getDeliberacao: vi.fn(async () => null),
   getDeliberacoesPorIds: vi.fn(async () => new Map()),
