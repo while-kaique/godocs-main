@@ -3,7 +3,7 @@
  * Antes o código rodava duas avaliações independentes do mesmo projeto e ninguém as fundia.
  */
 import { describe, it, expect } from "vitest";
-import { STATUS_FUNIL } from "@/lib/funil-status";
+import { STATUS_FUNIL, agentePodeGravar } from "@/lib/funil-status";
 import { juntarAnalises } from "@/lib/avaliacao/junta";
 
 const imp = (veredito: string) => ({ veredito });
@@ -127,18 +127,21 @@ describe("juntarAnalises", () => {
    * (15/09), a condição `doTime.status === 'Pendente'` parou de casar e a regra sairia de
    * circulação justo no caso mais comum. Este teste prende as DUAS formas de "o time não fechou".
    */
-  it("⚠️ mesa APROVA vence tanto `Pendente` quanto `Ajuste pedido` do time", () => {
+  it("⚠️ mesa APROVA vence o time que não fechou, seja `humano` ou `ajuste`", () => {
+    // A regra 2b foi medida em 10/09 sobre 9 projetos, e em 7 deles o time vinha com `ajuste`.
     for (const saida of ["humano", "ajuste"]) {
       const j = juntarAnalises({ impacto: imp("aprovar"), estrela: est(saida) });
       expect(j.status, `mesa aprovando + time em "${saida}"`).toBe("Aprovado");
     }
   });
 
-  it("mesa sem fechar + time pedindo ajuste CONCORDAM, e vale o do time", () => {
-    // As duas dizem "não fechei"; o time é o que sabe o que pedir ao autor.
-    const j = juntarAnalises({ impacto: imp("em_validacao"), estrela: est("ajuste") });
-    expect(j.status).toBe("Ajuste pedido");
-    expect(j.concordam).toBe(true);
+  it("⚠️ a junta NUNCA devolve um status que o agente não pode gravar", () => {
+    const casos = ["aprovar", "reprovar", "em_validacao", "isento", "coisa_nova", ""];
+    for (const a of casos)
+      for (const b of ["aprovar", "reprovar", "humano", "ajuste", "xpto"])
+        expect(agentePodeGravar(juntarAnalises({ impacto: imp(a), estrela: est(b) }).status)).toBe(
+          true,
+        );
   });
 });
 

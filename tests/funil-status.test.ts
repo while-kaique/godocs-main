@@ -2,7 +2,7 @@
  * O funil do GoDocs tem TRÊS status (decisão do dono do produto, 09/09/2026), e a flag 6-10 é
  * aviso, não status.
  */
-import { agenteDecideFunil } from "@/lib/funil-status";
+import { agenteDecideFunil, agentePodeGravar, STATUS_FORA_DO_AGENTE } from "@/lib/funil-status";
 import { describe, it, expect } from "vitest";
 import {
   STATUS_FUNIL,
@@ -22,9 +22,8 @@ describe("statusDoFunil — o desfecho do time vira status", () => {
   // ⚠️ `Ajuste pedido` entrou em 15/09/2026: a saída `ajuste` do consenso passou a ter onde
   // aterrissar. `Pré-aprovado` NÃO entra — ele é o estado de ENTRADA do agente (quem grava é o
   // líder ou a submissão), nunca um desfecho dele.
-  it("são os quatro desfechos graváveis, e só eles", () => {
-    expect([...STATUS_FUNIL]).toEqual(["Aprovado", "Pendente", "Ajuste pedido", "Reprovado"]);
-    expect([...STATUS_FUNIL]).not.toContain("Pré-aprovado");
+  it("são três, e só três", () => {
+    expect([...STATUS_FUNIL]).toEqual(["Aprovado", "Pendente", "Reprovado"]);
   });
 
   it("aprovar → Aprovado · reprovar → Reprovado", () => {
@@ -52,13 +51,27 @@ describe("statusDoFunil — o desfecho do time vira status", () => {
    * «Debug-skill»: `status_gravado: Pendente` com o porquê "o time pede ajuste ao autor".
    * O autor, que é quem tem de agir, via "Pendente", que não pede nada.
    */
-  it("⚠️ `ajuste` vira `Ajuste pedido`: o autor precisa saber que a bola é dele", () => {
-    expect(statusDoFunil({ saida: "ajuste" }).status).toBe("Ajuste pedido");
-    expect(statusDoFunil({ saida: "ajuste" }).porque).toMatch(/ajuste ao autor/);
+  it("⚠️ `ajuste` é Pendente: pedir ajuste ao autor é do líder, não do agente", () => {
+    expect(statusDoFunil({ saida: "ajuste" }).status).toBe("Pendente");
+    expect(statusDoFunil({ saida: "humano" }).status).toBe("Pendente");
   });
 
-  it("`humano` continua Pendente: é decisão de gente, não pedido ao autor", () => {
-    expect(statusDoFunil({ saida: "humano" }).status).toBe("Pendente");
+  it("⚠️ NENHUM desfecho do agente escapa dos três — a trava é código, não lembrança", () => {
+    const saidas = ["aprovar", "reprovar", "ajuste", "humano", "isento", "dispensado", "", "xpto"];
+    for (const saida of saidas) {
+      for (const escape of [true, false, null, undefined]) {
+        const st = statusDoFunil({ saida, escape });
+        expect(agentePodeGravar(st.status), `saída "${saida}" (escape=${escape})`).toBe(true);
+      }
+    }
+  });
+
+  it("os status PROIBIDOS ao agente dizem por que estão proibidos", () => {
+    for (const [status, porque] of Object.entries(STATUS_FORA_DO_AGENTE)) {
+      expect(agentePodeGravar(status), `${status} não pode ser gravável pelo agente`).toBe(false);
+      expect(porque.length, `${status} precisa do porquê`).toBeGreaterThan(20);
+    }
+    expect(Object.keys(STATUS_FORA_DO_AGENTE)).toContain("Ajuste pedido");
   });
 
   it("⚠️ desfecho DESCONHECIDO vira Pendente, nunca Aprovado nem Reprovado", () => {
@@ -146,17 +159,12 @@ describe("justificativaDaReprovacao — a causa REAL, não um carimbo", () => {
 });
 
 describe("fecharPendente — o funil sem limbo (opt-in)", () => {
-  it("desligado: o limbo NÃO é fechado em Aprovado nem Reprovado", async () => {
+  it("desligado: nada muda", async () => {
     const { juntarAnalises } = await import("@/lib/avaliacao/junta");
-    // ⚠️ O status aqui é `Ajuste pedido` desde 15/09/2026, e isso é de OUTRA mudança: a saída
-    // `ajuste` do time deixou de ser achatada em `Pendente`. O que este teste guarda é o
-    // efeito da FLAG — com ela desligada, nada vira decisão final.
-    const j = juntarAnalises({
-      impacto: { veredito: "em_validacao" },
-      estrela: { saida: "ajuste" },
-    });
-    expect(j.status).toBe("Ajuste pedido");
-    expect(["Aprovado", "Reprovado"]).not.toContain(j.status);
+    expect(
+      juntarAnalises({ impacto: { veredito: "em_validacao" }, estrela: { saida: "ajuste" } })
+        .status,
+    ).toBe("Pendente");
   });
 
   it("ligado: reenvio que NUNCA CHEGOU → Reprovado, com tom EXORTATIVO", async () => {
