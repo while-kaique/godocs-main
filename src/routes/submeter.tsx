@@ -937,15 +937,18 @@ export function SubmeterPageContent({
           // chat/wizard por cima — sem reiniciar a coleta do zero.
           applySeed(data, editProjetoId);
           if (editDraft && editDraft.projetoId === editProjetoId) {
-            // Servidor manda: só reidrata o rascunho local se for consistente com o
-            // servidor. Se o rascunho diz que a doc foi concluída (preview aprovado /
-            // chatComplete) mas o servidor NÃO tem doc persistida (legado que nunca
-            // teve o preview aprovado), descarta — senão a tela de aprovação final
-            // "ressuscita" sobre um projeto sem doc e trava ("Documentação ainda não
-            // foi gerada"). Descartando, o re-init abaixo (reset_doc) limpa o chat no
-            // servidor e recomeça a auditoria do zero. Ver deveDescartarDraftEdicao.
-            const serverTemDoc = data.documentacao != null;
-            if (deveDescartarDraftEdicao({ serverTemDoc, draft: editDraft })) {
+            // ⚠️ **Servidor manda quando é MAIS NOVO.** O rascunho é aplicado por cima do
+            // seed (`setForm` inteiro), então um rascunho velho RESSUSCITA o estado antigo —
+            // foi assim que o «Proxy AI» perdeu um Coautor que já estava gravado: a lista
+            // voltou a uma pessoa e a sincronização seguinte apagou a outra no servidor, sem
+            // ninguém ver. A comparação vive em `deveDescartarDraftEdicao`, declarada e
+            // testável, e não num `if` solto aqui.
+            if (
+              deveDescartarDraftEdicao({
+                servidorAtualizadoEm: (data.updated_at as string | null) ?? null,
+                draft: editDraft,
+              })
+            ) {
               clearDraft(editDraftKey(editProjetoId));
             } else {
               rehydrateFromLocal(editDraft);

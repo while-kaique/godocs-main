@@ -23,6 +23,14 @@ export function editDraftKey(projetoId: string): string {
 
 export type DraftSnapshot = {
   projetoId: string;
+  /**
+   * Quando este rascunho foi salvo (epoch ms). É o que permite saber se ele ficou para trás
+   * do servidor — ver `deveDescartarDraftEdicao`.
+   *
+   * ⚠️ OPCIONAL porque rascunho gravado antes de 15/09/2026 não tem a chave. Ausência é
+   * tratada como "velho", não como "agora": ver a régua na função.
+   */
+  salvoEm?: number;
   step: number;
   form: FormData;
   nomesExistentes: string[];
@@ -53,16 +61,22 @@ export type DraftSnapshot = {
  * (Etapas 1 a 3) deixava de persistir em silêncio (achado ALTO da revisão de qualidade). A v1
  * nunca guardou bytes no draft. Ao retomar, a pessoa reanexa; o que ela DIGITOU está salvo.
  */
-export function semAnexosNoRascunho<T extends { savingAnexos?: unknown[]; receitaAnexos?: unknown[]; imensuravelAnexos?: unknown[] }>(
-  ganhos: T | undefined,
-): T | undefined {
+export function semAnexosNoRascunho<
+  T extends { savingAnexos?: unknown[]; receitaAnexos?: unknown[]; imensuravelAnexos?: unknown[] },
+>(ganhos: T | undefined): T | undefined {
   if (!ganhos) return ganhos;
   return { ...ganhos, savingAnexos: [], receitaAnexos: [], imensuravelAnexos: [] };
 }
 
 export function saveDraft(snapshot: DraftSnapshot, key: string = DRAFT_KEY): void {
   try {
-    const enxuto = { ...snapshot, ganhos: semAnexosNoRascunho(snapshot.ganhos) as DraftSnapshot['ganhos'] };
+    const enxuto = {
+      ...snapshot,
+      // Carimba SEMPRE, sobrescrevendo o que veio no snapshot: o valor que importa é o do
+      // momento da gravação.
+      salvoEm: Date.now(),
+      ganhos: semAnexosNoRascunho(snapshot.ganhos) as DraftSnapshot["ganhos"],
+    };
     localStorage.setItem(key, JSON.stringify(enxuto));
   } catch (e) {
     // Quota cheia / localStorage indisponível — degrada silenciosamente.
@@ -103,14 +117,45 @@ export function clearDraft(key: string = DRAFT_KEY): void {
  * de aprovação e sem turno de aceite (D6), e projeto cuja doc não terminou não trava —
  * é reconciliado pelo cron. Não há mais o que o rascunho possa afirmar sobre a doc.
  *
- * Por isso devolve `false` SEMPRE: descartar o rascunho de quem está editando passou a
- * ser puro prejuízo — jogaria fora os blocos de ganho já preenchidos. A função (e o `if`
- * no seed da edição) fica de propósito: se um novo motivo de descarte aparecer, ele entra
- * AQUI, declarado e testável, em vez de virar um `if` solto dentro do `submeter.tsx`.
+ * ⚠️ **15/09/2026 — voltou a existir um motivo de descarte, e ele é o do INCIDENTE:** o
+ * rascunho local vencia o servidor SEMPRE, inclusive quando estava velho. No «Proxy AI», o
+ * autor adicionou um Coautor, reenviou (o servidor gravou os dois participantes) e, ao abrir
+ * a edição de novo, um rascunho salvo ANTES daquela adição foi aplicado por cima do seed —
+ * a lista voltou a UMA pessoa e a sincronização seguinte **apagou o Coautor no servidor**,
+ * em silêncio. Medido no `form_events`: 17:08 grava `[rafael, joao.gabriel]`, 17:14 grava
+ * `[rafael]`.
+ *
+ * A régua agora é a do resto do repo: **quem tem o dado mais novo manda**.
  */
-export function deveDescartarDraftEdicao(_args: {
-  serverTemDoc: boolean;
-  draft: Pick<DraftSnapshot, "ganhos">;
+export function deveDescartarDraftEdicao(args: {
+  /** `projetos.updated_at` do seed — `YYYY-MM-DD HH:MM:SS` em UTC, ou ISO. */
+  servidorAtualizadoEm: string | null | undefined;
+  draft: Pick<DraftSnapshot, "salvoEm">;
 }): boolean {
-  return false;
+  const servidorMs = msDoCarimboDoServidor(args.servidorAtualizadoEm);
+  // Sem carimbo do servidor não há com o que comparar, e o rascunho é a melhor fonte que
+  // existe: mantém. (É o caso do projeto que nunca foi atualizado depois de criado.)
+  if (servidorMs == null) return false;
+  // ⚠️ Rascunho SEM `salvoEm` é anterior a 15/09/2026 e não dá para datar. Conta como VELHO:
+  // o preço de manter é o do incidente (apagar participante em silêncio, sem ninguém ver);
+  // o preço de descartar é a pessoa reabrir a edição com o que o SERVIDOR tem, que é o
+  // estado do último reenvio dela. Perde-se o que foi digitado e nunca sincronizado, uma
+  // única vez, na primeira abertura após o deploy.
+  if (args.draft.salvoEm == null) return true;
+  return servidorMs > args.draft.salvoEm;
+}
+
+/**
+ * Converte o carimbo do servidor em epoch ms. PURA.
+ *
+ * ⚠️ O `updated_at` do SQLite é `YYYY-MM-DD HH:MM:SS` **em UTC e sem sufixo**, e o JS lê isso
+ * como hora LOCAL — daí o `+ "Z"`. Sem ele, um rascunho salvo há 2 horas pareceria mais novo
+ * que um servidor atualizado agora, e o descarte nunca aconteceria no fuso de Brasília. É a
+ * mesma armadilha do `diaDaDecisao` em `agentes-atividade.ts`.
+ */
+export function msDoCarimboDoServidor(bruto: string | null | undefined): number | null {
+  const txt = String(bruto ?? "").trim();
+  if (!txt) return null;
+  const ms = Date.parse(txt.includes("T") ? txt : txt.replace(" ", "T") + "Z");
+  return Number.isFinite(ms) ? ms : null;
 }
