@@ -762,7 +762,31 @@ export async function drenarFilaDoFunil(
       .filter(Boolean);
     const consensos = await getUltimosConsensosDoTimePorIds(pendentes);
     const corte = Date.now() - REAVALIAR_PENDENTE_APOS_HORAS * 3600_000;
+    // ⚠️ **`Pré-aprovado` NÃO espera as 72 h** (15/09/2026). A carência existe para não queimar
+    // ~30 chamadas de LLM reavaliando `Pendente`, onde a escrita está bloqueada de qualquer
+    // jeito. Em `Pré-aprovado` o agente ESTÁ autorizado e o projeto não tem decisão: fazê-lo
+    // esperar 3 dias trava o backlog justamente em quem já passou pelo líder.
+    //
+    // ⚠️ O caso que expôs isto: os 3 pré-aprovados de prod tinham consenso de <27 h, obtido
+    // quando o agente ainda NÃO podia gravar (o portão de ontem). Com a carência valendo para
+    // eles, o parecer existia, a autorização existia, e mesmo assim nada andava.
+    //
+    // ⚠️ Não vira laço infinito: quem é avaliado em `Pré-aprovado` sai daqui na mesma passada
+    // — `Aprovado`/`Reprovado` deixam de entrar em `entraNaFilaDeAvaliacao`. Só continua na
+    // fila quem o time não conseguiu fechar, e esse é o caso em que reavaliar é o certo.
+    const podeDecidirAgora = new Set(
+      linhas
+        .filter((r) =>
+          podeAgenteDecidir((r as unknown as Record<string, string>)["Status"] ?? null),
+        )
+        .map((r) =>
+          String((r as unknown as Record<string, string>)["ID Projeto"] ?? "")
+            .trim()
+            .toLowerCase(),
+        ),
+    );
     const fila = pendentes.filter((id) => {
+      if (podeDecidirAgora.has(id.toLowerCase())) return true;
       const c = consensos.get(id.toLowerCase());
       if (!c) return true; // nunca avaliado em prod
       const quando = Date.parse(String(c.created_at ?? "").replace(" ", "T") + "Z");
