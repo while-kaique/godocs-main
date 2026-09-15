@@ -13,6 +13,7 @@
  * Toda dimensão sai de campo que a listagem JÁ carrega (`ProjetoDashboardResumo`): nada
  * aqui exige coluna nova no espelho nem leitura extra da planilha.
  */
+import { JANELAS, type JanelaAgente } from "@/lib/agentes-atividade";
 import type { ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 import { pilulaDe } from "@/components/dashboard/status-triagem";
 import { msDeIso, type Intervalo } from "@/lib/calendario-datas";
@@ -54,6 +55,9 @@ export type FiltroGanho = "todos" | "saving" | "receita";
  * entra). E ela responde a pergunta certa: se há nota, o time rodou ali.
  */
 export type FiltroAgente = "todos" | "sem" | "com";
+
+/** Janela em que o TIME decidiu o projeto. `todos` = sem recorte temporal. */
+export type FiltroDecididoEm = "todos" | JanelaAgente;
 
 /**
  * Recorte pelas **CATEGORIAS DE GANHO da v2** — multi-seleção que SOMA (pedido do Luis,
@@ -173,6 +177,14 @@ export type FiltrosDashboard = {
   /** "O agente já rodou neste projeto?" — ver `FiltroAgente`. */
   agente: FiltroAgente;
   /**
+   * QUANDO o agente decidiu (aprovou/reprovou): `todos` · `hoje` · `ontem` · `semana`.
+   *
+   * ⚠️ É a pergunta "o que o agente decidiu no tempo", que é diferente de `agente` ("ele já
+   * rodou aqui?"): um projeto analisado na semana passada tem análise e **não** entra em
+   * "hoje". As duas somam (AND), como todas as outras.
+   */
+  decididoEm: FiltroDecididoEm;
+  /**
    * Categorias de ganho da v2 marcadas. Vazio = sem recorte; 2+ SOMAM (OU) — ver
    * `CategoriaFiltroGanho`.
    */
@@ -183,6 +195,7 @@ export const FILTROS_VAZIOS: FiltrosDashboard = {
   status: "todos",
   ganho: "todos",
   agente: "todos",
+  decididoEm: "todos",
   area: TODAS_AS_AREAS,
   parecer: TODOS_OS_PARECERES,
   periodo: null,
@@ -292,6 +305,19 @@ export function casaAgente(p: ProjetoDashboardResumo, f: FiltroAgente): boolean 
   return f === "com" ? rodou : !rodou;
 }
 
+/**
+ * O agente decidiu este projeto na janela pedida? PURA.
+ *
+ * ⚠️ Lê a marca que o CLIENTE pendurou (`indexarDecisoes`), com as janelas já resolvidas no
+ * fuso de quem lê — por isso o predicado não precisa saber que dia é hoje. Projeto sem marca
+ * (o agente nunca decidiu, ou decidiu antes da janela de leitura) fica de fora, que é a
+ * resposta certa para "o que ele decidiu hoje".
+ */
+export function casaDecididoEm(p: ProjetoDashboardResumo, f: FiltroDecididoEm): boolean {
+  if (f === "todos") return true;
+  return (p.decisaoAgente?.janelas ?? []).includes(f);
+}
+
 export type DimensaoFiltro =
   | "status"
   | "ganho"
@@ -300,6 +326,7 @@ export type DimensaoFiltro =
   | "periodo"
   | "estrelas"
   | "agente"
+  | "decididoEm"
   | "categorias";
 
 /**
@@ -323,6 +350,7 @@ export function casaFiltrosExceto(
     (exceto === "periodo" || casaPeriodo(p, f.periodo)) &&
     (exceto === "estrelas" || casaEstrelas(p, f.estrelasMin, f.estrelasMax)) &&
     (exceto === "agente" || casaAgente(p, f.agente)) &&
+    (exceto === "decididoEm" || casaDecididoEm(p, f.decididoEm)) &&
     (exceto === "categorias" || casaCategorias(p, f.categorias))
   );
 }
@@ -341,6 +369,7 @@ export function aplicarFiltros(
       casaPeriodo(p, f.periodo) &&
       casaEstrelas(p, f.estrelasMin, f.estrelasMax) &&
       casaAgente(p, f.agente) &&
+      casaDecididoEm(p, f.decididoEm) &&
       casaCategorias(p, f.categorias),
   );
 }
@@ -391,6 +420,7 @@ export function contarFiltrosAtivos(f: FiltrosDashboard): number {
     (f.estrelasMin != null || f.estrelasMax != null ? 1 : 0) +
     (f.soMultiplos ? 1 : 0) +
     (f.agente !== "todos" ? 1 : 0) +
+    (f.decididoEm !== "todos" ? 1 : 0) +
     // Multi-seleção conta como UMA dimensão, como a faixa de estrelas com as 2 pontas.
     (f.categorias.length > 0 ? 1 : 0)
   );
@@ -506,6 +536,12 @@ export function descreverFiltrosAtivos(f: FiltrosDashboard): ChipFiltro[] {
       rotulo: f.agente === "sem" ? "Sem análise do agente" : "Com análise do agente",
     });
   }
+  if (f.decididoEm !== "todos") {
+    chips.push({
+      chave: "decididoEm",
+      rotulo: `Agente decidiu: ${(JANELAS.find((j) => j.chave === f.decididoEm)?.rotulo ?? f.decididoEm).toLowerCase()}`,
+    });
+  }
   if (f.soMultiplos) chips.push({ chave: "multiplos", rotulo: "Autores com 2 ou mais" });
   return chips;
 }
@@ -525,6 +561,8 @@ export function limparDimensao(f: FiltrosDashboard, chave: ChipFiltro["chave"]):
       return { ...f, parecer: TODOS_OS_PARECERES };
     case "agente":
       return { ...f, agente: "todos" };
+    case "decididoEm":
+      return { ...f, decididoEm: "todos" };
     case "multiplos":
       return { ...f, soMultiplos: false };
     // `ganho` é a dimensão LEGADA (substituída por `categorias`) — nunca vira chip, mas o
