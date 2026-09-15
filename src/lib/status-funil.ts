@@ -209,3 +209,28 @@ export function ehReenvioDeAjuste(statusAnterior: string | null | undefined): bo
 export function statusDeSubmissao(preAprovacao: { isento: boolean }): StatusProjeto {
   return preAprovacao.isento ? "Pré-aprovado" : "Pendente";
 }
+
+/**
+ * O projeto entra na fila de AVALIAÇÃO do time? PURA.
+ *
+ * ⚠️ **Avaliar não é decidir, e confundir os dois foi o meu erro (15/09/2026).** Eu pus
+ * `podeAgenteDecidir` no filtro da FILA (`drenarFilaDoFunil`), e o efeito foi que projeto em
+ * `Pendente` — esperando o parecer do líder — **nem chegava a ser avaliado**: ficava sem
+ * estrela, sem parecer do time, sem nada. Palavras do dono do produto: *"ainda não entendi
+ * porque os projetos estão como pendente. Estão esperando pré-aprovação ainda? Mas mesmo
+ * assim, deveria ter o time de agentes já classificado eles, não é?"* — e sim, deveria.
+ *
+ * A classificação é INFORMAÇÃO: ela ajuda o próprio líder a decidir, e não depende de
+ * autorização nenhuma. O que depende é a ESCRITA do status, e essa continua atrás de
+ * `podeAgenteDecidir`.
+ *
+ * ⚠️ `Ajuste pedido` fica de fora: ali a bola está com o AUTOR, e o material vai mudar no
+ * reenvio — avaliar agora é gastar ~30 chamadas de LLM sobre algo que será reescrito.
+ * Decisão final e arquivo também ficam de fora, por razões óbvias.
+ */
+export function entraNaFilaDeAvaliacao(statusBruto: string | null | undefined): boolean {
+  const s = statusDoTexto(statusBruto);
+  if (ehArquivado(statusBruto)) return false;
+  // Célula vazia conta como `Pendente` (é o mesmo estado do funil), por isso o `?? "Pendente"`.
+  return (s ?? "Pendente") === "Pendente" || s === "Pré-aprovado";
+}

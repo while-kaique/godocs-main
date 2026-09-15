@@ -23,11 +23,13 @@ import {
   statusDoParecerDoLider,
   statusDoTexto,
   unificarStatus,
+  entraNaFilaDeAvaliacao,
 } from "@/lib/status-funil";
 import { pilulaDe, STATUS_TRIAGEM } from "@/components/dashboard/status-triagem";
 import { STATUS_GRAVAVEIS_ESPECIAIS } from "@/lib/especiais-acoes";
 import { ehStatusIndeciso } from "@/lib/decisao-humana";
 import { planejarMigracao } from "@/lib/migrar-status-unico";
+import { agenteDeveGravar, agentePodeGravar } from "@/lib/funil-status";
 import { ehDaFilaRpa } from "@/lib/aprovacao-pendentes-view";
 
 describe("o vocabulário", () => {
@@ -380,5 +382,61 @@ describe("migração destrava quem não tem fila", () => {
     expect(r1.mudancas).toHaveLength(1);
     const depois = antes.map((l) => ({ ...l, Status: r1.mudancas[0].para }));
     expect(planejarMigracao(depois, new Set()).mudancas).toEqual([]);
+  });
+});
+
+// ─── Avaliar ≠ decidir, e "não decidi" não se escreve ────────────────────────
+
+describe("o que o agente FAZ e o que ele GRAVA são coisas diferentes", () => {
+  /**
+   * ⚠️ REGRESSÃO REAL (15/09/2026). Eu pus `podeAgenteDecidir` no filtro da FILA, e projeto
+   * em `Pendente` — esperando o líder — deixou de ser AVALIADO: ficava sem estrela e sem
+   * parecer. Dono do produto: *"deveria ter o time de agentes já classificado eles, não é?"*.
+   * A classificação é informação e ajuda o próprio líder a decidir.
+   */
+  it("⚠️ `Pendente` ENTRA na fila de avaliação, mesmo sem poder ser decidido", () => {
+    expect(entraNaFilaDeAvaliacao("Pendente")).toBe(true);
+    expect(podeAgenteDecidir("Pendente")).toBe(false);
+  });
+
+  it("`Pré-aprovado` entra nas duas: é avaliado E pode ser decidido", () => {
+    expect(entraNaFilaDeAvaliacao("Pré-aprovado")).toBe(true);
+    expect(podeAgenteDecidir("Pré-aprovado")).toBe(true);
+  });
+
+  it("célula vazia é tratada como Pendente e entra na fila", () => {
+    expect(entraNaFilaDeAvaliacao(null)).toBe(true);
+    expect(entraNaFilaDeAvaliacao("")).toBe(true);
+    expect(entraNaFilaDeAvaliacao("—")).toBe(true);
+  });
+
+  it("quem já foi decidido, está em ajuste ou arquivado NÃO é reavaliado", () => {
+    // Gastar ~30 chamadas de LLM em material que já foi decidido ou que o autor vai reescrever.
+    for (const s of ["Aprovado", "Reprovado", "Ajuste pedido", "Descontinuado"]) {
+      expect(entraNaFilaDeAvaliacao(s), s).toBe(false);
+    }
+  });
+
+  /**
+   * ⚠️ REGRESSÃO REAL (15/09/2026), a mais cara da sessão. O líder pré-aprovou o «Protheus
+   * reports», o cron pegou o projeto às 14:43, o time não fechou e o agente gravou
+   * `Pré-aprovado → Pendente` — desfazendo a pré-aprovação do líder E retrancando o projeto,
+   * porque sem `Pré-aprovado` o portão volta a bloquear. O agente derrubou a própria
+   * autorização.
+   */
+  it("⚠️ o agente NÃO grava `Pendente`: 'não decidi' não se escreve por cima de ninguém", () => {
+    expect(agenteDeveGravar("Aprovado")).toBe(true);
+    expect(agenteDeveGravar("Reprovado")).toBe(true);
+    expect(agenteDeveGravar("Pendente")).toBe(false);
+    expect(agenteDeveGravar("Ajuste pedido")).toBe(false);
+    expect(agenteDeveGravar("Pré-aprovado")).toBe(false);
+  });
+
+  it("tudo que o agente GRAVA é também algo que ele PODE gravar", () => {
+    // As duas travas têm de ser coerentes: `agenteDeveGravar` é um subconjunto de
+    // `agentePodeGravar`, senão uma delas autorizaria o que a outra proíbe.
+    for (const s of [...STATUS_GRAVAVEIS_PROJETO]) {
+      if (agenteDeveGravar(s)) expect(agentePodeGravar(s), s).toBe(true);
+    }
   });
 });
