@@ -7,10 +7,7 @@
 
 import { getCurrentUser, isAdmin } from "@/lib/auth.functions";
 import { ehLideranca } from "@/lib/areas/teamguide.server";
-import {
-  sincronizarTeamGuide,
-  statusTeamGuideEspelho,
-} from "@/lib/teamguide-espelho";
+import { sincronizarTeamGuide, statusTeamGuideEspelho } from "@/lib/teamguide-espelho";
 import { diasParaExpirarTokenTG } from "@/lib/teamguide-token";
 import { alertarErroIntegracao, COOLDOWN_ALERTA_LENTO_MS } from "@/lib/alertas.functions";
 import {
@@ -74,6 +71,7 @@ import {
   avaliarComTimeCompletoEmBackground,
   avaliarLoteComTime,
   avaliarProjetoComTimeCompleto,
+  atividadeDoAgente,
   drenarFilaDoFunil,
 } from "@/lib/avaliacao-completa.functions";
 import {
@@ -373,9 +371,7 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const resultado = await sincronizarTeamGuide("cron");
       const dias = diasParaExpirarTokenTG(process.env.TG_API_TOKEN);
       if (dias != null && dias < 14) {
-        const data = new Date(Date.now() + dias * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .slice(0, 10);
+        const data = new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
         await alertarErroIntegracao(
           "teamguide-token",
           `token da TeamGuide expira em ${dias} dia(s) (${data})`,
@@ -528,7 +524,8 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       if (!request.headers.get("x-godeploy-cron")) {
         return errorJson("Rota exclusiva de cron.", 403);
       }
-      return json(await avaliarRetroativo({ dry: false, limite: 20 }));    }
+      return json(await avaliarRetroativo({ dry: false, limite: 20 }));
+    }
 
     // ── Cron: snapshot diário das pendências de pré-aprovação → Gomoon (D17) ──
     // 1×/dia às 09h BRT (`0 12 * * 1-5` — o cron do Godeploy é UTC). O Gomoon
@@ -998,21 +995,41 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // "Estrelas"/"Status"; devolve o resultado e registra o log em árvore (agente_log).
     if (pathname === "/api/admin/avaliacao/time" && method === "POST") {
       await requireAdmin(request);
-      const body = (await request.json().catch(() => ({}))) as { projetoId?: string; cicloId?: string | null; sincrono?: boolean };
+      const body = (await request.json().catch(() => ({}))) as {
+        projetoId?: string;
+        cicloId?: string | null;
+        sincrono?: boolean;
+      };
       if (!body.projetoId) return errorJson("projetoId é obrigatório", 400);
       // Default em BACKGROUND (até ~30 chamadas LLM; uma request cortada deixaria o ciclo 'aberto').
       // Resultado sai em GET /api/admin/agentes/ciclos e /api/admin/agentes/arvore?ciclo=&projeto=.
       if (body.sincrono === true) {
-        return json(await avaliarProjetoComTime(body.projetoId, { cicloId: body.cicloId ?? null, gatilho: "manual" }), 200, {
-          "Cache-Control": "no-store",
-        });
+        return json(
+          await avaliarProjetoComTime(body.projetoId, {
+            cicloId: body.cicloId ?? null,
+            gatilho: "manual",
+          }),
+          200,
+          {
+            "Cache-Control": "no-store",
+          },
+        );
       }
       runBackground(
-        avaliarProjetoComTime(body.projetoId, { cicloId: body.cicloId ?? null, gatilho: "manual" }).then((r) =>
-          console.log("[avaliacao-time]", body.projetoId, r.ok ? `ok ciclo=${r.ciclo_id}` : `falhou: ${r.motivo}`),
+        avaliarProjetoComTime(body.projetoId, {
+          cicloId: body.cicloId ?? null,
+          gatilho: "manual",
+        }).then((r) =>
+          console.log(
+            "[avaliacao-time]",
+            body.projetoId,
+            r.ok ? `ok ciclo=${r.ciclo_id}` : `falhou: ${r.motivo}`,
+          ),
         ),
       );
-      return json({ ok: true, agendado: true, projetoId: body.projetoId }, 202, { "Cache-Control": "no-store" });
+      return json({ ok: true, agendado: true, projetoId: body.projetoId }, 202, {
+        "Cache-Control": "no-store",
+      });
     }
 
     // ── Memória e LOG dos agentes avaliadores (T21) — leitura em árvore, só admin ──
@@ -1040,8 +1057,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const q = (k: string) => url.searchParams.get(k) ?? undefined;
       return json(
         await listarLog({
-          agente: q("agente"), desde: q("desde"), veredito: q("veredito"), projeto: q("projeto"),
-          ciclo: q("ciclo"), cursor: q("cursor"), limit: q("limit"),
+          agente: q("agente"),
+          desde: q("desde"),
+          veredito: q("veredito"),
+          projeto: q("projeto"),
+          ciclo: q("ciclo"),
+          cursor: q("cursor"),
+          limit: q("limit"),
         }),
         200,
         { "Cache-Control": "no-store" },
@@ -1140,9 +1162,19 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // eram dois cliques e dois caminhos (decisão do Luis, 08/09/2026: "é um TIME agindo JUNTO e
     // classificando JUNTO"). SÍNCRONA: são ~5 chamadas de LLM, cabem num request — e o caminho
     // em background morreu no `waitUntil` do Godeploy, prometendo estrela que nunca chegava.
+    // View TEMPORAL do agente: o que ele decidiu hoje, ontem e nesta semana. Só leitura.
+    if (pathname === "/api/admin/agentes/atividade" && method === "GET") {
+      await requireAdmin(request);
+      return json(await atividadeDoAgente());
+    }
+
     if (pathname === "/api/admin/avaliacao/time-completo" && method === "POST") {
       await requireAdmin(request);
-      const body = (await readBody(request)) as { projetoId?: string; dry?: boolean; forcar?: boolean };
+      const body = (await readBody(request)) as {
+        projetoId?: string;
+        dry?: boolean;
+        forcar?: boolean;
+      };
       if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
       return json(
         await avaliarProjetoComTimeCompleto(body.projetoId, { dry: body.dry, forcar: body.forcar }),
@@ -1154,10 +1186,18 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // iterado pelo FRONT (padrão do repo para trabalho longo — o disparo de e-mails faz igual).
     if (pathname === "/api/admin/avaliacao/lote" && method === "POST") {
       await requireAdmin(request);
-      const body = (await readBody(request)) as { projetoIds?: string[]; dry?: boolean; forcar?: boolean };
-      return json(await avaliarLoteComTime(body.projetoIds ?? [], { dry: body.dry, forcar: body.forcar }), 200, {
-        "Cache-Control": "no-store",
-      });
+      const body = (await readBody(request)) as {
+        projetoIds?: string[];
+        dry?: boolean;
+        forcar?: boolean;
+      };
+      return json(
+        await avaliarLoteComTime(body.projetoIds ?? [], { dry: body.dry, forcar: body.forcar }),
+        200,
+        {
+          "Cache-Control": "no-store",
+        },
+      );
     }
     // Backfill: avalia os normais SEM recomendação + mantém os embeddings do corpus. `dry` é o
     // DEFAULT (gravar exige {"dry":false}); `limite` limita a corrida.
@@ -1166,14 +1206,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === "/api/admin/embeddings/backfill" && method === "POST") {
       await requireAdmin(request);
       const body = (await readBody(request)) as { dry?: boolean; cap?: number };
-      return json(await backfillEmbeddingsBase({ dry: body.dry, cap: body.cap }), 200, { "Cache-Control": "no-store" });
+      return json(await backfillEmbeddingsBase({ dry: body.dry, cap: body.cap }), 200, {
+        "Cache-Control": "no-store",
+      });
     }
     if (pathname === "/api/admin/avaliar-normais-pendentes" && method === "POST") {
       await requireAdmin(request);
       const body = (await readBody(request)) as { dry?: boolean; limite?: number };
-      return json(
-        await avaliarProjetosNormaisPendentes({ dry: body.dry, limite: body.limite }),
-      );
+      return json(await avaliarProjetosNormaisPendentes({ dry: body.dry, limite: body.limite }));
     }
     // Deliberação: avança as mesas abertas. `dry` DEFAULT (gravar exige {"dry":false}). NO-OP se OFF.
     if (pathname === "/api/admin/deliberar-avaliacoes" && method === "POST") {

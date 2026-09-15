@@ -1787,6 +1787,35 @@ export async function abrirAprovacoesPendentes(
  * ⚠️ UMA consulta, sem `IN`: a migração varre a base inteira e um round-trip por projeto é o
  * padrão que já derrubou o Investigador.
  */
+/**
+ * As decisões de status gravadas pelo TIME DE AGENTES desde um instante. UMA consulta.
+ *
+ * ⚠️ Filtra pelo ATOR no SQL, não em memória: o `admin_status_log` cresce a cada escrita de
+ * status (de gente e de agente), e trazer tudo para filtrar no JS é o padrão que já derrubou
+ * o Investigador. O índice de `created_at` cobre o recorte.
+ *
+ * `desde` é `YYYY-MM-DD HH:MM:SS` em **UTC**, que é o formato do `datetime('now')` do SQLite.
+ */
+export async function getDecisoesDoAgenteDesde(
+  ator: string,
+  desde: string,
+): Promise<
+  {
+    projeto_id: string;
+    projeto_nome: string | null;
+    status_novo: string;
+    created_at: string | null;
+  }[]
+> {
+  return queryAll(
+    `SELECT projeto_id, projeto_nome, status_novo, created_at
+       FROM admin_status_log
+      WHERE LOWER(admin_email) = LOWER(?) AND created_at >= ?
+      ORDER BY created_at DESC`,
+    [ator, desde],
+  );
+}
+
 export async function getIdsComFilaPendente(): Promise<Set<string>> {
   const rows = await queryAll<{ projeto_id: string }>(
     `SELECT DISTINCT projeto_id FROM projeto_aprovacoes WHERE veredito = 'pendente'`,
@@ -3802,9 +3831,7 @@ export async function getMedicoesRetroativas(): Promise<
  * ⚠️ Uma linha só, pelo índice `idx_agente_log_projeto_criado`. O `saida` do nó de consenso é o
  * `Consenso` inteiro em JSON — quem o interpreta é o chamador.
  */
-export async function getUltimoConsensoDoTime(
-  projetoId: string,
-): Promise<{
+export async function getUltimoConsensoDoTime(projetoId: string): Promise<{
   saida: string | null;
   confianca: string | null;
   veredito: string | null;
@@ -3835,9 +3862,7 @@ export async function getUltimoConsensoDoTime(
  * `/investigador` de 600 round-trips. E seleciona só 4 colunas: `agente_log.entrada`/`tools_chamadas`
  * são textos longos e o teto de 32 MiB de RPC já derrubou 3 consultas nesta vizinhança.
  */
-export async function getUltimosConsensosDoTimePorIds(
-  ids: string[],
-): Promise<
+export async function getUltimosConsensosDoTimePorIds(ids: string[]): Promise<
   Map<
     string,
     {

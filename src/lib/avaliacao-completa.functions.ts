@@ -28,9 +28,13 @@ import { numero } from "@/lib/dashboard-resumo";
 import { ESTRELA_LIMITE_REPROVAVEL } from "@/lib/materialidade-piso";
 import { juntarAnalises, type Juncao } from "@/lib/avaliacao/junta";
 import { justificativaDaReprovacao, agenteDecideFunil, agenteDeveGravar } from "@/lib/funil-status";
-import { getUltimosConsensosDoTimePorIds } from "@/integrations/db/client.server";
+import {
+  getUltimosConsensosDoTimePorIds,
+  getDecisoesDoAgenteDesde,
+} from "@/integrations/db/client.server";
 import { definirStatusProjeto } from "@/lib/dashboard-admin.functions";
 import { podeAgenteDecidir, entraNaFilaDeAvaliacao } from "@/lib/status-funil";
+import { resumirPorJanela, type ResumoJanela } from "@/lib/agentes-atividade";
 import {
   podeAgenteGravarStatus,
   podeAgenteEscreverNota,
@@ -803,6 +807,45 @@ export async function drenarFilaDoFunil(
       ok: false,
       avaliados: [],
       fila: 0,
+      motivo: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
+
+/**
+ * A view TEMPORAL do agente: o que ele decidiu hoje, ontem e nesta semana.
+ *
+ * ⚠️ Lê o `admin_status_log`, que já registra toda escrita de status com ator e carimbo —
+ * nenhum dado novo é coletado. O agrupamento (e o fuso de Brasília) mora no módulo PURO
+ * `agentes-atividade.ts`; aqui só há a leitura e o recorte da janela.
+ *
+ * ⚠️ Busca **10 dias** para trás e não a semana exata: a semana começa na segunda, então na
+ * segunda-feira de manhã "esta semana" tem 1 dia e no domingo tem 7 — pedir com folga é uma
+ * consulta só e evita uma aritmética de fuso do lado do SQL, que é onde o erro se esconde.
+ *
+ * ⚠️ NUNCA lança: é painel de leitura, e painel que derruba a rota do admin é pior que
+ * painel vazio (mesma disciplina de `saudeDosAgentes`).
+ */
+export async function atividadeDoAgente(): Promise<{
+  ok: boolean;
+  ator: string;
+  janelas: ResumoJanela[];
+  motivo?: string;
+}> {
+  const agora = new Date();
+  const desde = new Date(agora.getTime() - 10 * 86_400_000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+  try {
+    const linhas = await getDecisoesDoAgenteDesde(ATOR_TIME_AGENTES, desde);
+    return { ok: true, ator: ATOR_TIME_AGENTES, janelas: resumirPorJanela(linhas, agora) };
+  } catch (e) {
+    console.error("[time-completo] falha ao ler a atividade do agente:", e);
+    return {
+      ok: false,
+      ator: ATOR_TIME_AGENTES,
+      janelas: resumirPorJanela([], agora),
       motivo: e instanceof Error ? e.message : String(e),
     };
   }

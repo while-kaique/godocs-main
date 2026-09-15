@@ -2216,3 +2216,19 @@ que responde certo — só com o anti-feedback-loop mais fraco).
 **Fix irmão, no mesmo PR:** o harness passou a usar `LLM_EMBEDDINGS_KEY` e ganhou uma **trava** que
 **aborta a rodada** quando o cache de vetores nasce vazio — relatório bonito sobre RAG morto é pior
 que rodada que falha.
+
+## Feature adicional — Painel "Agentes" (view temporal das decisões)
+
+**Pedido (Luis, 15/09/2026):** *"eu quero uma view temporal dos agentes no frontend também: quero saber o que foi aprovado pelos agentes hoje, ontem e esta semana"*.
+
+**O que é:** botão "Agentes" ao lado de "Histórico" no cabeçalho do `/dashboard`, abrindo um popover com 3 janelas (Hoje · Ontem · Esta semana), cada uma com o par aprovados/reprovados e a lista dos projetos.
+
+**Decisões fechadas:**
+
+- **D1 — a lista é de DECISÕES, não de escritas.** Só `Aprovado` e `Reprovado` entram, nas contagens e na lista. O agente só decide aprovando ou reprovando (`agenteDeveGravar`); as escritas de `Pré-aprovado`/`Pendente` que existiram antes da trava de 15/09 são exatamente o defeito que a trava fechou, e exibi-las sob um título que promete decisões seria carimbá-las como veredito. Elas continuam no `admin_status_log`. _(A 1ª versão as mostrava na lista e as excluía só das contagens — "Hoje: 9 decisões, 4 aprovações" não fecha para quem lê.)_
+- **D2 — o dia é o de Brasília, e a semana começa na segunda.** O `created_at` do SQLite é UTC sem sufixo; `diaDaDecisao` concatena `"Z"` antes de converter. Sem isso toda decisão a partir das 21h cairia no dia seguinte — a mesma lição das chaves de disparo do Gomoon.
+- **D3 — status inesperado não derruba nem inventa.** Um valor fora do par conhecido fica fora das contagens e fora da lista; o módulo não lança.
+- **D4 — leitura barata.** `getDecisoesDoAgenteDesde(ator, desde)` filtra o ator no SQL sobre o índice de `created_at`, com janela de 10 dias. Nada de varrer o log inteiro no request.
+- **D5 — recarrega a cada abertura do popover** (é um recorte de "agora", não estado de página) e **`atividadeDoAgente()` nunca lança** (painel de diagnóstico que derruba a rota do admin é pior que nenhum — mesma régua de `saudeDosAgentes`).
+
+Arquivos: `src/lib/agentes-atividade.ts` (PURO), `src/components/dashboard/painel-agentes.tsx`, `atividadeDoAgente()` em `avaliacao-completa.functions.ts`, rota `GET /api/admin/agentes/atividade`. Testes: `tests/agentes-atividade.test.ts`.
