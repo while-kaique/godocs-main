@@ -1,19 +1,29 @@
-// O FUNIL do GoDocs tem TRÊS status, e este módulo é a fonte única do mapa
-// "desfecho do time de agentes → status da planilha". PURO.
+// Fonte única do mapa "desfecho do time de agentes → status da planilha". PURO.
 //
-// ⚠️ **Decisão do dono do produto (09/09/2026):** *"O godocs nao vai ter mais no funil outro
-// status senao aprovado, pendente ou reprovado"*. Antes eram seis na lista gravável
-// (`STATUS_GRAVAVEIS`), e três deles diziam a mesma coisa com nomes diferentes: `Em validação` é
-// "esperando", que é `Pendente`; `Reenvio Pendente` é "esperando o autor"; `Descontinuado` não é
-// etapa de funil nenhuma, é arquivo.
+// ⚠️ **Os status do funil agora são CINCO** e moram em `status-funil.ts`
+// (`STATUS_PROJETO`): `Pendente` · `Pré-aprovado` · `Ajuste pedido` · `Aprovado` ·
+// `Reprovado`. A lista de três deste arquivo (`STATUS_FUNIL`) é a de 09/09/2026 e ficou
+// para trás — ela é o ALVO que o time pode gravar, não o vocabulário do funil.
+//
+// A decisão de 09/09 (*"O godocs nao vai ter mais no funil outro status senao aprovado,
+// pendente ou reprovado"*) foi ESTENDIDA pelo dono do produto em 14/09: *"Pendente,
+// pre-aprovado, aprovado, ajuste pedido e reprovado sao os unicos status possiveis agora"*.
+// `Em validação` e `Reenvio Pendente` continuam fora — o primeiro é `Pendente`, o segundo
+// virou `Ajuste pedido`.
 //
 // ⚠️ **`Descontinuado` fica FORA do funil, de propósito** — não é um 4º status, é o dono dizendo
 // que a automação não roda mais (`projetos.descontinuado` é a fonte da verdade, e o Status da
 // planilha só reflete). Projeto descontinuado **não é julgado pelo time**: julgar mérito de algo
 // que foi desligado gasta chamada e produz um veredito que ninguém vai aplicar.
 
-/** Os três, e só estes três. */
-export const STATUS_FUNIL = ['Aprovado', 'Pendente', 'Reprovado'] as const;
+/**
+ * O que o TIME pode gravar como desfecho.
+ *
+ * ⚠️ `Ajuste pedido` entrou em 15/09/2026: a saída `ajuste` do consenso passou a ter onde
+ * aterrissar (ver `statusDoFunil`). `Pré-aprovado` NÃO está aqui de propósito — ele é o
+ * estado de ENTRADA do agente (quem o grava é o líder ou a submissão), não um desfecho.
+ */
+export const STATUS_FUNIL = ["Aprovado", "Pendente", "Ajuste pedido", "Reprovado"] as const;
 
 /**
  * O TIME de agentes decide o funil (Aprovado/Pendente/Reprovado)? Env `AGENTE_DECIDE_FUNIL`, lida em
@@ -26,13 +36,15 @@ export const STATUS_FUNIL = ['Aprovado', 'Pendente', 'Reprovado'] as const;
  * depois, decidia por régua — e a reprovação da v1, sem citação, é justamente o que a v2 proíbe.
  */
 export function agenteDecideFunil(): boolean {
-  const v = String(process.env.AGENTE_DECIDE_FUNIL ?? '').trim().toLowerCase();
-  return v === '1' || v === 'true' || v === 'sim' || v === 'on';
+  const v = String(process.env.AGENTE_DECIDE_FUNIL ?? "")
+    .trim()
+    .toLowerCase();
+  return v === "1" || v === "true" || v === "sim" || v === "on";
 }
 export type StatusFunil = (typeof STATUS_FUNIL)[number];
 
 /** Fora do funil: existe na coluna, não é etapa. */
-export const STATUS_FORA_DO_FUNIL = ['Descontinuado'] as const;
+export const STATUS_FORA_DO_FUNIL = ["Descontinuado"] as const;
 
 /** O que o time conclui, como chega aqui. */
 export type DesfechoDoTime = {
@@ -58,9 +70,7 @@ export type DecisaoDoFunil = {
 /**
  * Desfecho do time → status do funil. PURA.
  *
- * ⚠️ **A 4ª saída interna (`ajuste`) NÃO virou um 4º status.** Ela existe no consenso porque
- * carrega as PERGUNTAS ao autor, e isso é informação boa; o que ela não pode é abrir uma fila
- * própria na planilha. No funil ela é `Pendente`, como todo desfecho que espera gente.
+ * ⚠️ **A saída `ajuste` virou `Ajuste pedido`** (15/09/2026) — ver o porquê no ramo dela.
  * ⚠️ **Desfecho desconhecido → `Pendente`**, nunca `Aprovado` nem `Reprovado`: ampliar o enum do
  * consenso sem passar por aqui não pode aprovar nem reprovar projeto por acidente (é a lição do
  * `Dispensado` que virava `Pré-reprovado` num fall-through e afirmava que o líder reprovou).
@@ -68,25 +78,51 @@ export type DecisaoDoFunil = {
 export function statusDoFunil(d: DesfechoDoTime): DecisaoDoFunil {
   if (d.escape === true) {
     return {
-      status: 'Pendente',
+      status: "Pendente",
       flag6a10: true,
       porque:
-        'O time avaliou e o projeto se sustenta, mas caiu na faixa 6 a 10: fica pendente até o comitê humano cravar a estrela (6, 7, 8, 9 ou 10) e aprovar.',
+        "O time avaliou e o projeto se sustenta, mas caiu na faixa 6 a 10: fica pendente até o comitê humano cravar a estrela (6, 7, 8, 9 ou 10) e aprovar.",
     };
   }
-  if (d.saida === 'aprovar') {
-    return { status: 'Aprovado', flag6a10: false, porque: 'O time de agentes aprovou o projeto.' };
+  if (d.saida === "aprovar") {
+    return { status: "Aprovado", flag6a10: false, porque: "O time de agentes aprovou o projeto." };
   }
-  if (d.saida === 'reprovar') {
-    return { status: 'Reprovado', flag6a10: false, porque: 'O time de agentes reprovou o projeto por régua declarada.' };
+  if (d.saida === "reprovar") {
+    return {
+      status: "Reprovado",
+      flag6a10: false,
+      porque: "O time de agentes reprovou o projeto por régua declarada.",
+    };
   }
-  if (d.saida === 'ajuste') {
-    return { status: 'Pendente', flag6a10: false, porque: 'O time pede ajuste ao autor antes de decidir.' };
+  if (d.saida === "ajuste") {
+    // ⚠️ **`Ajuste pedido` é um STATUS desde 14/09/2026** — antes esta saída era achatada em
+    // `Pendente` porque o funil só tinha três estados, e o comentário do topo deste arquivo
+    // ainda dizia isso. Manter o achatamento depois da coluna única criava um LOOP: o time
+    // concluía `ajuste`, o projeto voltava a `Pendente`, o cron o reavaliava depois de 72h e
+    // concluía `ajuste` de novo — e o autor, que é quem tem de agir, nunca era avisado (o
+    // card dele mostra "Pendente", que não pede nada). Medido em prod (15/09) no
+    // «Debug-skill»: `status_gravado: Pendente` com o porquê "o time pede ajuste ao autor".
+    //
+    // ⚠️ É o mesmo desfecho de sempre; o que muda é ele ter onde aterrissar. As PERGUNTAS ao
+    // autor continuam vindo no texto do consenso, que é a razão de `ajuste` existir.
+    return {
+      status: "Ajuste pedido",
+      flag6a10: false,
+      porque: "O time pede ajuste ao autor antes de decidir.",
+    };
   }
-  if (d.saida === 'humano') {
-    return { status: 'Pendente', flag6a10: false, porque: 'O time não fechou sozinho e a decisão é de gente.' };
+  if (d.saida === "humano") {
+    return {
+      status: "Pendente",
+      flag6a10: false,
+      porque: "O time não fechou sozinho e a decisão é de gente.",
+    };
   }
-  return { status: 'Pendente', flag6a10: false, porque: `Desfecho não reconhecido (${d.saida}): fica pendente para conferência humana.` };
+  return {
+    status: "Pendente",
+    flag6a10: false,
+    porque: `Desfecho não reconhecido (${d.saida}): fica pendente para conferência humana.`,
+  };
 }
 
 /**
@@ -102,13 +138,15 @@ export function statusDoFunil(d: DesfechoDoTime): DecisaoDoFunil {
  * detalhe de implementação: a lista dos 21 vai no relatório antes de qualquer escrita.
  */
 export function statusFunilDeLegado(bruto: string | null | undefined): StatusFunil | null {
-  const t = String(bruto ?? '').trim().toLowerCase();
-  if (!t) return 'Pendente';
-  if (t === 'aprovado') return 'Aprovado';
-  if (t === 'reprovado' || t === 'rejeitado') return 'Reprovado';
-  if (t === 'descontinuado') return null;
+  const t = String(bruto ?? "")
+    .trim()
+    .toLowerCase();
+  if (!t) return "Pendente";
+  if (t === "aprovado") return "Aprovado";
+  if (t === "reprovado" || t === "rejeitado") return "Reprovado";
+  if (t === "descontinuado") return null;
   // 'pendente' · 'em validação' · 'reenvio pendente' · qualquer coisa nova
-  return 'Pendente';
+  return "Pendente";
 }
 
 /** O projeto entra na fila do time? PURA. Descontinuado não entra (ver o topo do arquivo). */
@@ -154,17 +192,19 @@ export function justificativaDaReprovacao(args: {
   semMaterial?: boolean;
 }): string {
   const partes: string[] = [];
-  const anterior = String(args.statusAnterior ?? '').trim().toLowerCase();
-  const pedido = String(args.motivoReenvio ?? '').trim();
-  const temPedido = pedido !== '' && pedido !== '—' && pedido !== '-';
+  const anterior = String(args.statusAnterior ?? "")
+    .trim()
+    .toLowerCase();
+  const pedido = String(args.motivoReenvio ?? "").trim();
+  const temPedido = pedido !== "" && pedido !== "—" && pedido !== "-";
 
-  if (anterior === 'reenvio pendente' || anterior === 'rejeitado') {
+  if (anterior === "reenvio pendente" || anterior === "rejeitado") {
     partes.push(
-      'Este projeto foi devolvido pela triagem para ajuste e o reenvio não chegou. A reprovação é por isso, não por um julgamento do mérito do que você fez.',
+      "Este projeto foi devolvido pela triagem para ajuste e o reenvio não chegou. A reprovação é por isso, não por um julgamento do mérito do que você fez.",
     );
     if (temPedido) partes.push(`O que a triagem pediu: ${pedido}`);
     partes.push(
-      'Para corrigir: edite o projeto com o ajuste e reenvie. O time reavalia o projeto no reenvio e a decisão pode mudar.',
+      "Para corrigir: edite o projeto com o ajuste e reenvie. O time reavalia o projeto no reenvio e a decisão pode mudar.",
     );
   } else if (args.semMaterial) {
     // ⚠️ **CONCISA por pedido do dono do produto** (10/09/2026): *"reprovar com justificativa
@@ -189,28 +229,30 @@ export function justificativaDaReprovacao(args: {
     if (falta) {
       partes.push(`O que ficou sem resposta neste projeto: ${falta}`);
       partes.push(
-        'O time não consegue confirmar o ganho com o que está escrito hoje. Isso não é um juízo sobre o valor do trabalho.',
+        "O time não consegue confirmar o ganho com o que está escrito hoje. Isso não é um juízo sobre o valor do trabalho.",
       );
     } else {
       partes.push(
-        'O time não conseguiu confirmar o ganho deste projeto com o material que existe hoje, e não há um ponto único a apontar.',
+        "O time não conseguiu confirmar o ganho deste projeto com o material que existe hoje, e não há um ponto único a apontar.",
       );
     }
-    partes.push('Responda esse ponto e reenvie: o reenvio reabre a avaliação.');
+    partes.push("Responda esse ponto e reenvie: o reenvio reabre a avaliação.");
   } else {
     partes.push(...args.porques);
-    const parecer = String(args.parecerDaMesa ?? '').trim();
-    if (parecer) partes.push('', 'O que os especialistas apontaram:', parecer);
+    const parecer = String(args.parecerDaMesa ?? "").trim();
+    if (parecer) partes.push("", "O que os especialistas apontaram:", parecer);
   }
 
-  const t = partes.join('\n').trim();
+  const t = partes.join("\n").trim();
   // ⚠️ **Nunca vazio.** Medido em prod: o «Feel Nutrition» apareceu Reprovado com `Motivo
   // Reprovado` em branco — o autor vê o card cinza e não tem o que responder. Sem causa
   // conhecida, o texto diz isso e manda para a triagem, que é a verdade.
   const texto =
     t ||
-    'Reprovado sem uma causa registrada pelo time. Procure a triagem: este caso precisa de conferência humana.';
-  return texto.length > MOTIVO_REPROVADO_MAX ? `${texto.slice(0, MOTIVO_REPROVADO_MAX - 1)}…` : texto;
+    "Reprovado sem uma causa registrada pelo time. Procure a triagem: este caso precisa de conferência humana.";
+  return texto.length > MOTIVO_REPROVADO_MAX
+    ? `${texto.slice(0, MOTIVO_REPROVADO_MAX - 1)}…`
+    : texto;
 }
 
 /** Teto de cada ponto na justificativa concisa. Linha que não cabe na tela não é lida. */
@@ -228,7 +270,7 @@ export const PONTOS_MAX = 3;
  * especialista objetou…"), que fala do PROCESSO e não do que o autor tem de fazer.
  */
 export function resumirPontos(parecer?: string | null): string[] {
-  const cru = String(parecer ?? '').trim();
+  const cru = String(parecer ?? "").trim();
   if (!cru) return [];
   const out: string[] = [];
   for (const linha of cru.split(/\r?\n/)) {
@@ -236,9 +278,9 @@ export function resumirPontos(parecer?: string | null): string[] {
     if (!t) continue;
     if (/^(os especialistas|só um especialista|nenhum especialista|o time)/i.test(t)) continue;
     const m = t.match(/^([^:]{3,24}:)?\s*(.*)$/);
-    const rotulo = (m?.[1] ?? '').trim();
+    const rotulo = (m?.[1] ?? "").trim();
     const corpo = (m?.[2] ?? t).split(/(?<=[.!?])\s+/)[0].trim();
-    const frase = `${rotulo ? rotulo + ' ' : ''}${corpo}`.replace(/\s{2,}/g, ' ');
+    const frase = `${rotulo ? rotulo + " " : ""}${corpo}`.replace(/\s{2,}/g, " ");
     out.push(frase.length > PONTO_MAX ? `${frase.slice(0, PONTO_MAX - 1)}…` : frase);
     if (out.length >= PONTOS_MAX) break;
   }
@@ -260,11 +302,11 @@ export const RESUMO_FALTA_MAX = 320;
  */
 export function resumirEmUmaFrase(parecer?: string | null): string {
   const pontos = resumirPontos(parecer).map((p) => {
-    const semRotulo = p.replace(/^[^:]{3,24}:\s*/, '').trim();
+    const semRotulo = p.replace(/^[^:]{3,24}:\s*/, "").trim();
     // minúscula na emenda, para virar uma frase só em vez de um bloco de sentenças soltas
-    return semRotulo.charAt(0).toLowerCase() + semRotulo.slice(1).replace(/\.$/, '');
+    return semRotulo.charAt(0).toLowerCase() + semRotulo.slice(1).replace(/\.$/, "");
   });
-  if (!pontos.length) return '';
-  const t = pontos.join('; ') + '.';
+  if (!pontos.length) return "";
+  const t = pontos.join("; ") + ".";
   return t.length > RESUMO_FALTA_MAX ? `${t.slice(0, RESUMO_FALTA_MAX - 1)}…` : t;
 }

@@ -182,18 +182,30 @@ export function ehReenvioDeAjuste(statusAnterior: string | null | undefined): bo
 }
 
 /**
- * O Status com que uma SUBMISSÃO nasce, a partir do rótulo do parecer. PURA.
+ * O Status com que uma SUBMISSÃO nasce. PURA.
  *
- * ⚠️ Projeto que **não entra em fila de líder** nasce `Pré-aprovado`. São 71% da base
- * (coordenador para cima submetendo, projeto especial, pessoa sem líder na TeamGuide, e o
- * caso de integração fora), e o rótulo deles já é `Pré-aprovado (liderança)` e afins — o
- * que muda é o Status passar a dizer o mesmo. Sem isto, a régua *"o agente só decide em
- * Pré-aprovado"* pararia o funil para a maioria dos projetos, esperando um líder que não
- * existe.
+ * ⚠️ **A régua é o `isento`, NUNCA o rótulo da coluna do líder** (corrigido em 15/09/2026,
+ * depois de projetos ficarem presos em produção).
  *
- * ⚠️ Quem ENTRA em fila nasce `Pendente`: o rótulo dele é `Pré-pendente`, e é literalmente
- * "o líder ainda não olhou".
+ * A primeira versão lia `rotuloSheet` e tratava `"Pré-aprovado"` como o sinal de isenção.
+ * Só que `rotuloIsencaoSheet` devolve `"Pré-aprovado"` **em UM dos quatro casos** de
+ * isenção — o de `lideranca` — e `"—"` nos outros três (`especial`, `sem_lider`,
+ * `teamguide_indisponivel`), de propósito: a D12 decidiu que aqueles três não têm ESTADO de
+ * parecer e que o porquê mora na justificativa. Ou seja, eu derivei uma régua de funil de
+ * uma coluna desenhada para *não* distinguir esses casos.
+ *
+ * O efeito em produção: **projeto especial nascia `Pendente` e ficava preso para sempre**.
+ * Especial não entra em fila de líder (D27), então nunca viraria `Pré-aprovado`, e o portão
+ * `podeAgenteDecidir` faz o agente só agir em `Pré-aprovado` — ninguém decidia, nem gente
+ * nem agente. Medido em 15/09: 3 dos 8 Pendentes eram especiais nessa situação.
+ *
+ * `isento` é o discriminador certo e já existia em `ResultadoAbertura`: é o MESMO que
+ * `decidirMomentoNotificacao` usa para decidir se o grupo do Chat é avisado. Ele quer dizer
+ * exatamente "nenhuma fila foi aberta e nenhuma será" — que é a pergunta que o Status
+ * precisa responder.
+ *
+ * ⚠️ Quem ENTRA em fila nasce `Pendente`: é literalmente "o líder ainda não olhou".
  */
-export function statusDeSubmissao(rotuloDoParecer: string | null | undefined): StatusProjeto {
-  return statusDoTexto(rotuloDoParecer) === "Pré-aprovado" ? "Pré-aprovado" : "Pendente";
+export function statusDeSubmissao(preAprovacao: { isento: boolean }): StatusProjeto {
+  return preAprovacao.isento ? "Pré-aprovado" : "Pendente";
 }

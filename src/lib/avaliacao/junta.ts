@@ -16,7 +16,7 @@
 // saída é PENDENTE, nunca a média nem "a que gritou mais alto". Os dois erros não são simétricos —
 // aprovar por engano custa uma correção da triagem, reprovar por engano apaga o trabalho de
 // alguém — e este repo já pagou o preço de fechar desfecho negativo na dúvida.
-import { statusDoFunil, type DecisaoDoFunil, type StatusFunil } from '@/lib/funil-status';
+import { statusDoFunil, type DecisaoDoFunil, type StatusFunil } from "@/lib/funil-status";
 
 /** O que a metade do IMPACTO (a mesa) concluiu. `null` = não rodou (falhou, ou é especial). */
 export type LadoImpacto = { veredito: string } | null;
@@ -26,7 +26,7 @@ export type LadoEstrela = {
   saida: string;
   escape?: boolean | null;
   estrela?: number | null;
-  confianca?: 'alta' | 'media' | 'baixa' | null;
+  confianca?: "alta" | "media" | "baixa" | null;
   /**
    * O cérebro da estrela JULGOU, ou a nota é o fallback dele?
    *
@@ -43,7 +43,7 @@ export type Juncao = DecisaoDoFunil & {
   /** As duas metades apontaram para o mesmo status? */
   concordam: boolean;
   /** A confiança que sobrevive à junção (discordância derruba para baixa). */
-  confianca: 'alta' | 'media' | 'baixa';
+  confianca: "alta" | "media" | "baixa";
   /** Uma linha por razão, na ordem em que pesaram. É o que vira parecer legível. */
   porques: string[];
   /** A reprovação veio de "não deu para validar", não de régua de mérito. Muda o TOM do texto. */
@@ -73,13 +73,27 @@ export type Juncao = DecisaoDoFunil & {
  */
 export const NOTA_SUSTENTA_APROVACAO = 1;
 
+/**
+ * O time não fechou nem a favor nem contra.
+ *
+ * ⚠️ Existe porque `Ajuste pedido` passou a ser um status de verdade (15/09/2026) e o time
+ * pode devolvê-lo. Antes a saída `ajuste` era achatada em `Pendente`, então TODA comparação
+ * aqui usava `=== 'Pendente'` para dizer "o time não concluiu" — e manter aquelas
+ * comparações depois da mudança faria a regra 2b (o mérito tem um dono só, medida em prod
+ * em 10/09) parar de valer justo no caso mais comum: 7 dos 9 projetos daquela medição vinham
+ * com o time em `ajuste`.
+ */
+function timeEmAberto(status: StatusFunil): boolean {
+  return status === "Pendente" || status === "Ajuste pedido";
+}
+
 /** Veredito da MESA → status do funil. Vocabulário dela, não do time. */
 function statusDaMesa(veredito: string): StatusFunil {
   const v = veredito.trim().toLowerCase();
-  if (v === 'aprovar' || v === 'aprovado') return 'Aprovado';
-  if (v === 'reprovar' || v === 'reprovado') return 'Reprovado';
+  if (v === "aprovar" || v === "aprovado") return "Aprovado";
+  if (v === "reprovar" || v === "reprovado") return "Reprovado";
   // `em_validacao`, `isento`, `ajuste`, desconhecido: tudo que espera gente é Pendente.
-  return 'Pendente';
+  return "Pendente";
 }
 
 /**
@@ -136,45 +150,71 @@ export function juntarAnalises(args: {
 
   const doTime = estrela ? statusDoFunil({ saida: estrela.saida, escape: estrela.escape }) : null;
   const daMesa = impacto ? statusDaMesa(impacto.veredito) : null;
-  const confTime = estrela?.confianca ?? 'baixa';
+  const confTime = estrela?.confianca ?? "baixa";
   // A nota, e se ela é julgamento de fato (ver `LadoEstrela.avaliada` e `NOTA_SUSTENTA_APROVACAO`).
-  const nota = typeof estrela?.estrela === 'number' && Number.isFinite(estrela.estrela) ? estrela.estrela : null;
-  const notaSustenta = estrela?.avaliada !== false && nota !== null && nota >= NOTA_SUSTENTA_APROVACAO;
+  const nota =
+    typeof estrela?.estrela === "number" && Number.isFinite(estrela.estrela)
+      ? estrela.estrela
+      : null;
+  const notaSustenta =
+    estrela?.avaliada !== false && nota !== null && nota >= NOTA_SUSTENTA_APROVACAO;
 
   // 1 — a faixa de escape
   if (doTime?.flag6a10) {
     porques.push(doTime.porque);
-    if (daMesa && daMesa !== 'Aprovado') {
-      porques.push(`A análise do impacto ficou em ${daMesa}, então há o que conferir junto com a estrela.`);
+    if (daMesa && daMesa !== "Aprovado") {
+      porques.push(
+        `A análise do impacto ficou em ${daMesa}, então há o que conferir junto com a estrela.`,
+      );
     }
-    return { ...doTime, concordam: daMesa === 'Aprovado', confianca: confTime, porques };
+    return { ...doTime, concordam: daMesa === "Aprovado", confianca: confTime, porques };
   }
 
   // 5 / 4 — metades ausentes
   if (!doTime && !daMesa) {
     return {
-      status: 'Pendente',
+      status: "Pendente",
       flag6a10: false,
-      porque: 'Nenhuma das duas metades do time concluiu: sem julgamento não há decisão.',
+      porque: "Nenhuma das duas metades do time concluiu: sem julgamento não há decisão.",
       concordam: false,
-      confianca: 'baixa',
-      porques: ['Nenhuma das duas metades do time concluiu: sem julgamento não há decisão.'],
+      confianca: "baixa",
+      porques: ["Nenhuma das duas metades do time concluiu: sem julgamento não há decisão."],
     };
   }
   if (!daMesa) {
     if (especial && doTime) {
-      porques.push('Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.');
+      porques.push(
+        "Projeto especial: a análise de impacto não se aplica (não há memorial financeiro), então vale a do time da estrela.",
+      );
       porques.push(doTime.porque);
       return { ...doTime, concordam: true, confianca: confTime, porques };
     }
-    porques.push('A análise do impacto não concluiu, e uma decisão de funil precisa das duas metades.');
+    porques.push(
+      "A análise do impacto não concluiu, e uma decisão de funil precisa das duas metades.",
+    );
     if (doTime) porques.push(`O time da estrela concluiu: ${doTime.porque}`);
-    return { status: 'Pendente', flag6a10: false, porque: porques[0], concordam: false, confianca: 'baixa', porques };
+    return {
+      status: "Pendente",
+      flag6a10: false,
+      porque: porques[0],
+      concordam: false,
+      confianca: "baixa",
+      porques,
+    };
   }
   if (!doTime) {
-    porques.push('O time da estrela não concluiu, e uma decisão de funil precisa das duas metades.');
+    porques.push(
+      "O time da estrela não concluiu, e uma decisão de funil precisa das duas metades.",
+    );
     porques.push(`A análise do impacto concluiu: ${daMesa}.`);
-    return { status: 'Pendente', flag6a10: false, porque: porques[0], concordam: false, confianca: 'baixa', porques };
+    return {
+      status: "Pendente",
+      flag6a10: false,
+      porque: porques[0],
+      concordam: false,
+      confianca: "baixa",
+      porques,
+    };
   }
 
   // 2b — ⚠️ **O MÉRITO TEM UM DONO SÓ: a mesa.** Medido em prod (10/09/2026, 9 projetos do
@@ -193,15 +233,17 @@ export function juntarAnalises(args: {
   //   • a nota, que a mesa não produz.
   // ⚠️ E `ajuste` do time NÃO é descartado: ele vira a JUSTIFICATIVA que o autor lê, com as
   // perguntas dos especialistas. O que ele deixou de fazer é impedir a decisão.
-  if (daMesa === 'Aprovado' && doTime.status === 'Pendente') {
-    porques.push('O time do impacto aprovou o projeto.');
-    if (doTime.status === 'Pendente') {
-      porques.push('A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito.');
+  if (daMesa === "Aprovado" && timeEmAberto(doTime.status)) {
+    porques.push("O time do impacto aprovou o projeto.");
+    {
+      porques.push(
+        "A avaliação da estrela levantou pontos a acompanhar, que ficam registrados no parecer, e não impedem a aprovação do mérito.",
+      );
     }
     return {
-      status: 'Aprovado',
+      status: "Aprovado",
       flag6a10: false,
-      porque: 'O time do impacto aprovou o projeto; o mérito é dele.',
+      porque: "O time do impacto aprovou o projeto; o mérito é dele.",
       concordam: false,
       confianca: confTime,
       porques,
@@ -218,15 +260,18 @@ export function juntarAnalises(args: {
   // ⚠️ Mesmo limite do outro lado: só vale quando o TIME não aprovou. Time aprovando contra mesa
   // reprovando é divergência DE VERDADE e cai em Pendente, porque aí duas leituras do mesmo
   // material discordam — não é uma metade sem o número na mão.
-  if (daMesa === 'Reprovado' && doTime.status !== 'Aprovado') {
-    porques.push('A análise do impacto reprovou o projeto por régua declarada.');
-    if (doTime.status === 'Pendente') {
-      porques.push('A avaliação da estrela não aprovou o projeto, então não há leitura que sustente mantê-lo.');
+  if (daMesa === "Reprovado" && doTime.status !== "Aprovado") {
+    porques.push("A análise do impacto reprovou o projeto por régua declarada.");
+    if (timeEmAberto(doTime.status)) {
+      porques.push(
+        "A avaliação da estrela não aprovou o projeto, então não há leitura que sustente mantê-lo.",
+      );
     }
     return {
-      status: 'Reprovado',
+      status: "Reprovado",
       flag6a10: false,
-      porque: 'A análise do impacto reprovou por régua declarada e a estrela não sustenta o contrário.',
+      porque:
+        "A análise do impacto reprovou por régua declarada e a estrela não sustenta o contrário.",
       concordam: doTime.status === daMesa,
       confianca: confTime,
       porques,
@@ -240,7 +285,7 @@ export function juntarAnalises(args: {
   // _(medido em prod, 10/09/2026: a 1ª versão exigia que NENHUM dos dois tivesse aprovado, e o
   // primeiro projeto da fila veio com mesa `em_validacao` + time `aprovar` — caiu em "divergiram"
   // e voltou para Pendente, justamente o limbo que esta regra existe para fechar.)_
-  if (args.fecharPendente && daMesa !== 'Aprovado') {
+  if (args.fecharPendente && daMesa !== "Aprovado") {
     // ⚠️ **TRAVA 1 — a NOTA sustenta o projeto.** Ver `NOTA_SUSTENTA_APROVACAO`: se o time
     // posicionou o projeto em 1★ ou mais, ele já respondeu "isto é um projeto" com a régua na mão.
     // Fechar em Reprovado por não confirmar o NÚMERO seria dizer o contrário no mesmo parecer.
@@ -249,14 +294,14 @@ export function juntarAnalises(args: {
         `A avaliação da estrela colocou o projeto em ${nota}★, então ele está numa das caixas da régua: o projeto existe e faz o que descreve.`,
       );
       porques.push(
-        'A análise do impacto não conseguiu confirmar o número do ganho com o material que existe. Isso fica registrado no parecer como ponto a acompanhar e não derruba o projeto.',
+        "A análise do impacto não conseguiu confirmar o número do ganho com o material que existe. Isso fica registrado no parecer como ponto a acompanhar e não derruba o projeto.",
       );
       return {
-        status: 'Aprovado',
+        status: "Aprovado",
         flag6a10: false,
         porque: `O projeto vale ${nota}★ pela régua; o que falta é confirmar o número, e isso fica como ressalva.`,
         concordam: false,
-        confianca: confTime === 'alta' ? 'media' : confTime,
+        confianca: confTime === "alta" ? "media" : confTime,
         porques,
       };
     }
@@ -269,15 +314,15 @@ export function juntarAnalises(args: {
     // subidos como ganho imensuravel"*.
     if (args.semNumeroDeGanho) {
       porques.push(
-        'O projeto foi submetido como ganho sem valor financeiro, então não há número de ganho a confirmar: a régua do material não se aplica a ele.',
+        "O projeto foi submetido como ganho sem valor financeiro, então não há número de ganho a confirmar: a régua do material não se aplica a ele.",
       );
-      porques.push('Sem um número para conferir, quem decide o mérito é a triagem humana.');
+      porques.push("Sem um número para conferir, quem decide o mérito é a triagem humana.");
       return {
-        status: 'Pendente',
+        status: "Pendente",
         flag6a10: false,
-        porque: 'Ganho sem valor financeiro: não há número a comprovar, então a decisão é humana.',
+        porque: "Ganho sem valor financeiro: não há número a comprovar, então a decisão é humana.",
         concordam: false,
-        confianca: 'baixa',
+        confianca: "baixa",
         porques,
       };
     }
@@ -305,12 +350,13 @@ export function juntarAnalises(args: {
     // deixou de existir é o agente fazendo isso sozinho.
     if (args.reenvioNaoChegou) {
       porques.push(
-        'A triagem devolveu este projeto para ajuste e o reenvio não chegou: é por isso que ele é reprovado, e não por um julgamento do mérito.',
+        "A triagem devolveu este projeto para ajuste e o reenvio não chegou: é por isso que ele é reprovado, e não por um julgamento do mérito.",
       );
       return {
-        status: 'Reprovado',
+        status: "Reprovado",
         flag6a10: false,
-        porque: 'Reenvio pedido pela triagem que nunca chegou: reprovado por isso, e o reenvio reabre.',
+        porque:
+          "Reenvio pedido pela triagem que nunca chegou: reprovado por isso, e o reenvio reabre.",
         concordam: doTime.status === daMesa,
         confianca: confTime,
         porques,
@@ -318,21 +364,27 @@ export function juntarAnalises(args: {
       };
     }
     porques.push(
-      'O time não conseguiu confirmar o número do ganho com o material que existe. Isso é uma pergunta ao autor, não um veredito sobre o projeto, então a decisão fica com a triagem.',
+      "O time não conseguiu confirmar o número do ganho com o material que existe. Isso é uma pergunta ao autor, não um veredito sobre o projeto, então a decisão fica com a triagem.",
     );
     return {
-      status: 'Pendente',
+      status: "Pendente",
       flag6a10: false,
-      porque: 'Falta confirmar o número do ganho: o agente não reprova por isso, quem decide é a triagem.',
+      porque:
+        "Falta confirmar o número do ganho: o agente não reprova por isso, quem decide é a triagem.",
       concordam: false,
-      confianca: 'baixa',
+      confianca: "baixa",
       porques,
     };
   }
 
   // 2 — concordam
-  if (doTime.status === daMesa) {
-    porques.push(`As duas metades do time chegaram ao mesmo lugar: ${daMesa}.`);
+  //
+  // ⚠️ Mesa em `Pendente` + time em `Ajuste pedido` CONCORDAM: as duas dizem "não fechei".
+  // A diferença é que o time sabe o que pedir, então o status dele é que vale — sem isto, o
+  // par cairia em "divergiram" e o projeto perderia as perguntas ao autor além de sair com
+  // confiança baixa sem motivo.
+  if (doTime.status === daMesa || (daMesa === "Pendente" && timeEmAberto(doTime.status))) {
+    porques.push(`As duas metades do time chegaram ao mesmo lugar: ${doTime.status}.`);
     porques.push(doTime.porque);
     return { ...doTime, concordam: true, confianca: confTime, porques };
   }
@@ -349,7 +401,7 @@ export function juntarAnalises(args: {
   // ⚠️ O limite é estreito e está aqui: só vale quando a mesa **não aprovou**. Mesa aprovando
   // contra time reprovando é divergência DE VERDADE (ela julgou o mérito com o material todo) e cai
   // em Pendente, como qualquer outra.
-  if (doTime.status === 'Reprovado' && daMesa !== 'Aprovado') {
+  if (doTime.status === "Reprovado" && daMesa !== "Aprovado") {
     porques.push(doTime.porque);
     porques.push(
       `A análise do impacto ficou em ${daMesa} e não contradiz a reprovação: a régua do piso depende da nota, que o time acabou de avaliar.`,
@@ -363,11 +415,11 @@ export function juntarAnalises(args: {
   );
   porques.push(`Pela estrela: ${doTime.porque}`);
   return {
-    status: 'Pendente',
+    status: "Pendente",
     flag6a10: false,
     porque: porques[0],
     concordam: false,
-    confianca: 'baixa',
+    confianca: "baixa",
     porques,
   };
 }
