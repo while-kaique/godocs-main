@@ -3562,3 +3562,27 @@ as `linhas` no lugar, o recálculo normal volta a somar horas + contrato (12.621
 **Causa:** `SAFE_UPDATE_FIELDS` só cobria campos da v1; as colunas renomeadas eram puladas em linha v2 (`soV1`) e as colunas v2 de `projetos` não tinham leitor na volta.
 **Fix:** `src/lib/google/sync-reverso-v2.ts` (puro) lê os blocos v2 da linha e recalcula os 3 impactos pela fórmula de `impacto.ts`; `updatesV2DaLinha` aplica na atualização e na criação; divergência real regrava os 3 impactos na planilha. Recálculo ligado por default (`SYNC_REVERSO_RECALCULA_IMPACTO=0` desliga). Medição prévia: 771 linhas, 653 iguais, 62 só arredondamento, 1 real.
 **Onde aterrissou:** `sync-reverse.ts`, `sync-reverso-v2.ts`, `client.server.ts` (`getProjetosParaSyncReverso` com colunas v2). PR `feat/sync-reverso-v2`.
+
+## Rascunho velho da edição apagava participante já gravado (15/09/2026)
+
+**Sintoma (relatado pelo dono do produto):** *"AI Proxy subiu agora com edições e nem todas foram subidas. Como por exemplo ele adicionou joao gabriel como participante e nao foi."*
+
+**Medição, no `form_events` de prod (projeto `af34e6b392a80cd8790f6fde17b78d61`):**
+
+| hora (UTC) | evento | `membros` |
+|---|---|---|
+| 17:08:52 | metadados | `[rafael, joao.gabriel]` ✅ |
+| 17:10:44 | submit (reenvio) | — |
+| **17:14:46** | metadados | **`[rafael]`** ❌ |
+| 19:27:26 | metadados | `[rafael]` |
+| 19:27:44 | submit (reenvio) | — |
+
+O dado **chegou** ao servidor e foi **removido depois**, por uma sincronização do próprio formulário.
+
+**Causa:** a edição persiste um rascunho em localStorage e, no seed de `/editar/$id`, ele é aplicado **por cima** do que veio do servidor (`rehydrateFromLocal` faz `setForm` inteiro). O único guard, `deveDescartarDraftEdicao`, havia virado um stub que devolvia `false` sempre — o comentário prometia "servidor manda", mas nada comparava. Resultado: rascunho salvo **antes** da adição ressuscitou a lista antiga, e o `atualizar-metadados` seguinte gravou isso, apagando o Coautor no SQLite e na planilha. Em silêncio: não há erro, não há aviso, e o autor vê a tela de sucesso.
+
+**Correção:** `saveDraft` carimba `salvoEm`; `deveDescartarDraftEdicao` descarta quando `projetos.updated_at` (que o seed já devolvia) é mais novo. ⚠️ `msDoCarimboDoServidor` concatena `"Z"` porque o `updated_at` do SQLite é UTC sem sufixo — sem isso, em Brasília, o descarte nunca aconteceria. Rascunho sem carimbo conta como velho (decisão declarada, com o preço nomeado).
+
+**Dado reparado em prod:** `atualizar-metadados` com os membros de 17:08 + os campos de 19:27 → `resync-google` para a planilha. ⚠️ O `resyncGoogle` **regrava a linha inteira e derrubou o Status de `Pré-aprovado` para `Pendente`** (a regra temporária grava sempre "Pendente"); restaurado por `POST /api/admin/dashboard/status`. **Quem usar `resync-google` precisa conferir o Status depois.**
+
+**Onde aterrissou:** `src/lib/submeter/draft-storage.ts`, `src/routes/submeter.tsx`, `tests/draft-storage.test.ts`.

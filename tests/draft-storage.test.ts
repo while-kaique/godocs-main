@@ -6,6 +6,7 @@ import {
   editDraftKey,
   deveDescartarDraftEdicao,
   type DraftSnapshot,
+  msDoCarimboDoServidor,
 } from "@/lib/submeter/draft-storage";
 import { ganhosFormVazio } from "@/lib/submeter/validacao-etapa3";
 
@@ -25,7 +26,11 @@ function memoryStorage(): Storage {
 }
 
 const snap = (projetoId: string): DraftSnapshot =>
-  ({ projetoId, step: 3, chatMessages: [{ role: "user", content: "oi" }] } as unknown as DraftSnapshot);
+  ({
+    projetoId,
+    step: 3,
+    chatMessages: [{ role: "user", content: "oi" }],
+  }) as unknown as DraftSnapshot;
 
 describe("draft-storage: isolamento submissão nova × edição (por projeto)", () => {
   beforeEach(() => vi.stubGlobal("localStorage", memoryStorage()));
@@ -76,19 +81,86 @@ describe("deveDescartarDraftEdicao: hoje NEUTRO (v2), e é decisão", () => {
   // de edição, tem de ser DECISÃO (passa por aqui), não efeito colateral — descartar hoje
   // jogaria fora os blocos de ganho que a pessoa já preencheu.
   const draft = (d: Partial<DraftSnapshot> = {}) => ({ ...d }) as DraftSnapshot;
+  const AGORA = Date.parse("2026-09-15T19:00:00Z");
 
-  it("PRESERVA o rascunho mesmo quando o servidor ainda não tem doc", () => {
-    expect(deveDescartarDraftEdicao({ serverTemDoc: false, draft: draft() })).toBe(false);
+  /**
+   * ⚠️ O INCIDENTE que criou esta régua (15/09/2026, «Proxy AI»): o autor adicionou um
+   * Coautor e reenviou — o servidor gravou os dois participantes. Ao reabrir a edição, um
+   * rascunho salvo ANTES daquela adição foi aplicado por cima do seed, a lista voltou a uma
+   * pessoa, e a sincronização seguinte APAGOU o Coautor no servidor, em silêncio. Medido no
+   * `form_events`: 17:08 grava `[rafael, joao.gabriel]`, 17:14 grava `[rafael]`.
+   */
+  it("⚠️ DESCARTA o rascunho quando o servidor foi atualizado DEPOIS dele", () => {
+    expect(
+      deveDescartarDraftEdicao({
+        servidorAtualizadoEm: "2026-09-15 19:00:00",
+        draft: draft({ salvoEm: AGORA - 60_000 }),
+      }),
+    ).toBe(true);
   });
 
-  it("PRESERVA o rascunho quando o servidor JÁ tem doc (reenvio normal)", () => {
-    expect(deveDescartarDraftEdicao({ serverTemDoc: true, draft: draft() })).toBe(false);
+  it("PRESERVA o rascunho quando ele é mais novo que o servidor (edição em curso)", () => {
+    expect(
+      deveDescartarDraftEdicao({
+        servidorAtualizadoEm: "2026-09-15 19:00:00",
+        draft: draft({ salvoEm: AGORA + 60_000 }),
+      }),
+    ).toBe(false);
   });
 
-  it("PRESERVA rascunho com blocos de ganho preenchidos — é o que se perderia", () => {
-    const comGanhos = draft({
-      ganhos: { ...ganhosFormVazio(), savingValorAntes: "1.200,00" },
-    });
-    expect(deveDescartarDraftEdicao({ serverTemDoc: false, draft: comGanhos })).toBe(false);
+  /**
+   * ⚠️ O `updated_at` do SQLite é UTC SEM sufixo, e o JS o lê como hora LOCAL. Sem o `+ "Z"`,
+   * em Brasília o servidor pareceria 3h mais velho do que é e o descarte nunca aconteceria —
+   * exatamente no fuso de quem usa o produto. Mesma armadilha do `diaDaDecisao`.
+   */
+  it("⚠️ lê o carimbo do servidor como UTC, não como hora local", () => {
+    expect(msDoCarimboDoServidor("2026-09-15 19:00:00")).toBe(Date.parse("2026-09-15T19:00:00Z"));
+    // ISO com fuso explícito continua valendo.
+    expect(msDoCarimboDoServidor("2026-09-15T19:00:00Z")).toBe(Date.parse("2026-09-15T19:00:00Z"));
+  });
+
+  it("carimbo ilegível ou ausente não descarta nada (e não lança)", () => {
+    for (const bruto of [null, undefined, "", "ontem"]) {
+      expect(
+        deveDescartarDraftEdicao({ servidorAtualizadoEm: bruto, draft: draft({ salvoEm: 1 }) }),
+      ).toBe(false);
+    }
+  });
+
+  /**
+   * ⚠️ Rascunho gravado antes de 15/09/2026 não tem `salvoEm` e não dá para datar. Conta como
+   * VELHO: manter é repetir o incidente (apagar participante em silêncio); descartar custa,
+   * uma única vez, o que a pessoa digitou e nunca sincronizou — e ela reabre com o que o
+   * servidor tem, que é o estado do último reenvio dela.
+   */
+  it("rascunho SEM carimbo conta como velho quando o servidor tem atualização", () => {
+    expect(
+      deveDescartarDraftEdicao({
+        servidorAtualizadoEm: "2026-09-15 19:00:00",
+        draft: draft(),
+      }),
+    ).toBe(true);
+  });
+
+  it("rascunho sem carimbo + servidor sem carimbo: preserva (nada a comparar)", () => {
+    expect(deveDescartarDraftEdicao({ servidorAtualizadoEm: null, draft: draft() })).toBe(false);
+  });
+});
+
+describe("o carimbo do rascunho", () => {
+  beforeEach(() => vi.stubGlobal("localStorage", memoryStorage()));
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Sem ele não há como saber que o rascunho ficou para trás — é a base da régua acima. */
+  it("saveDraft carimba a hora, mesmo quando o snapshot não traz", () => {
+    const antes = Date.now();
+    saveDraft({ projetoId: "p1" } as DraftSnapshot, "k");
+    const lido = loadDraft("k");
+    expect(lido?.salvoEm).toBeGreaterThanOrEqual(antes);
+  });
+
+  it("o carimbo do momento da GRAVAÇÃO vence o que veio no snapshot", () => {
+    saveDraft({ projetoId: "p1", salvoEm: 1 } as DraftSnapshot, "k");
+    expect(loadDraft("k")?.salvoEm).toBeGreaterThan(1);
   });
 });
