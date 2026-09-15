@@ -7,20 +7,43 @@ import { cn } from "@/lib/utils";
 import { useTituloPagina } from "@/lib/use-titulo-pagina";
 import { SECAO } from "@/lib/titulo-pagina";
 import { apiFetch, apiStream, ApiError, setDemoBackend } from "@/lib/api-client";
-import { criarDemoBackend, demoSeedForm, demoFile, CHAVE_TESTE_LIDERANCA, type FluxoDemo } from "@/lib/fluxos/demo-backend";
+import {
+  criarDemoBackend,
+  demoSeedForm,
+  demoFile,
+  CHAVE_TESTE_LIDERANCA,
+  type FluxoDemo,
+} from "@/lib/fluxos/demo-backend";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
 import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
 
 import {
-  filesToDocs, TOKEN_BLOCK_CHARS,
-  parseMoedaBR, numeroParaMoedaBR, montarMembrosPapeis, montarMembrosContribuicoes,
+  filesToDocs,
+  TOKEN_BLOCK_CHARS,
+  parseMoedaBR,
+  numeroParaMoedaBR,
+  montarMembrosPapeis,
+  montarMembrosContribuicoes,
   validarEtapa1,
-  validarEtapa2, validarSelecaoGanho, camposMinimosDocProntos, serializarAfetados, desserializarAfetados,
-  limitarCoautorUnico, deveMostrarIntro,
-  serializarFerramentas, desserializarFerramentas,
+  validarEtapa2,
+  validarSelecaoGanho,
+  camposMinimosDocProntos,
+  serializarAfetados,
+  desserializarAfetados,
+  limitarUmPorPapel,
+  deveMostrarIntro,
+  serializarFerramentas,
+  desserializarFerramentas,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, PapelParticipante } from "@/lib/submeter/constants";
-import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
+import {
+  saveDraft,
+  loadDraft,
+  clearDraft,
+  editDraftKey,
+  deveDescartarDraftEdicao,
+  type DraftSnapshot,
+} from "@/lib/submeter/draft-storage";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
 
 function hasLocalDraft(): boolean {
@@ -38,7 +61,14 @@ function bloqueioDoErro(e: unknown): BloqueioSubmissao | null {
 
 /** Toast curto que só aponta para o painel — o conteúdo do bloqueio mora na tela. */
 const TOAST_ENVIO_PAUSADO = "Envio pausado — veja na tela o que precisa ser corrigido.";
-import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
+import {
+  PageFrame,
+  PageHeader,
+  PageFooter,
+  BrowserDots,
+  WizardProgress,
+  StepAnimation,
+} from "@/lib/submeter/layout";
 import { FAQ_RODAPE } from "@/lib/faq/links";
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
@@ -70,7 +100,10 @@ export const Route = createFileRoute("/submeter")({
   head: () => ({
     meta: [
       { title: "Triagem de Fluxos | RPA & IA" },
-      { name: "description", content: "Formulário interno para submissão de projetos de RPA e IA." },
+      {
+        name: "description",
+        content: "Formulário interno para submissão de projetos de RPA e IA.",
+      },
     ],
   }),
   // ?retomar=<id> reabre um rascunho específico (botão "Continuar" de Meus Projetos).
@@ -134,30 +167,35 @@ type GanhoFinal = {
 // Comparativo numérico antes×depois exibido na tela de sucesso após uma edição.
 // "antes" vem do snapshot da versão anterior; "depois" dos números recalculados
 // pelo servidor nesta submissão. Só renderiza quando há versão anterior.
-function GanhoComparison({
-  anterior,
-  atual,
-}: {
-  anterior: VersaoSnapshot;
-  atual: GanhoFinal;
-}) {
+function GanhoComparison({ anterior, atual }: { anterior: VersaoSnapshot; atual: GanhoFinal }) {
   const sp = anterior.snapshot_projeto;
   const fmtHoras = (n: number | null | undefined, tipo: string | null | undefined) =>
     n != null ? `${n}h${tipo === "pontual" ? " (total)" : "/mês"}` : "—";
 
   const linhas: { label: string; antes: string; depois: string; mudou: boolean }[] = [];
-  const push = (label: string, a: number | null | undefined, d: number | null | undefined, fmt: (v: number | null | undefined) => string) => {
+  const push = (
+    label: string,
+    a: number | null | undefined,
+    d: number | null | undefined,
+    fmt: (v: number | null | undefined) => string,
+  ) => {
     if (a == null && d == null) return;
     linhas.push({ label, antes: fmt(a), depois: fmt(d), mudou: (a ?? null) !== (d ?? null) });
   };
   // SOMENTE horas — o usuário NÃO pode ver valores financeiros de saving (R$, custo
   // externo, ganho total). Isso é visível só para a equipe que analisa as submissões.
-  push("Economia (horas)", sp?.saving_horas, atual.saving_horas, (v) => fmtHoras(v, atual.tipo_saving ?? sp?.tipo_saving));
+  push("Economia (horas)", sp?.saving_horas, atual.saving_horas, (v) =>
+    fmtHoras(v, atual.tipo_saving ?? sp?.tipo_saving),
+  );
 
   if (linhas.length === 0) return null;
 
   const dataFmt = anterior.created_at
-    ? new Date(anterior.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+    ? new Date(anterior.created_at).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
     : null;
 
   return (
@@ -175,24 +213,53 @@ function GanhoComparison({
         Comparativo com a versão anterior
         {dataFmt && (
           <span className="font-normal" style={{ color: "#8b8b9a" }}>
-            {" "}· v{anterior.versao_num} de {dataFmt}
+            {" "}
+            · v{anterior.versao_num} de {dataFmt}
           </span>
         )}
       </div>
-      <div className="grid grid-cols-[1.2fr_1fr_1fr]" style={{ borderTop: "1px solid rgba(0,89,169,0.08)" }}>
-        <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "#9b9bab" }} />
-        <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "#9b4040" }}>Antes</div>
-        <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "#166534" }}>Agora</div>
+      <div
+        className="grid grid-cols-[1.2fr_1fr_1fr]"
+        style={{ borderTop: "1px solid rgba(0,89,169,0.08)" }}
+      >
+        <div
+          className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider"
+          style={{ color: "#9b9bab" }}
+        />
+        <div
+          className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider"
+          style={{ color: "#9b4040" }}
+        >
+          Antes
+        </div>
+        <div
+          className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider"
+          style={{ color: "#166534" }}
+        >
+          Agora
+        </div>
       </div>
       {linhas.map((l) => (
         <div
           key={l.label}
           className="grid grid-cols-[1.2fr_1fr_1fr] items-center"
-          style={{ borderTop: "1px solid rgba(0,89,169,0.06)", background: l.mudou ? "rgba(22,163,74,0.04)" : undefined }}
+          style={{
+            borderTop: "1px solid rgba(0,89,169,0.06)",
+            background: l.mudou ? "rgba(22,163,74,0.04)" : undefined,
+          }}
         >
-          <div className="px-3 py-2 text-[11px] font-medium" style={{ color: "#555" }}>{l.label}</div>
-          <div className="px-3 py-2 text-[11px]" style={{ color: "#888" }}>{l.antes}</div>
-          <div className="px-3 py-2 text-[11px] font-semibold" style={{ color: l.mudou ? "#166534" : "#555" }}>{l.depois}</div>
+          <div className="px-3 py-2 text-[11px] font-medium" style={{ color: "#555" }}>
+            {l.label}
+          </div>
+          <div className="px-3 py-2 text-[11px]" style={{ color: "#888" }}>
+            {l.antes}
+          </div>
+          <div
+            className="px-3 py-2 text-[11px] font-semibold"
+            style={{ color: l.mudou ? "#166534" : "#555" }}
+          >
+            {l.depois}
+          </div>
         </div>
       ))}
     </div>
@@ -200,9 +267,17 @@ function GanhoComparison({
 }
 
 // Passos nomeados estimados por operação pesada (item: loading com etapa explícita).
-const LOADING_STEPS_INICIAR = ["Lendo os arquivos…", "Analisando o código…", "Montando a documentação…"];
+const LOADING_STEPS_INICIAR = [
+  "Lendo os arquivos…",
+  "Analisando o código…",
+  "Montando a documentação…",
+];
 const LOADING_STEPS_COMPILAR = ["Compilando a documentação…", "Preparando a análise de impacto…"];
-const LOADING_STEPS_REPROCESSAR = ["Relendo os arquivos…", "Reanalisando o projeto…", "Atualizando a documentação…"];
+const LOADING_STEPS_REPROCESSAR = [
+  "Relendo os arquivos…",
+  "Reanalisando o projeto…",
+  "Atualizando a documentação…",
+];
 const LOADING_STEPS_ENVIAR_ESPECIAL = ["Registrando o projeto…", "Enviando para validação…"];
 // Edição reprocessa o documento e REGERA a documentação via IA antes de reenviar —
 // passos fiéis a esse trabalho (lento) para o usuário não achar que travou.
@@ -285,7 +360,10 @@ function ConfirmarRecomecoModal({
             <AlertTriangle style={{ width: 18, height: 18 }} />
           </span>
           <div className="min-w-0">
-            <h2 className="font-extrabold leading-tight" style={{ color: "var(--go-text-heading)", fontSize: 16 }}>
+            <h2
+              className="font-extrabold leading-tight"
+              style={{ color: "var(--go-text-heading)", fontSize: 16 }}
+            >
               Recomeçar o formulário?
             </h2>
             <p className="mt-0.5 text-[12px]" style={{ color: "#8b8b9a" }}>
@@ -297,8 +375,8 @@ function ConfirmarRecomecoModal({
         {/* Body */}
         <div className="px-6 py-5">
           <p className="text-[12.5px] leading-snug" style={{ color: "#6b6b7a" }}>
-            Você vai <span className="font-semibold">perder tudo o que preencheu até aqui</span> e voltar
-            para o início. Isso inclui:
+            Você vai <span className="font-semibold">perder tudo o que preencheu até aqui</span> e
+            voltar para o início. Isso inclui:
           </p>
           <ul className="mt-3 space-y-2">
             {[
@@ -306,7 +384,11 @@ function ConfirmarRecomecoModal({
               "A documentação gerada a partir dos arquivos",
               "Os valores de saving e receita informados",
             ].map((item) => (
-              <li key={item} className="flex items-start gap-2 text-[12.5px] leading-snug" style={{ color: "#5b5b6a" }}>
+              <li
+                key={item}
+                className="flex items-start gap-2 text-[12.5px] leading-snug"
+                style={{ color: "#5b5b6a" }}
+              >
                 <span
                   className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: "#b45309" }}
@@ -322,13 +404,20 @@ function ConfirmarRecomecoModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 border-t px-6 py-4" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+        <div
+          className="flex justify-end gap-2 border-t px-6 py-4"
+          style={{ borderColor: "rgba(0,0,0,0.06)" }}
+        >
           <button
             type="button"
             onClick={onClose}
             disabled={processando}
             className="rounded-full px-4 py-2 text-[12px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-2 disabled:opacity-50"
-            style={{ background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.12)" }}
+            style={{
+              background: "transparent",
+              color: "#8b8b9a",
+              border: "1px solid rgba(0,0,0,0.12)",
+            }}
           >
             Cancelar
           </button>
@@ -339,7 +428,11 @@ function ConfirmarRecomecoModal({
             className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold text-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b91c1c] focus-visible:ring-offset-2 disabled:opacity-60"
             style={{ background: "#b91c1c" }}
           >
-            {processando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+            {processando ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3.5 w-3.5" />
+            )}
             {processando ? "Recomeçando…" : "Sim, recomeçar"}
           </button>
         </div>
@@ -395,7 +488,10 @@ function SalvarRascunhoModal({
             <FolderClock style={{ width: 18, height: 18 }} />
           </span>
           <div className="min-w-0">
-            <h2 className="font-extrabold leading-tight" style={{ color: "var(--go-text-heading)", fontSize: 16 }}>
+            <h2
+              className="font-extrabold leading-tight"
+              style={{ color: "var(--go-text-heading)", fontSize: 16 }}
+            >
               Salvar como rascunho?
             </h2>
             <p className="mt-0.5 text-[12px]" style={{ color: "#8b8b9a" }}>
@@ -407,15 +503,20 @@ function SalvarRascunhoModal({
         {/* Body */}
         <div className="px-6 py-5">
           <p className="text-[12.5px] leading-snug" style={{ color: "#6b6b7a" }}>
-            Este projeto fica salvo em <span className="font-semibold">Meus Projetos › Rascunhos</span>.
-            Você volta quando quiser e continua de onde parou. Antes de sair:
+            Este projeto fica salvo em{" "}
+            <span className="font-semibold">Meus Projetos › Rascunhos</span>. Você volta quando
+            quiser e continua de onde parou. Antes de sair:
           </p>
           <ul className="mt-3 space-y-2">
             {[
               "O rascunho ainda NÃO foi enviado. A equipe de RPA & IA só vê o projeto depois que você clicar em enviar.",
               "Ao sair, você volta para a tela inicial e pode começar uma nova submissão.",
             ].map((item) => (
-              <li key={item} className="flex items-start gap-2 text-[12.5px] leading-snug" style={{ color: "#5b5b6a" }}>
+              <li
+                key={item}
+                className="flex items-start gap-2 text-[12.5px] leading-snug"
+                style={{ color: "#5b5b6a" }}
+              >
                 <span
                   className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: "var(--go-blue)" }}
@@ -428,13 +529,20 @@ function SalvarRascunhoModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 border-t px-6 py-4" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+        <div
+          className="flex justify-end gap-2 border-t px-6 py-4"
+          style={{ borderColor: "rgba(0,0,0,0.06)" }}
+        >
           <button
             type="button"
             onClick={onClose}
             disabled={processando}
             className="rounded-full px-4 py-2 text-[12px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-2 disabled:opacity-50"
-            style={{ background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.12)" }}
+            style={{
+              background: "transparent",
+              color: "#8b8b9a",
+              border: "1px solid rgba(0,0,0,0.12)",
+            }}
           >
             Cancelar
           </button>
@@ -445,7 +553,11 @@ function SalvarRascunhoModal({
             className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold text-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-2 disabled:opacity-60"
             style={{ background: "var(--go-blue)" }}
           >
-            {processando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {processando ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
             {processando ? "Salvando…" : "Salvar e sair"}
           </button>
         </div>
@@ -547,6 +659,16 @@ export function SubmeterPageContent({
   // Promise do disparo em voo — os botões da Etapa 2.5 aguardam antes de navegar.
   // Resolve com o projeto_id criado (sucesso) ou null (falha → cai no fluxo síncrono).
   const bgPromiseRef = useRef<Promise<string | null> | null>(null);
+  /**
+   * A sincronização de metadados disparada no avanço da Etapa 2, que corre ENQUANTO a pessoa
+   * escolhe o tipo de ganho. O envio espera por ela (é o único ponto em que descrição, AI
+   * Proxy, participantes e "quem sentiria falta" chegam ao servidor).
+   *
+   * ⚠️ Os syncs são ENCADEADOS, nunca paralelos: dois em voo podem chegar fora de ordem ao
+   * servidor e o mais VELHO sobrescreveria o mais novo. Enquanto havia `await` no avanço isso
+   * era impossível; sem ele, é a corrida que precisa estar fechada por construção.
+   */
+  const syncMetaRef = useRef<Promise<void> | null>(null);
   const bgInFlightRef = useRef(false);
   const bgDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Sinaliza que o background já criou o projeto e a Etapa 2.5 (não-especial) deve delegar
@@ -577,168 +699,165 @@ export function SubmeterPageContent({
   // gateada por `editProjetoId` em outros pontos — aqui o seed é idêntico.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const applySeed = useCallback((data: Record<string, unknown>, id: string) => {
-        const membros = (data.membros as string[]) ?? [];
-        const tiposProjeto = ((data.tipos_projeto as string[]) ?? []).filter(
-          (t): t is "saving" | "receita_incremental" =>
-            t === "saving" || t === "receita_incremental"
-        );
-        // Uma string no banco → lista de chips. Quebra por " + ", normaliza os valores
-        // legados de quando o campo era de escolha única ("Claude", "Claude + GoDeploy")
-        // e devolve o texto de "Outros: …" separado. Ver desserializarFerramentas.
-        const { ferramentas, ferramentaOutra } = desserializarFerramentas(
-          data.ferramenta as string | null,
-        );
+    const membros = (data.membros as string[]) ?? [];
+    const tiposProjeto = ((data.tipos_projeto as string[]) ?? []).filter(
+      (t): t is "saving" | "receita_incremental" => t === "saving" || t === "receita_incremental",
+    );
+    // Uma string no banco → lista de chips. Quebra por " + ", normaliza os valores
+    // legados de quando o campo era de escolha única ("Claude", "Claude + GoDeploy")
+    // e devolve o texto de "Outros: …" separado. Ver desserializarFerramentas.
+    const { ferramentas, ferramentaOutra } = desserializarFerramentas(
+      data.ferramenta as string | null,
+    );
 
-        // Papel de cada membro já existente: usa o papel conhecido (projetos novos)
-        // ou, na falta (legado importado antes desta feature), "coexecutor" — que é a
-        // semântica da coluna "Participantes" de onde esses e-mails vieram. Lookup
-        // tolerante a caixa. Novos participantes adicionados na edição começam sem
-        // papel (obrigatório escolher). O autor não entra aqui.
-        const membrosPapeisSeed = (data.membros_papeis as Record<string, string>) ?? {};
-        const papeisLower: Record<string, string> = {};
-        for (const [k, v] of Object.entries(membrosPapeisSeed)) papeisLower[k.toLowerCase()] = v;
-        const participantesPapeisBruto: FormData["participantesPapeis"] = {};
-        for (const email of membros) {
-          const p = membrosPapeisSeed[email] ?? papeisLower[email.toLowerCase()];
-          participantesPapeisBruto[email] = (p as PapelParticipante) || "coexecutor";
-        }
-        // Coautor é único por projeto: projeto antigo/legado pode trazer vários da coluna
-        // "Participantes" — mantém o primeiro e deixa os demais sem papel para o usuário
-        // reclassificar (a validação da Etapa 1 exige papel de todos).
-        const participantesPapeis = limitarCoautorUnico(membros, participantesPapeisBruto);
+    // Papel de cada membro já existente: usa o papel conhecido (projetos novos)
+    // ou, na falta (legado importado antes desta feature), "coexecutor" — que é a
+    // semântica da coluna "Participantes" de onde esses e-mails vieram. Lookup
+    // tolerante a caixa. Novos participantes adicionados na edição começam sem
+    // papel (obrigatório escolher). O autor não entra aqui.
+    const membrosPapeisSeed = (data.membros_papeis as Record<string, string>) ?? {};
+    const papeisLower: Record<string, string> = {};
+    for (const [k, v] of Object.entries(membrosPapeisSeed)) papeisLower[k.toLowerCase()] = v;
+    const participantesPapeisBruto: FormData["participantesPapeis"] = {};
+    for (const email of membros) {
+      const p = membrosPapeisSeed[email] ?? papeisLower[email.toLowerCase()];
+      participantesPapeisBruto[email] = (p as PapelParticipante) || "coexecutor";
+    }
+    // Coautor é único por projeto: projeto antigo/legado pode trazer vários da coluna
+    // "Participantes" — mantém o primeiro e deixa os demais sem papel para o usuário
+    // reclassificar (a validação da Etapa 1 exige papel de todos).
+    const participantesPapeis = limitarUmPorPapel(membros, participantesPapeisBruto);
 
-        // O que cada participante fez: seed do texto já escrito, com o MESMO lookup
-        // tolerante a caixa dos papéis. Legado/projeto anterior à feature vem vazio — a
-        // validação da Etapa 1 cobra o texto de todos antes de avançar.
-        const contribSeed = (data.membros_contribuicoes as Record<string, string>) ?? {};
-        const contribLower: Record<string, string> = {};
-        for (const [k, v] of Object.entries(contribSeed)) contribLower[k.toLowerCase()] = v;
-        const participantesContribuicoes: FormData["participantesContribuicoes"] = {};
-        for (const email of membros) {
-          participantesContribuicoes[email] =
-            contribSeed[email] ?? contribLower[email.toLowerCase()] ?? "";
-        }
+    // O que cada participante fez: seed do texto já escrito, com o MESMO lookup
+    // tolerante a caixa dos papéis. Legado/projeto anterior à feature vem vazio — a
+    // validação da Etapa 1 cobra o texto de todos antes de avançar.
+    const contribSeed = (data.membros_contribuicoes as Record<string, string>) ?? {};
+    const contribLower: Record<string, string> = {};
+    for (const [k, v] of Object.entries(contribSeed)) contribLower[k.toLowerCase()] = v;
+    const participantesContribuicoes: FormData["participantesContribuicoes"] = {};
+    for (const email of membros) {
+      participantesContribuicoes[email] =
+        contribSeed[email] ?? contribLower[email.toLowerCase()] ?? "";
+    }
 
-        // Contrafactual: a lista de afetados é gravada serializada ("pessoa:a@x;b@y").
-        const afetadosSeed = desserializarAfetados(data.contrafactual_afetados as string | null);
+    // Contrafactual: a lista de afetados é gravada serializada ("pessoa:a@x;b@y").
+    const afetadosSeed = desserializarAfetados(data.contrafactual_afetados as string | null);
 
-        const newForm: FormData = {
-          escopo: ((data.escopo as string) ?? "interno") as FormData["escopo"],
-          prodStatus: "sim",
-          nome: (data.responsavel_nome as string) ?? "",
-          email: (data.responsavel_email as string) ?? "",
-          ferramentas,
-          ferramentaOutra,
-          servicoExterno: (data.servico_externo as string) ?? "",
-          emEquipe: membros.length > 0 ? "sim" : "nao",
-          participantes: membros,
-          participantesPapeis,
-          participantesContribuicoes,
-          nomeProjeto: (data.nome_projeto as string) ?? "",
-          // v2: as categorias vêm da coluna `ganho_categorias` (JSON). A leitura NUNCA
-          // lança e nunca inventa categoria — projeto gravado antes da v2 simplesmente
-          // volta sem nenhuma, e a Etapa 2 cobra a escolha.
-          ganhoCategorias: desserializarCategorias(data.ganho_categorias as string | null),
-          descricaoBreve: (data.descricao_breve as string) ?? "",
-          usaAiProxy: ((data.usa_ai_proxy as string) ?? "") as FormData["usaAiProxy"],
-          contrafactualAfetadosTipo: afetadosSeed.tipo,
-          contrafactualAfetados: afetadosSeed.lista,
-          // Vínculo de FEATURE é read-only na edição (só a submissão nova o cria). O
-          // prefixo "[feature de <pai>]" no nome já mostra o vínculo; aqui só semeamos o
-          // estado para o step1 exibir a referência.
-          // ⚠️ Os campos do ESPECIAL que a branch de origem semeava aqui NÃO voltaram: a v2
-          // os removeu do formulário (D5 — especial passou a ser derivado da estrela).
-          vinculo: (data.projeto_pai_id as string | null) ? "feature" : "novo",
-          paiId: (data.projeto_pai_id as string | null) ?? "",
-          // O NOME do pai não vem no seed (o backend devolve só o id) — e não precisa: o
-          // prefixo "[feature de <pai>]" já está no nome do projeto, e na edição o vínculo
-          // é read-only.
-          paiNome: "",
-          temAppGodeploy: (data.url_godeploy as string | null) ? "sim" : "",
-          urlGodeploy: (data.url_godeploy as string | null) ?? "",
-        };
+    const newForm: FormData = {
+      escopo: ((data.escopo as string) ?? "interno") as FormData["escopo"],
+      prodStatus: "sim",
+      nome: (data.responsavel_nome as string) ?? "",
+      email: (data.responsavel_email as string) ?? "",
+      ferramentas,
+      ferramentaOutra,
+      servicoExterno: (data.servico_externo as string) ?? "",
+      emEquipe: membros.length > 0 ? "sim" : "nao",
+      participantes: membros,
+      participantesPapeis,
+      participantesContribuicoes,
+      nomeProjeto: (data.nome_projeto as string) ?? "",
+      // v2: as categorias vêm da coluna `ganho_categorias` (JSON). A leitura NUNCA
+      // lança e nunca inventa categoria — projeto gravado antes da v2 simplesmente
+      // volta sem nenhuma, e a Etapa 2 cobra a escolha.
+      ganhoCategorias: desserializarCategorias(data.ganho_categorias as string | null),
+      descricaoBreve: (data.descricao_breve as string) ?? "",
+      usaAiProxy: ((data.usa_ai_proxy as string) ?? "") as FormData["usaAiProxy"],
+      contrafactualAfetadosTipo: afetadosSeed.tipo,
+      contrafactualAfetados: afetadosSeed.lista,
+      // Vínculo de FEATURE é read-only na edição (só a submissão nova o cria). O
+      // prefixo "[feature de <pai>]" no nome já mostra o vínculo; aqui só semeamos o
+      // estado para o step1 exibir a referência.
+      // ⚠️ Os campos do ESPECIAL que a branch de origem semeava aqui NÃO voltaram: a v2
+      // os removeu do formulário (D5 — especial passou a ser derivado da estrela).
+      vinculo: (data.projeto_pai_id as string | null) ? "feature" : "novo",
+      paiId: (data.projeto_pai_id as string | null) ?? "",
+      // O NOME do pai não vem no seed (o backend devolve só o id) — e não precisa: o
+      // prefixo "[feature de <pai>]" já está no nome do projeto, e na edição o vínculo
+      // é read-only.
+      paiNome: "",
+      temAppGodeploy: (data.url_godeploy as string | null) ? "sim" : "",
+      urlGodeploy: (data.url_godeploy as string | null) ?? "",
+    };
 
-        setForm(newForm);
-        setNomesExistentes((data.arquivos_nomes as string[]) ?? []);
-        setProjetoId(id);
+    setForm(newForm);
+    setNomesExistentes((data.arquivos_nomes as string[]) ?? []);
+    setProjetoId(id);
 
-        // ── Etapa 3: repõe os blocos de ganho das colunas da v2 ──
-        // ⚠️ Os valores voltam com MÁSCARA BR (`numeroParaMoedaBR`): a coluna guarda
-        // número, o input mostra "1.234,56", e reabrir com o número cru faria a máscara
-        // reler "1234.56" como centavos na primeira tecla digitada.
-        const moeda = (v: unknown) =>
-          v != null && v !== "" ? numeroParaMoedaBR(Number(v)) : "";
-        const freq = (v: unknown) => ((v as string) ?? "") as GanhosFormData["savingFrequencia"];
-        setGanhos({
-          ...ganhosFormVazio(),
-          // ⚠️ O par antes/agora vem das colunas NOVAS. `saving_efetivado_valor` e
-          // `_desde` são LEGADO (nunca escritos — ver `schema.ts`): não semear deles.
-          savingValorAntes: moeda(data.saving_efetivado_valor_antes),
-          savingValorAgora: moeda(data.saving_efetivado_valor_agora),
-          savingFrequencia: freq(data.saving_efetivado_frequencia),
-          savingEvidencia: (data.saving_efetivado_evidencia as string) ?? "",
-          ceFrequencia: freq(data.custo_evitado_frequencia),
-          ceLinhas: (() => {
-            const linhas = desserializarLinhasHoras(
-              data.custo_evitado_horas_linhas as string | null,
-            ).map((l) => ({
-              funcao: l.funcao,
-              funcaoDescricao: l.funcaoDescricao ?? "",
-              horasAntes: String(l.horasAntes),
-              horasDepois: String(l.horasDepois),
-            }));
-            return linhas.length > 0 ? linhas : ganhosFormVazio().ceLinhas;
-          })(),
-          ceNaoContratado: moeda(data.custo_evitado_nao_contratado),
-          ceRacional: (data.custo_evitado_racional as string) ?? "",
-          receitaValor: moeda(data.receita_incremental_valor),
-          receitaFrequencia: freq(data.receita_incremental_frequencia),
-          receitaRacional: (data.receita_incremental_racional as string) ?? "",
-          imensuravelRacional: (data.ganho_imensuravel_racional as string) ?? "",
-          custoRodar: (() => {
-            const itens = desserializarCustoRodar(data.custo_rodar_itens as string | null).map(
-              (i) => ({
-                nome: i.nome,
-                valor: numeroParaMoedaBR(i.valor),
-                frequencia: i.frequencia as GanhosFormData["custoRodar"][number]["frequencia"],
-                descricao: i.oQueE,
-              }),
-            );
-            return itens.length > 0 ? itens : ganhosFormVazio().custoRodar;
-          })(),
-        });
+    // ── Etapa 3: repõe os blocos de ganho das colunas da v2 ──
+    // ⚠️ Os valores voltam com MÁSCARA BR (`numeroParaMoedaBR`): a coluna guarda
+    // número, o input mostra "1.234,56", e reabrir com o número cru faria a máscara
+    // reler "1234.56" como centavos na primeira tecla digitada.
+    const moeda = (v: unknown) => (v != null && v !== "" ? numeroParaMoedaBR(Number(v)) : "");
+    const freq = (v: unknown) => ((v as string) ?? "") as GanhosFormData["savingFrequencia"];
+    setGanhos({
+      ...ganhosFormVazio(),
+      // ⚠️ O par antes/agora vem das colunas NOVAS. `saving_efetivado_valor` e
+      // `_desde` são LEGADO (nunca escritos — ver `schema.ts`): não semear deles.
+      savingValorAntes: moeda(data.saving_efetivado_valor_antes),
+      savingValorAgora: moeda(data.saving_efetivado_valor_agora),
+      savingFrequencia: freq(data.saving_efetivado_frequencia),
+      savingEvidencia: (data.saving_efetivado_evidencia as string) ?? "",
+      ceFrequencia: freq(data.custo_evitado_frequencia),
+      ceLinhas: (() => {
+        const linhas = desserializarLinhasHoras(
+          data.custo_evitado_horas_linhas as string | null,
+        ).map((l) => ({
+          funcao: l.funcao,
+          funcaoDescricao: l.funcaoDescricao ?? "",
+          horasAntes: String(l.horasAntes),
+          horasDepois: String(l.horasDepois),
+        }));
+        return linhas.length > 0 ? linhas : ganhosFormVazio().ceLinhas;
+      })(),
+      ceNaoContratado: moeda(data.custo_evitado_nao_contratado),
+      ceRacional: (data.custo_evitado_racional as string) ?? "",
+      receitaValor: moeda(data.receita_incremental_valor),
+      receitaFrequencia: freq(data.receita_incremental_frequencia),
+      receitaRacional: (data.receita_incremental_racional as string) ?? "",
+      imensuravelRacional: (data.ganho_imensuravel_racional as string) ?? "",
+      custoRodar: (() => {
+        const itens = desserializarCustoRodar(data.custo_rodar_itens as string | null).map((i) => ({
+          nome: i.nome,
+          valor: numeroParaMoedaBR(i.valor),
+          frequencia: i.frequencia as GanhosFormData["custoRodar"][number]["frequencia"],
+          descricao: i.oQueE,
+        }));
+        return itens.length > 0 ? itens : ganhosFormVazio().custoRodar;
+      })(),
+    });
 
-        // Doc preview não existe mais como tela (a doc é invisível — D6), mas o snapshot
-        // congelado da última versão segue alimentando a comparação antes/depois.
-        const ultimaVersao = data.ultima_versao as VersaoSnapshot | null;
-        if (ultimaVersao) setVersaoAnterior(ultimaVersao);
+    // Doc preview não existe mais como tela (a doc é invisível — D6), mas o snapshot
+    // congelado da última versão segue alimentando a comparação antes/depois.
+    const ultimaVersao = data.ultima_versao as VersaoSnapshot | null;
+    if (ultimaVersao) setVersaoAnterior(ultimaVersao);
 
-        // Snapshot do agentMeta para não reprocessar a doc se nada mudou.
-        setAgentMeta({
-          nomeProjeto: newForm.nomeProjeto.trim(),
-          ferramenta: newForm.escopo === "externo"
-            ? newForm.servicoExterno.trim()
-            : serializarFerramentas(newForm.ferramentas, newForm.ferramentaOutra),
-          participantes: newForm.participantes,
-          participantesPapeis: montarMembrosPapeis(newForm.participantes, newForm.participantesPapeis),
-          participantesContribuicoes: montarMembrosContribuicoes(
-            newForm.participantes,
-            newForm.participantesContribuicoes,
-          ),
-          descricaoBreve: newForm.descricaoBreve.trim(),
-          temAppGodeploy: newForm.temAppGodeploy,
-          urlGodeploy: newForm.urlGodeploy,
-          usaAiProxy: newForm.usaAiProxy,
-          contrafactualAfetados: serializarAfetados(
-            newForm.contrafactualAfetadosTipo,
-            newForm.contrafactualAfetados,
-          ),
-        });
+    // Snapshot do agentMeta para não reprocessar a doc se nada mudou.
+    setAgentMeta({
+      nomeProjeto: newForm.nomeProjeto.trim(),
+      ferramenta:
+        newForm.escopo === "externo"
+          ? newForm.servicoExterno.trim()
+          : serializarFerramentas(newForm.ferramentas, newForm.ferramentaOutra),
+      participantes: newForm.participantes,
+      participantesPapeis: montarMembrosPapeis(newForm.participantes, newForm.participantesPapeis),
+      participantesContribuicoes: montarMembrosContribuicoes(
+        newForm.participantes,
+        newForm.participantesContribuicoes,
+      ),
+      descricaoBreve: newForm.descricaoBreve.trim(),
+      temAppGodeploy: newForm.temAppGodeploy,
+      urlGodeploy: newForm.urlGodeploy,
+      usaAiProxy: newForm.usaAiProxy,
+      contrafactualAfetados: serializarAfetados(
+        newForm.contrafactualAfetadosTipo,
+        newForm.contrafactualAfetados,
+      ),
+    });
 
-        // A edição ABRE na Etapa 1 (participantes/papéis são o foco). As Etapas 1 e 2 já
-        // contam como alcançadas (clicáveis no topo).
-        setStep(1);
-        setCompletedSteps(new Set([1, 2]));
+    // A edição ABRE na Etapa 1 (participantes/papéis são o foco). As Etapas 1 e 2 já
+    // contam como alcançadas (clicáveis no topo).
+    setStep(1);
+    setCompletedSteps(new Set([1, 2]));
   }, []);
 
   // Repõe o estado do wizard a partir do snapshot local (mesmo navegador) —
@@ -759,9 +878,10 @@ export function SubmeterPageContent({
       // VAZIO de propósito: converter "saving" → "saving_efetivado" seria adivinhar a
       // régua D1 no lugar da pessoa, e a régua D1 é justamente o que a v2 pergunta.
       ganhoCategorias: d.form.ganhoCategorias ?? [],
-      ferramentas: d.form.ferramentas ?? desserializarFerramentas(
-        (d.form as unknown as { ferramenta?: string }).ferramenta,
-      ).ferramentas,
+      ferramentas:
+        d.form.ferramentas ??
+        desserializarFerramentas((d.form as unknown as { ferramenta?: string }).ferramenta)
+          .ferramentas,
     });
     setNomesExistentes(d.nomesExistentes ?? []);
     setDocExistenteInvalidado(d.docExistenteInvalidado ?? false);
@@ -794,7 +914,9 @@ export function SubmeterPageContent({
     // o formulário em branco e descarta o rascunho que estava sendo retomado.
     const safety = setTimeout(() => {
       if (cancelled) return;
-      console.warn("[seed] timeout ao carregar — liberando formulário e descartando rascunho local");
+      console.warn(
+        "[seed] timeout ao carregar — liberando formulário e descartando rascunho local",
+      );
       clearDraft();
       setSeedLoading(false);
     }, 8000);
@@ -839,7 +961,10 @@ export function SubmeterPageContent({
           );
         })
         .finally(finishSeed);
-      return () => { cancelled = true; clearTimeout(safety); };
+      return () => {
+        cancelled = true;
+        clearTimeout(safety);
+      };
     }
 
     // ── Modo retomada de rascunho ──
@@ -881,8 +1006,11 @@ export function SubmeterPageContent({
         clearDraft();
       })
       .finally(finishSeed);
-    return () => { cancelled = true; clearTimeout(safety); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+      clearTimeout(safety);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editProjetoId, resumeDraftId]);
 
   const today = useMemo(() => {
@@ -960,7 +1088,9 @@ export function SubmeterPageContent({
         });
       })
       .catch((e) => console.warn("[auth] não foi possível obter a conta logada:", e));
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Perfil de submissão: o usuário logado é LIDERANÇA (cargo isento, coordenador+)? Se
@@ -983,8 +1113,12 @@ export function SubmeterPageContent({
         setPerfilAdmin(!!p?.isAdmin);
       })
       .catch((e) => console.warn("[submeter] perfil de submissão indisponível:", e))
-      .finally(() => { if (!cancelled) setPerfilCarregado(true); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (!cancelled) setPerfilCarregado(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Liderança EFETIVA: cargo isento OU override de admin para testar. O override vem de
@@ -1015,20 +1149,33 @@ export function SubmeterPageContent({
     if (!projetoId || submitted || seedLoading) return;
     // Persiste tanto a submissão NOVA quanto a EDIÇÃO (esta sob chave por projeto).
     // Antes a edição não salvava nada → reload no meio da conversa perdia tudo.
-    saveDraft({
-      projetoId,
-      step,
-      form,
-      nomesExistentes,
-      docExistenteInvalidado,
-      completedSteps: [...completedSteps],
-      agentMeta,
-      agentArquivosSig,
-      ganhos,
-    }, editProjetoId ? editDraftKey(editProjetoId) : undefined);
+    saveDraft(
+      {
+        projetoId,
+        step,
+        form,
+        nomesExistentes,
+        docExistenteInvalidado,
+        completedSteps: [...completedSteps],
+        agentMeta,
+        agentArquivosSig,
+        ganhos,
+      },
+      editProjetoId ? editDraftKey(editProjetoId) : undefined,
+    );
   }, [
-    editProjetoId, projetoId, submitted, seedLoading, step, form, nomesExistentes,
-    docExistenteInvalidado, completedSteps, agentMeta, agentArquivosSig, ganhos,
+    editProjetoId,
+    projetoId,
+    submitted,
+    seedLoading,
+    step,
+    form,
+    nomesExistentes,
+    docExistenteInvalidado,
+    completedSteps,
+    agentMeta,
+    agentArquivosSig,
+    ganhos,
   ]);
 
   // Ao submeter (qualquer fluxo), o rascunho deixa de existir — descarta o snapshot
@@ -1039,17 +1186,14 @@ export function SubmeterPageContent({
     else clearDraft();
   }, [submitted, editProjetoId]);
 
-  const updateField = useCallback(
-    <K extends keyof FormData>(key: K, value: FormData[K]) => {
-      setForm((prev) => ({ ...prev, [key]: value }));
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    },
-    []
-  );
+  const updateField = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
 
   const setError = useCallback((key: string, msg: string) => {
     setErrors((prev) => ({ ...prev, [key]: msg }));
@@ -1130,24 +1274,37 @@ export function SubmeterPageContent({
     return form.escopo === "externo" ? form.servicoExterno.trim() : undefined;
   }, [form.escopo, form.servicoExterno]);
 
-  const snapshotMeta = useCallback((): AgentMeta => ({
-    temAppGodeploy: form.temAppGodeploy,
-    urlGodeploy: form.urlGodeploy,
-    nomeProjeto: form.nomeProjeto.trim(),
-    ferramenta: computeFerramenta(),
-    participantes: form.participantes,
-    participantesPapeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
-    participantesContribuicoes: montarMembrosContribuicoes(
+  const snapshotMeta = useCallback(
+    (): AgentMeta => ({
+      temAppGodeploy: form.temAppGodeploy,
+      urlGodeploy: form.urlGodeploy,
+      nomeProjeto: form.nomeProjeto.trim(),
+      ferramenta: computeFerramenta(),
+      participantes: form.participantes,
+      participantesPapeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
+      participantesContribuicoes: montarMembrosContribuicoes(
+        form.participantes,
+        form.participantesContribuicoes,
+      ),
+      descricaoBreve: form.descricaoBreve.trim(),
+      usaAiProxy: form.usaAiProxy,
+      contrafactualAfetados: serializarAfetados(
+        form.contrafactualAfetadosTipo,
+        form.contrafactualAfetados ?? [],
+      ),
+    }),
+    [
+      form.nomeProjeto,
       form.participantes,
+      form.participantesPapeis,
       form.participantesContribuicoes,
-    ),
-    descricaoBreve: form.descricaoBreve.trim(),
-    usaAiProxy: form.usaAiProxy,
-    contrafactualAfetados: serializarAfetados(
+      form.descricaoBreve,
+      form.usaAiProxy,
       form.contrafactualAfetadosTipo,
-      form.contrafactualAfetados ?? [],
-    ),
-  }), [form.nomeProjeto, form.participantes, form.participantesPapeis, form.participantesContribuicoes, form.descricaoBreve, form.usaAiProxy, form.contrafactualAfetadosTipo, form.contrafactualAfetados, computeFerramenta]);
+      form.contrafactualAfetados,
+      computeFerramenta,
+    ],
+  );
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -1177,34 +1334,35 @@ export function SubmeterPageContent({
         const ferramentaEnviada = computeFerramenta();
         // Rota SSE: `apiStream` trata tanto event-stream (flag ON) quanto JSON (flag OFF).
         // A compilação da doc é SILENCIOSA (não streama prosa) — só aguardamos o envelope.
-        const result = await apiStream<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
-          "/api/chat/iniciar-submissao",
-          {
-            responsavel_nome: form.nome.trim(),
-            responsavel_email: form.email.trim(),
-            ferramenta: ferramentaEnviada,
-            escopo: form.escopo as "interno" | "externo",
-            servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
-            membros: form.participantes,
-            membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
-            membros_contribuicoes: montarMembrosContribuicoes(
-              form.participantes,
-              form.participantesContribuicoes,
-            ),
-            nome_projeto: form.nomeProjeto.trim(),
-            // ⚠️ SEM `data_criacao`: o campo saiu do formulário na v2 (a data que vale é a
-            // de SUBMISSÃO). E sem tipos/categorias: a fase de doc não depende delas — o
-            // ganho declarado é gravado no envio, pela rota própria.
-            projeto_pai_id: form.vinculo === "feature" && form.paiId ? form.paiId : undefined,
-            descricao_breve: form.descricaoBreve.trim() || undefined,
-            usa_ai_proxy: form.usaAiProxy || undefined,
-            url_godeploy: form.temAppGodeploy === "sim" ? form.urlGodeploy.trim() || undefined : undefined,
-            contrafactual_afetados:
-              serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
-              undefined,
-            docs,
-          },
-        );
+        const result = await apiStream<{
+          projeto_id: string;
+          response: ReturnType<typeof Object.create>;
+        }>("/api/chat/iniciar-submissao", {
+          responsavel_nome: form.nome.trim(),
+          responsavel_email: form.email.trim(),
+          ferramenta: ferramentaEnviada,
+          escopo: form.escopo as "interno" | "externo",
+          servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
+          membros: form.participantes,
+          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
+          membros_contribuicoes: montarMembrosContribuicoes(
+            form.participantes,
+            form.participantesContribuicoes,
+          ),
+          nome_projeto: form.nomeProjeto.trim(),
+          // ⚠️ SEM `data_criacao`: o campo saiu do formulário na v2 (a data que vale é a
+          // de SUBMISSÃO). E sem tipos/categorias: a fase de doc não depende delas — o
+          // ganho declarado é gravado no envio, pela rota própria.
+          projeto_pai_id: form.vinculo === "feature" && form.paiId ? form.paiId : undefined,
+          descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
+          url_godeploy:
+            form.temAppGodeploy === "sim" ? form.urlGodeploy.trim() || undefined : undefined,
+          contrafactual_afetados:
+            serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
+            undefined,
+          docs,
+        });
         setProjetoId(result.projeto_id);
         setNomesExistentes(arquivos.map((f) => f.name));
         setAgentMeta(snapshotMeta());
@@ -1258,9 +1416,25 @@ export function SubmeterPageContent({
     const sig = `${arquivosSig()}::${JSON.stringify(snapshotMeta())}`;
     if (bgSigRef.current === sig) return;
     if (bgDebounceRef.current) clearTimeout(bgDebounceRef.current);
-    bgDebounceRef.current = setTimeout(() => { void dispararDocBackground(); }, 800);
-    return () => { if (bgDebounceRef.current) clearTimeout(bgDebounceRef.current); };
-  }, [editProjetoId, projetoId, arquivos, form, docExistenteInvalidado, arquivosSig, snapshotMeta, dispararDocBackground, perfilCarregado, ehLiderancaEfetivo, demoFluxo]);
+    bgDebounceRef.current = setTimeout(() => {
+      void dispararDocBackground();
+    }, 800);
+    return () => {
+      if (bgDebounceRef.current) clearTimeout(bgDebounceRef.current);
+    };
+  }, [
+    editProjetoId,
+    projetoId,
+    arquivos,
+    form,
+    docExistenteInvalidado,
+    arquivosSig,
+    snapshotMeta,
+    dispararDocBackground,
+    perfilCarregado,
+    ehLiderancaEfetivo,
+    demoFluxo,
+  ]);
 
   /* ── Validation ── */
   function validateStep(n: number): boolean {
@@ -1347,15 +1521,29 @@ export function SubmeterPageContent({
       setTimeout(() => setShaking(false), 350);
       return;
     }
+    // ⚠️ CAMINHO RÁPIDO: o projeto já existe (o background o criou assim que houve arquivo +
+    // nome, bem antes deste clique). Nada na tela seguinte — a escolha do tipo de ganho —
+    // depende do servidor, então esperar aqui era cobrar da pessoa uma requisição inteira
+    // (~1s de overhead do edge, mais o re-upload dos anexos quando a assinatura mudou) para
+    // mostrar uma tela que já podia estar na frente dela. Pedido do dono do produto
+    // (15/09/2026): *"não faz sentido nenhum ter esse delay... era pra ir pra próxima tela
+    // praticamente logo depois do usuário clicar no botão"*.
+    //
+    // A sincronização segue correndo e o ENVIO espera por ela (`syncMetaRef`) — o dado chega
+    // ao servidor do mesmo jeito, só deixou de estar no caminho crítico da navegação.
+    if (projetoId) {
+      avancarParaTelaDeGanhos(projetoId);
+      return;
+    }
+
+    // Sem projeto ainda: aqui a espera é legítima — não há o que fazer na Etapa 3 sem ele, e
+    // se a criação falhar a pessoa precisa saber AGORA, na tela em que pode corrigir.
     setAvancando(true);
     try {
-      let id = projetoId;
-      if (!id) {
-        // ⚠️ Se o background está EM VOO, espera por ele em vez de disparar de novo:
-        // criar um segundo projeto aqui deixaria um órfão no banco a cada avanço rápido.
-        id = bgPromiseRef.current ? await bgPromiseRef.current : null;
-        if (!id) id = await dispararDocBackground();
-      }
+      // ⚠️ Se o background está EM VOO, espera por ele em vez de disparar de novo:
+      // criar um segundo projeto aqui deixaria um órfão no banco a cada avanço rápido.
+      let id = bgPromiseRef.current ? await bgPromiseRef.current : null;
+      if (!id) id = await dispararDocBackground();
       if (!id) {
         // ⚠️ O texto muda conforme o erro seja TRANSITÓRIO ou não. Mandar "tente novamente em
         // alguns segundos" para um 400 de validação é pedir que a pessoa repita o que nunca vai
@@ -1369,25 +1557,36 @@ export function SubmeterPageContent({
         );
         return;
       }
-      await sincronizarMetadados(id);
-      // ⚠️ Empurra a compilação da doc AGORA, e NÃO espera.
-      //
-      // O `iniciar-submissao` já a disparou em segundo plano, mas a plataforma cancela as
-      // tarefas de `waitUntil` pouco depois de a resposta fechar ("waitUntil() tasks did not
-      // complete within the allowed time and have been cancelled", visto no log de produção).
-      // Esta chamada dá à compilação o tempo de vida de uma requisição inteira — que corre
-      // enquanto a pessoa preenche o ganho na Etapa 3.
-      //
-      // ⚠️ Sem `await` de propósito: nada na tela depende dela. E o `.catch` vazio é
-      // deliberado — falhar aqui não muda nada para quem está preenchendo, porque a fila
-      // (o cron) e a reconciliação do envio continuam de pé. Barulho aqui só assustaria.
-      void apiFetch("/api/chat/compilar-doc", {}).catch(() => {});
-      setRevisando(false);
-      setTelaGanho("tipos");
-      goToStep(3, "forward");
+      avancarParaTelaDeGanhos(id);
     } finally {
       setAvancando(false);
     }
+  }
+
+  /** Abre a Etapa 3 e deixa o servidor se acertar por trás. Nada aqui é aguardado. */
+  function avancarParaTelaDeGanhos(id: string) {
+    // Encadeado, nunca paralelo — ver `syncMetaRef`. `sincronizarMetadados` não rejeita
+    // (trata o próprio erro), mas o `catch` fecha a corrente contra um erro inesperado, que
+    // de outro modo derrubaria o envio lá na frente.
+    syncMetaRef.current = (syncMetaRef.current ?? Promise.resolve())
+      .then(() => sincronizarMetadados(id))
+      .catch(() => {});
+
+    // ⚠️ Empurra a compilação da doc AGORA, e NÃO espera.
+    //
+    // O `iniciar-submissao` já a disparou em segundo plano, mas a plataforma cancela as
+    // tarefas de `waitUntil` pouco depois de a resposta fechar ("waitUntil() tasks did not
+    // complete within the allowed time and have been cancelled", visto no log de produção).
+    // Esta chamada dá à compilação o tempo de vida de uma requisição inteira — que corre
+    // enquanto a pessoa preenche o ganho na Etapa 3.
+    //
+    // ⚠️ Sem `await` de propósito: nada na tela depende dela. E o `.catch` vazio é
+    // deliberado — falhar aqui não muda nada para quem está preenchendo, porque a fila
+    // (o cron) e a reconciliação do envio continuam de pé. Barulho aqui só assustaria.
+    void apiFetch("/api/chat/compilar-doc", {}).catch(() => {});
+    setRevisando(false);
+    setTelaGanho("tipos");
+    goToStep(3, "forward");
   }
 
   /* ── Etapa 3, tela 1 (seleção dos tipos) → tela 2 (os blocos) ──
@@ -1430,7 +1629,8 @@ export function SubmeterPageContent({
         membros_contribuicoes: meta.participantesContribuicoes,
         descricao_breve: meta.descricaoBreve,
         usa_ai_proxy: meta.usaAiProxy || undefined,
-        url_godeploy: meta.temAppGodeploy === "sim" ? meta.urlGodeploy.trim() || undefined : undefined,
+        url_godeploy:
+          meta.temAppGodeploy === "sim" ? meta.urlGodeploy.trim() || undefined : undefined,
         contrafactual_afetados: meta.contrafactualAfetados || undefined,
         ...(docs ? { docs } : {}),
       });
@@ -1480,6 +1680,13 @@ export function SubmeterPageContent({
     setSubmittingProject(true);
 
     try {
+      // 0) A sincronização de metadados que começou no avanço da Etapa 2 (ver `syncMetaRef`).
+      //    É o ÚNICO ponto em que descrição, AI Proxy, participantes e "quem sentiria falta"
+      //    chegam ao servidor, e o `submeter-validacao` não os reenvia — submeter na frente
+      //    dela gravaria o projeto sem eles. Na prática já terminou há muito: a pessoa passou
+      //    pela escolha do ganho e pelos blocos desde então.
+      await syncMetaRef.current;
+
       // 1) Grava o ganho declarado. Vem ANTES da submissão porque é o que o servidor
       //    recompõe para calcular o impacto — submeter sem isto daria projeto sem ganho.
       await apiFetch("/api/submeter/ganhos", {
@@ -1574,8 +1781,7 @@ export function SubmeterPageContent({
             <div
               className="absolute top-0 left-0 right-0 h-1"
               style={{
-                background:
-                  "linear-gradient(90deg, #16a34a 0%, #4ade80 50%, var(--go-lime) 100%)",
+                background: "linear-gradient(90deg, #16a34a 0%, #4ade80 50%, var(--go-lime) 100%)",
               }}
             />
             <BrowserDots centered />
@@ -1618,13 +1824,11 @@ export function SubmeterPageContent({
             >
               Projeto Enviado!
             </h2>
-            <p
-              className="mb-7 text-sm leading-relaxed"
-              style={{ color: "var(--go-text-primary)" }}
-            >
+            <p className="mb-7 text-sm leading-relaxed" style={{ color: "var(--go-text-primary)" }}>
               Sua documentação foi recebida e está em análise pela equipe de RPA & IA.
               <br />
-              Pode fechar esta página. O resultado aparece em <strong>Meus Projetos</strong>, e você recebe um retorno por e-mail.
+              Pode fechar esta página. O resultado aparece em <strong>Meus Projetos</strong>, e você
+              recebe um retorno por e-mail.
             </p>
             <div
               className="mb-7 text-left"
@@ -1683,11 +1887,7 @@ export function SubmeterPageContent({
   // dentro do `PageFooter`, porque quem sabe em que ponto do formulário a pessoa está é
   // esta tela — o rodapé é só quem desenha.
   const faqDoRodape =
-    step === 3
-      ? FAQ_RODAPE.memorial
-      : step === 2
-        ? FAQ_RODAPE.financeiro
-        : FAQ_RODAPE.indice;
+    step === 3 ? FAQ_RODAPE.memorial : step === 2 ? FAQ_RODAPE.financeiro : FAQ_RODAPE.indice;
 
   return (
     <PageFrame>
@@ -1830,7 +2030,10 @@ export function SubmeterPageContent({
           {/* Navegação. A Etapa 3 tem os botões dela dentro do próprio componente (e a
               revisão tem os seus), por isso ela fica fora daqui. */}
           {step !== 3 && (
-            <div style={{ padding: "0 32px 24px" }} className="mt-6 flex items-center justify-between gap-3">
+            <div
+              style={{ padding: "0 32px 24px" }}
+              className="mt-6 flex items-center justify-between gap-3"
+            >
               <button
                 type="button"
                 onClick={handleBack}
@@ -1859,7 +2062,10 @@ export function SubmeterPageContent({
                   type="button"
                   onClick={handleAvancarParaGanhos}
                   disabled={avancando}
-                  className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
+                  className={cn(
+                    "go-btn-next inline-flex items-center justify-center gap-2",
+                    shaking && "go-shake",
+                  )}
                 >
                   {avancando ? (
                     <>

@@ -2233,3 +2233,41 @@ que rodada que falha.
 - **D6 — mapa lateral, não campo por projeto** no payload — a régua do payload enxuto do `/dashboard` vale aqui.
 
 Arquivos: `src/lib/agentes-atividade.ts` (PURO), `casaDecididoEm` em `dashboard-filtros.ts`, campo em `painel-filtros.tsx`, leitura em `dashboard-admin.functions.ts`. Testes: `tests/agentes-atividade.test.ts`, `tests/dashboard-filtros.test.ts`.
+
+## Feature adicional — Formulário enxuto: um papel por pessoa, empresa inteira, tooltip e avanço sem espera (15/09/2026)
+
+Quatro pedidos do Luis no mesmo dia, todos sobre a mesma tela.
+
+### 1. Um participante por papel
+
+*"Agora só pode ter 1 por participação. Só pode ter 1 autor (padrão), 1 coautor, 1 contribuidor e 1 participante. Não é pra permitir selecionar mais de um."*
+
+- **D1** — generaliza a regra do Coautor único (30/07). Puras: `selecionadosComPapel`, `papeisRepetidos`, `limitarUmPorPapel`.
+- **D2 — o teto de participantes é CONSEQUÊNCIA, não regra nova.** `MAX_PARTICIPANTES = PAPEIS_PARTICIPANTE.length` (3) é derivado do catálogo e barra na ADIÇÃO. Sem ele a 4ª pessoa entra, fica sem papel possível e o gate do avanço trava para sempre sem dizer o que fazer — o beco que a regra abriria.
+- **D3 — o seletor remove o papel tomado, não o desabilita**, e a nota abaixo do campo diz quais já têm dono (opção sumindo sem explicação parece bug).
+- **D4 — legado com repetição mantém o PRIMEIRO de cada papel e limpa o resto.** Não promove ninguém por conta própria. Efeito aceito: projeto legado com 4+ participantes exige remover gente para ser editado.
+
+### 2. "Quem sentiria falta" aceita a empresa inteira
+
+*"Deve ter a opção de todos também. A empresa inteira. Gogroup."*
+
+- **D5** — `AfetadoTipo` ganha `"empresa"`; o valor gravado é `AFETADO_EMPRESA = "Gogroup"` (grafia da marca).
+- **D6 — a escolha JÁ É a resposta.** Não abre campo, a validação não cobra lista e não há chip de remoção: pedir uma seleção seria pedir que a pessoa enumere a empresa, e um ✕ deixaria a pergunta obrigatória sem resposta.
+
+### 3. Texto de apoio em tooltip
+
+*"Todo texto abaixo de título de seção assim deve estar em tooltip para enxugar a página de informação e texto."*
+
+- **D7 — fonte única é o `hint` do `FormLabel`.** Mudar lá converteu o formulário inteiro. Não redigitar hint como `<p>` solto.
+- **D8 — o gatilho abre por hover, foco E clique**, e o texto vai no `aria-label`. Sem o clique, quem está no celular perde a orientação que deixou de estar na página; sem o `aria-label`, o leitor de tela ouve "Mais informações" e nada mais.
+
+### 4. Avanço da Etapa 2 sem espera
+
+*"Não faz sentido nenhum ter esse delay... era pra ir pra próxima tela praticamente logo depois do usuário clicar no botão."*
+
+- **D9 — com o projeto já criado, navega na hora**; `sincronizarMetadados` corre por trás. Nada na escolha do ganho depende do servidor.
+- **D10 — o ENVIO espera por ela** (`syncMetaRef`): `submeter-validacao` não reenvia descrição/AI Proxy/participantes/afetados, e esse sync é o único caminho deles ao servidor.
+- **D11 — os syncs são encadeados, nunca paralelos.** Dois em voo podem chegar fora de ordem e o mais velho sobrescreveria o mais novo — impossível enquanto havia `await`, e por isso a corrente é explícita agora.
+- **D12 — sem projeto ainda, a espera continua.** Não há o que fazer na Etapa 3 sem ele, e a falha precisa aparecer onde dá para corrigir.
+
+Testes: `tests/validacao-etapa1.test.ts`, `tests/validacao-etapa2.test.ts`, `tests/form-label-tooltip.test.ts`.

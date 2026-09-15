@@ -3,9 +3,19 @@ import { createPortal } from "react-dom";
 import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE, PAPEL_COAUTOR, DESCRICAO_PAPEL,
-  coautoresSelecionados, AFETADO_TIPOS,
-  CONTRIBUICAO_MIN, CONTRIBUICAO_MAX, contribuicoesFaltando, contribuicaoEhDescricaoDePapel,
+  EMAIL_RE,
+  ALLOWED_DOMAINS_RE,
+  PAPEIS_PARTICIPANTE,
+  PAPEL_COAUTOR,
+  DESCRICAO_PAPEL,
+  selecionadosComPapel,
+  AFETADO_TIPOS,
+  AFETADO_EMPRESA,
+  MAX_PARTICIPANTES,
+  CONTRIBUICAO_MIN,
+  CONTRIBUICAO_MAX,
+  contribuicoesFaltando,
+  contribuicaoEhDescricaoDePapel,
 } from "./constants";
 import type { PapelParticipante, AfetadoTipo } from "./constants";
 import { filtrarSugestoes, type SugestaoParticipante } from "./participantes-sugestoes";
@@ -28,25 +38,67 @@ export function SectionTitle({ icon, children }: { icon: string; children: React
   );
 }
 
-export function FormGroup({ children, className }: { children: React.ReactNode; className?: string }) {
+export function FormGroup({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return <div className={cn("mb-[18px]", className)}>{children}</div>;
 }
 
-export function FormLabel({ children, required, hint }: { children: React.ReactNode; required?: boolean; hint?: string }) {
+/**
+ * Rótulo de campo: título em negrito + a orientação num TOOLTIP.
+ *
+ * ⚠️ O `hint` era um parágrafo cinza embaixo do título, sempre visível. Pedido do dono do
+ * produto (15/09/2026), olhando a Etapa 2 inteira: *"todo texto abaixo de título de seção
+ * assim deve estar em tooltip para enxugar a página de informação e texto"*. Com 4 campos
+ * seguidos, três deles com duas ou três linhas de apoio, a pessoa rolava mais texto do que
+ * formulário e parava de ler — inclusive o que importa.
+ *
+ * ⚠️ **O gatilho abre por HOVER, FOCO e CLIQUE.** O clique não é enfeite: sem ele, quem está
+ * no celular não alcança a orientação de jeito nenhum, e ela deixou de estar na tela. Pela
+ * mesma razão o texto vai no `aria-label` do gatilho — leitor de tela ouve a orientação, não
+ * um "Mais informações" que não diz nada.
+ *
+ * ⚠️ **É a FONTE ÚNICA do padrão**: mudar aqui converte todos os campos do formulário de uma
+ * vez. Não redigitar hint como `<p>` solto abaixo do rótulo.
+ */
+export function FormLabel({
+  children,
+  required,
+  hint,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+  hint?: string;
+}) {
   return (
-    <label className="mb-1.5 block text-[13px] font-semibold" style={{ color: "var(--go-text-primary)" }}>
+    <label
+      className="mb-1.5 block text-[13px] font-semibold"
+      style={{ color: "var(--go-text-primary)" }}
+    >
       {children}
-      {required && <span className="ml-0.5" style={{ color: "#dc2626" }}>*</span>}
-      {hint && (
-        <span className="mt-0.5 block text-[11px] font-normal" style={{ color: "#8b8b9a" }}>
-          {hint}
+      {required && (
+        <span className="ml-0.5" style={{ color: "#dc2626" }}>
+          *
         </span>
+      )}
+      {hint && (
+        <InfoTooltip largura={320} ariaLabel={hint}>
+          {hint}
+        </InfoTooltip>
       )}
     </label>
   );
 }
 
-export function FormInput({ error, className, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { error?: string }) {
+export function FormInput({
+  error,
+  className,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & { error?: string }) {
   return (
     <>
       <input className={cn("go-input", error && "go-input-invalid", className)} {...props} />
@@ -55,7 +107,12 @@ export function FormInput({ error, className, ...props }: React.InputHTMLAttribu
   );
 }
 
-export function FormSelect({ error, children, className, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { error?: string }) {
+export function FormSelect({
+  error,
+  children,
+  className,
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement> & { error?: string }) {
   return (
     <>
       <select className={cn("go-select", error && "go-input-invalid", className)} {...props}>
@@ -83,7 +140,12 @@ export function FieldError({ message }: { message?: string }) {
 }
 
 export function RadioGroup({
-  name, options, value, onChange, error, vertical,
+  name,
+  options,
+  value,
+  onChange,
+  error,
+  vertical,
 }: {
   name: string;
   options: { value: string; label: string }[];
@@ -101,7 +163,7 @@ export function RadioGroup({
             className={cn(
               "go-radio-label",
               value === opt.value && "go-radio-checked",
-              vertical && "justify-start px-3.5 py-3"
+              vertical && "justify-start px-3.5 py-3",
             )}
           >
             <input
@@ -122,7 +184,10 @@ export function RadioGroup({
 }
 
 export function CheckboxGroup({
-  options, value, onChange, error,
+  options,
+  value,
+  onChange,
+  error,
 }: {
   options: { value: string; label: string; description?: string }[];
   value: string[];
@@ -141,7 +206,10 @@ export function CheckboxGroup({
           return (
             <label
               key={opt.value}
-              className={cn("go-radio-label flex-1 cursor-pointer select-none", checked && "go-radio-checked")}
+              className={cn(
+                "go-radio-label flex-1 cursor-pointer select-none",
+                checked && "go-radio-checked",
+              )}
             >
               <input
                 type="checkbox"
@@ -164,7 +232,16 @@ export function CheckboxGroup({
                     animation: "go-step-in 0.2s ease",
                   }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </span>
@@ -202,7 +279,11 @@ export function CheckboxGroup({
  * quem decide a lista resultante é a régua pura do call site, não este componente.
  */
 export function CardCheckboxGroup({
-  options, value, onChange, onToggle, error,
+  options,
+  value,
+  onChange,
+  onToggle,
+  error,
 }: {
   options: { value: string; title: string; desc?: string; icon?: string }[];
   value: string[];
@@ -234,9 +315,7 @@ export function CardCheckboxGroup({
                     onToggle(opt.value);
                     return;
                   }
-                  onChange(
-                    checked ? value.filter((x) => x !== opt.value) : [...value, opt.value],
-                  );
+                  onChange(checked ? value.filter((x) => x !== opt.value) : [...value, opt.value]);
                 }}
               />
               {/* Indicador do checkbox — o "check" só aparece quando marcado */}
@@ -266,8 +345,12 @@ export function CardCheckboxGroup({
               </span>
               {/* Título + descrição da opção */}
               <span className="min-w-0">
-                <span className="block text-[13.5px] font-bold" style={{ color: "var(--go-text-heading)" }}>
-                  {opt.icon ? `${opt.icon} ` : ""}{opt.title}
+                <span
+                  className="block text-[13.5px] font-bold"
+                  style={{ color: "var(--go-text-heading)" }}
+                >
+                  {opt.icon ? `${opt.icon} ` : ""}
+                  {opt.title}
                 </span>
                 {opt.desc && (
                   <span
@@ -323,7 +406,12 @@ export function CardCheckboxGroup({
  * neutraliza sob `prefers-reduced-motion`.
  */
 export function GridCheckboxGroup({
-  options, value, onChange, error, ariaLabel, colunas = 3,
+  options,
+  value,
+  onChange,
+  error,
+  ariaLabel,
+  colunas = 3,
 }: {
   options: { value: string; label?: string; familia?: string; variante?: string; marca?: string }[];
   value: string[];
@@ -363,9 +451,14 @@ export function GridCheckboxGroup({
               <span aria-hidden="true" className="go-grid-check-box">
                 {checked && (
                   <svg
-                    width="11" height="11" viewBox="0 0 24 24" fill="none"
-                    stroke="#fff" strokeWidth="4"
-                    strokeLinecap="round" strokeLinejoin="round"
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                     style={{ animation: "go-step-in 0.15s ease" }}
                   >
                     <polyline points="20 6 9 17 4 12" />
@@ -385,7 +478,7 @@ export function GridCheckboxGroup({
                     <span className="go-grid-check-variante">{opt.variante}</span>
                   </>
                 ) : (
-                  opt.label ?? opt.value
+                  (opt.label ?? opt.value)
                 )}
               </span>
             </label>
@@ -407,7 +500,10 @@ export function GridCheckboxGroup({
  * `largura` sobe o padrão de 300px quando o conteúdo é uma lista curta.
  */
 export function InfoTooltip({
-  children, trigger, largura = 300, ariaLabel,
+  children,
+  trigger,
+  largura = 300,
+  ariaLabel,
 }: {
   children: React.ReactNode;
   trigger?: React.ReactNode;
@@ -419,7 +515,9 @@ export function InfoTooltip({
   const [coords, setCoords] = useState({ bottom: 0, left: 0 });
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function show() {
     if (iconRef.current) {
@@ -432,44 +530,45 @@ export function InfoTooltip({
     setVisible(true);
   }
 
-  const tooltip = mounted && visible
-    ? createPortal(
-        <div
-          style={{
-            position: "fixed",
-            bottom: coords.bottom,
-            left: coords.left,
-            transform: "translateX(-50%)",
-            zIndex: 9999,
-            width: largura,
-            maxWidth: "90vw",
-            padding: "12px 14px",
-            background: "var(--go-blue)",
-            borderRadius: "var(--go-radius-sm)",
-            color: "rgba(255,255,255,0.92)",
-            fontSize: 12,
-            fontFamily: "'Poppins', sans-serif",
-            lineHeight: 1.55,
-            textAlign: "left",
-            boxShadow: "0 8px 24px rgba(0,89,169,0.3)",
-            pointerEvents: "none",
-          }}
-        >
-          {children}
-          <span
+  const tooltip =
+    mounted && visible
+      ? createPortal(
+          <div
             style={{
-              position: "absolute",
-              top: "100%",
-              left: "50%",
+              position: "fixed",
+              bottom: coords.bottom,
+              left: coords.left,
               transform: "translateX(-50%)",
-              border: "5px solid transparent",
-              borderTopColor: "var(--go-blue)",
+              zIndex: 9999,
+              width: largura,
+              maxWidth: "90vw",
+              padding: "12px 14px",
+              background: "var(--go-blue)",
+              borderRadius: "var(--go-radius-sm)",
+              color: "rgba(255,255,255,0.92)",
+              fontSize: 12,
+              fontFamily: "'Poppins', sans-serif",
+              lineHeight: 1.55,
+              textAlign: "left",
+              boxShadow: "0 8px 24px rgba(0,89,169,0.3)",
+              pointerEvents: "none",
             }}
-          />
-        </div>,
-        document.body
-      )
-    : null;
+          >
+            {children}
+            <span
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                border: "5px solid transparent",
+                borderTopColor: "var(--go-blue)",
+              }}
+            />
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <>
@@ -483,6 +582,19 @@ export function InfoTooltip({
         onFocus={show}
         onMouseLeave={() => setVisible(false)}
         onBlur={() => setVisible(false)}
+        // ⚠️ O clique alterna, e não é redundante com o hover: em telas de TOQUE não há
+        // hover, e desde que os textos de apoio saíram da página (ver `FormLabel`) este é o
+        // único caminho para a orientação no celular. Teclado entra por `onKeyDown`, porque
+        // `role="button"` num `<span>` não dispara clique com Espaço/Enter sozinho.
+        onClick={() => (visible ? setVisible(false) : show())}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (visible) setVisible(false);
+            else show();
+          }
+        }}
+        aria-expanded={visible}
       >
         {trigger ?? "i"}
       </span>
@@ -511,7 +623,15 @@ function Realce({ texto, termos }: { texto: string; termos: string[] }) {
   for (let i = 1; i <= texto.length; i++) {
     if (i === texto.length || marcado[i] !== marcado[inicio]) {
       const trecho = texto.slice(inicio, i);
-      partes.push(marcado[inicio] ? <strong key={inicio} className="font-bold">{trecho}</strong> : trecho);
+      partes.push(
+        marcado[inicio] ? (
+          <strong key={inicio} className="font-bold">
+            {trecho}
+          </strong>
+        ) : (
+          trecho
+        ),
+      );
       inicio = i;
     }
   }
@@ -584,7 +704,10 @@ function useDropdownAnchor(
 }
 
 export function ChipsInput({
-  chips, onAdd, onRemove, error,
+  chips,
+  onAdd,
+  onRemove,
+  error,
 }: {
   chips: string[];
   onAdd: (email: string) => boolean;
@@ -596,7 +719,10 @@ export function ChipsInput({
   const inputRef = useRef<HTMLInputElement>(null);
 
   function tryAdd(raw: string) {
-    const val = raw.trim().replace(/[,;]+$/, "").trim();
+    const val = raw
+      .trim()
+      .replace(/[,;]+$/, "")
+      .trim();
     if (!val) return;
     if (!EMAIL_RE.test(val)) {
       setTipMessage("Insira um e-mail válido (ex: nome@gocase.com.br)");
@@ -613,8 +739,10 @@ export function ChipsInput({
   function handleKeyDown(e: React.KeyboardEvent) {
     if (["Enter", " ", ",", ";", "Tab"].includes(e.key)) {
       const val = inputValue.trim();
-      if (val) { e.preventDefault(); tryAdd(val); }
-      else if (e.key === "Enter") e.preventDefault();
+      if (val) {
+        e.preventDefault();
+        tryAdd(val);
+      } else if (e.key === "Enter") e.preventDefault();
     } else if (e.key === "Backspace" && inputValue === "" && chips.length > 0) {
       onRemove(chips[chips.length - 1]);
     }
@@ -624,7 +752,9 @@ export function ChipsInput({
     const text = e.clipboardData.getData("text");
     if (text && /[,;\s]/.test(text)) {
       e.preventDefault();
-      text.split(/[,;\s]+/).forEach((p) => { if (p.trim()) tryAdd(p); });
+      text.split(/[,;\s]+/).forEach((p) => {
+        if (p.trim()) tryAdd(p);
+      });
       setInputValue("");
     }
   }
@@ -634,7 +764,7 @@ export function ChipsInput({
       <div
         className={cn(
           "flex min-h-[42px] flex-wrap items-center gap-1 rounded-lg px-2 py-1 transition-colors cursor-text",
-          error && "!border-[#dc2626] shadow-[0_0_0_3px_rgba(220,38,38,0.08)]"
+          error && "!border-[#dc2626] shadow-[0_0_0_3px_rgba(220,38,38,0.08)]",
         )}
         style={{ background: "var(--go-white)", border: "1.5px solid rgba(215, 219, 0, 0.35)" }}
         onClick={() => inputRef.current?.focus()}
@@ -650,10 +780,15 @@ export function ChipsInput({
               animation: "go-chip-in 0.15s ease",
             }}
           >
-            <span className="max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap">{chip}</span>
+            <span className="max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap">
+              {chip}
+            </span>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onRemove(chip); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(chip);
+              }}
               className="flex h-[15px] w-[15px] items-center justify-center rounded-full text-xs transition-colors"
               style={{ background: "rgba(0,89,169,0.1)", border: "none", color: "inherit" }}
             >
@@ -668,14 +803,22 @@ export function ChipsInput({
           style={{ fontFamily: "'Poppins', sans-serif", color: "var(--go-text-primary)" }}
           placeholder="exemplo@gocase.com.br"
           value={inputValue}
-          onChange={(e) => { setInputValue(e.target.value); setTipMessage(null); }}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            setTipMessage(null);
+          }}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          onBlur={() => { if (inputValue.trim()) tryAdd(inputValue.trim()); }}
+          onBlur={() => {
+            if (inputValue.trim()) tryAdd(inputValue.trim());
+          }}
         />
       </div>
       {tipMessage && (
-        <p className="mt-1 text-[11px] font-semibold" style={{ color: "#dc2626", animation: "go-slide-down 0.2s ease" }}>
+        <p
+          className="mt-1 text-[11px] font-semibold"
+          style={{ color: "#dc2626", animation: "go-slide-down 0.2s ease" }}
+        >
           {tipMessage}
         </p>
       )}
@@ -687,10 +830,13 @@ export function ChipsInput({
 // Cor suplementar por papel. a11y: o RÓTULO em texto é sempre o sinal primário do
 // estado; a cor apenas reforça — nunca é o único indicador.
 const COR_PAPEL: Record<PapelParticipante, string> = {
-  coexecutor: "#0059A9",   // --go-blue — "Coautor"
-  planejador: "#0E7490",   // cyan-700 — "Participante"
+  coexecutor: "#0059A9", // --go-blue — "Coautor"
+  planejador: "#0E7490", // cyan-700 — "Participante"
   contribuidor: "#8A7D00", // âmbar (família do lime do form) — "Contribuidor"
 };
+
+/** Dita na ADIÇÃO, que é onde a pessoa pode agir — não no gate lá do avanço. */
+const MSG_TIME_CHEIO = `O time já tem ${MAX_PARTICIPANTES} pessoas, uma para cada papel (Coautor, Participante e Contribuidor). Remova alguém para incluir outra.`;
 
 // Legenda dos papéis: uma linha por papel com o ponto colorido (MESMA cor do seletor —
 // reforça "cor = papel"), o rótulo em negrito e a descrição. a11y: o rótulo em texto é
@@ -735,8 +881,17 @@ export function LegendaPapeis() {
 // obrigatório — o gate de avançar da Etapa 1 bloqueia enquanto faltar. O autor/
 // submissor NÃO entra aqui: ele é o dono, só o time adicionado ganha papel.
 export function ParticipantesPapeisInput({
-  participantes, papeis, contribuicoes, onAdd, onRemove, onSetPapel, onSetContribuicao,
-  error, errorContribuicao, suggestions, loadingSuggestions,
+  participantes,
+  papeis,
+  contribuicoes,
+  onAdd,
+  onRemove,
+  onSetPapel,
+  onSetContribuicao,
+  error,
+  errorContribuicao,
+  suggestions,
+  loadingSuggestions,
 }: {
   participantes: string[];
   papeis: Record<string, PapelParticipante | "">;
@@ -767,7 +922,13 @@ export function ParticipantesPapeisInput({
 
   // Autocomplete: filtra a lista da TeamGuide a cada letra (nome ou e-mail,
   // sem acento/caixa); sem lista carregada, o campo funciona como sempre.
-  const termos = inputValue.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean);
+  const termos = inputValue
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
   const filtradas = filtrarSugestoes(suggestions ?? [], inputValue, participantes);
   const visiveis = filtradas.slice(0, MAX_SUGESTOES);
   // Abre com sugestões OU enquanto a lista carrega (para mostrar o "buscando…").
@@ -777,15 +938,16 @@ export function ParticipantesPapeisInput({
   // Mantém a opção ativa à vista quando a navegação por teclado rola a lista.
   useEffect(() => {
     if (!open) return;
-    listRef.current
-      ?.querySelector('[data-ativa="true"]')
-      ?.scrollIntoView({ block: "nearest" });
+    listRef.current?.querySelector('[data-ativa="true"]')?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, open]);
 
   const coords = useDropdownAnchor(open, boxRef, [visiveis.length, filtradas.length]);
 
   function tryAdd(raw: string) {
-    const val = raw.trim().replace(/[,;]+$/, "").trim();
+    const val = raw
+      .trim()
+      .replace(/[,;]+$/, "")
+      .trim();
     if (!val) return;
     if (!EMAIL_RE.test(val)) {
       setTipMessage("Insira um e-mail válido (ex: nome@gocase.com.br)");
@@ -795,11 +957,19 @@ export function ParticipantesPapeisInput({
       setTipMessage("Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos");
       return;
     }
+    if (lotado) {
+      setTipMessage(MSG_TIME_CHEIO);
+      return;
+    }
     setTipMessage(null);
     if (onAdd(val)) setInputValue("");
   }
 
   function escolherSugestao(email: string) {
+    if (lotado) {
+      setTipMessage(MSG_TIME_CHEIO);
+      return;
+    }
     setTipMessage(null);
     if (onAdd(email)) {
       setInputValue("");
@@ -838,8 +1008,10 @@ export function ParticipantesPapeisInput({
       : ["Enter", ",", ";", "Tab"];
     if (separadores.includes(e.key)) {
       const val = inputValue.trim();
-      if (val) { e.preventDefault(); tryAdd(val); }
-      else if (e.key === "Enter") e.preventDefault();
+      if (val) {
+        e.preventDefault();
+        tryAdd(val);
+      } else if (e.key === "Enter") e.preventDefault();
     } else if (e.key === "Backspace" && inputValue === "" && participantes.length > 0) {
       onRemove(participantes[participantes.length - 1]);
     }
@@ -849,24 +1021,38 @@ export function ParticipantesPapeisInput({
     const text = e.clipboardData.getData("text");
     if (text && /[,;\s]/.test(text)) {
       e.preventDefault();
-      text.split(/[,;\s]+/).forEach((p) => { if (p.trim()) tryAdd(p); });
+      text.split(/[,;\s]+/).forEach((p) => {
+        if (p.trim()) tryAdd(p);
+      });
       setInputValue("");
     }
   }
+
+  // ⚠️ O time enche em `MAX_PARTICIPANTES` porque cada papel cabe a uma pessoa só — a próxima
+  // não teria papel possível e o avanço travaria sem explicação. Ver `MAX_PARTICIPANTES`.
+  const lotado = participantes.length >= MAX_PARTICIPANTES;
 
   const semPapel = participantes.filter((p) => !papeis[p]).length;
   // Quantas pessoas ainda estão sem a descrição do que fizeram (ou com texto curto).
   const semContribuicao = contribuicoesFaltando(participantes, contribuicoes).length;
 
-  // Coautor é ÚNICO por projeto (1 autor + no máximo 1 coautor). Quando alguém já é
-  // Coautor, a opção SAI da lista dos outros — nada de opção morta na tela. Quem já é o
-  // Coautor mantém a opção (precisa dela para exibir o papel atual e poder trocar); a
-  // ausência é explicada pela nota abaixo da lista.
-  const coautores = coautoresSelecionados(participantes, papeis);
+  // ⚠️ CADA papel é único no projeto (15/09/2026) — antes só o Coautor era. Papel já tomado
+  // SAI da lista dos outros: nada de opção morta na tela. Quem já tem o papel mantém a opção
+  // (precisa dela para exibir o papel atual e poder trocar); a ausência é explicada pela nota
+  // abaixo da lista.
+  const donoDoPapel = new Map(
+    PAPEIS_PARTICIPANTE.map((p) => [
+      p.value,
+      selecionadosComPapel(participantes, papeis, p.value)[0],
+    ]),
+  );
   const papeisDisponiveis = (email: string) =>
-    PAPEIS_PARTICIPANTE.filter(
-      (p) => p.value !== PAPEL_COAUTOR || coautores.length === 0 || coautores[0] === email,
-    );
+    PAPEIS_PARTICIPANTE.filter((p) => {
+      const dono = donoDoPapel.get(p.value);
+      return !dono || dono === email;
+    });
+  /** Os papéis que já têm dono, pelo rótulo — é o que a nota abaixo da lista informa. */
+  const tomados = PAPEIS_PARTICIPANTE.filter((p) => donoDoPapel.get(p.value)).map((p) => p.label);
 
   return (
     <>
@@ -889,7 +1075,9 @@ export function ParticipantesPapeisInput({
             aria-expanded={open}
             aria-controls="participantes-sugestoes"
             aria-autocomplete="list"
-            aria-activedescendant={open && visiveis.length > 0 ? `participante-sugestao-${activeIndex}` : undefined}
+            aria-activedescendant={
+              open && visiveis.length > 0 ? `participante-sugestao-${activeIndex}` : undefined
+            }
             className="min-w-[160px] flex-1 border-none bg-transparent px-1 py-1 text-sm outline-none"
             style={{ fontFamily: "'Poppins', sans-serif", color: "var(--go-text-primary)" }}
             placeholder="Digite um nome ou e-mail…"
@@ -911,7 +1099,8 @@ export function ParticipantesPapeisInput({
           />
         </div>
 
-        {open && coords &&
+        {open &&
+          coords &&
           createPortal(
             <div
               className="fixed z-[60] overflow-hidden rounded-lg"
@@ -926,100 +1115,128 @@ export function ParticipantesPapeisInput({
                 animation: "go-slide-down 0.15s ease",
               }}
             >
-            {visiveis.length > 0 ? (
-              <>
-                <ul
-                  ref={listRef}
-                  id="participantes-sugestoes"
-                  role="listbox"
-                  aria-label="Sugestões de participantes"
-                  className="overflow-y-auto py-1"
-                  style={{ maxHeight: coords.maxHeight }}
+              {visiveis.length > 0 ? (
+                <>
+                  <ul
+                    ref={listRef}
+                    id="participantes-sugestoes"
+                    role="listbox"
+                    aria-label="Sugestões de participantes"
+                    className="overflow-y-auto py-1"
+                    style={{ maxHeight: coords.maxHeight }}
+                  >
+                    {visiveis.map((p, i) => {
+                      const ativa = i === activeIndex;
+                      return (
+                        <li
+                          key={p.email}
+                          id={`participante-sugestao-${i}`}
+                          role="option"
+                          aria-selected={ativa}
+                          data-ativa={ativa || undefined}
+                          className="flex cursor-pointer items-center gap-2 px-3 py-1.5"
+                          style={{
+                            background: ativa ? "rgba(0,89,169,0.08)" : "transparent",
+                            borderLeft: ativa
+                              ? "3px solid var(--go-lime)"
+                              : "3px solid transparent",
+                          }}
+                          // onMouseDown (não onClick): dispara ANTES do blur do input,
+                          // senão o blur tenta adicionar o texto parcial digitado.
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            escolherSugestao(p.email);
+                          }}
+                          onMouseMove={() => {
+                            if (!ativa) setActiveIndex(i);
+                          }}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className="block truncate text-[13px] font-semibold"
+                              style={{ color: "var(--go-text-primary)" }}
+                            >
+                              <Realce texto={p.nome} termos={termos} />
+                              {p.cargo && (
+                                <span
+                                  className="ml-1.5 text-[11px] font-normal"
+                                  style={{ color: "#8b8b9a" }}
+                                >
+                                  · {p.cargo}
+                                </span>
+                              )}
+                            </span>
+                            <span
+                              className="block truncate text-[11px]"
+                              style={{ color: "var(--go-blue)" }}
+                            >
+                              <Realce texto={p.email} termos={termos} />
+                            </span>
+                          </span>
+                          {ativa && (
+                            <span
+                              aria-hidden="true"
+                              className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                              style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+                            >
+                              ↵ Enter
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {filtradas.length > MAX_SUGESTOES && (
+                    <p
+                      className="border-t px-3 py-1.5 text-[10px]"
+                      style={{ color: "#8b8b9a", borderColor: "rgba(0,89,169,0.08)" }}
+                    >
+                      Mostrando {MAX_SUGESTOES} de {filtradas.length} — continue digitando para
+                      refinar.
+                    </p>
+                  )}
+                </>
+              ) : loadingSuggestions ? (
+                // Micro-indicador sutil: 3 pontinhos go-blue (mesmo vocabulário do chat),
+                // neutralizados sob prefers-reduced-motion pelo CSS global. role="status"
+                // + aria-live para leitores de tela anunciarem o carregamento.
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex items-center gap-2 px-3 py-2.5 text-[11px]"
+                  style={{ color: "#8b8b9a" }}
                 >
-                  {visiveis.map((p, i) => {
-                    const ativa = i === activeIndex;
-                    return (
-                      <li
-                        key={p.email}
-                        id={`participante-sugestao-${i}`}
-                        role="option"
-                        aria-selected={ativa}
-                        data-ativa={ativa || undefined}
-                        className="flex cursor-pointer items-center gap-2 px-3 py-1.5"
+                  <span aria-hidden="true" className="flex items-center gap-1">
+                    {[0, 0.2, 0.4].map((delay) => (
+                      <span
+                        key={delay}
+                        className="h-1.5 w-1.5 rounded-full"
                         style={{
-                          background: ativa ? "rgba(0,89,169,0.08)" : "transparent",
-                          borderLeft: ativa ? "3px solid var(--go-lime)" : "3px solid transparent",
+                          background: "var(--go-blue)",
+                          opacity: 0.5,
+                          animation: `go-bounce 1.2s ease-in-out ${delay}s infinite`,
                         }}
-                        // onMouseDown (não onClick): dispara ANTES do blur do input,
-                        // senão o blur tenta adicionar o texto parcial digitado.
-                        onMouseDown={(e) => { e.preventDefault(); escolherSugestao(p.email); }}
-                        onMouseMove={() => { if (!ativa) setActiveIndex(i); }}
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[13px] font-semibold" style={{ color: "var(--go-text-primary)" }}>
-                            <Realce texto={p.nome} termos={termos} />
-                            {p.cargo && (
-                              <span className="ml-1.5 text-[11px] font-normal" style={{ color: "#8b8b9a" }}>
-                                · {p.cargo}
-                              </span>
-                            )}
-                          </span>
-                          <span className="block truncate text-[11px]" style={{ color: "var(--go-blue)" }}>
-                            <Realce texto={p.email} termos={termos} />
-                          </span>
-                        </span>
-                        {ativa && (
-                          <span
-                            aria-hidden="true"
-                            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                            style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
-                          >
-                            ↵ Enter
-                          </span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-                {filtradas.length > MAX_SUGESTOES && (
-                  <p className="border-t px-3 py-1.5 text-[10px]" style={{ color: "#8b8b9a", borderColor: "rgba(0,89,169,0.08)" }}>
-                    Mostrando {MAX_SUGESTOES} de {filtradas.length} — continue digitando para refinar.
-                  </p>
-                )}
-              </>
-            ) : loadingSuggestions ? (
-              // Micro-indicador sutil: 3 pontinhos go-blue (mesmo vocabulário do chat),
-              // neutralizados sob prefers-reduced-motion pelo CSS global. role="status"
-              // + aria-live para leitores de tela anunciarem o carregamento.
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex items-center gap-2 px-3 py-2.5 text-[11px]"
-                style={{ color: "#8b8b9a" }}
-              >
-                <span aria-hidden="true" className="flex items-center gap-1">
-                  {[0, 0.2, 0.4].map((delay) => (
-                    <span
-                      key={delay}
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ background: "var(--go-blue)", opacity: 0.5, animation: `go-bounce 1.2s ease-in-out ${delay}s infinite` }}
-                    />
-                  ))}
-                </span>
-                Buscando e-mails na Team Guide…
-              </div>
-            ) : (
-              <p className="px-3 py-2.5 text-[11px]" style={{ color: "#8b8b9a" }}>
-                Ninguém encontrado na Team Guide — digite o e-mail completo e pressione Enter para adicionar.
-              </p>
-            )}
+                      />
+                    ))}
+                  </span>
+                  Buscando e-mails na Team Guide…
+                </div>
+              ) : (
+                <p className="px-3 py-2.5 text-[11px]" style={{ color: "#8b8b9a" }}>
+                  Ninguém encontrado na Team Guide — digite o e-mail completo e pressione Enter para
+                  adicionar.
+                </p>
+              )}
             </div>,
             document.body,
           )}
       </div>
 
       {tipMessage && (
-        <p className="mt-1 text-[11px] font-semibold" style={{ color: "#dc2626", animation: "go-slide-down 0.2s ease" }}>
+        <p
+          className="mt-1 text-[11px] font-semibold"
+          style={{ color: "#dc2626", animation: "go-slide-down 0.2s ease" }}
+        >
           {tipMessage}
         </p>
       )}
@@ -1079,9 +1296,13 @@ export function ParticipantesPapeisInput({
                     className="go-select !mt-0 !w-auto !max-w-[190px] !rounded-md !py-1.5 !pl-2.5 !pr-8 !text-[12px]"
                     style={faltando ? { borderColor: "#dc2626" } : undefined}
                   >
-                    <option value="" disabled>Selecione o papel</option>
+                    <option value="" disabled>
+                      Selecione o papel
+                    </option>
                     {papeisDisponiveis(email).map((p) => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
                     ))}
                   </select>
                   <button
@@ -1177,7 +1398,8 @@ export function ParticipantesPapeisInput({
           (avançar bloqueado) para não duplicar mensagem. */}
       {participantes.length > 0 && semPapel > 0 && !error && (
         <p className="mt-1.5 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
-          {semPapel === 1 ? "1 participante sem papel" : `${semPapel} participantes sem papel`} — escolha o papel de cada pessoa.
+          {semPapel === 1 ? "1 participante sem papel" : `${semPapel} participantes sem papel`} —
+          escolha o papel de cada pessoa.
         </p>
       )}
 
@@ -1192,15 +1414,16 @@ export function ParticipantesPapeisInput({
         </p>
       )}
 
-      {/* Regra do Coautor único — informativa (ícone + texto, nunca só cor). Aparece
-          quando há mais de uma pessoa e ainda não há erro vermelho na tela. */}
+      {/* Regra do papel único — informativa (ícone + texto, nunca só cor). Aparece quando há
+          mais de uma pessoa e ainda não há erro vermelho na tela. ⚠️ É ela que explica por que
+          uma opção sumiu do seletor de outra pessoa: sem isso, a lista encolhendo parece bug. */}
       {participantes.length > 1 && !error && (
         <p className="mt-1.5 flex items-start gap-1 text-[11px]" style={{ color: "#8b8b9a" }}>
           <span aria-hidden="true">ℹ️</span>
           <span>
-            {coautores.length === 1
-              ? "O papel de Coautor já está definido — os demais entram como Participante ou Contribuidor."
-              : "Cada projeto tem 1 autor (você) e no máximo 1 Coautor."}
+            {tomados.length > 0
+              ? `${tomados.join(" e ")} já ${tomados.length > 1 ? "estão definidos" : "está definido"} — cada papel cabe a uma pessoa só.`
+              : "Cada projeto tem 1 autor (você) e 1 pessoa por papel."}
           </span>
         </p>
       )}
@@ -1219,8 +1442,15 @@ export function ParticipantesPapeisInput({
 // a11y: o tipo escolhido é dito por rótulo em texto (não só cor); o dropdown tem
 // combobox/listbox, navegação por setas, Esc e foco visível.
 export function AfetadosInput({
-  tipo, lista, onChangeTipo, onChangeLista, error,
-  suggestions, loadingSuggestions, areas, loadingAreas,
+  tipo,
+  lista,
+  onChangeTipo,
+  onChangeLista,
+  error,
+  suggestions,
+  loadingSuggestions,
+  areas,
+  loadingAreas,
 }: {
   tipo: AfetadoTipo;
   lista: string[];
@@ -1241,7 +1471,13 @@ export function AfetadosInput({
   const listRef = useRef<HTMLUListElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
-  const termos = inputValue.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean);
+  const termos = inputValue
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
   const filtradas = filtrarSugestoes(suggestions ?? [], inputValue, lista);
   const visiveis = filtradas.slice(0, MAX_SUGESTOES);
   const open =
@@ -1266,7 +1502,10 @@ export function AfetadosInput({
   }
 
   function tryAdd(raw: string) {
-    const val = raw.trim().replace(/[,;]+$/, "").trim();
+    const val = raw
+      .trim()
+      .replace(/[,;]+$/, "")
+      .trim();
     if (!val) return;
     if (!EMAIL_RE.test(val)) {
       setTipMessage("Escolha alguém da lista ou digite um e-mail válido (ex: nome@gocase.com.br)");
@@ -1319,8 +1558,10 @@ export function AfetadosInput({
       : ["Enter", ",", ";", "Tab"];
     if (separadores.includes(e.key)) {
       const val = inputValue.trim();
-      if (val) { e.preventDefault(); tryAdd(val); }
-      else if (e.key === "Enter") e.preventDefault();
+      if (val) {
+        e.preventDefault();
+        tryAdd(val);
+      } else if (e.key === "Enter") e.preventDefault();
     }
   }
 
@@ -1338,7 +1579,10 @@ export function AfetadosInput({
           const novo = v as AfetadoTipo;
           if (novo === tipo) return;
           onChangeTipo(novo);
-          onChangeLista([]); // uma resposta não se mistura com a outra
+          // ⚠️ "A empresa inteira" JÁ É a resposta: ela se grava ao ser escolhida, em vez de
+          // abrir um campo para a pessoa enumerar a empresa. As outras duas zeram a lista —
+          // uma resposta não se mistura com a outra.
+          onChangeLista(novo === "empresa" ? [AFETADO_EMPRESA] : []);
           setInputValue("");
           setTipMessage(null);
         }}
@@ -1346,12 +1590,29 @@ export function AfetadosInput({
       />
 
       <div className="mt-2.5">
-        {tipo === "pessoa" ? (
+        {tipo === "empresa" ? (
+          // Sem campo: a escolha já respondeu. O bloco confirma o que ficou gravado, para a
+          // pessoa não achar que faltou um passo ao ver a área vazia.
+          <p
+            className="rounded-lg px-3 py-2.5 text-[12px]"
+            style={{
+              background: "rgba(0,89,169,0.05)",
+              border: "1px solid rgba(0,89,169,0.15)",
+              color: "var(--go-text-primary)",
+            }}
+          >
+            <span aria-hidden="true">🏢</span> Toda a {AFETADO_EMPRESA} sentiria falta. Nada mais a
+            selecionar.
+          </p>
+        ) : tipo === "pessoa" ? (
           <div className="relative">
             <div
               ref={boxRef}
               className="flex min-h-[42px] items-center rounded-lg px-2 py-1 transition-colors cursor-text"
-              style={{ background: "var(--go-white)", border: "1.5px solid rgba(215, 219, 0, 0.35)" }}
+              style={{
+                background: "var(--go-white)",
+                border: "1.5px solid rgba(215, 219, 0, 0.35)",
+              }}
               onClick={() => inputRef.current?.focus()}
             >
               <input
@@ -1363,7 +1624,9 @@ export function AfetadosInput({
                 aria-expanded={open}
                 aria-controls="afetados-sugestoes"
                 aria-autocomplete="list"
-                aria-activedescendant={open && visiveis.length > 0 ? `afetado-sugestao-${activeIndex}` : undefined}
+                aria-activedescendant={
+                  open && visiveis.length > 0 ? `afetado-sugestao-${activeIndex}` : undefined
+                }
                 className="min-w-[160px] flex-1 border-none bg-transparent px-1 py-1 text-sm outline-none"
                 style={{ fontFamily: "'Poppins', sans-serif", color: "var(--go-text-primary)" }}
                 placeholder="Digite um nome ou e-mail…"
@@ -1384,7 +1647,8 @@ export function AfetadosInput({
               />
             </div>
 
-            {open && coords &&
+            {open &&
+              coords &&
               createPortal(
                 <div
                   className="fixed z-[60] overflow-hidden rounded-lg"
@@ -1421,21 +1685,37 @@ export function AfetadosInput({
                               className="flex cursor-pointer items-center gap-2 px-3 py-1.5"
                               style={{
                                 background: ativa ? "rgba(0,89,169,0.08)" : "transparent",
-                                borderLeft: ativa ? "3px solid var(--go-lime)" : "3px solid transparent",
+                                borderLeft: ativa
+                                  ? "3px solid var(--go-lime)"
+                                  : "3px solid transparent",
                               }}
-                              onMouseDown={(e) => { e.preventDefault(); escolherSugestao(p.email); }}
-                              onMouseMove={() => { if (!ativa) setActiveIndex(i); }}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                escolherSugestao(p.email);
+                              }}
+                              onMouseMove={() => {
+                                if (!ativa) setActiveIndex(i);
+                              }}
                             >
                               <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[13px] font-semibold" style={{ color: "var(--go-text-primary)" }}>
+                                <span
+                                  className="block truncate text-[13px] font-semibold"
+                                  style={{ color: "var(--go-text-primary)" }}
+                                >
                                   <Realce texto={p.nome} termos={termos} />
                                   {p.cargo && (
-                                    <span className="ml-1.5 text-[11px] font-normal" style={{ color: "#8b8b9a" }}>
+                                    <span
+                                      className="ml-1.5 text-[11px] font-normal"
+                                      style={{ color: "#8b8b9a" }}
+                                    >
                                       · {p.cargo}
                                     </span>
                                   )}
                                 </span>
-                                <span className="block truncate text-[11px]" style={{ color: "var(--go-blue)" }}>
+                                <span
+                                  className="block truncate text-[11px]"
+                                  style={{ color: "var(--go-blue)" }}
+                                >
                                   <Realce texto={p.email} termos={termos} />
                                 </span>
                               </span>
@@ -1444,19 +1724,32 @@ export function AfetadosInput({
                         })}
                       </ul>
                       {filtradas.length > MAX_SUGESTOES && (
-                        <p className="border-t px-3 py-1.5 text-[10px]" style={{ color: "#8b8b9a", borderColor: "rgba(0,89,169,0.08)" }}>
-                          Mostrando {MAX_SUGESTOES} de {filtradas.length} — continue digitando para refinar.
+                        <p
+                          className="border-t px-3 py-1.5 text-[10px]"
+                          style={{ color: "#8b8b9a", borderColor: "rgba(0,89,169,0.08)" }}
+                        >
+                          Mostrando {MAX_SUGESTOES} de {filtradas.length} — continue digitando para
+                          refinar.
                         </p>
                       )}
                     </>
                   ) : loadingSuggestions ? (
-                    <div role="status" aria-live="polite" className="flex items-center gap-2 px-3 py-2.5 text-[11px]" style={{ color: "#8b8b9a" }}>
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="flex items-center gap-2 px-3 py-2.5 text-[11px]"
+                      style={{ color: "#8b8b9a" }}
+                    >
                       <span aria-hidden="true" className="flex items-center gap-1">
                         {[0, 0.2, 0.4].map((delay) => (
                           <span
                             key={delay}
                             className="h-1.5 w-1.5 rounded-full"
-                            style={{ background: "var(--go-blue)", opacity: 0.5, animation: `go-bounce 1.2s ease-in-out ${delay}s infinite` }}
+                            style={{
+                              background: "var(--go-blue)",
+                              opacity: 0.5,
+                              animation: `go-bounce 1.2s ease-in-out ${delay}s infinite`,
+                            }}
                           />
                         ))}
                       </span>
@@ -1488,20 +1781,26 @@ export function AfetadosInput({
                   : "Selecione o time/área…"}
             </option>
             {areasDisponiveis.map((a) => (
-              <option key={a.nome} value={a.nome}>{a.nome}</option>
+              <option key={a.nome} value={a.nome}>
+                {a.nome}
+              </option>
             ))}
           </FormSelect>
         )}
       </div>
 
       {tipMessage && (
-        <p className="mt-1 text-[11px] font-semibold" style={{ color: "#dc2626", animation: "go-slide-down 0.2s ease" }}>
+        <p
+          className="mt-1 text-[11px] font-semibold"
+          style={{ color: "#dc2626", animation: "go-slide-down 0.2s ease" }}
+        >
           {tipMessage}
         </p>
       )}
 
-      {/* Selecionados — chips com remoção */}
-      {lista.length > 0 && (
+      {/* Selecionados — chips com remoção. No modo "empresa" não há chip: o único item é a
+          própria resposta, e um ✕ ali deixaria a pergunta obrigatória sem resposta nenhuma. */}
+      {tipo !== "empresa" && lista.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1.5">
           {lista.map((item) => (
             <li
@@ -1515,7 +1814,9 @@ export function AfetadosInput({
               }}
             >
               <span aria-hidden="true">{tipo === "time" ? "👥" : "👤"}</span>
-              <span className="max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap">{item}</span>
+              <span className="max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap">
+                {item}
+              </span>
               <button
                 type="button"
                 onClick={() => onChangeLista(lista.filter((x) => x !== item))}
@@ -1536,7 +1837,11 @@ export function AfetadosInput({
 }
 
 export function SummaryRow({
-  label, value, highlight, badge, last,
+  label,
+  value,
+  highlight,
+  badge,
+  last,
 }: {
   label: string;
   value: string;
@@ -1566,7 +1871,9 @@ export function SummaryRow({
             {value}
           </span>
         ) : highlight ? (
-          <span className="font-bold" style={{ color: "#16a34a" }}>{value}</span>
+          <span className="font-bold" style={{ color: "#16a34a" }}>
+            {value}
+          </span>
         ) : (
           value || "—"
         )}
@@ -1582,7 +1889,11 @@ export function SummaryRow({
  * navegável por teclado (setas/Enter/Esc).
  */
 export function ProjetoPaiInput({
-  paiId, paiNome, onSelect, onClear, error,
+  paiId,
+  paiNome,
+  onSelect,
+  onClear,
+  error,
 }: {
   paiId: string;
   paiNome: string;
@@ -1603,7 +1914,9 @@ export function ProjetoPaiInput({
   // não existe. Com 2+ caracteres e foco, a lista abre SEMPRE e diz o que aconteceu.
   const open = focused && !dismissed && query.trim().length >= 2;
 
-  useEffect(() => { setActiveIndex(0); }, [resultados.length]);
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [resultados.length]);
 
   function escolher(p: ProjetoSugestao) {
     onSelect(p.id, p.nome);
@@ -1621,16 +1934,26 @@ export function ProjetoPaiInput({
         >
           <span aria-hidden="true">🧩</span>
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--go-blue)" }}>
+            <div
+              className="text-[10px] font-semibold uppercase tracking-wide"
+              style={{ color: "var(--go-blue)" }}
+            >
               Feature do projeto
             </div>
-            <div className="truncate text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+            <div
+              className="truncate text-[13px] font-bold"
+              style={{ color: "var(--go-text-heading)" }}
+            >
               {paiNome || paiId}
             </div>
           </div>
           <button
             type="button"
-            onClick={() => { onClear(); setQuery(""); setDismissed(false); }}
+            onClick={() => {
+              onClear();
+              setQuery("");
+              setDismissed(false);
+            }}
             className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold"
             style={{ color: "var(--go-blue)", background: "rgba(0,89,169,0.08)" }}
             aria-label="Trocar o projeto pai"
@@ -1653,15 +1976,27 @@ export function ProjetoPaiInput({
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
-        onChange={(e) => { setQuery(e.currentTarget.value); setDismissed(false); }}
+        onChange={(e) => {
+          setQuery(e.currentTarget.value);
+          setDismissed(false);
+        }}
         onFocus={() => setFocused(true)}
         onBlur={() => setTimeout(() => setFocused(false), 150)}
         onKeyDown={(e) => {
           if (!open || resultados.length === 0) return;
-          if (e.key === "ArrowDown") { e.preventDefault(); setActiveIndex((i) => (i + 1) % resultados.length); }
-          else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIndex((i) => (i - 1 + resultados.length) % resultados.length); }
-          else if (e.key === "Enter") { e.preventDefault(); escolher(resultados[Math.min(activeIndex, resultados.length - 1)]); }
-          else if (e.key === "Escape") { e.preventDefault(); setDismissed(true); }
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActiveIndex((i) => (i + 1) % resultados.length);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActiveIndex((i) => (i - 1 + resultados.length) % resultados.length);
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            escolher(resultados[Math.min(activeIndex, resultados.length - 1)]);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setDismissed(true);
+          }
         }}
       />
       <FieldError message={error} />
@@ -1672,25 +2007,42 @@ export function ProjetoPaiInput({
           style={{ background: "#fff", border: "1px solid rgba(0,89,169,0.15)" }}
         >
           {loading && resultados.length === 0 && (
-            <li className="px-3 py-2 text-[12px]" style={{ color: "#8b8b9a" }}>Buscando…</li>
+            <li className="px-3 py-2 text-[12px]" style={{ color: "#8b8b9a" }}>
+              Buscando…
+            </li>
           )}
           {!loading && resultados.length === 0 && (
-            <li className="px-3 py-2 text-[12px]" style={{ color: "#8b8b9a" }}>Nenhum projeto encontrado</li>
+            <li className="px-3 py-2 text-[12px]" style={{ color: "#8b8b9a" }}>
+              Nenhum projeto encontrado
+            </li>
           )}
           {resultados.map((p, i) => (
-            <li key={p.id} role="option" aria-selected={i === activeIndex} data-ativa={i === activeIndex}>
+            <li
+              key={p.id}
+              role="option"
+              aria-selected={i === activeIndex}
+              data-ativa={i === activeIndex}
+            >
               <button
                 type="button"
-                onMouseDown={(e) => { e.preventDefault(); escolher(p); }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  escolher(p);
+                }}
                 onMouseEnter={() => setActiveIndex(i)}
                 className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left"
                 style={{ background: i === activeIndex ? "rgba(0,89,169,0.07)" : "transparent" }}
               >
-                <span className="truncate text-[13px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                <span
+                  className="truncate text-[13px] font-semibold"
+                  style={{ color: "var(--go-text-heading)" }}
+                >
                   {p.nome}
                 </span>
                 {p.autor && (
-                  <span className="truncate text-[11px]" style={{ color: "#8b8b9a" }}>{p.autor}</span>
+                  <span className="truncate text-[11px]" style={{ color: "#8b8b9a" }}>
+                    {p.autor}
+                  </span>
                 )}
               </button>
             </li>

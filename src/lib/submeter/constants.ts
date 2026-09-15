@@ -1,15 +1,45 @@
 import { erroCategorias, type GanhoCategoria } from "@/lib/ganhos";
 
 export const AREAS = [
-  "AZ", "B2B Gobeauté", "B2B Gocase", "Contabilidade", "CSC", "CX",
-  "CX - Agentes", "Dados", "Departamento Pessoal", "E-commerce", "Facilities",
-  "Financeiro", "Fiscal", "FP&A", "Gente e Gestão", "Growth", "Ilustração",
-  "Jurídico", "Logística", "M&A", "Marketing de Influência",
-  "Offline - Administrativo", "Offline - Lojas", "Operações Gobeauté",
-  "Operações Gocase - Administrativo", "Transportes", "Qualidade", "Manutenção",
-  "Expedição", "Almoxarifado", "Produção", "Produto Gobeauté", "Produto Gocase",
-  "Projetos e Integrações", "RPA", "Marketing - Branding",
-  "Sourcing & Procurement Gobeauté", "Supply Gogroup", "Tecnologia",
+  "AZ",
+  "B2B Gobeauté",
+  "B2B Gocase",
+  "Contabilidade",
+  "CSC",
+  "CX",
+  "CX - Agentes",
+  "Dados",
+  "Departamento Pessoal",
+  "E-commerce",
+  "Facilities",
+  "Financeiro",
+  "Fiscal",
+  "FP&A",
+  "Gente e Gestão",
+  "Growth",
+  "Ilustração",
+  "Jurídico",
+  "Logística",
+  "M&A",
+  "Marketing de Influência",
+  "Offline - Administrativo",
+  "Offline - Lojas",
+  "Operações Gobeauté",
+  "Operações Gocase - Administrativo",
+  "Transportes",
+  "Qualidade",
+  "Manutenção",
+  "Expedição",
+  "Almoxarifado",
+  "Produção",
+  "Produto Gobeauté",
+  "Produto Gocase",
+  "Projetos e Integrações",
+  "RPA",
+  "Marketing - Branding",
+  "Sourcing & Procurement Gobeauté",
+  "Supply Gogroup",
+  "Tecnologia",
 ] as const;
 
 // ─── Ferramentas de CONSTRUÇÃO do projeto (MULTI-seleção) ────────────────────
@@ -66,9 +96,9 @@ export type FerramentaOpcao = {
 // porque nada lê a coluna por posição, mas a string de um mesmo projeto muda de forma.
 export const FERRAMENTAS_OPCOES: readonly FerramentaOpcao[] = [
   // Coluna 1 — a família Claude, de cima para baixo, na cor do logo dele (`marca`)
-  { value: "Claude AI",     familia: "Claude", variante: "AI",     marca: "claude" },
+  { value: "Claude AI", familia: "Claude", variante: "AI", marca: "claude" },
   { value: "Claude Cowork", familia: "Claude", variante: "Cowork", marca: "claude" },
-  { value: "Claude Code",   familia: "Claude", variante: "Code",   marca: "claude" },
+  { value: "Claude Code", familia: "Claude", variante: "Code", marca: "claude" },
   // Coluna 2
   { value: "Python" },
   { value: "n8n" },
@@ -90,14 +120,14 @@ export const FERRAMENTAS: readonly string[] = FERRAMENTAS_OPCOES.map((o) => o.va
 // (`analyzer.ts`) já dizia. "Claude + GoDeploy" não precisa de entrada própria: quebra
 // no separador e cada metade cai aqui.
 export const FERRAMENTAS_LEGADO: Record<string, string> = {
-  "claude": "Claude Code",
+  claude: "Claude Code",
   // ⚠️ `Claude.ai` esteve NO AR como valor da opção por ~1h em 12/08/2026 (a grafia foi
   // corrigida para "Claude AI" no mesmo dia). Projeto submetido nessa janela tem a string
   // antiga na planilha e no SQLite — sem esta linha ele reabriria com ZERO opção marcada.
   "claude.ai": "Claude AI",
   "claude ai": "Claude AI",
   "claude chat": "Claude AI",
-  "godeploy": "GoDeploy",
+  godeploy: "GoDeploy",
 };
 
 // "n8n + Claude Code" → ["n8n", "Claude Code"]. `Outros: <texto>` volta separado em
@@ -109,7 +139,10 @@ export function desserializarFerramentas(bruto: string | null | undefined): {
   ferramentas: string[];
   ferramentaOutra: string;
 } {
-  const tokens = (bruto ?? "").split(FERRAMENTA_SEP).map((t) => t.trim()).filter(Boolean);
+  const tokens = (bruto ?? "")
+    .split(FERRAMENTA_SEP)
+    .map((t) => t.trim())
+    .filter(Boolean);
   const ferramentas: string[] = [];
   let ferramentaOutra = "";
   for (const token of tokens) {
@@ -120,9 +153,7 @@ export function desserializarFerramentas(bruto: string | null | undefined): {
       continue;
     }
     const canonico =
-      FERRAMENTAS.find((f) => f.toLowerCase() === lower) ??
-      FERRAMENTAS_LEGADO[lower] ??
-      token;
+      FERRAMENTAS.find((f) => f.toLowerCase() === lower) ?? FERRAMENTAS_LEGADO[lower] ?? token;
     if (!ferramentas.includes(canonico)) ferramentas.push(canonico);
   }
   return { ferramentas, ferramentaOutra };
@@ -161,12 +192,23 @@ export function limiteFerramentaOutra(ferramentas: string[]): number {
 export const ACCEPTED_DOC_EXT_BASE = [".pdf", ".docx", ".doc", ".txt", ".md"];
 // Extensões de código e config
 export const ACCEPTED_CODE_EXT = [
-  ".json", ".ts", ".tsx", ".js", ".jsx", ".py",
-  ".sql", ".sh", ".yaml", ".yml", ".toml", ".css", ".html",
+  ".json",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".py",
+  ".sql",
+  ".sh",
+  ".yaml",
+  ".yml",
+  ".toml",
+  ".css",
+  ".html",
 ];
 export const ACCEPTED_DOC_EXT = [...ACCEPTED_DOC_EXT_BASE, ...ACCEPTED_CODE_EXT];
 
-export const MAX_FILE_MB = 10;   // por arquivo
+export const MAX_FILE_MB = 10; // por arquivo
 // Sem limite de contagem de arquivos — o gate é o orçamento de tokens (abaixo).
 // Cap de segurança alto só para evitar payloads patológicos.
 export const MAX_FILES = 5000;
@@ -174,9 +216,9 @@ export const MAX_FILES = 5000;
 // Orçamento de TOKENS (não de arquivos). ~4 chars por token.
 // Analisamos a codebase/pasta inteira desde que não estoure 200k tokens.
 // BLOCK = 200k tokens (= cap de truncamento do backend); WARN um pouco antes.
-export const TOKEN_BUDGET = 200_000;             // tokens
-export const TOKEN_WARN_CHARS = 600_000;         // ~150k tokens
-export const TOKEN_BLOCK_CHARS = 800_000;        // ~200k tokens
+export const TOKEN_BUDGET = 200_000; // tokens
+export const TOKEN_WARN_CHARS = 600_000; // ~150k tokens
+export const TOKEN_BLOCK_CHARS = 800_000; // ~200k tokens
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const ALLOWED_DOMAINS_RE = /^[^\s@]+@(gocase|gobeaute|gogroup)\.(com|com\.br)$/i;
 
@@ -198,7 +240,7 @@ export const PAPEIS_PARTICIPANTE = [
     value: "coexecutor",
     label: "Coautor",
     descricao:
-      "Executou e esteve à frente do projeto. Atuou como executor ou coexecutor principal. Apenas 1 por projeto.",
+      "Executou e esteve à frente do projeto. Atuou como executor ou coexecutor principal.",
   },
   {
     value: "planejador",
@@ -222,34 +264,68 @@ export const DESCRICAO_PAPEL: Record<PapelParticipante, string> = Object.fromEnt
   PAPEIS_PARTICIPANTE.map((p) => [p.value, p.descricao]),
 ) as Record<PapelParticipante, string>;
 
-// Papel "Coautor" — ÚNICO por projeto (decisão de produto 30/07/2026): cada projeto tem
-// 1 autor (o submissor/dono) e no máximo 1 Coautor. Os demais participantes ficam como
-// "Participante" ou "Contribuidor". O seletor desabilita "Coautor" para os outros quando
-// alguém já o tem, e `validarEtapa1` bloqueia o avanço se vierem 2+ (caso de legado
-// importado do Sheets com vários na coluna "Participantes" — o usuário reclassifica).
+// ⚠️ **CADA PAPEL É ÚNICO NO PROJETO** (decisão do dono do produto, 15/09/2026): *"agora só
+// pode ter 1 por participação. Só pode ter 1 autor (padrão), 1 coautor, 1 contribuidor e 1
+// participante. Não é pra permitir selecionar mais de um."* Antes só o **Coautor** era único
+// (decisão de 30/07/2026) e os outros dois eram ilimitados.
+//
+// O seletor REMOVE da lista de outra pessoa o papel já tomado (nunca desabilitado — a nota
+// abaixo do campo explica), e `validarEtapa1` bloqueia o avanço se vierem repetidos, que é o
+// caso do LEGADO importado do Sheets com vários na mesma coluna: quem reclassifica é a pessoa,
+// porque promover/rebaixar alguém por conta própria seria decidir por ela.
 export const PAPEL_COAUTOR: PapelParticipante = "coexecutor";
 
-// E-mails (dentro de `participantes`) marcados como Coautor. Função pura — testável.
-export function coautoresSelecionados(
+/**
+ * Teto de participantes além do autor — CONSEQUÊNCIA direta de "1 por papel", não uma regra
+ * nova: com três papéis e cada um cabendo a uma pessoa só, a quarta pessoa não tem papel
+ * possível.
+ *
+ * ⚠️ Sem este teto o formulário entra num BECO: a pessoa adiciona a quarta, o campo de papel
+ * dela fica sem nenhuma opção disponível, e o gate "escolha o papel de cada participante"
+ * bloqueia o avanço para sempre — sem dizer o que fazer. Barrar na ADIÇÃO, com a razão dita
+ * na hora, é o único lugar em que isso se explica.
+ */
+export const MAX_PARTICIPANTES = PAPEIS_PARTICIPANTE.length;
+
+/** E-mails (dentro de `participantes`) marcados com um papel. PURA. */
+export function selecionadosComPapel(
   participantes: string[],
   papeis: Record<string, PapelParticipante | "">,
+  papel: PapelParticipante,
 ): string[] {
-  return participantes.filter((email) => papeis[email] === PAPEL_COAUTOR);
+  return participantes.filter((email) => papeis[email] === papel);
 }
 
-// Aplica a regra do Coautor único a um mapa de papéis que veio de FORA do formulário
-// (seed da edição / rascunho): mantém o PRIMEIRO Coautor da lista e LIMPA o papel dos
-// demais (string vazia) — não promove ninguém por conta própria; o usuário escolhe
-// (o form já exige papel de todos). Sem 2+ Coautores, devolve o mapa como está.
-// Função pura — testável.
-export function limitarCoautorUnico(
+/** Os papéis que aparecem em 2+ participantes, na ordem do catálogo. PURA. */
+export function papeisRepetidos(
+  participantes: string[],
+  papeis: Record<string, PapelParticipante | "">,
+): PapelParticipante[] {
+  return PAPEIS_PARTICIPANTE.map((p) => p.value).filter(
+    (papel) => selecionadosComPapel(participantes, papeis, papel).length > 1,
+  );
+}
+
+// Aplica a regra "um por papel" a um mapa que veio de FORA do formulário (seed da edição /
+// rascunho): mantém o PRIMEIRO de cada papel na ordem da lista e LIMPA o papel dos demais
+// (string vazia) — não promove ninguém por conta própria; a pessoa escolhe (o form já exige
+// papel de todos). Sem repetição, devolve o mapa como está. PURA.
+//
+// ⚠️ Substitui `limitarCoautorUnico`, que fazia isto só para o Coautor. O nome antigo não
+// sobreviveu de propósito: um helper chamado "coautor" que limita os três papéis mentiria
+// sobre o que faz, e este é o arquivo que o seed da edição consulta.
+export function limitarUmPorPapel(
   participantes: string[],
   papeis: Record<string, PapelParticipante | "">,
 ): Record<string, PapelParticipante | ""> {
-  const coautores = coautoresSelecionados(participantes, papeis);
-  if (coautores.length <= 1) return papeis;
+  const repetidos = papeisRepetidos(participantes, papeis);
+  if (repetidos.length === 0) return papeis;
   const out = { ...papeis };
-  for (const email of coautores.slice(1)) out[email] = "";
+  for (const papel of repetidos) {
+    for (const email of selecionadosComPapel(participantes, papeis, papel).slice(1)) {
+      out[email] = "";
+    }
+  }
   return out;
 }
 
@@ -319,7 +395,10 @@ function nucleoComparavel(texto: string): string {
       return c < 0x300 || c > 0x36f;
     })
     .join("");
-  return semAcento.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return semAcento
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 // A contribuição digitada é só a DESCRIÇÃO de um papel copiada da legenda? É o modo de
@@ -380,10 +459,7 @@ export function deveMostrarIntro(args: {
 // preenchidos, e não deve travar (D2/RF-103). Fora da edição (submissão NOVA), a
 // validação é a completa de sempre (RF-106). Identidade (e-mail da conta detectado) e
 // participantes/papéis são exigidos nos DOIS modos (RF-101/RF-102). Função pura — testável.
-export function validarEtapa1(
-  form: FormData,
-  opts: { modoEdicao: boolean },
-): FieldErrors {
+export function validarEtapa1(form: FormData, opts: { modoEdicao: boolean }): FieldErrors {
   const errs: FieldErrors = {};
   const { modoEdicao } = opts;
 
@@ -401,18 +477,15 @@ export function validarEtapa1(
     // do `prodStatus` DESTA feature, abaixo.
     if (form.vinculo === "feature" && !form.paiId.trim())
       errs.paiId = "Escolha o projeto do qual este é uma feature";
-    if (!form.escopo)
-      errs.escopo = "Selecione se a solução é interna ou externa";
-    if (!form.prodStatus)
-      errs.prodStatus = "Selecione o status do projeto";
+    if (!form.escopo) errs.escopo = "Selecione se a solução é interna ou externa";
+    if (!form.prodStatus) errs.prodStatus = "Selecione o status do projeto";
     else if (form.prodStatus !== "sim")
       errs.prodStatus =
         form.escopo === "externo"
           ? "Apenas ferramentas externas já em uso podem ser submetidas"
           : "Apenas projetos em produção podem ser submetidos";
     if (form.escopo === "externo") {
-      if (!form.servicoExterno.trim())
-        errs.servicoExterno = "Informe o nome do serviço externo";
+      if (!form.servicoExterno.trim()) errs.servicoExterno = "Informe o nome do serviço externo";
     } else {
       if ((form.ferramentas ?? []).length === 0)
         errs.ferramentas = "Selecione ao menos uma ferramenta";
@@ -440,18 +513,21 @@ export function validarEtapa1(
     // Papel obrigatório por participante (decisão de produto: obriga escolher).
     else if (form.participantes.some((p) => !form.participantesPapeis[p]))
       errs.participantes = "Escolha o papel de cada participante";
-    // Coautor é ÚNICO por projeto (1 autor + no máximo 1 coautor).
-    else if (coautoresSelecionados(form.participantes, form.participantesPapeis).length > 1)
+    // Cada papel é ÚNICO no projeto: 1 autor (o submissor) + 1 de cada papel.
+    else if (papeisRepetidos(form.participantes, form.participantesPapeis).length > 0) {
+      const repetidos = papeisRepetidos(form.participantes, form.participantesPapeis).map(
+        (papel) => PAPEIS_PARTICIPANTE.find((p) => p.value === papel)?.label ?? papel,
+      );
       errs.participantes =
-        "Só é possível ter 1 Coautor por projeto — deixe os demais como Participante ou Contribuidor";
+        repetidos.length === 1
+          ? `Só é possível ter 1 ${repetidos[0]} por projeto — escolha outro papel para os demais`
+          : `Cada papel cabe a uma pessoa só — há mais de um ${repetidos.join(" e mais de um ")}`;
+    }
     // O que cada pessoa FEZ — obrigatório nos dois modos, como o papel. Erro em campo
     // PRÓPRIO (`participantesContribuicoes`): quem esquece o texto de uma pessoa não
     // pode ver a mensagem de papel/coautor, que fala de outra coisa.
     else {
-      const faltando = contribuicoesFaltando(
-        form.participantes,
-        form.participantesContribuicoes,
-      );
+      const faltando = contribuicoesFaltando(form.participantes, form.participantesContribuicoes);
       if (faltando.length > 0)
         errs.participantesContribuicoes =
           faltando.length === 1
@@ -461,10 +537,7 @@ export function validarEtapa1(
       // (caso Smart Replan): tem 20+ caracteres e passaria pelo gate de tamanho, mas não
       // diz o que a pessoa fez. Bloqueia com mensagem própria.
       else {
-        const copiadas = contribuicoesCopiadas(
-          form.participantes,
-          form.participantesContribuicoes,
-        );
+        const copiadas = contribuicoesCopiadas(form.participantes, form.participantesContribuicoes);
         if (copiadas.length > 0)
           errs.participantesContribuicoes =
             copiadas.length === 1
@@ -511,7 +584,14 @@ export function validarEtapa2(
   // contrafactual — QUEM sente falta (pessoas ou times, da Team Guide). O "o que piora"
   // saiu do formulário (03/08/2026): nunca teve coluna própria no Sheets e o agente já
   // cobre o efeito de desligar na conversa. Não reintroduzir aqui.
-  if (!form.contrafactualAfetados || form.contrafactualAfetados.length === 0) {
+  // ⚠️ "A empresa inteira" JÁ É a resposta — não há o que selecionar depois dela, e cobrar
+  // uma lista ali seria pedir que a pessoa enumere a empresa. Quem grava o valor é a própria
+  // tela, ao escolher a opção (`AFETADO_EMPRESA`); esta guarda existe para o caso de um
+  // rascunho antigo chegar com a marca vazia.
+  if (
+    form.contrafactualAfetadosTipo !== "empresa" &&
+    (!form.contrafactualAfetados || form.contrafactualAfetados.length === 0)
+  ) {
     errs.contrafactualAfetados =
       form.contrafactualAfetadosTipo === "time"
         ? "Selecione ao menos um time/área que sentiria falta"
@@ -624,13 +704,22 @@ export interface FormData {
   // Não vai ao backend, a nenhum prompt nem ao Sheets.
 }
 
-// Quem sentiria falta se a automação parasse: pessoas específicas OU um time/área
-// inteiro (evita marcar pessoa por pessoa quando o impacto é do time todo).
-export type AfetadoTipo = "pessoa" | "time";
+// Quem sentiria falta se a automação parasse: pessoas específicas · um time/área inteiro ·
+// a EMPRESA inteira (evita marcar pessoa por pessoa quando o impacto é de todo mundo).
+//
+// ⚠️ `empresa` entrou em 15/09/2026 a pedido do dono do produto: *"se desligar hoje quem
+// sentiria falta deve ter a opção de todos também. A empresa inteira. Gogroup"*. Sem ela, quem
+// faz automação de alcance geral (o hub, o proxy de IA, a folha) tinha de escolher entre
+// listar times a esmo e escolher um só — as duas respostas erradas.
+export type AfetadoTipo = "pessoa" | "time" | "empresa";
+
+/** O valor gravado quando a resposta é "a empresa inteira". A grafia da marca é `Gogroup`. */
+export const AFETADO_EMPRESA = "Gogroup";
 
 export const AFETADO_TIPOS: { value: AfetadoTipo; label: string }[] = [
   { value: "pessoa", label: "👤 Pessoas específicas" },
   { value: "time", label: "👥 Um time/área inteiro" },
+  { value: "empresa", label: "🏢 A empresa inteira" },
 ];
 
 // Serialização das duas respostas para o banco (e para a comparação de metaChanged):
@@ -646,7 +735,9 @@ export function desserializarAfetados(bruto: string | null | undefined): {
 } {
   const txt = (bruto ?? "").trim();
   const sep = txt.indexOf(":");
-  const tipo: AfetadoTipo = txt.slice(0, sep) === "time" ? "time" : "pessoa";
+  const prefixo = txt.slice(0, sep);
+  const tipo: AfetadoTipo =
+    prefixo === "time" ? "time" : prefixo === "empresa" ? "empresa" : "pessoa";
   const lista =
     sep < 0
       ? []
@@ -662,7 +753,14 @@ export interface FieldErrors {
   [key: string]: string;
 }
 
-export type ChatFase = "doc" | "doc_preview" | "saving" | "saving_preview" | "receita" | "receita_preview" | "completo";
+export type ChatFase =
+  | "doc"
+  | "doc_preview"
+  | "saving"
+  | "saving_preview"
+  | "receita"
+  | "receita_preview"
+  | "completo";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -688,7 +786,7 @@ export interface SavingLinhaInput {
 export interface CustoEvitadoItemInput {
   nome: string;
   valor: string;
-  recorrencia: 'mensal' | 'pontual' | '';
+  recorrencia: "mensal" | "pontual" | "";
   justificativa: string;
 }
 
@@ -698,31 +796,31 @@ export interface SavingFormData {
   // 'sim' → tabela antes+depois (economia clássica). 'nao' → ninguém fazia: a
   // árvore segue para `eliminaGastoExterno` (e, conforme a resposta, custo evitado
   // puro OU equivalente manual estimado — saving contrafactual).
-  alguemFazia: 'sim' | 'nao' | '';
+  alguemFazia: "sim" | "nao" | "";
   // Árvore do "Não, ninguém fazia": a automação eliminou um gasto externo
   // (contrato/serviço/licença)? 'sim' → coleta o custo evitado (o ganho); 'nao' →
   // contrafactual (equivalente manual estimado). Só relevante quando alguemFazia==='nao'.
-  eliminaGastoExterno: 'sim' | 'nao' | '';
+  eliminaGastoExterno: "sim" | "nao" | "";
   // 2c — só no ramo "Não → elimina SIM": além do gasto eliminado, há um trabalho
   // manual ADICIONAL (que ninguém fazia e o contrato NÃO cobria)? 'sim' → também
   // coleta horas contrafactuais distintas; 'nao' → custo evitado puro (0h, mapeia
   // para alguem_fazia='externo' no payload). Evita a dupla contagem do mesmo trabalho.
-  temContrafactualAdicional: 'sim' | 'nao' | '';
+  temContrafactualAdicional: "sim" | "nao" | "";
   // Saving: a solução evitou um custo externo (ferramenta/serviço que deixou de
   // ser pago)? 'sim' → lista de ferramentas evitadas (custoEvitadoItens). No ramo
   // "Sim, alguém fazia" é a pergunta OPCIONAL de um custo DISTINTO das horas; no
   // ramo "Não" o papel é cumprido por `eliminaGastoExterno`.
-  temCustoEvitado: 'sim' | 'nao' | '';
+  temCustoEvitado: "sim" | "nao" | "";
   custoEvitadoItens: CustoEvitadoItemInput[];
   // Saving: a solução INTERNA consome algum serviço externo PAGO para funcionar
   // (chave de API, ElevenLabs, etc.)? 'sim' → lista de serviços (custoProjetoItens).
   // O valor (pontual e mensal pelo valor cheio, sem ÷12) SUBTRAI do saving. Mesmo formato
   // do custo evitado, mas ABATE em vez de somar. ≠ custoExterno (que é escopo externo).
-  temCustoProjeto: 'sim' | 'nao' | '';
+  temCustoProjeto: "sim" | "nao" | "";
   custoProjetoItens: CustoEvitadoItemInput[];
-  tipoSaving: 'mensal' | 'pontual' | 'trimestral' | 'semestral' | '';
+  tipoSaving: "mensal" | "pontual" | "trimestral" | "semestral" | "";
   custoExterno: string;
-  custoPeriodicidade: 'mensal' | 'anual' | '';
+  custoPeriodicidade: "mensal" | "anual" | "";
   // Receita: ganho estimado informado pela pessoa antes do chat (o agente desafia).
   valorReceita: string;
   // Receita: racional curto (de onde vem a receita) — o agente usa como ponto de partida.
@@ -738,7 +836,7 @@ export interface AnaliseResultCriterio {
 }
 
 export interface AnaliseResult {
-  resultado: 'aprovado' | 'rejeitado';
+  resultado: "aprovado" | "rejeitado";
   pontuacao_total: number;
   pontuacao_maxima: number;
   justificativa: string;
@@ -757,7 +855,10 @@ export function formatMoedaBR(raw: string): string {
   const digits = String(raw).replace(/\D/g, "");
   if (!digits) return "";
   const cents = parseInt(digits, 10);
-  return (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (cents / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 // "1.234,56" → 1234.56 (0 se inválido). Inverso de formatMoedaBR/numeroParaMoedaBR.
@@ -796,11 +897,9 @@ export function descartarDocsVazios<T extends { base64: string }>(docs: T[]): T[
 
 // Converte os arquivos selecionados no payload `docs` (base64 + nome), descartando
 // arquivos vazios para nunca enviar um base64 "" que o backend recusaria.
-export async function filesToDocs(
-  files: File[]
-): Promise<{ base64: string; filename: string }[]> {
+export async function filesToDocs(files: File[]): Promise<{ base64: string; filename: string }[]> {
   const docs = await Promise.all(
-    files.map(async (f) => ({ base64: await readFileAsBase64(f), filename: f.name }))
+    files.map(async (f) => ({ base64: await readFileAsBase64(f), filename: f.name })),
   );
   return descartarDocsVazios(docs);
 }
@@ -817,12 +916,14 @@ export function ocultarReaisSaving(content: string): string {
   // ("Custo adicional: 1h/mês") é legítima e deve permanecer.
   const ehLinhaFinanceira = (l: string) =>
     /r\$/i.test(l) || /\d[\d.,]*\s*reais\b/i.test(l) || /(valor|taxa)[\s/]*(por\s*)?hora/i.test(l);
-  return content
-    .split("\n")
-    .filter((linha) => !ehLinhaFinanceira(linha))
-    .join("\n")
-    // Segurança extra: remove qualquer "R$ 1.234,56" residual inline
-    .replace(/r\$\s*[\d.,]+/gi, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return (
+    content
+      .split("\n")
+      .filter((linha) => !ehLinhaFinanceira(linha))
+      .join("\n")
+      // Segurança extra: remove qualquer "R$ 1.234,56" residual inline
+      .replace(/r\$\s*[\d.,]+/gi, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }
