@@ -17,13 +17,39 @@
 // que foi desligado gasta chamada e produz um veredito que ninguém vai aplicar.
 
 /**
- * O que o TIME pode gravar como desfecho.
+ * O que o AGENTE pode gravar. Três, e esta lista é uma TRAVA — não documentação.
  *
- * ⚠️ `Ajuste pedido` entrou em 15/09/2026: a saída `ajuste` do consenso passou a ter onde
- * aterrissar (ver `statusDoFunil`). `Pré-aprovado` NÃO está aqui de propósito — ele é o
- * estado de ENTRADA do agente (quem o grava é o líder ou a submissão), não um desfecho.
+ * ⚠️ **`Ajuste pedido` NÃO está aqui, e não pode entrar** (decisão do dono do produto,
+ * 15/09/2026): *"O ajuste pedido é um status que só o líder pede para o liderado no projeto
+ * quando ele vai aprovar. O agente só aprova ou reprova."* A razão é de AUTORIDADE, não de
+ * vocabulário: devolver o projeto ao autor é um pedido que alguém FAZ — o líder na fila dele,
+ * a triagem no cartão. Eu cheguei a mapear a saída `ajuste` do time para esse status e foi ao
+ * ar (o «Debug-skill» de prod foi gravado assim pelo agente); por isso a proibição virou
+ * `agentePodeGravar` logo abaixo, em vez de ficar só neste comentário.
+ *
+ * ⚠️ **`Pré-aprovado` também fica fora**, por outra razão: é o estado de ENTRADA do agente
+ * (quem grava é o líder ou a submissão), nunca um desfecho dele.
  */
-export const STATUS_FUNIL = ["Aprovado", "Pendente", "Ajuste pedido", "Reprovado"] as const;
+export const STATUS_FUNIL = ["Aprovado", "Pendente", "Reprovado"] as const;
+
+/** Status proibidos ao agente, com o porquê de cada um. Alimenta o guard e o teste. */
+export const STATUS_FORA_DO_AGENTE: Readonly<Record<string, string>> = {
+  "Ajuste pedido":
+    "devolver o projeto ao autor é ato de gente: o líder na fila dele ou a triagem no cartão",
+  "Pré-aprovado": "é o estado de ENTRADA do agente, gravado pelo líder ou pela submissão",
+  Descontinuado: "é o dono arquivando a automação, não uma etapa do funil",
+};
+
+/**
+ * O agente pode gravar este status? PURA.
+ *
+ * ⚠️ Existe para a proibição ser CÓDIGO, não lembrança. Um mapeamento novo que devolva
+ * `Ajuste pedido` ou `Pré-aprovado` falha no teste em vez de ir a produção — que é
+ * exatamente o que aconteceu em 15/09.
+ */
+export function agentePodeGravar(status: string): boolean {
+  return (STATUS_FUNIL as readonly string[]).includes(status.trim());
+}
 
 /**
  * O TIME de agentes decide o funil (Aprovado/Pendente/Reprovado)? Env `AGENTE_DECIDE_FUNIL`, lida em
@@ -95,18 +121,18 @@ export function statusDoFunil(d: DesfechoDoTime): DecisaoDoFunil {
     };
   }
   if (d.saida === "ajuste") {
-    // ⚠️ **`Ajuste pedido` é um STATUS desde 14/09/2026** — antes esta saída era achatada em
-    // `Pendente` porque o funil só tinha três estados, e o comentário do topo deste arquivo
-    // ainda dizia isso. Manter o achatamento depois da coluna única criava um LOOP: o time
-    // concluía `ajuste`, o projeto voltava a `Pendente`, o cron o reavaliava depois de 72h e
-    // concluía `ajuste` de novo — e o autor, que é quem tem de agir, nunca era avisado (o
-    // card dele mostra "Pendente", que não pede nada). Medido em prod (15/09) no
-    // «Debug-skill»: `status_gravado: Pendente` com o porquê "o time pede ajuste ao autor".
+    // ⚠️ **`ajuste` é `Pendente`, NUNCA `Ajuste pedido`** (15/09/2026). Eu mapeei para
+    // `Ajuste pedido` e foi ao ar; o dono do produto corrigiu na hora: *"O ajuste pedido é um
+    // status que só o líder pede para o liderado. O agente só aprova ou reprova."*
     //
-    // ⚠️ É o mesmo desfecho de sempre; o que muda é ele ter onde aterrissar. As PERGUNTAS ao
-    // autor continuam vindo no texto do consenso, que é a razão de `ajuste` existir.
+    // O agente dizendo "ajuste" quer dizer "não fecho com o material que existe" — e quem não
+    // fecha devolve para GENTE decidir, que é `Pendente`. Pôr a bola com o autor é um pedido,
+    // e pedido tem dono.
+    //
+    // ⚠️ As PERGUNTAS que o mérito levantou não se perdem: ficam no parecer, que é onde a
+    // triagem as lê antes de decidir o que pedir ao autor.
     return {
-      status: "Ajuste pedido",
+      status: "Pendente",
       flag6a10: false,
       porque: "O time pede ajuste ao autor antes de decidir.",
     };

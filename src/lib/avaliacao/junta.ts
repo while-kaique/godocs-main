@@ -73,20 +73,6 @@ export type Juncao = DecisaoDoFunil & {
  */
 export const NOTA_SUSTENTA_APROVACAO = 1;
 
-/**
- * O time não fechou nem a favor nem contra.
- *
- * ⚠️ Existe porque `Ajuste pedido` passou a ser um status de verdade (15/09/2026) e o time
- * pode devolvê-lo. Antes a saída `ajuste` era achatada em `Pendente`, então TODA comparação
- * aqui usava `=== 'Pendente'` para dizer "o time não concluiu" — e manter aquelas
- * comparações depois da mudança faria a regra 2b (o mérito tem um dono só, medida em prod
- * em 10/09) parar de valer justo no caso mais comum: 7 dos 9 projetos daquela medição vinham
- * com o time em `ajuste`.
- */
-function timeEmAberto(status: StatusFunil): boolean {
-  return status === "Pendente" || status === "Ajuste pedido";
-}
-
 /** Veredito da MESA → status do funil. Vocabulário dela, não do time. */
 function statusDaMesa(veredito: string): StatusFunil {
   const v = veredito.trim().toLowerCase();
@@ -233,7 +219,7 @@ export function juntarAnalises(args: {
   //   • a nota, que a mesa não produz.
   // ⚠️ E `ajuste` do time NÃO é descartado: ele vira a JUSTIFICATIVA que o autor lê, com as
   // perguntas dos especialistas. O que ele deixou de fazer é impedir a decisão.
-  if (daMesa === "Aprovado" && timeEmAberto(doTime.status)) {
+  if (daMesa === "Aprovado" && doTime.status === "Pendente") {
     porques.push("O time do impacto aprovou o projeto.");
     {
       porques.push(
@@ -262,7 +248,7 @@ export function juntarAnalises(args: {
   // material discordam — não é uma metade sem o número na mão.
   if (daMesa === "Reprovado" && doTime.status !== "Aprovado") {
     porques.push("A análise do impacto reprovou o projeto por régua declarada.");
-    if (timeEmAberto(doTime.status)) {
+    if (doTime.status === "Pendente") {
       porques.push(
         "A avaliação da estrela não aprovou o projeto, então não há leitura que sustente mantê-lo.",
       );
@@ -379,12 +365,8 @@ export function juntarAnalises(args: {
 
   // 2 — concordam
   //
-  // ⚠️ Mesa em `Pendente` + time em `Ajuste pedido` CONCORDAM: as duas dizem "não fechei".
-  // A diferença é que o time sabe o que pedir, então o status dele é que vale — sem isto, o
-  // par cairia em "divergiram" e o projeto perderia as perguntas ao autor além de sair com
-  // confiança baixa sem motivo.
-  if (doTime.status === daMesa || (daMesa === "Pendente" && timeEmAberto(doTime.status))) {
-    porques.push(`As duas metades do time chegaram ao mesmo lugar: ${doTime.status}.`);
+  if (doTime.status === daMesa) {
+    porques.push(`As duas metades do time chegaram ao mesmo lugar: ${daMesa}.`);
     porques.push(doTime.porque);
     return { ...doTime, concordam: true, confianca: confTime, porques };
   }
