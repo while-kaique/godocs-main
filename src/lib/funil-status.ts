@@ -41,6 +41,27 @@ export const STATUS_FORA_DO_AGENTE: Readonly<Record<string, string>> = {
 };
 
 /**
+ * O agente deve ESCREVER este desfecho, ou ficar calado? PURA.
+ *
+ * ⚠️ **Só decisão FINAL é escrita. `Pendente` do agente NÃO se escreve** (15/09/2026).
+ *
+ * `Pendente` como desfecho quer dizer "eu não decidi". Escrever "não decidi" por cima de um
+ * status que alguém construiu **apaga o trabalho de quem construiu** — e foi o que aconteceu
+ * em produção: o líder pré-aprovou o «Protheus reports», o cron pegou o projeto, o time não
+ * fechou e gravou `Pré-aprovado → Pendente` às 14:43, desfazendo a pré-aprovação. Pior: com o
+ * Status de volta em `Pendente`, o portão `podeAgenteDecidir` volta a bloquear e o projeto
+ * fica preso — o agente derrubando a própria autorização.
+ *
+ * É também a leitura literal da regra do dono do produto: *"o agente só aprova ou reprova"*.
+ * Se ele não aprova nem reprova, não encosta; o que ele apurou fica no parecer, que é onde a
+ * triagem lê.
+ */
+export function agenteDeveGravar(alvo: string): boolean {
+  const t = alvo.trim();
+  return t === "Aprovado" || t === "Reprovado";
+}
+
+/**
  * O agente pode gravar este status? PURA.
  *
  * ⚠️ Existe para a proibição ser CÓDIGO, não lembrança. Um mapeamento novo que devolva

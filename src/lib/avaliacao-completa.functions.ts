@@ -16,40 +16,40 @@
  * por dentro: a mesa pode falhar (flag OFF, projeto especial) sem levar a nota, e vice-versa. Quem
  * chama isto — submissão, botão da ficha, lote — nunca recebe exceção.
  */
-import { avaliarProjetoNormal } from '@/lib/avaliacao-normais.functions';
-import { avaliarProjetoComTime } from '@/lib/avaliacao/time.functions';
-import { lerLinhaEspelho, espelharEscrita, lerResumosEspelho } from '@/lib/sheet-espelho';
-import { updateRowByProjectId } from '@/lib/google/sheets';
-import { upsertAvaliacaoEspecial, getProjetoById } from '@/integrations/db/client.server';
-import { rotuloNotaAgente } from '@/lib/estrelas-regua';
-import { TIPOS_PROJETO, NIVEIS_PROJETO } from '@/lib/categorizacao-projeto';
-import { chaveProjeto } from '@/lib/projeto-chave';
-import { numero } from '@/lib/dashboard-resumo';
-import { ESTRELA_LIMITE_REPROVAVEL } from '@/lib/materialidade-piso';
-import { juntarAnalises, type Juncao } from '@/lib/avaliacao/junta';
-import { justificativaDaReprovacao, agenteDecideFunil } from '@/lib/funil-status';
-import { getUltimosConsensosDoTimePorIds } from '@/integrations/db/client.server';
-import { definirStatusProjeto } from '@/lib/dashboard-admin.functions';
-import { podeAgenteDecidir } from '@/lib/status-funil';
+import { avaliarProjetoNormal } from "@/lib/avaliacao-normais.functions";
+import { avaliarProjetoComTime } from "@/lib/avaliacao/time.functions";
+import { lerLinhaEspelho, espelharEscrita, lerResumosEspelho } from "@/lib/sheet-espelho";
+import { updateRowByProjectId } from "@/lib/google/sheets";
+import { upsertAvaliacaoEspecial, getProjetoById } from "@/integrations/db/client.server";
+import { rotuloNotaAgente } from "@/lib/estrelas-regua";
+import { TIPOS_PROJETO, NIVEIS_PROJETO } from "@/lib/categorizacao-projeto";
+import { chaveProjeto } from "@/lib/projeto-chave";
+import { numero } from "@/lib/dashboard-resumo";
+import { ESTRELA_LIMITE_REPROVAVEL } from "@/lib/materialidade-piso";
+import { juntarAnalises, type Juncao } from "@/lib/avaliacao/junta";
+import { justificativaDaReprovacao, agenteDecideFunil, agenteDeveGravar } from "@/lib/funil-status";
+import { getUltimosConsensosDoTimePorIds } from "@/integrations/db/client.server";
+import { definirStatusProjeto } from "@/lib/dashboard-admin.functions";
+import { podeAgenteDecidir, entraNaFilaDeAvaliacao } from "@/lib/status-funil";
 import {
   podeAgenteGravarStatus,
   podeAgenteEscreverNota,
   porqueNaoEncostou,
   ehAtorHumano,
   type EscritaDeStatus,
-} from '@/lib/decisao-humana';
+} from "@/lib/decisao-humana";
 import {
   getAdminStatusLogs,
   queryAdminActivitiesPorAcao,
   getReenviosDoProjeto,
-} from '@/integrations/db/client.server';
+} from "@/integrations/db/client.server";
 
 /**
  * Quem aparece na auditoria quando quem decidiu foi o time. ⚠️ Não usar um e-mail de pessoa: o
  * `admin_status_log` e o feed do painel existem para responder "quem mudou este status", e atribuir
  * a decisão do agente a um humano apaga exatamente essa resposta.
  */
-export const ATOR_TIME_AGENTES = 'time-de-agentes@godocs';
+export const ATOR_TIME_AGENTES = "time-de-agentes@godocs";
 
 /**
  * O time escreve o Status do funil? Env lida em RUNTIME (nunca em escopo de módulo — no Godeploy
@@ -62,8 +62,8 @@ export const ATOR_TIME_AGENTES = 'time-de-agentes@godocs';
  */
 /** A célula está vazia? `—`/`-` contam como vazio, como em todo o resto do repo. */
 function vazioNaPlanilha(v: string | undefined | null): boolean {
-  const t = String(v ?? '').trim();
-  return t === '' || t === '—' || t === '-';
+  const t = String(v ?? "").trim();
+  return t === "" || t === "—" || t === "-";
 }
 
 /**
@@ -72,8 +72,10 @@ function vazioNaPlanilha(v: string | undefined | null): boolean {
  * ficar num limbo. Ver `juntarAnalises.fecharPendente`.
  */
 export function agenteFechaPendente(): boolean {
-  const v = String(process.env.AGENTE_FECHA_PENDENTE ?? '').trim().toLowerCase();
-  return v === '1' || v === 'true' || v === 'sim' || v === 'on';
+  const v = String(process.env.AGENTE_FECHA_PENDENTE ?? "")
+    .trim()
+    .toLowerCase();
+  return v === "1" || v === "true" || v === "sim" || v === "on";
 }
 
 export { agenteDecideFunil };
@@ -83,7 +85,7 @@ export { agenteDecideFunil };
  * agente). Distinguir importa: a régua de reprovação por impacto só pode se apoiar em nota que o
  * time avaliou, e sem carimbo próprio não há como saber de onde ela veio.
  */
-export const ORIGEM_TIME_COMPLETO = 'time-completo';
+export const ORIGEM_TIME_COMPLETO = "time-completo";
 
 /**
  * A metade da NOTA, agora pelo TIME INTEIRO.
@@ -115,7 +117,7 @@ async function estrelaPeloTimeInteiro(
   /** O consenso do TIME, que até 09/09/2026 era CALCULADO e JOGADO FORA aqui. */
   saida?: string;
   escape?: boolean;
-  confianca?: 'alta' | 'media' | 'baixa';
+  confianca?: "alta" | "media" | "baixa";
   /** O cérebro da estrela julgou de fato? (`false` = fallback dele — ver `LadoEstrela.avaliada`) */
   avaliada?: boolean;
 }> {
@@ -155,21 +157,29 @@ async function estrelaPeloTimeInteiro(
   {
     const humanoMexeu = await humanoAlterouEstrelas(projetoId);
     const nota = podeAgenteEscreverNota({
-      naCelula: numero(linhaAtual?.['Estrelas']),
-      recomendadaPeloAgente: linhaAtual?.['Estrela Agente'],
+      naCelula: numero(linhaAtual?.["Estrelas"]),
+      recomendadaPeloAgente: linhaAtual?.["Estrela Agente"],
       humanoMexeu,
     });
     if (!nota.pode) ancoraHumana = nota.ancora;
   }
 
-  const r = await avaliarProjetoComTime(projetoId, { gatilho: 'time-completo' });
+  const r = await avaliarProjetoComTime(projetoId, { gatilho: "time-completo" });
   if (!r.ok) return { ok: false, motivo: r.motivo };
   const c = r.resultado.consenso;
 
   // ⚠️ `avaliada` viaja junto: a junta precisa distinguir "o time julgou e é 0★" de "o cérebro
   // da estrela caiu no fallback e devolveu 0". Sem isso, uma falha de modelo viraria decisão.
   const avaliada = r.resultado.estrela.avaliada !== false;
-  if (opts.dry) return { ok: true, estrelas: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca, avaliada };
+  if (opts.dry)
+    return {
+      ok: true,
+      estrelas: c.estrela,
+      saida: c.saida,
+      escape: c.escape,
+      confianca: c.confianca,
+      avaliada,
+    };
 
   // ⚠️ A âncora humana protege a coluna "Estrelas", NÃO as colunas do AGENTE (corrigido 11/09/2026).
   // Antes este ponto dava `return` antes de gravar `especial_avaliacao` e `Estrela Agente`, então
@@ -193,7 +203,7 @@ async function estrelaPeloTimeInteiro(
       modelo: null,
     });
   } catch (e) {
-    console.error('[time-completo] falha ao gravar a recomendação do time:', e);
+    console.error("[time-completo] falha ao gravar a recomendação do time:", e);
   }
   try {
     // `rotuloNotaAgente` é a FONTE ÚNICA do rótulo (a mesma da tela): a faixa 6-10 vira "6-10",
@@ -211,17 +221,17 @@ async function estrelaPeloTimeInteiro(
     // `automacao`/`inteligencia`/`autonomia`), e dois escritores na mesma célula é a briga que este
     // repo já pagou em outras colunas. O nível do time vira `Tipo de Projeto` só pelo eixo TIPO.
     const celulas: Record<string, string> = {
-      'Estrela Agente': rotuloNotaAgente(c.estrela, c.escape).rotulo,
-      'Confiança Agente': c.confianca,
+      "Estrela Agente": rotuloNotaAgente(c.estrela, c.escape).rotulo,
+      "Confiança Agente": c.confianca,
     };
     const tipoDoTime = TIPOS_PROJETO.find((t) => t.chave === r.resultado.estrela.tipo)?.rotulo;
-    if (tipoDoTime && vazioNaPlanilha(linhaAtual?.['Tipo de Projeto'])) {
-      celulas['Tipo de Projeto'] = tipoDoTime;
+    if (tipoDoTime && vazioNaPlanilha(linhaAtual?.["Tipo de Projeto"])) {
+      celulas["Tipo de Projeto"] = tipoDoTime;
     }
     await updateRowByProjectId(projetoId, celulas);
     await espelharEscrita(projetoId, celulas);
   } catch (e) {
-    console.error('[time-completo] falha ao escrever as colunas do agente:', e);
+    console.error("[time-completo] falha ao escrever as colunas do agente:", e);
   }
   if (ancoraHumana != null) {
     return {
@@ -233,10 +243,18 @@ async function estrelaPeloTimeInteiro(
       confianca: c.confianca,
       // nota de gente é julgamento por definição
       avaliada: true,
-      motivo: `nota humana ${ancoraHumana} é âncora — o time recomendou ${c.estrela}${c.escape ? ' (6-10)' : ''} e não reescreveu a nota`,
+      motivo: `nota humana ${ancoraHumana} é âncora — o time recomendou ${c.estrela}${c.escape ? " (6-10)" : ""} e não reescreveu a nota`,
     };
   }
-  return { ok: true, estrelas: c.estrela, estrelas_time: c.estrela, saida: c.saida, escape: c.escape, confianca: c.confianca, avaliada };
+  return {
+    ok: true,
+    estrelas: c.estrela,
+    estrelas_time: c.estrela,
+    saida: c.saida,
+    escape: c.escape,
+    confianca: c.confianca,
+    avaliada,
+  };
 }
 
 export type ResultadoTimeCompleto = {
@@ -245,31 +263,36 @@ export type ResultadoTimeCompleto = {
   /** O veredito da mesa (impacto): `{ok, veredito, ...}` ou o motivo do NO-OP. */
   mesa: { ok: boolean; motivo?: string; veredito?: string | null };
   /** A nota: `{ok, estrelas}` ou o motivo (já tem nota humana, sem vizinhos…). */
-  estrela: { ok: boolean; motivo?: string; estrelas?: number | null; estrelas_time?: number | null };
+  estrela: {
+    ok: boolean;
+    motivo?: string;
+    estrelas?: number | null;
+    estrelas_time?: number | null;
+  };
   /** A JUNÇÃO das duas metades: uma análise só, com o status do funil que ela implica. */
   junta?: Juncao;
   /** O Status realmente gravado na planilha, ou `null` quando a flag está desligada / `dry`. */
   status_gravado?: string | null;
 };
 
-function resumoMesa(r: unknown): ResultadoTimeCompleto['mesa'] {
+function resumoMesa(r: unknown): ResultadoTimeCompleto["mesa"] {
   const o = (r ?? {}) as Record<string, unknown>;
   return {
     ok: o.ok === true,
-    motivo: typeof o.motivo === 'string' ? o.motivo : undefined,
-    veredito: typeof o.veredito === 'string' ? o.veredito : null,
+    motivo: typeof o.motivo === "string" ? o.motivo : undefined,
+    veredito: typeof o.veredito === "string" ? o.veredito : null,
   };
 }
 
 /** O que a metade da estrela devolveu, na forma que a junta lê. */
 function ladoEstrela(r: unknown) {
   const o = (r ?? {}) as Record<string, unknown>;
-  if (o.ok !== true || typeof o.saida !== 'string') return null;
+  if (o.ok !== true || typeof o.saida !== "string") return null;
   return {
     saida: o.saida,
     escape: o.escape === true,
-    estrela: typeof o.estrelas === 'number' ? o.estrelas : null,
-    confianca: (o.confianca as 'alta' | 'media' | 'baixa' | undefined) ?? null,
+    estrela: typeof o.estrelas === "number" ? o.estrelas : null,
+    confianca: (o.confianca as "alta" | "media" | "baixa" | undefined) ?? null,
     avaliada: o.avaliada !== false,
   };
 }
@@ -283,20 +306,20 @@ function ladoEstrela(r: unknown) {
  */
 function semNumeroDeGanhoNaLinha(linha: Record<string, string> | null, especial: boolean): boolean {
   if (especial) return true;
-  const cats = String(linha?.['Tipos de Ganho'] ?? '').toLowerCase();
+  const cats = String(linha?.["Tipos de Ganho"] ?? "").toLowerCase();
   if (!cats) return false;
-  const temImensuravel = cats.includes('imensur');
+  const temImensuravel = cats.includes("imensur");
   const temNumero = /saving|custo evitado|receita/.test(cats);
   return temImensuravel && !temNumero;
 }
 
-function resumoEstrela(r: unknown): ResultadoTimeCompleto['estrela'] {
+function resumoEstrela(r: unknown): ResultadoTimeCompleto["estrela"] {
   const o = (r ?? {}) as Record<string, unknown>;
   return {
     ok: o.ok === true,
-    motivo: typeof o.motivo === 'string' ? o.motivo : undefined,
-    estrelas: typeof o.estrelas === 'number' ? o.estrelas : null,
-    estrelas_time: typeof o.estrelas_time === 'number' ? o.estrelas_time : null,
+    motivo: typeof o.motivo === "string" ? o.motivo : undefined,
+    estrelas: typeof o.estrelas === "number" ? o.estrelas : null,
+    estrelas_time: typeof o.estrelas_time === "number" ? o.estrelas_time : null,
   };
 }
 
@@ -313,9 +336,12 @@ export async function avaliarProjetoComTimeCompleto(
     avaliarProjetoNormal(projetoId, { dry }),
     estrelaPeloTimeInteiro(projetoId, { dry, forcar: opts.forcar }),
   ]);
-  const m = mesa.status === 'fulfilled' ? resumoMesa(mesa.value) : { ok: false, motivo: String(mesa.reason) };
+  const m =
+    mesa.status === "fulfilled"
+      ? resumoMesa(mesa.value)
+      : { ok: false, motivo: String(mesa.reason) };
   const e =
-    estrela.status === 'fulfilled'
+    estrela.status === "fulfilled"
       ? resumoEstrela(estrela.value)
       : { ok: false, motivo: String(estrela.reason) };
 
@@ -334,20 +360,52 @@ export async function avaliarProjetoComTimeCompleto(
   }
   const junta = juntarAnalises({
     impacto: m.ok && m.veredito ? { veredito: m.veredito } : null,
-    estrela: estrela.status === 'fulfilled' ? ladoEstrela(estrela.value) : null,
+    estrela: estrela.status === "fulfilled" ? ladoEstrela(estrela.value) : null,
     especial,
     fecharPendente: agenteFechaPendente(),
     semNumeroDeGanho: semNumeroDeGanhoNaLinha(linhaAtual, especial),
     // ⚠️ O Status parado em `Reenvio Pendente` é o FATO "o autor não voltou" (um reenvio o
     // reescreveria) — a única reprovação por material que sobrou. Ver a TRAVA 3 da junta.
-    reenvioNaoChegou: ['reenvio pendente', 'rejeitado'].includes(
-      String(linhaAtual?.['Status'] ?? '').trim().toLowerCase(),
+    reenvioNaoChegou: ["reenvio pendente", "rejeitado"].includes(
+      String(linhaAtual?.["Status"] ?? "")
+        .trim()
+        .toLowerCase(),
     ),
   });
 
   // ── O funil ──────────────────────────────────────────────────────────────────────────────────
+  //
+  // ⚠️ **É AQUI que o portão do líder mora, e só aqui** (15/09/2026). A avaliação acima roda
+  // para todo projeto em aberto — a estrela e o parecer são informação, e o próprio líder as
+  // usa para decidir. O que exige `Pré-aprovado` é a ESCRITA do status: em `Pendente` ninguém
+  // pré-aprovou, e gravar ali seria o agente passando na frente do líder.
+  //
+  // ⚠️ `statusAnterior` é lido da linha do espelho, a mesma que a avaliação usou — sem
+  // round-trip novo. Linha ausente (projeto que só existe no SQLite) cai em `Pendente` pelo
+  // `entraNaFilaDeAvaliacao`/`podeAgenteDecidir`, então NÃO grava: o conservador é não
+  // decidir por um projeto cujo estado não se conseguiu ler.
   let status_gravado: string | null = null;
-  if (!dry && agenteDecideFunil()) {
+  const statusDaLinha = linhaAtual?.["Status"] ?? null;
+  const portaoAberto = podeAgenteDecidir(statusDaLinha);
+  // ⚠️ **Duas condições, e cada uma nasceu de um estrago medido em prod:**
+  //   • `portaoAberto` — o líder já liberou? Em `Pendente` ninguém pré-aprovou, e escrever ali
+  //     seria passar na frente dele.
+  //   • `agenteDeveGravar` — o desfecho é DECISÃO? `Pendente` quer dizer "não decidi", e
+  //     escrever isso por cima de um status que alguém construiu apaga o trabalho de quem
+  //     construiu. Foi o que derrubou o «Protheus reports»: o líder pré-aprovou, o time não
+  //     fechou e o agente gravou `Pré-aprovado → Pendente`, desfazendo a pré-aprovação E
+  //     retrancando o projeto (sem `Pré-aprovado`, o portão acima volta a bloquear).
+  const deveGravar = agenteDeveGravar(junta.status);
+  if (!dry && agenteDecideFunil() && !(portaoAberto && deveGravar)) {
+    console.log(
+      `[time-completo] ${projetoId}: avaliado, status NÃO gravado — ${
+        !portaoAberto
+          ? `o funil espera a pré-aprovação (Status atual: ${statusDaLinha ?? "vazio"})`
+          : `o time não decidiu (concluiu ${junta.status}); o parecer fica registrado`
+      }.`,
+    );
+  }
+  if (!dry && agenteDecideFunil() && portaoAberto && deveGravar) {
     try {
       // ⚠️ Reusa `definirStatusProjeto`, que é o ÚNICO ponto do sistema que sabe gravar Status
       // direito: escreve na planilha, remenda o espelho na hora (invariante 1) e registra nas DUAS
@@ -361,8 +419,8 @@ export async function avaliarProjetoComTimeCompleto(
       const justificativa = justificativaDaReprovacao({
         porques: junta.porques,
         parecerDaMesa: m.motivo,
-        statusAnterior: linhaAtual?.['Status'],
-        motivoReenvio: linhaAtual?.['Motivo Reenvio'],
+        statusAnterior: linhaAtual?.["Status"],
+        motivoReenvio: linhaAtual?.["Motivo Reenvio"],
         semMaterial: junta.semMaterial === true,
       });
       // ⚠️ **O AGENTE CLASSIFICA de 0 a 5 na coluna `Estrelas`** (decisão do dono do produto,
@@ -378,7 +436,11 @@ export async function avaliarProjetoComTimeCompleto(
       // ⚠️ Vai por `definirStatusProjeto` porque ele é o ÚNICO ponto que grava essa coluna direito
       // (numérica, sem `ouTraco`, com remendo do espelho e as 2 auditorias).
       const notaParaCelula =
-        !junta.flag6a10 && e.ok && typeof e.estrelas === 'number' && e.estrelas >= 0 && e.estrelas <= 5
+        !junta.flag6a10 &&
+        e.ok &&
+        typeof e.estrelas === "number" &&
+        e.estrelas >= 0 &&
+        e.estrelas <= 5
           ? e.estrelas
           : undefined;
       // ⚠️ **A DECISÃO DE GENTE VENCE** (10/09/2026) — ver `src/lib/decisao-humana.ts` para os três
@@ -388,7 +450,7 @@ export async function avaliarProjetoComTimeCompleto(
       // o que não acontece é a escrita.
       const trilha = await historicoDeStatus(projetoId);
       const permissao = podeAgenteGravarStatus({
-        statusAtual: linhaAtual?.['Status'],
+        statusAtual: linhaAtual?.["Status"],
         alvo: junta.status,
         atorDoStatusAtual: await atorDoUltimoStatus(projetoId),
         historico: trilha.historico,
@@ -405,17 +467,19 @@ export async function avaliarProjetoComTimeCompleto(
         // avaliados — indistinguível de "ninguém olhou". Agora a estrela 0-5 é gravada sozinha,
         // mantendo o Status atual (mesmo status é sempre permitido), e só quando NÃO há nota humana
         // (a âncora protege a nota de gente; a faixa 6-10 continua fora da célula).
-        const statusAtual = String(linhaAtual?.['Status'] ?? '').trim();
-        const ancoradaEmGente = String(e.motivo ?? '').includes('âncora');
+        const statusAtual = String(linhaAtual?.["Status"] ?? "").trim();
+        const ancoradaEmGente = String(e.motivo ?? "").includes("âncora");
         if (notaParaCelula !== undefined && !ancoradaEmGente && statusAtual) {
           try {
             await definirStatusProjeto(
               { projeto_id: projetoId, status: statusAtual as never, estrelas: notaParaCelula },
               ATOR_TIME_AGENTES,
             );
-            junta.porques.push(`A estrela ${notaParaCelula} do time foi gravada; o Status ${statusAtual} não foi tocado.`);
+            junta.porques.push(
+              `A estrela ${notaParaCelula} do time foi gravada; o Status ${statusAtual} não foi tocado.`,
+            );
           } catch (err) {
-            console.error('[time-completo] falha ao gravar só a estrela:', err);
+            console.error("[time-completo] falha ao gravar só a estrela:", err);
           }
         }
       } else {
@@ -423,7 +487,7 @@ export async function avaliarProjetoComTimeCompleto(
           {
             projeto_id: projetoId,
             status: junta.status,
-            ...(junta.status === 'Reprovado' ? { motivo_reprovado: justificativa } : {}),
+            ...(junta.status === "Reprovado" ? { motivo_reprovado: justificativa } : {}),
             ...(notaParaCelula !== undefined ? { estrelas: notaParaCelula } : {}),
           },
           ATOR_TIME_AGENTES,
@@ -432,7 +496,7 @@ export async function avaliarProjetoComTimeCompleto(
       }
     } catch (err) {
       // Falhar aqui não desfaz a avaliação, que já está gravada. O relatório do lote mostra o nulo.
-      console.error('[time-completo] falha ao gravar o Status do funil:', err);
+      console.error("[time-completo] falha ao gravar o Status do funil:", err);
     }
   }
 
@@ -483,13 +547,20 @@ async function historicoDeStatus(
       created_at?: string | null;
       status_novo?: string | null;
     }[];
-    out.historico = logs.map((l) => ({ ator: l.admin_email ?? null, quando: l.created_at ?? null, status: l.status_novo ?? null }));
+    out.historico = logs.map((l) => ({
+      ator: l.admin_email ?? null,
+      quando: l.created_at ?? null,
+      status: l.status_novo ?? null,
+    }));
   } catch {
     /* sem histórico, valem só as travas duras */
   }
   try {
     const reenvios = (await getReenviosDoProjeto(projetoId)) as { created_at?: string | null }[];
-    const carimbos = reenvios.map((r) => String(r.created_at ?? '').trim()).filter(Boolean).sort();
+    const carimbos = reenvios
+      .map((r) => String(r.created_at ?? "").trim())
+      .filter(Boolean)
+      .sort();
     out.ultimoReenvioEm = carimbos.length ? carimbos[carimbos.length - 1] : null;
   } catch {
     /* sem reenvio conhecido = nada reabre; a trava fica do lado seguro */
@@ -509,13 +580,16 @@ async function historicoDeStatus(
  */
 async function humanoAlterouEstrelas(projetoId: string): Promise<boolean> {
   try {
-    const linhas = (await queryAdminActivitiesPorAcao(['estrelas'], 500)) as {
+    const linhas = (await queryAdminActivitiesPorAcao(["estrelas"], 500)) as {
       projeto_id?: string | null;
       ator_email?: string | null;
     }[];
     const id = projetoId.trim().toLowerCase();
     return linhas.some(
-      (l) => String(l.projeto_id ?? '').trim().toLowerCase() === id && ehAtorHumano(l.ator_email),
+      (l) =>
+        String(l.projeto_id ?? "")
+          .trim()
+          .toLowerCase() === id && ehAtorHumano(l.ator_email),
     );
   } catch {
     return false;
@@ -543,7 +617,7 @@ async function ehEspecial(projetoId: string): Promise<boolean> {
   }
   try {
     const linha = (await lerLinhaEspelho(projetoId)) as Record<string, string> | null;
-    return /^(sim|1|true)$/i.test(String(linha?.['Especial?'] ?? '').trim());
+    return /^(sim|1|true)$/i.test(String(linha?.["Especial?"] ?? "").trim());
   } catch {
     return false;
   }
@@ -560,9 +634,9 @@ async function ehEspecial(projetoId: string): Promise<boolean> {
  */
 export function motivoParaOAutor(junta: Juncao, parecerDaMesa?: string | null): string {
   const partes = [...junta.porques];
-  const parecer = String(parecerDaMesa ?? '').trim();
-  if (parecer) partes.push('', 'O que os especialistas apontaram:', parecer);
-  const t = partes.join('\n').trim();
+  const parecer = String(parecerDaMesa ?? "").trim();
+  if (parecer) partes.push("", "O que os especialistas apontaram:", parecer);
+  const t = partes.join("\n").trim();
   return t.length > 4000 ? `${t.slice(0, 3999)}…` : t;
 }
 
@@ -575,11 +649,11 @@ export async function avaliarComTimeCompletoEmBackground(projetoId: string): Pro
   try {
     const r = await avaliarProjetoComTimeCompleto(projetoId);
     console.log(
-      `[time-completo] ${projetoId} · mesa=${r.mesa.ok ? (r.mesa.veredito ?? 'ok') : `no-op (${r.mesa.motivo ?? '?'})`}` +
-        ` · estrela=${r.estrela.ok ? r.estrela.estrelas : `no-op (${r.estrela.motivo ?? '?'})`}`,
+      `[time-completo] ${projetoId} · mesa=${r.mesa.ok ? (r.mesa.veredito ?? "ok") : `no-op (${r.mesa.motivo ?? "?"})`}` +
+        ` · estrela=${r.estrela.ok ? r.estrela.estrelas : `no-op (${r.estrela.motivo ?? "?"})`}`,
     );
   } catch (e) {
-    console.error('[time-completo] falha em background:', e);
+    console.error("[time-completo] falha em background:", e);
   }
 }
 
@@ -616,8 +690,9 @@ export async function avaliarLoteComTime(
   projetoIds: string[],
   opts: { dry?: boolean; forcar?: boolean } = {},
 ): Promise<ResultadoLote> {
-  const ids = [...new Set((projetoIds ?? []).map((i) => String(i ?? '').trim()).filter(Boolean))];
-  if (ids.length === 0) return { ok: false, pedidos: 0, rodados: 0, itens: [], motivo: 'nenhum projeto informado' };
+  const ids = [...new Set((projetoIds ?? []).map((i) => String(i ?? "").trim()).filter(Boolean))];
+  if (ids.length === 0)
+    return { ok: false, pedidos: 0, rodados: 0, itens: [], motivo: "nenhum projeto informado" };
   if (ids.length > LOTE_MAX_PROJETOS) {
     return {
       ok: false,
@@ -673,33 +748,38 @@ export async function drenarFilaDoFunil(
     // vazia" (14/09/2026): 34 Pendentes tinham a coluna preenchida pelo porte da rodada de calibragem
     // (avaliados na STAGING) e nunca entravam na fila — e projeto que o time deixou Pendente precisa
     // voltar à fila depois de `REAVALIAR_PENDENTE_APOS_HORAS`, senão fica Pendente para sempre.
-    // ⚠️ **A fila é `Pré-aprovado`, não `Pendente` (14/09/2026).** Regra do dono do produto:
-    // *"O agente só vai aprovar/reprovar quando status for pré-aprovado, que indica que o líder
-    // pré aprovou. Se for pendente não teve pré-aprovação."* Em `Pendente` o agente estaria
-    // decidindo ANTES do líder — que é justamente o que a fila de pré-aprovação existe para
-    // impedir. Quem não tem líder para esperar (71% da base: coordenador para cima, especial,
-    // sem líder na TeamGuide) já nasce `Pré-aprovado` e entra aqui na submissão.
+    // ⚠️ **A fila é de AVALIAÇÃO, não de decisão (corrigido em 15/09/2026).** Eu havia posto
+    // `podeAgenteDecidir` aqui, e o efeito foi que projeto em `Pendente` — esperando o parecer
+    // do líder — **nem chegava a ser avaliado**: ficava sem estrela e sem parecer do time.
+    // Classificar é INFORMAÇÃO (ajuda o próprio líder a decidir) e não depende de autorização;
+    // quem depende é a ESCRITA do status, e ela continua atrás de `podeAgenteDecidir`, lá no
+    // `avaliarProjetoComTimeCompleto`.
     const pendentes = linhas
       .filter((r) =>
-        podeAgenteDecidir((r as unknown as Record<string, string>)['Status'] ?? null),
+        entraNaFilaDeAvaliacao((r as unknown as Record<string, string>)["Status"] ?? null),
       )
-      .map((r) => String((r as unknown as Record<string, string>)['ID Projeto'] ?? '').trim())
+      .map((r) => String((r as unknown as Record<string, string>)["ID Projeto"] ?? "").trim())
       .filter(Boolean);
     const consensos = await getUltimosConsensosDoTimePorIds(pendentes);
     const corte = Date.now() - REAVALIAR_PENDENTE_APOS_HORAS * 3600_000;
     const fila = pendentes.filter((id) => {
       const c = consensos.get(id.toLowerCase());
       if (!c) return true; // nunca avaliado em prod
-      const quando = Date.parse(String(c.created_at ?? '').replace(' ', 'T') + 'Z');
+      const quando = Date.parse(String(c.created_at ?? "").replace(" ", "T") + "Z");
       return !Number.isFinite(quando) || quando < corte;
     });
     const avaliados: string[] = [];
     for (const id of fila.slice(0, limite)) {
       const r = await avaliarProjetoComTimeCompleto(id, { dry: opts.dry });
-      avaliados.push(`${id} → ${r.status_gravado ?? r.junta?.status ?? 'sem decisão'}`);
+      avaliados.push(`${id} → ${r.status_gravado ?? r.junta?.status ?? "sem decisão"}`);
     }
     return { ok: true, avaliados, fila: fila.length };
   } catch (e) {
-    return { ok: false, avaliados: [], fila: 0, motivo: e instanceof Error ? e.message : String(e) };
+    return {
+      ok: false,
+      avaliados: [],
+      fila: 0,
+      motivo: e instanceof Error ? e.message : String(e),
+    };
   }
 }
