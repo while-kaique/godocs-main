@@ -121,8 +121,20 @@ it('T1 — régua cega nos não-especiais', async () => {
   // VARIANTE 'd' — diagnóstico da revisão de 03/09: remove do PROMPT as linhas de EXEMPLOS REAIS
   // (mantendo critério e classe de artefato). Isola quanto do ganho de discriminação vem das
   // âncoras nomeadas e quanto vem do texto do critério. Não toca `estrelas-regua.ts`.
+  // VARIANTE 'e' — diagnóstico da revisão de 03/09: é a 'c' (sem o item do piso que fala do número)
+  // MAIS a degradação do gate tecnológico do 4★ ("estocástico/aprendizado de máquina") a mera
+  // pista. Mede o fim de linha proposto. Não toca `estrelas-regua.ts`.
+  const SEM_GATE_ML =
+    'Decide de forma estocástica, não determinística — há inteligência agregada, não uma tabela de "se isto, então aquilo". ';
+
   const reguaAgente =
-    VARIANTE === 'd'
+    VARIANTE === 'e'
+      ? descreverReguaAgente()
+          .split('\n')
+          .filter((l) => !l.includes('se RESUME ao ganho mensurável'))
+          .join('\n')
+          .replace(SEM_GATE_ML, '')
+      : VARIANTE === 'd'
       ? descreverReguaAgente()
           .split('\n')
           .filter((l) => !l.trimStart().startsWith('Exemplos reais:'))
