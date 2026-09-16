@@ -1,0 +1,7342 @@
+[
+ {
+  "id": "legado-024",
+  "linha": 2,
+  "antes": {
+   "bruto": 572.91,
+   "liquido": 572.91,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-027",
+  "linha": 3,
+  "antes": {
+   "bruto": 323.4,
+   "liquido": 323.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-028",
+  "linha": 4,
+  "antes": {
+   "bruto": 321.07,
+   "liquido": 321.07,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-031",
+  "linha": 5,
+  "antes": {
+   "bruto": 1180.06,
+   "liquido": 1180.06,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-032",
+  "linha": 6,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-033",
+  "linha": 7,
+  "antes": {
+   "bruto": 745.15,
+   "liquido": 745.15,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-034",
+  "linha": 8,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-035",
+  "linha": 9,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-036",
+  "linha": 10,
+  "antes": {
+   "bruto": 599.42,
+   "liquido": 599.42,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-037",
+  "linha": 11,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-038",
+  "linha": 12,
+  "antes": {
+   "bruto": 367.67,
+   "liquido": 367.67,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-040",
+  "linha": 13,
+  "antes": {
+   "bruto": 2565,
+   "liquido": 2565,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-039",
+  "linha": 14,
+  "antes": {
+   "bruto": 1324,
+   "liquido": 1324,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-041",
+  "linha": 15,
+  "antes": {
+   "bruto": 1952.77,
+   "liquido": 1952.77,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-042",
+  "linha": 16,
+  "antes": {
+   "bruto": 939.18,
+   "liquido": 939.18,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-043",
+  "linha": 17,
+  "antes": {
+   "bruto": 299,
+   "liquido": 299,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-044",
+  "linha": 18,
+  "antes": {
+   "bruto": 132.4,
+   "liquido": 132.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-045",
+  "linha": 19,
+  "antes": {
+   "bruto": 468.38,
+   "liquido": 468.38,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-046",
+  "linha": 20,
+  "antes": {
+   "bruto": 53.9,
+   "liquido": 53.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-047",
+  "linha": 21,
+  "antes": {
+   "bruto": 0,
+   "liquido": 6000,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-048",
+  "linha": 22,
+  "antes": {
+   "bruto": 220.67,
+   "liquido": 220.67,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-056",
+  "linha": 23,
+  "antes": {
+   "bruto": 331,
+   "liquido": 331,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-049",
+  "linha": 24,
+  "antes": {
+   "bruto": 137.88,
+   "liquido": 137.88,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-050",
+  "linha": 25,
+  "antes": {
+   "bruto": 1315.6,
+   "liquido": 1315.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-051",
+  "linha": 26,
+  "antes": {
+   "bruto": 1249.82,
+   "liquido": 1249.82,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-052",
+  "linha": 27,
+  "antes": {
+   "bruto": 986.7,
+   "liquido": 986.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-053",
+  "linha": 28,
+  "antes": {
+   "bruto": 10963.43,
+   "liquido": 10963.43,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-054",
+  "linha": 29,
+  "antes": {
+   "bruto": 155.42,
+   "liquido": 155.42,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-055",
+  "linha": 30,
+  "antes": {
+   "bruto": 2491.57,
+   "liquido": 2491.57,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-058",
+  "linha": 31,
+  "antes": {
+   "bruto": 8548.41,
+   "liquido": 8548.41,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-057",
+  "linha": 32,
+  "antes": {
+   "bruto": 18.16,
+   "liquido": 18.16,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-059",
+  "linha": 33,
+  "antes": {
+   "bruto": 51.16,
+   "liquido": 51.16,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-060",
+  "linha": 34,
+  "antes": {
+   "bruto": 33.1,
+   "liquido": 33.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-061",
+  "linha": 35,
+  "antes": {
+   "bruto": 21.56,
+   "liquido": 21.56,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-062",
+  "linha": 36,
+  "antes": {
+   "bruto": 33.1,
+   "liquido": 33.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-063",
+  "linha": 37,
+  "antes": {
+   "bruto": 66.2,
+   "liquido": 66.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-065",
+  "linha": 38,
+  "antes": {
+   "bruto": 3044,
+   "liquido": 3044,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-064",
+  "linha": 39,
+  "antes": {
+   "bruto": 2817,
+   "liquido": 2817,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-069",
+  "linha": 40,
+  "antes": {
+   "bruto": 493.19,
+   "liquido": 493.19,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-070",
+  "linha": 41,
+  "antes": {
+   "bruto": 827.25,
+   "liquido": 827.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-066",
+  "linha": 42,
+  "antes": {
+   "bruto": 218.39,
+   "liquido": 218.39,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-067",
+  "linha": 43,
+  "antes": {
+   "bruto": 51.11,
+   "liquido": 51.11,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-068",
+  "linha": 44,
+  "antes": {
+   "bruto": 64.68,
+   "liquido": 64.68,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-065a",
+  "linha": 45,
+  "antes": {
+   "bruto": 20.45,
+   "liquido": 20.45,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-071",
+  "linha": 46,
+  "antes": {
+   "bruto": 21.29,
+   "liquido": 21.29,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-072",
+  "linha": 47,
+  "antes": {
+   "bruto": 21.29,
+   "liquido": 21.29,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-074",
+  "linha": 48,
+  "antes": {
+   "bruto": 436.59,
+   "liquido": 436.59,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-075",
+  "linha": 49,
+  "antes": {
+   "bruto": 181.22,
+   "liquido": 181.22,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-076",
+  "linha": 50,
+  "antes": {
+   "bruto": 761.3,
+   "liquido": 761.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-077",
+  "linha": 51,
+  "antes": {
+   "bruto": 819.26,
+   "liquido": 819.26,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-078",
+  "linha": 52,
+  "antes": {
+   "bruto": 116.61,
+   "liquido": 116.61,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-079",
+  "linha": 53,
+  "antes": {
+   "bruto": 976.45,
+   "liquido": 976.45,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-080",
+  "linha": 54,
+  "antes": {
+   "bruto": 279.07,
+   "liquido": 279.07,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-081",
+  "linha": 55,
+  "antes": {
+   "bruto": 209.1,
+   "liquido": 209.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-082",
+  "linha": 56,
+  "antes": {
+   "bruto": 239.21,
+   "liquido": 239.21,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "625248d60d3858b8d808da3089d83544",
+  "linha": 57,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1f1a3b577e1b657b147aaf6058371453",
+  "linha": 58,
+  "antes": {
+   "bruto": 165.5,
+   "liquido": 165.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "43dbbb4308158f46de4284d6e6f4ab26",
+  "linha": 59,
+  "antes": {
+   "bruto": 425.8,
+   "liquido": 425.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c270ce30ee1a70138e7474f5022ebc28",
+  "linha": 60,
+  "antes": {
+   "bruto": 1930.25,
+   "liquido": 1930.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4b652006784d6d96da9027a89a46da23",
+  "linha": 61,
+  "antes": {
+   "bruto": 1282.5,
+   "liquido": 1282.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4d35768e46b48c2b3ca1f79283aaf268",
+  "linha": 62,
+  "antes": {
+   "bruto": 171,
+   "liquido": 171,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-083",
+  "linha": 63,
+  "antes": {
+   "bruto": 92,
+   "liquido": 92,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-084",
+  "linha": 64,
+  "antes": {
+   "bruto": 1262.94,
+   "liquido": 1262.94,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-085",
+  "linha": 65,
+  "antes": {
+   "bruto": 1294.64,
+   "liquido": 1294.64,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-073",
+  "linha": 66,
+  "antes": {
+   "bruto": 1866.33,
+   "liquido": 1866.33,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-086",
+  "linha": 67,
+  "antes": {
+   "bruto": 248.25,
+   "liquido": 248.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-087",
+  "linha": 68,
+  "antes": {
+   "bruto": 273.08,
+   "liquido": 273.08,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-089",
+  "linha": 69,
+  "antes": {
+   "bruto": 176,
+   "liquido": 176,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-090",
+  "linha": 70,
+  "antes": {
+   "bruto": 85.16,
+   "liquido": 85.16,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-093",
+  "linha": 71,
+  "antes": {
+   "bruto": 808.85,
+   "liquido": 808.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-094",
+  "linha": 72,
+  "antes": {
+   "bruto": 808.85,
+   "liquido": 808.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-091",
+  "linha": 73,
+  "antes": {
+   "bruto": 761.3,
+   "liquido": 761.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-095",
+  "linha": 74,
+  "antes": {
+   "bruto": 300,
+   "liquido": 300,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-092",
+  "linha": 75,
+  "antes": {
+   "bruto": 1654.5,
+   "liquido": 1654.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-096",
+  "linha": 76,
+  "antes": {
+   "bruto": 340.64,
+   "liquido": 340.64,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-098",
+  "linha": 77,
+  "antes": {
+   "bruto": 837.07,
+   "liquido": 837.07,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-099",
+  "linha": 78,
+  "antes": {
+   "bruto": 506.66,
+   "liquido": 506.66,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-102",
+  "linha": 79,
+  "antes": {
+   "bruto": 211.29,
+   "liquido": 211.29,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-104",
+  "linha": 80,
+  "antes": {
+   "bruto": 606.65,
+   "liquido": 606.65,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-100",
+  "linha": 81,
+  "antes": {
+   "bruto": 3171.96,
+   "liquido": 3171.96,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-103",
+  "linha": 82,
+  "antes": {
+   "bruto": 966,
+   "liquido": 966,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-097",
+  "linha": 83,
+  "antes": {
+   "bruto": 15250,
+   "liquido": 15250,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-100B",
+  "linha": 84,
+  "antes": {
+   "bruto": 132.4,
+   "liquido": 132.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-100A",
+  "linha": 85,
+  "antes": {
+   "bruto": 441.2,
+   "liquido": 441.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-101",
+  "linha": 86,
+  "antes": {
+   "bruto": 4085,
+   "liquido": 4085,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-109",
+  "linha": 87,
+  "antes": {
+   "bruto": 197,
+   "liquido": 197,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-110",
+  "linha": 88,
+  "antes": {
+   "bruto": 97.58,
+   "liquido": 97.58,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-111",
+  "linha": 89,
+  "antes": {
+   "bruto": 485.58,
+   "liquido": 485.58,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-108",
+  "linha": 90,
+  "antes": {
+   "bruto": 595.8,
+   "liquido": 595.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-106",
+  "linha": 91,
+  "antes": {
+   "bruto": 1324,
+   "liquido": 1324,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-107",
+  "linha": 92,
+  "antes": {
+   "bruto": 1324,
+   "liquido": 1324,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-113",
+  "linha": 93,
+  "antes": {
+   "bruto": 1334.85,
+   "liquido": 1334.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-114",
+  "linha": 94,
+  "antes": {
+   "bruto": 1103,
+   "liquido": 1103,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-112",
+  "linha": 95,
+  "antes": {
+   "bruto": 565.3,
+   "liquido": 565.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-115",
+  "linha": 96,
+  "antes": {
+   "bruto": 478.4,
+   "liquido": 478.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-116",
+  "linha": 97,
+  "antes": {
+   "bruto": 599.42,
+   "liquido": 599.42,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-117",
+  "linha": 98,
+  "antes": {
+   "bruto": 419.59,
+   "liquido": 419.59,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-118",
+  "linha": 99,
+  "antes": {
+   "bruto": 4929.55,
+   "liquido": 4929.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-120",
+  "linha": 100,
+  "antes": {
+   "bruto": 294.19,
+   "liquido": 294.19,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-119",
+  "linha": 101,
+  "antes": {
+   "bruto": 2972.59,
+   "liquido": 2972.59,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-121",
+  "linha": 102,
+  "antes": {
+   "bruto": 1699.02,
+   "liquido": 1699.02,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-122",
+  "linha": 103,
+  "antes": {
+   "bruto": 86.88,
+   "liquido": 86.88,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-124",
+  "linha": 104,
+  "antes": {
+   "bruto": 328.9,
+   "liquido": 328.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-125",
+  "linha": 105,
+  "antes": {
+   "bruto": 598,
+   "liquido": 598,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-123",
+  "linha": 106,
+  "antes": {
+   "bruto": 4301.7,
+   "liquido": 4301.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-127",
+  "linha": 107,
+  "antes": {
+   "bruto": 55.15,
+   "liquido": 55.15,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "86ee91737aaec4705480a41992d05a1c",
+  "linha": 108,
+  "antes": {
+   "bruto": 338.89,
+   "liquido": 338.89,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-128",
+  "linha": 109,
+  "antes": {
+   "bruto": 613.36,
+   "liquido": 613.36,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-129",
+  "linha": 110,
+  "antes": {
+   "bruto": 1134.71,
+   "liquido": 1134.71,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-136",
+  "linha": 111,
+  "antes": {
+   "bruto": 1196,
+   "liquido": 1196,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-131",
+  "linha": 112,
+  "antes": {
+   "bruto": 1478.58,
+   "liquido": 1478.58,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-133",
+  "linha": 113,
+  "antes": {
+   "bruto": 379.8,
+   "liquido": 379.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-137",
+  "linha": 114,
+  "antes": {
+   "bruto": 1240.66,
+   "liquido": 1240.66,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-134",
+  "linha": 115,
+  "antes": {
+   "bruto": 385.17,
+   "liquido": 385.17,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-135",
+  "linha": 116,
+  "antes": {
+   "bruto": 383.22,
+   "liquido": 383.22,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-138",
+  "linha": 117,
+  "antes": {
+   "bruto": 1419.4,
+   "liquido": 1419.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "db6eba61c6b1dbaa6cffe93d08ab1cee",
+  "linha": 118,
+  "antes": {
+   "bruto": 308.93,
+   "liquido": 308.93,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "dd39b29ea3dc3fc51332d9a650c12fc7",
+  "linha": 119,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-130",
+  "linha": 120,
+  "antes": {
+   "bruto": 29.9,
+   "liquido": 29.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-140",
+  "linha": 121,
+  "antes": {
+   "bruto": 209.1,
+   "liquido": 209.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-139",
+  "linha": 122,
+  "antes": {
+   "bruto": 787.5,
+   "liquido": 787.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-141",
+  "linha": 123,
+  "antes": {
+   "bruto": 24936.25,
+   "liquido": 24936.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "nao_convertida"
+ },
+ {
+  "id": "legado-142",
+  "linha": 124,
+  "antes": {
+   "bruto": 300,
+   "liquido": 300,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-143",
+  "linha": 125,
+  "antes": {
+   "bruto": 3309.8,
+   "liquido": 3309.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-144",
+  "linha": 126,
+  "antes": {
+   "bruto": 171,
+   "liquido": 171,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-146",
+  "linha": 127,
+  "antes": {
+   "bruto": 120.41,
+   "liquido": 120.41,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-147",
+  "linha": 128,
+  "antes": {
+   "bruto": 446.08,
+   "liquido": 446.08,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-145",
+  "linha": 129,
+  "antes": {
+   "bruto": 557.6,
+   "liquido": 557.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-149",
+  "linha": 130,
+  "antes": {
+   "bruto": 2341.9,
+   "liquido": 2341.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ef0add4b31d3990c62632be255c4e855",
+  "linha": 131,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-150",
+  "linha": 132,
+  "antes": {
+   "bruto": 38.87,
+   "liquido": 38.87,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-151",
+  "linha": 133,
+  "antes": {
+   "bruto": 717.6,
+   "liquido": 717.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-152",
+  "linha": 134,
+  "antes": {
+   "bruto": 5176.2,
+   "liquido": 5176.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-153",
+  "linha": 135,
+  "antes": {
+   "bruto": 149.5,
+   "liquido": 149.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-154",
+  "linha": 136,
+  "antes": {
+   "bruto": 340.64,
+   "liquido": 340.64,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-160",
+  "linha": 137,
+  "antes": {
+   "bruto": 298.06,
+   "liquido": 298.06,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-166",
+  "linha": 138,
+  "antes": {
+   "bruto": 131.49,
+   "liquido": 131.49,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-162",
+  "linha": 139,
+  "antes": {
+   "bruto": 4136.25,
+   "liquido": 4136.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-163",
+  "linha": 140,
+  "antes": {
+   "bruto": 220.6,
+   "liquido": 220.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-165",
+  "linha": 141,
+  "antes": {
+   "bruto": 220.6,
+   "liquido": 220.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-158",
+  "linha": 142,
+  "antes": {
+   "bruto": 551.5,
+   "liquido": 551.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-159",
+  "linha": 143,
+  "antes": {
+   "bruto": 882.4,
+   "liquido": 882.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-161",
+  "linha": 144,
+  "antes": {
+   "bruto": 441.2,
+   "liquido": 441.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-164",
+  "linha": 145,
+  "antes": {
+   "bruto": 441.2,
+   "liquido": 441.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-169",
+  "linha": 146,
+  "antes": {
+   "bruto": 441.2,
+   "liquido": 441.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-181",
+  "linha": 147,
+  "antes": {
+   "bruto": 882.4,
+   "liquido": 882.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-157",
+  "linha": 148,
+  "antes": {
+   "bruto": 6618,
+   "liquido": 6618,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-168",
+  "linha": 149,
+  "antes": {
+   "bruto": 255.48,
+   "liquido": 255.48,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-170",
+  "linha": 150,
+  "antes": {
+   "bruto": 179.4,
+   "liquido": 179.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-171",
+  "linha": 151,
+  "antes": {
+   "bruto": 478.4,
+   "liquido": 478.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-172",
+  "linha": 152,
+  "antes": {
+   "bruto": 1009.55,
+   "liquido": 1009.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-187",
+  "linha": 153,
+  "antes": {
+   "bruto": 100,
+   "liquido": 100,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-188",
+  "linha": 154,
+  "antes": {
+   "bruto": 2205.1,
+   "liquido": 2205.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-177",
+  "linha": 155,
+  "antes": {
+   "bruto": 1762,
+   "liquido": 1762,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-156",
+  "linha": 156,
+  "antes": {
+   "bruto": 31604.82,
+   "liquido": 31604.82,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-176",
+  "linha": 157,
+  "antes": {
+   "bruto": 3163.5,
+   "liquido": 3163.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-179",
+  "linha": 158,
+  "antes": {
+   "bruto": 496.5,
+   "liquido": 496.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-180",
+  "linha": 159,
+  "antes": {
+   "bruto": 55.15,
+   "liquido": 55.15,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-175",
+  "linha": 160,
+  "antes": {
+   "bruto": 330.9,
+   "liquido": 330.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-167",
+  "linha": 161,
+  "antes": {
+   "bruto": 200.6,
+   "liquido": 200.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-174",
+  "linha": 162,
+  "antes": {
+   "bruto": 441.2,
+   "liquido": 441.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-182",
+  "linha": 163,
+  "antes": {
+   "bruto": 882.4,
+   "liquido": 882.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-183",
+  "linha": 164,
+  "antes": {
+   "bruto": 606.65,
+   "liquido": 606.65,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-186",
+  "linha": 165,
+  "antes": {
+   "bruto": 29.9,
+   "liquido": 79.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-184",
+  "linha": 166,
+  "antes": {
+   "bruto": 993,
+   "liquido": 14593,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-178",
+  "linha": 167,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-185",
+  "linha": 168,
+  "antes": {
+   "bruto": 897,
+   "liquido": 8197,
+   "liquidoMensal": 0
+  },
+  "desfecho": "nao_convertida"
+ },
+ {
+  "id": "legado-173",
+  "linha": 169,
+  "antes": {
+   "bruto": 882.4,
+   "liquido": 882.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-192",
+  "linha": 170,
+  "antes": {
+   "bruto": 1103,
+   "liquido": 1103,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-190",
+  "linha": 171,
+  "antes": {
+   "bruto": 331,
+   "liquido": 331,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-191",
+  "linha": 172,
+  "antes": {
+   "bruto": 551.5,
+   "liquido": 551.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-189",
+  "linha": 173,
+  "antes": {
+   "bruto": 728.2,
+   "liquido": 728.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-193",
+  "linha": 174,
+  "antes": {
+   "bruto": 993,
+   "liquido": 993,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-195",
+  "linha": 175,
+  "antes": {
+   "bruto": 308.84,
+   "liquido": 308.84,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-196",
+  "linha": 176,
+  "antes": {
+   "bruto": 55.15,
+   "liquido": 55.15,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-194",
+  "linha": 177,
+  "antes": {
+   "bruto": 102.23,
+   "liquido": 102.23,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-198",
+  "linha": 178,
+  "antes": {
+   "bruto": 1606.8,
+   "liquido": 1606.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-199",
+  "linha": 179,
+  "antes": {
+   "bruto": 752.58,
+   "liquido": 752.58,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-200",
+  "linha": 180,
+  "antes": {
+   "bruto": 114.62,
+   "liquido": 114.62,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-201",
+  "linha": 181,
+  "antes": {
+   "bruto": 149.03,
+   "liquido": 149.03,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-202",
+  "linha": 182,
+  "antes": {
+   "bruto": 1764.8,
+   "liquido": 1764.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-197",
+  "linha": 183,
+  "antes": {
+   "bruto": 1456.4,
+   "liquido": 1456.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-203",
+  "linha": 184,
+  "antes": {
+   "bruto": 3778.1,
+   "liquido": 3778.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-204",
+  "linha": 185,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-205",
+  "linha": 186,
+  "antes": {
+   "bruto": 1363.75,
+   "liquido": 1363.75,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-206",
+  "linha": 187,
+  "antes": {
+   "bruto": 1660.41,
+   "liquido": 1660.41,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-207",
+  "linha": 188,
+  "antes": {
+   "bruto": 29.9,
+   "liquido": 29.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-208",
+  "linha": 189,
+  "antes": {
+   "bruto": 69.7,
+   "liquido": 69.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-210",
+  "linha": 190,
+  "antes": {
+   "bruto": 49.08,
+   "liquido": 49.08,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-213",
+  "linha": 191,
+  "antes": {
+   "bruto": 809.02,
+   "liquido": 809.02,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-211",
+  "linha": 192,
+  "antes": {
+   "bruto": 827.25,
+   "liquido": 827.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-209",
+  "linha": 193,
+  "antes": {
+   "bruto": 1654.5,
+   "liquido": 1654.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-212",
+  "linha": 194,
+  "antes": {
+   "bruto": 2990.16,
+   "liquido": 2990.16,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-218",
+  "linha": 195,
+  "antes": {
+   "bruto": 100.39,
+   "liquido": 100.39,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-215",
+  "linha": 196,
+  "antes": {
+   "bruto": 809.02,
+   "liquido": 809.02,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-216",
+  "linha": 197,
+  "antes": {
+   "bruto": 1256.96,
+   "liquido": 2881.96,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-217",
+  "linha": 198,
+  "antes": {
+   "bruto": 418.2,
+   "liquido": 418.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-214",
+  "linha": 199,
+  "antes": {
+   "bruto": 568.1,
+   "liquido": 568.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-219",
+  "linha": 200,
+  "antes": {
+   "bruto": 4136.25,
+   "liquido": 4136.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-220",
+  "linha": 201,
+  "antes": {
+   "bruto": 3006.15,
+   "liquido": 3006.15,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-221",
+  "linha": 202,
+  "antes": {
+   "bruto": 20570.95,
+   "liquido": 20570.95,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-222",
+  "linha": 203,
+  "antes": {
+   "bruto": 1378.75,
+   "liquido": 1378.75,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-224",
+  "linha": 204,
+  "antes": {
+   "bruto": 264.8,
+   "liquido": 264.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-225",
+  "linha": 205,
+  "antes": {
+   "bruto": 95.45,
+   "liquido": 95.45,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-227",
+  "linha": 206,
+  "antes": {
+   "bruto": 482.56,
+   "liquido": 482.56,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-228",
+  "linha": 207,
+  "antes": {
+   "bruto": 119.6,
+   "liquido": 119.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-229",
+  "linha": 208,
+  "antes": {
+   "bruto": 2302.3,
+   "liquido": 2302.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-223",
+  "linha": 209,
+  "antes": {
+   "bruto": 1103,
+   "liquido": 1103,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-226",
+  "linha": 210,
+  "antes": {
+   "bruto": 3115.67,
+   "liquido": 3115.67,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-230",
+  "linha": 211,
+  "antes": {
+   "bruto": 190.33,
+   "liquido": 190.33,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-234",
+  "linha": 212,
+  "antes": {
+   "bruto": 7475,
+   "liquido": 7475,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-235",
+  "linha": 213,
+  "antes": {
+   "bruto": 8970,
+   "liquido": 8970,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-236",
+  "linha": 214,
+  "antes": {
+   "bruto": 1794,
+   "liquido": 1794,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "LEGADO-237",
+  "linha": 215,
+  "antes": {
+   "bruto": 7176,
+   "liquido": 7176,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-231",
+  "linha": 216,
+  "antes": {
+   "bruto": 153.34,
+   "liquido": 153.34,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-233",
+  "linha": 217,
+  "antes": {
+   "bruto": 787.54,
+   "liquido": 787.54,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-232",
+  "linha": 218,
+  "antes": {
+   "bruto": 174.25,
+   "liquido": 174.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-238",
+  "linha": 219,
+  "antes": {
+   "bruto": 368,
+   "liquido": 368,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-239",
+  "linha": 220,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-241",
+  "linha": 221,
+  "antes": {
+   "bruto": 992.7,
+   "liquido": 992.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-244",
+  "linha": 222,
+  "antes": {
+   "bruto": 1103,
+   "liquido": 1103,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-240",
+  "linha": 223,
+  "antes": {
+   "bruto": 4343.55,
+   "liquido": 4343.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-242",
+  "linha": 224,
+  "antes": {
+   "bruto": 5073.8,
+   "liquido": 5073.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-243",
+  "linha": 225,
+  "antes": {
+   "bruto": 2812.65,
+   "liquido": 2812.65,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-245",
+  "linha": 226,
+  "antes": {
+   "bruto": 374.75,
+   "liquido": 374.75,
+   "liquidoMensal": 0
+  },
+  "desfecho": "preservada"
+ },
+ {
+  "id": "legado-247",
+  "linha": 227,
+  "antes": {
+   "bruto": 842.9,
+   "liquido": 842.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-248",
+  "linha": 228,
+  "antes": {
+   "bruto": 622.07,
+   "liquido": 622.07,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-249",
+  "linha": 229,
+  "antes": {
+   "bruto": 3660.86,
+   "liquido": 3660.86,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-263",
+  "linha": 230,
+  "antes": {
+   "bruto": 2021.89,
+   "liquido": 2021.89,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-264",
+  "linha": 231,
+  "antes": {
+   "bruto": 697.2,
+   "liquido": 697.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-265",
+  "linha": 232,
+  "antes": {
+   "bruto": 1158.5,
+   "liquido": 1158.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-266",
+  "linha": 233,
+  "antes": {
+   "bruto": 1456.4,
+   "liquido": 1456.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-250",
+  "linha": 234,
+  "antes": {
+   "bruto": 1257.8,
+   "liquido": 1257.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-251",
+  "linha": 235,
+  "antes": {
+   "bruto": 1390.2,
+   "liquido": 1390.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-252",
+  "linha": 236,
+  "antes": {
+   "bruto": 595.8,
+   "liquido": 595.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-253",
+  "linha": 237,
+  "antes": {
+   "bruto": 3766.78,
+   "liquido": 3766.78,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-255",
+  "linha": 238,
+  "antes": {
+   "bruto": 794.4,
+   "liquido": 794.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-257",
+  "linha": 239,
+  "antes": {
+   "bruto": 334.31,
+   "liquido": 334.31,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-258",
+  "linha": 240,
+  "antes": {
+   "bruto": 132.4,
+   "liquido": 132.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-259",
+  "linha": 241,
+  "antes": {
+   "bruto": 496.5,
+   "liquido": 496.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-260",
+  "linha": 242,
+  "antes": {
+   "bruto": 662,
+   "liquido": 810.95,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-261",
+  "linha": 243,
+  "antes": {
+   "bruto": 536.22,
+   "liquido": 536.22,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-256",
+  "linha": 244,
+  "antes": {
+   "bruto": 761.3,
+   "liquido": 761.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-262",
+  "linha": 245,
+  "antes": {
+   "bruto": 1483.6,
+   "liquido": 1483.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-254",
+  "linha": 246,
+  "antes": {
+   "bruto": 17022.68,
+   "liquido": 17022.68,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-267",
+  "linha": 247,
+  "antes": {
+   "bruto": 590.03,
+   "liquido": 590.03,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-268",
+  "linha": 248,
+  "antes": {
+   "bruto": 104.55,
+   "liquido": 104.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "LEGADO-269",
+  "linha": 249,
+  "antes": {
+   "bruto": 468.38,
+   "liquido": 468.38,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "legado-270",
+  "linha": 250,
+  "antes": {
+   "bruto": 2040.55,
+   "liquido": 2040.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "011154efe218d675c32636d58adfd0db",
+  "linha": 251,
+  "antes": {
+   "bruto": 329.48,
+   "liquido": 329.48,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4e5fd243efe0a5963460a05e1491a1ae",
+  "linha": 252,
+  "antes": {
+   "bruto": 1571.78,
+   "liquido": 1571.78,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d1579cfa97be186fc9a13a6f036d7474",
+  "linha": 253,
+  "antes": {
+   "bruto": 31.94,
+   "liquido": 31.94,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1844c74da817b98d8084ffefaf982f83",
+  "linha": 254,
+  "antes": {
+   "bruto": 1287.39,
+   "liquido": 1287.39,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0e1fd5d4dca9a13a35e0014adefc3f25",
+  "linha": 255,
+  "antes": {
+   "bruto": 1298.48,
+   "liquido": 2396.96,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2a7695206a58d660fa367fcdab4f963a",
+  "linha": 256,
+  "antes": {
+   "bruto": 1500,
+   "liquido": 1500,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "61798a938d844be29e148e580e5c4dde",
+  "linha": 257,
+  "antes": {
+   "bruto": 185.4,
+   "liquido": 185.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "75490b6b4fb70711102de90b0d24bd9c",
+  "linha": 258,
+  "antes": {
+   "bruto": 2355.84,
+   "liquido": 2355.84,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "71f8c78816d6a3dd9088f1d2a39ffc5a",
+  "linha": 259,
+  "antes": {
+   "bruto": 8844,
+   "liquido": 8844,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ca9f66e51fd930a620d0e2188dce7672",
+  "linha": 260,
+  "antes": {
+   "bruto": 1003.95,
+   "liquido": 1003.95,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "48c8f4e05b8853fa00057811b69085c2",
+  "linha": 261,
+  "antes": {
+   "bruto": 110.3,
+   "liquido": 110.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "65f414735ac7a0a9914d433c36b9deb8",
+  "linha": 262,
+  "antes": {
+   "bruto": 355.59,
+   "liquido": 355.59,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5ebe736d7bd4b27ba7138ebba2de9daf",
+  "linha": 263,
+  "antes": {
+   "bruto": 1158.18,
+   "liquido": 1158.18,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "50bbc1c687e8bfceb04da0f8b936652b",
+  "linha": 264,
+  "antes": {
+   "bruto": 390.46,
+   "liquido": 390.46,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0b92927b09b1ae84dd0c481bf6fa5214",
+  "linha": 265,
+  "antes": {
+   "bruto": 1461.48,
+   "liquido": 1461.48,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0a362cd4b1b8f5f5ebb60abb6d25df5d",
+  "linha": 266,
+  "antes": {
+   "bruto": 1005.21,
+   "liquido": 1005.21,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7a5fadc829ff57f7024ab08528b04898",
+  "linha": 267,
+  "antes": {
+   "bruto": 85.16,
+   "liquido": 85.16,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "07511217b9285b04674d50654bcd6c12",
+  "linha": 268,
+  "antes": {
+   "bruto": 556.5,
+   "liquido": 556.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "33c884049f5fa0c017c684ec9f353a10",
+  "linha": 269,
+  "antes": {
+   "bruto": 2780.75,
+   "liquido": 2780.75,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "299719a729c65ca062af80b1ad6f85e5",
+  "linha": 270,
+  "antes": {
+   "bruto": 348.93,
+   "liquido": 348.93,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "15231d3ac6615b352f194a54e14393be",
+  "linha": 271,
+  "antes": {
+   "bruto": 37.38,
+   "liquido": 37.38,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8bdd59602d2ec57e255a89175fa33d07",
+  "linha": 272,
+  "antes": {
+   "bruto": 377.91,
+   "liquido": 377.91,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "08779c5e5c78b787f808fffbfc0a77c7",
+  "linha": 273,
+  "antes": {
+   "bruto": 7.04,
+   "liquido": 7.04,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e4b1dcc3e07f56a7f576c672fcc78824",
+  "linha": 274,
+  "antes": {
+   "bruto": 12226.87,
+   "liquido": 12226.87,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b35f788c70ef99bfb465fb4d20d36a9d",
+  "linha": 275,
+  "antes": {
+   "bruto": 418.2,
+   "liquido": 418.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b1b47044a5244921df55a0ec0bd0857c",
+  "linha": 276,
+  "antes": {
+   "bruto": 209.1,
+   "liquido": 209.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "cc96f5b88c0cfbf6a87c470c2eb77b0c",
+  "linha": 277,
+  "antes": {
+   "bruto": 236.98,
+   "liquido": 236.98,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1b75bcf9e08ccb24f7247781beb4ca44",
+  "linha": 278,
+  "antes": {
+   "bruto": 250.92,
+   "liquido": 250.92,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "be3f36359d25e44684f4cf9ed00c1b49",
+  "linha": 279,
+  "antes": {
+   "bruto": 230.01,
+   "liquido": 230.01,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "35cfa0b6276a79e3d6e401fc43097deb",
+  "linha": 280,
+  "antes": {
+   "bruto": 961.86,
+   "liquido": 961.86,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "50f7370646f7b8dafc071ec9615dcb31",
+  "linha": 281,
+  "antes": {
+   "bruto": 3333.86,
+   "liquido": 3333.86,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3ec81350fc444814eb61630353ae233b",
+  "linha": 282,
+  "antes": {
+   "bruto": 1632.92,
+   "liquido": 1632.92,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "95cbd504a32e6f29cf5549ad1a16ae53",
+  "linha": 283,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "cddae49aba75b90af7f210ac5a2c4073",
+  "linha": 284,
+  "antes": {
+   "bruto": 80.85,
+   "liquido": 80.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "51e9e6688c428027257542b7f71f666b",
+  "linha": 285,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "be298b19e8921082d3f7445b7422445f",
+  "linha": 286,
+  "antes": {
+   "bruto": 124.47,
+   "liquido": 124.47,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "6910309d52726b6737d61a27d2cc6df1",
+  "linha": 287,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3d27a2e354fe3cb0ebf40dd326ed5264",
+  "linha": 288,
+  "antes": {
+   "bruto": 290.91,
+   "liquido": 290.91,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f76826e2d62b524e96a96403253a783d",
+  "linha": 289,
+  "antes": {
+   "bruto": 160.84,
+   "liquido": 160.84,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "fd13dd230d3f470bbae29393ab3c1f84",
+  "linha": 290,
+  "antes": {
+   "bruto": 4139.1,
+   "liquido": 4139.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "fd40aab38a81793e733273e9bb684597",
+  "linha": 291,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0617045d5b31d216d7e403852a52c114",
+  "linha": 292,
+  "antes": {
+   "bruto": 149.85,
+   "liquido": 149.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5a0eba5329975cea1a5a084cea4244b4",
+  "linha": 293,
+  "antes": {
+   "bruto": 1220.56,
+   "liquido": 1220.56,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7e4004e94b6102fb6a6a1bc6fd0627f0",
+  "linha": 294,
+  "antes": {
+   "bruto": 264.8,
+   "liquido": 264.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "93fc4b950478ba8d15006a8af54c991b",
+  "linha": 295,
+  "antes": {
+   "bruto": 55.71,
+   "liquido": 55.71,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f42a5563a94b384937b0ad39bfb8ff4d",
+  "linha": 296,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1058a17a415fb7ce749044bfe3cb6885",
+  "linha": 297,
+  "antes": {
+   "bruto": 661.8,
+   "liquido": 661.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "71abeeb121c643d60133e2ac48b902ef",
+  "linha": 298,
+  "antes": {
+   "bruto": 557.6,
+   "liquido": 557.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9e8799cb030793403ecdffd62983ebd0",
+  "linha": 299,
+  "antes": {
+   "bruto": 139.4,
+   "liquido": 139.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1f6318ad264374497cc9af8de3cacff3",
+  "linha": 300,
+  "antes": {
+   "bruto": 191.61,
+   "liquido": 191.61,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "61815f1e4ffe49c19a77dedcab544ad1",
+  "linha": 301,
+  "antes": {
+   "bruto": 906.23,
+   "liquido": 906.23,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "186b8c7553f6d9cfbbadcd75816344d8",
+  "linha": 302,
+  "antes": {
+   "bruto": 57,
+   "liquido": 57,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "dd804126e9677a45ffa1b232383ba552",
+  "linha": 303,
+  "antes": {
+   "bruto": 30.67,
+   "liquido": 30.67,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "faff959b675a914b2e9d982ee15d46f2",
+  "linha": 304,
+  "antes": {
+   "bruto": 880.32,
+   "liquido": 880.32,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "05c4b3690bb33ff8f9bc0c039790d971",
+  "linha": 305,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "27974e66b3f3cd233e153ca34156736b",
+  "linha": 306,
+  "antes": {
+   "bruto": 848.33,
+   "liquido": 848.33,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "033884529f4c1a5e0b648899f649f354",
+  "linha": 307,
+  "antes": {
+   "bruto": 513,
+   "liquido": 513,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7cc9557be3880660feccbfa842ef4fc9",
+  "linha": 308,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9ea94045b29b20f79e861adeab561a9d",
+  "linha": 309,
+  "antes": {
+   "bruto": 4489.09,
+   "liquido": 4489.09,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c3de05afe937e1818b8a41261d37ba53",
+  "linha": 310,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f4dd86d51bf371ada22f32a1b4c63e99",
+  "linha": 311,
+  "antes": {
+   "bruto": 1244.02,
+   "liquido": 1244.02,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d1f00a69b3a113d2c9121450533f978b",
+  "linha": 312,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "cdfa8daf29b3dfff65d0499ebf22efb3",
+  "linha": 313,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "797a887e1fcba72cf7da73c9dfffa81a",
+  "linha": 314,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2afc53e51f6935703b474988d0840a4a",
+  "linha": 315,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c1538380f0aedeac9353419bce98e8f8",
+  "linha": 316,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "fc990e190c5bba2cef976af6f4b5f3a7",
+  "linha": 317,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2c33e5088fd9ec5c46d6c4bfd43fa1b8",
+  "linha": 318,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f482fa39fbab042409249c96ee0b5bc4",
+  "linha": 319,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "084f0d94ec2ad51b4d3b0e73cda57948",
+  "linha": 320,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f3bbd579ba1b284d0e8f5fb20ee3a1f0",
+  "linha": 321,
+  "antes": {
+   "bruto": 250.92,
+   "liquido": 250.92,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8a69b80a0321c31c2c577ae4254fcec7",
+  "linha": 322,
+  "antes": {
+   "bruto": 1390.2,
+   "liquido": 1390.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a390a173a8020baaa7ec8128fc291608",
+  "linha": 323,
+  "antes": {
+   "bruto": 32.06,
+   "liquido": 32.06,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5651c09639c1f61bee22b5767ebd8ef6",
+  "linha": 324,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f4888bd4bfae265b91c1b45e8d3324f1",
+  "linha": 325,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "50fb602a5c8c180ed5407895c8d31376",
+  "linha": 326,
+  "antes": {
+   "bruto": 1360.98,
+   "liquido": 1360.98,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1337c147f90a0a73c54f40526422453a",
+  "linha": 327,
+  "antes": {
+   "bruto": 4627.9,
+   "liquido": 4627.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a557f78db43bb57038d6d694038ac029",
+  "linha": 328,
+  "antes": {
+   "bruto": 14928.1,
+   "liquido": 14928.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a36ed1702e5c5f9b538c1b410d669978",
+  "linha": 329,
+  "antes": {
+   "bruto": 1588.8,
+   "liquido": 1588.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "fa26d2c4b6410f8ae63b4eaf34010f69",
+  "linha": 330,
+  "antes": {
+   "bruto": 1257.8,
+   "liquido": 1257.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3f951b0ad47c42be5de0406c3999d1fd",
+  "linha": 331,
+  "antes": {
+   "bruto": 340.98,
+   "liquido": 340.98,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d13a49e9ee35a65943bcf7e63c7e0265",
+  "linha": 332,
+  "antes": {
+   "bruto": 1410.82,
+   "liquido": 1410.82,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4f83eb613abc6d704bc4f1ef3bb0877c",
+  "linha": 333,
+  "antes": {
+   "bruto": 9338.23,
+   "liquido": 9338.23,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2d53ff57f03b678a31610d3e1f270848",
+  "linha": 334,
+  "antes": {
+   "bruto": 369.03,
+   "liquido": 369.03,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "caddf5a75fa33da411b7e84e39cc0475",
+  "linha": 335,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "579c3c7b66c65698b61f6573c111669d",
+  "linha": 336,
+  "antes": {
+   "bruto": 170.32,
+   "liquido": 775.32,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4c0b4e19ac8316415208f764d25ebe7e",
+  "linha": 337,
+  "antes": {
+   "bruto": 2846.89,
+   "liquido": 2846.89,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e0bc3303bdb4ab42cab081c977bc6ea9",
+  "linha": 338,
+  "antes": {
+   "bruto": 27.88,
+   "liquido": 27.88,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "131abf36629d46bf8c52cf92df3c551c",
+  "linha": 339,
+  "antes": {
+   "bruto": 3381.61,
+   "liquido": 3381.61,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "931fc7c51c5f001bbedde2403c139393",
+  "linha": 340,
+  "antes": {
+   "bruto": 5663.74,
+   "liquido": 5663.74,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "53bebbcff7ffb94f919b9707ae2552b3",
+  "linha": 341,
+  "antes": {
+   "bruto": 33.1,
+   "liquido": 33.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "bd39a9d631e79f119322595cde43d1b3",
+  "linha": 342,
+  "antes": {
+   "bruto": 364.1,
+   "liquido": 364.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3a51d2a2f02a777c02bec67ab7e61544",
+  "linha": 343,
+  "antes": {
+   "bruto": 529.6,
+   "liquido": 529.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7200ffef79839a551bf94b336ad51279",
+  "linha": 344,
+  "antes": {
+   "bruto": 29.9,
+   "liquido": 29.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "054d62fcacfe6986ca1f17bfc4d764a5",
+  "linha": 345,
+  "antes": {
+   "bruto": 85.16,
+   "liquido": 85.16,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b51684eeeb45ea55dab79f50d8109b04",
+  "linha": 346,
+  "antes": {
+   "bruto": 161.95,
+   "liquido": 161.95,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "aa11961a045e68d4c935f714c2c3d184",
+  "linha": 347,
+  "antes": {
+   "bruto": 496.35,
+   "liquido": 496.35,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ade11cc282647402bb7402d6ffd8dcfe",
+  "linha": 348,
+  "antes": {
+   "bruto": 397.2,
+   "liquido": 397.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "97bd0531e2b1773a5a275164a7567d5f",
+  "linha": 349,
+  "antes": {
+   "bruto": 2554.8,
+   "liquido": 2554.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "04a1e4edee977d07335e203d6a67f890",
+  "linha": 350,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b1f79e9bb4658629252565ae737ac496",
+  "linha": 351,
+  "antes": {
+   "bruto": 4295.3,
+   "liquido": 4295.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f7abd07ec0318867fae7a7eb0fe130a0",
+  "linha": 352,
+  "antes": {
+   "bruto": 1433.9,
+   "liquido": 1433.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c9f41b4250fad168322a3b6a8ec85f99",
+  "linha": 353,
+  "antes": {
+   "bruto": 1958.68,
+   "liquido": 1958.68,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "042ceb241415c998dc98038ef31c4907",
+  "linha": 354,
+  "antes": {
+   "bruto": 425.8,
+   "liquido": 425.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "165b6c6fa396ad88cc4f33be32513061",
+  "linha": 355,
+  "antes": {
+   "bruto": 6916.67,
+   "liquido": 6916.67,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8eced3893d869c42bea54e24be242d27",
+  "linha": 356,
+  "antes": {
+   "bruto": 558.2,
+   "liquido": 558.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "25252e7ac823ff7b9e151a1ecf53604e",
+  "linha": 357,
+  "antes": {
+   "bruto": 623.99,
+   "liquido": 623.99,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ab9f8df573cfc1f3f589f88a89dd7e5d",
+  "linha": 358,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ca81fb51f2c64985fae009ac07614195",
+  "linha": 359,
+  "antes": {
+   "bruto": 269.1,
+   "liquido": 269.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e8d21e1041eab22d16bdafc271db909e",
+  "linha": 360,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "02b8188891c62bc531240f046c4b639f",
+  "linha": 361,
+  "antes": {
+   "bruto": 3454.33,
+   "liquido": 3454.33,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d9125b049a25cc98618efb0d3f93b0cf",
+  "linha": 362,
+  "antes": {
+   "bruto": 613.36,
+   "liquido": 613.36,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e7829ae35b31caac8e731f804436d483",
+  "linha": 363,
+  "antes": {
+   "bruto": 212.9,
+   "liquido": 212.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f0129730dfb62dbdfe9ad72be73367e2",
+  "linha": 364,
+  "antes": {
+   "bruto": 325.56,
+   "liquido": 325.56,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "70ac508ffef75517e5ca90db0f2b9ddf",
+  "linha": 365,
+  "antes": {
+   "bruto": 2581.48,
+   "liquido": 2581.48,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "35dba433db330c1ef85d7b50b7d04ddf",
+  "linha": 366,
+  "antes": {
+   "bruto": 149.5,
+   "liquido": 149.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a78d9409230671b40ff5a8c25b05951b",
+  "linha": 367,
+  "antes": {
+   "bruto": 54.82,
+   "liquido": 54.82,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f30237cb64731ee43cd474944eda5ee0",
+  "linha": 368,
+  "antes": {
+   "bruto": 496.35,
+   "liquido": 496.35,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "07049bed3a1858b64d7d8eb79313ecfc",
+  "linha": 369,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "802104cc9de075fea3cd300561f8a343",
+  "linha": 370,
+  "antes": {
+   "bruto": 165.47,
+   "liquido": 165.47,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "650333b67bf22ba4c414ba8aa70deb95",
+  "linha": 371,
+  "antes": {
+   "bruto": 248.18,
+   "liquido": 248.18,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4203ac78484d40640860aceb9b97bc86",
+  "linha": 372,
+  "antes": {
+   "bruto": 342,
+   "liquido": 342,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3f9f89ef8068f49c0e4ec40821716917",
+  "linha": 373,
+  "antes": {
+   "bruto": 107.8,
+   "liquido": 107.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "244735580d1bdff3d0a9ebef2eccd35e",
+  "linha": 374,
+  "antes": {
+   "bruto": 87.69,
+   "liquido": 87.69,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "6823c5d65ae95c32b1857565bb1a69f6",
+  "linha": 375,
+  "antes": {
+   "bruto": 1225.9,
+   "liquido": 1225.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1e9590e66107c4cd8ff7024323b3cc9b",
+  "linha": 376,
+  "antes": {
+   "bruto": 36.41,
+   "liquido": 36.41,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "6fe28b8e74447813c2563936fd6f430d",
+  "linha": 377,
+  "antes": {
+   "bruto": 78.77,
+   "liquido": 78.77,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "35fff6bdf6c73f17d59f3025ce2fc141",
+  "linha": 378,
+  "antes": {
+   "bruto": 111.52,
+   "liquido": 111.52,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a30d14ca06bd9b04c7a5852433e9bfa7",
+  "linha": 379,
+  "antes": {
+   "bruto": 1157.02,
+   "liquido": 1157.02,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d23a0d7cd5da36bb8d8950aafa494ebc",
+  "linha": 380,
+  "antes": {
+   "bruto": 110.3,
+   "liquido": 110.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "aaf138a9d752dff319fbb39c6348541c",
+  "linha": 381,
+  "antes": {
+   "bruto": 83.64,
+   "liquido": 83.64,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4bff68d10d71e67e1f03e692ea25f6c1",
+  "linha": 382,
+  "antes": {
+   "bruto": 29.9,
+   "liquido": 29.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0708a976f1dd189f1e8a106e93b5c2f7",
+  "linha": 383,
+  "antes": {
+   "bruto": 172.48,
+   "liquido": 172.48,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d4998ff2365b5752dbd9563df1d37f8e",
+  "linha": 384,
+  "antes": {
+   "bruto": 1103,
+   "liquido": 1103,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "110f199139399ccd797af95aee10f165",
+  "linha": 385,
+  "antes": {
+   "bruto": 9474.32,
+   "liquido": 12955.82,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7e90cfbe269fba6b6f5cd7cdc17d4c55",
+  "linha": 386,
+  "antes": {
+   "bruto": 69.7,
+   "liquido": 69.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b0634b89bef9ada24cbde538de91e767",
+  "linha": 387,
+  "antes": {
+   "bruto": 176.5,
+   "liquido": 176.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "85443676002563cbdfb4ae8b85a605ba",
+  "linha": 388,
+  "antes": {
+   "bruto": 2386.68,
+   "liquido": 2386.68,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "bb179c8d5d0d288221ce8f0c9c017427",
+  "linha": 389,
+  "antes": {
+   "bruto": 645.73,
+   "liquido": 645.73,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3c48f9c9aaf9d324b872488fb9c6ab13",
+  "linha": 390,
+  "antes": {
+   "bruto": 1496.56,
+   "liquido": 1496.56,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "167d5e3e30bfa736b3a91088f3635231",
+  "linha": 391,
+  "antes": {
+   "bruto": 256.53,
+   "liquido": 256.53,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "bd1bbf11e5ae47f192d68ece000eda80",
+  "linha": 392,
+  "antes": {
+   "bruto": 194.35,
+   "liquido": 194.35,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3f625de8dfbba719e411e4420e71f89c",
+  "linha": 393,
+  "antes": {
+   "bruto": 2150.85,
+   "liquido": 2150.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9e205b20011868b7a6cdef7fc13730fc",
+  "linha": 394,
+  "antes": {
+   "bruto": 430.3,
+   "liquido": 430.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ccf5eb1d3a1e189e1eb290721485cc69",
+  "linha": 395,
+  "antes": {
+   "bruto": 237.4,
+   "liquido": 237.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "248a344a3d28b968155d04092603b7b6",
+  "linha": 396,
+  "antes": {
+   "bruto": 1858.77,
+   "liquido": 1858.77,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f872b3d903047f213f60615358056ab2",
+  "linha": 397,
+  "antes": {
+   "bruto": 15268.67,
+   "liquido": 15268.67,
+   "liquidoMensal": 0
+  },
+  "desfecho": "nao_convertida"
+ },
+ {
+  "id": "ce2841057333e92477500158ea8049ec",
+  "linha": 398,
+  "antes": {
+   "bruto": 551.5,
+   "liquido": 551.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ddc7048802d34f36dfa9a40273703293",
+  "linha": 399,
+  "antes": {
+   "bruto": 4642.02,
+   "liquido": 4642.02,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b9059d498a219240957de4f90cef8c2d",
+  "linha": 400,
+  "antes": {
+   "bruto": 498.32,
+   "liquido": 498.32,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "eb044805e183bd126f884d1250c8024b",
+  "linha": 401,
+  "antes": {
+   "bruto": 106.5,
+   "liquido": 106.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "43149070d81a1b405ea08f66eebec1da",
+  "linha": 402,
+  "antes": {
+   "bruto": 13.94,
+   "liquido": 13.94,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5d7c8408e67099d0e6a3602bc1f0ca63",
+  "linha": 403,
+  "antes": {
+   "bruto": 165.45,
+   "liquido": 165.45,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d672763598c2468ab96606347d3b6e97",
+  "linha": 404,
+  "antes": {
+   "bruto": 606.65,
+   "liquido": 606.65,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d987baad481423869f32ff7fd4a81e33",
+  "linha": 405,
+  "antes": {
+   "bruto": 28.02,
+   "liquido": 28.02,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9b79a5c7119b2e7d92e3670a47eb0709",
+  "linha": 406,
+  "antes": {
+   "bruto": 66.2,
+   "liquido": 66.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b7f17bb3db0fdd56e42d7f61c7160b08",
+  "linha": 407,
+  "antes": {
+   "bruto": 27.88,
+   "liquido": 27.88,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "81a58b7774846b87f3b788edbd39543b",
+  "linha": 408,
+  "antes": {
+   "bruto": 2341.92,
+   "liquido": 2341.92,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f3a23765f1629a583c3a6bd2bbd359d6",
+  "linha": 409,
+  "antes": {
+   "bruto": 769.5,
+   "liquido": 769.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1201f1b825c691c3e463efc27aa3fc57",
+  "linha": 410,
+  "antes": {
+   "bruto": 555.98,
+   "liquido": 555.98,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "bb931ea4698ab28b97ce93a8077941e3",
+  "linha": 411,
+  "antes": {
+   "bruto": 161.7,
+   "liquido": 161.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a9711005403f798f7e27af7ff71ab155",
+  "linha": 412,
+  "antes": {
+   "bruto": 617.6,
+   "liquido": 617.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3cc7f441c0de8ac489045a58968e4828",
+  "linha": 413,
+  "antes": {
+   "bruto": 6264.06,
+   "liquido": 6264.06,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "50991805dcb3147e6a4b360ed4cf18a8",
+  "linha": 414,
+  "antes": {
+   "bruto": 7.1,
+   "liquido": 7.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "141a54f898a2a2bc781eb150d280ca98",
+  "linha": 415,
+  "antes": {
+   "bruto": 3243.8,
+   "liquido": 3243.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "88a169cce620725c413d7457b3cb9ce1",
+  "linha": 416,
+  "antes": {
+   "bruto": 27.01,
+   "liquido": 27.01,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "26c5bada1ec8259bf97fcfd4c1349d0a",
+  "linha": 417,
+  "antes": {
+   "bruto": 648.12,
+   "liquido": 648.12,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "62b60c15e40ce23d063a7e58f2db7ff1",
+  "linha": 418,
+  "antes": {
+   "bruto": 153.34,
+   "liquido": 153.34,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3b3a1a1f91f47a19c1586d91641ce79c",
+  "linha": 419,
+  "antes": {
+   "bruto": 248.18,
+   "liquido": 248.18,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8bce20c2919b3e6d94bfd4933116a6d8",
+  "linha": 420,
+  "antes": {
+   "bruto": 5940,
+   "liquido": 5940,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "08b47ab57b21c0dd7b171054d48654c7",
+  "linha": 421,
+  "antes": {
+   "bruto": 1330.55,
+   "liquido": 1330.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "89301661235d7ed7aa90f8afe8f5295e",
+  "linha": 422,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "67c6b4fa84cc48ad3ef75dce1cb164eb",
+  "linha": 423,
+  "antes": {
+   "bruto": 17.43,
+   "liquido": 17.43,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0f3057f1ca7036dfb26142886bebb384",
+  "linha": 424,
+  "antes": {
+   "bruto": 55.76,
+   "liquido": 55.76,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "bd06399ea6cedc780f786ff3101814d8",
+  "linha": 425,
+  "antes": {
+   "bruto": 213.75,
+   "liquido": 213.75,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "dd0fdf7cfe95641aa22dca13428b0cee",
+  "linha": 426,
+  "antes": {
+   "bruto": 110.3,
+   "liquido": 110.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "723127b3df977676770f030fb388d0f1",
+  "linha": 427,
+  "antes": {
+   "bruto": 87.32,
+   "liquido": 10087.32,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0153f250eb11f5575e027ea4c72aac53",
+  "linha": 428,
+  "antes": {
+   "bruto": 583.34,
+   "liquido": 583.34,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e6c942211cee075ab8f6ea65fdaf414d",
+  "linha": 429,
+  "antes": {
+   "bruto": 145.86,
+   "liquido": 145.86,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "fd165938a9c4583fb007e167a36e6615",
+  "linha": 430,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4603673ecd93494cf593453767bfa82c",
+  "linha": 431,
+  "antes": {
+   "bruto": 1654.5,
+   "liquido": 1654.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b829908f52d5d808c5444a5b26acfc01",
+  "linha": 432,
+  "antes": {
+   "bruto": 441.2,
+   "liquido": 441.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d85b7b561fa38b711363b582d19fecad",
+  "linha": 433,
+  "antes": {
+   "bruto": 1210.8,
+   "liquido": 1210.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "fd5f0bc608245c15a7ae72e38939beee",
+  "linha": 434,
+  "antes": {
+   "bruto": 20.91,
+   "liquido": 20.91,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "39d180dc4e4ee29640cffec5fe9a118a",
+  "linha": 435,
+  "antes": {
+   "bruto": 234.19,
+   "liquido": 234.19,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "af34e6b392a80cd8790f6fde17b78d61",
+  "linha": 436,
+  "antes": {
+   "bruto": 4000,
+   "liquido": 4000,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "fb804be9c7555ad4a1fe5ee42fd4bf4e",
+  "linha": 437,
+  "antes": {
+   "bruto": 357.36,
+   "liquido": 357.36,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "698637672d3bb93670f35d672f509482",
+  "linha": 438,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "46cf07d0ee60fd21e981405fd17265f3",
+  "linha": 439,
+  "antes": {
+   "bruto": 2095.7,
+   "liquido": 2095.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "6459c4ac1f78a46a3254dd0481c41a45",
+  "linha": 440,
+  "antes": {
+   "bruto": 80.76,
+   "liquido": 80.76,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9cb401f220d25e212ecdfe888ed39ab2",
+  "linha": 441,
+  "antes": {
+   "bruto": 1143.85,
+   "liquido": 1143.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0bd70ba17882781235e433235d4f16d9",
+  "linha": 442,
+  "antes": {
+   "bruto": 132.4,
+   "liquido": 132.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "094f30c93878a4211fe047de14def297",
+  "linha": 443,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2cfb921237ae51cc6217353026106c78",
+  "linha": 444,
+  "antes": {
+   "bruto": 478.4,
+   "liquido": 478.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "63f16fc5ed5addaf01a205321474ebf9",
+  "linha": 445,
+  "antes": {
+   "bruto": 34.85,
+   "liquido": 34.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "64307dcc3e497887862791a88f52c874",
+  "linha": 446,
+  "antes": {
+   "bruto": 219.64,
+   "liquido": 219.64,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "33bc7b75f2e86f725f06d700b76a8ff7",
+  "linha": 447,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "df4b6a3bf7414cbb11a9d0eeca118504",
+  "linha": 448,
+  "antes": {
+   "bruto": 515.78,
+   "liquido": 515.78,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "85520a8a41ab404678b2770ba8b1f91c",
+  "linha": 449,
+  "antes": {
+   "bruto": 328.9,
+   "liquido": 328.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "788493d6f77542c89409a8e63e68a464",
+  "linha": 450,
+  "antes": {
+   "bruto": 386.05,
+   "liquido": 386.05,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "04a8a02e7851466178210cfb15d176e3",
+  "linha": 451,
+  "antes": {
+   "bruto": 1196.56,
+   "liquido": 1196.56,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7254199fcf253f1b6036f9c967e4057c",
+  "linha": 452,
+  "antes": {
+   "bruto": 711.48,
+   "liquido": 711.48,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8747bb99425cac07482f01b58d5f0b4b",
+  "linha": 453,
+  "antes": {
+   "bruto": 121.31,
+   "liquido": 121.31,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "cc49390af33213499e413d2ace1aa7fe",
+  "linha": 454,
+  "antes": {
+   "bruto": 243.04,
+   "liquido": 243.04,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "cbe83a0740da0e3aa906a2c9fbf38a93",
+  "linha": 455,
+  "antes": {
+   "bruto": 127.74,
+   "liquido": 127.74,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "51a339718e462d9d74709f92e621ab21",
+  "linha": 456,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c9b86294e194954e9719a7f2bec05b22",
+  "linha": 457,
+  "antes": {
+   "bruto": 769.5,
+   "liquido": 769.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9ef1bb9d6ddd1c418693cc3a2aaaf326",
+  "linha": 458,
+  "antes": {
+   "bruto": 171,
+   "liquido": 171,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ac15e77f72462417e2fb67ab582805e4",
+  "linha": 459,
+  "antes": {
+   "bruto": 7235.8,
+   "liquido": 7235.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f4b5f9b6c411221863ab32b6cc4a8a29",
+  "linha": 460,
+  "antes": {
+   "bruto": 658.4,
+   "liquido": 658.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d371ae8b46b8b79a2bf3b5615c46ef95",
+  "linha": 461,
+  "antes": {
+   "bruto": 16126.88,
+   "liquido": 16126.88,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f8c9e95980b86a7ab3f7ab2a6ecde82f",
+  "linha": 462,
+  "antes": {
+   "bruto": 73.19,
+   "liquido": 73.19,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0c126bc37f8d5b9ed16a6ceb7aa8f61b",
+  "linha": 463,
+  "antes": {
+   "bruto": 546,
+   "liquido": 8951.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "6baef3286e66f0a9e51ccb10abbee6eb",
+  "linha": 464,
+  "antes": {
+   "bruto": 812.25,
+   "liquido": 812.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "909842fa77c5f2165fb0bd3967d0e802",
+  "linha": 465,
+  "antes": {
+   "bruto": 264.8,
+   "liquido": 264.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9f275281f82cee918e169971e9c6c19a",
+  "linha": 466,
+  "antes": {
+   "bruto": 9567.73,
+   "liquido": 9567.73,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c3b73cbf2f8cbbe83b4067886bd2f314",
+  "linha": 467,
+  "antes": {
+   "bruto": 4906.88,
+   "liquido": 6980.88,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "52524ee89317cbf728ef42ab05a11fa0",
+  "linha": 468,
+  "antes": {
+   "bruto": 1985.4,
+   "liquido": 1985.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0278114974d6e8234f58c218b92f0792",
+  "linha": 469,
+  "antes": {
+   "bruto": 198.68,
+   "liquido": 198.68,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7cc5e99cdc78654b7baa2717ac9eb6ca",
+  "linha": 470,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "21f755a705857a9d1d267495d8a859d5",
+  "linha": 471,
+  "antes": {
+   "bruto": 113.84,
+   "liquido": 113.84,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "dd99b132e1c98e8aedec88fe528ca660",
+  "linha": 472,
+  "antes": {
+   "bruto": 386.05,
+   "liquido": 386.05,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2b34a66d7c0f693a425f56ee50406e59",
+  "linha": 473,
+  "antes": {
+   "bruto": 2034.42,
+   "liquido": 98152.22,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "48a99d5a536decfcec59d07de6378bcd",
+  "linha": 474,
+  "antes": {
+   "bruto": 2261.15,
+   "liquido": 2261.15,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "af4e43366b472c6f587ad4d1da25b8e5",
+  "linha": 475,
+  "antes": {
+   "bruto": 560.64,
+   "liquido": 560.64,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5760091fa8ea81b8f3cd8bd9234968b8",
+  "linha": 476,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d054d508d6b794a3c3b18f692f784208",
+  "linha": 477,
+  "antes": {
+   "bruto": 501.84,
+   "liquido": 501.84,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "cf16f2e7b5d756a8b932989912bf8028",
+  "linha": 478,
+  "antes": {
+   "bruto": 71.77,
+   "liquido": 71.77,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5978e9979240fefb7794f59eaffa8730",
+  "linha": 479,
+  "antes": {
+   "bruto": 96.07,
+   "liquido": 96.07,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "27a74d9ababfb42d935b408380bf6432",
+  "linha": 480,
+  "antes": {
+   "bruto": 106.88,
+   "liquido": 106.88,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "92179c0d0543dc7114cfbe614504df49",
+  "linha": 481,
+  "antes": {
+   "bruto": 250.92,
+   "liquido": 250.92,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2e7661ed9d40c55958cb7cff0402c893",
+  "linha": 482,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5fe2a466ee718321e221646b2223ba3d",
+  "linha": 483,
+  "antes": {
+   "bruto": 7.01,
+   "liquido": 7.01,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b8dd0b6a8e94a771d0efe298582e2d1c",
+  "linha": 484,
+  "antes": {
+   "bruto": 41.82,
+   "liquido": 41.82,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9d48f3b13edf7b66f3dbb1c81d2a4aa5",
+  "linha": 485,
+  "antes": {
+   "bruto": 111.52,
+   "liquido": 111.52,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "04637a98a2f2a7b35d9b2535e4c97069",
+  "linha": 486,
+  "antes": {
+   "bruto": 104.55,
+   "liquido": 104.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ad03fe8f7d8cb548c610a4e566341fbf",
+  "linha": 487,
+  "antes": {
+   "bruto": 89.7,
+   "liquido": 89.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0651c407ef63b764963c9a081906239b",
+  "linha": 488,
+  "antes": {
+   "bruto": 234.12,
+   "liquido": 234.12,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "892919afc3baf2542791fe2d87817809",
+  "linha": 489,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "07751ee7e627610adcabafe7a15da62e",
+  "linha": 490,
+  "antes": {
+   "bruto": 11444.79,
+   "liquido": 11444.79,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d47451b553f0222c9945364bac5c7f20",
+  "linha": 491,
+  "antes": {
+   "bruto": 27.88,
+   "liquido": 27.88,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ffccf702c5ba9a95f29710067636a777",
+  "linha": 492,
+  "antes": {
+   "bruto": 167.28,
+   "liquido": 167.28,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1647f47266fad130216f1ed778419946",
+  "linha": 493,
+  "antes": {
+   "bruto": 744.71,
+   "liquido": 744.71,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1f9eee488fe69a28d695892490dee0d1",
+  "linha": 494,
+  "antes": {
+   "bruto": 647.62,
+   "liquido": 647.62,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1abc844b278446c2fbc786f613baaa83",
+  "linha": 495,
+  "antes": {
+   "bruto": 1300.65,
+   "liquido": 1300.65,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "88ba535dbdf3d55b708832576b536e9f",
+  "linha": 496,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "36df40ecc7af80c94e68da26b46f5c10",
+  "linha": 497,
+  "antes": {
+   "bruto": 1121.6,
+   "liquido": 1121.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f3032ec8d4dc423a8fb1adecd6fab2bd",
+  "linha": 498,
+  "antes": {
+   "bruto": 195.16,
+   "liquido": 195.16,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "29899445b2da1e827d277f8bf72fdd37",
+  "linha": 499,
+  "antes": {
+   "bruto": 441.2,
+   "liquido": 441.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4298da3386822cabc9b335e0f78a4bea",
+  "linha": 500,
+  "antes": {
+   "bruto": 276.77,
+   "liquido": 276.77,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c955748c57508700a7e2457fbaa369dd",
+  "linha": 501,
+  "antes": {
+   "bruto": 249.5,
+   "liquido": 249.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4243da19e69c851313ff8f0485d945cd",
+  "linha": 502,
+  "antes": {
+   "bruto": 986.7,
+   "liquido": 986.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "6a46c2628e247a1972355d31bb9ab195",
+  "linha": 503,
+  "antes": {
+   "bruto": 209.3,
+   "liquido": 209.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "787221b15119ff10a71bf9f4a992a785",
+  "linha": 504,
+  "antes": {
+   "bruto": 299,
+   "liquido": 299,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b9289e97e84b136bdc87639c75ed8d4b",
+  "linha": 505,
+  "antes": {
+   "bruto": 195.16,
+   "liquido": 195.16,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c373cfe2df938334bfd87c02d9b8a631",
+  "linha": 506,
+  "antes": {
+   "bruto": 1592.95,
+   "liquido": 1592.95,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "6dbc87bfaa6dfa09dc8bddb264c76836",
+  "linha": 507,
+  "antes": {
+   "bruto": 334.56,
+   "liquido": 334.56,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0afeef6dfe5bca7b6882eddc57ec1abd",
+  "linha": 508,
+  "antes": {
+   "bruto": 223.04,
+   "liquido": 223.04,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d498200cc74ccc2cbec075da0ee91caa",
+  "linha": 509,
+  "antes": {
+   "bruto": 153.34,
+   "liquido": 153.34,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ed2edb9139016e3f8081dac7ef6dc811",
+  "linha": 510,
+  "antes": {
+   "bruto": 676.09,
+   "liquido": 676.09,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "90740a2b7cbaa107c447c755ffddb887",
+  "linha": 511,
+  "antes": {
+   "bruto": 1037.58,
+   "liquido": 1037.58,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1c7b52e556a00ac886f335edfe2da3e9",
+  "linha": 512,
+  "antes": {
+   "bruto": 119.6,
+   "liquido": 119.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "86577b3dc2bfeb0f0a728ae4b5416a58",
+  "linha": 513,
+  "antes": {
+   "bruto": 87.13,
+   "liquido": 87.13,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "fd06f0d284d019f84731f86fa9b78c7c",
+  "linha": 514,
+  "antes": {
+   "bruto": 706.71,
+   "liquido": 706.71,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "cbde1f4d81286eac2c2c09ad631fc628",
+  "linha": 515,
+  "antes": {
+   "bruto": 98.23,
+   "liquido": 98.23,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b803bebb9429700bbe85f676c417f627",
+  "linha": 516,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "daaf2bf65b49579604a4510b07b9b9f2",
+  "linha": 517,
+  "antes": {
+   "bruto": 2747.3,
+   "liquido": 2747.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5ccda086567143e8d632e2d83ce4033a",
+  "linha": 518,
+  "antes": {
+   "bruto": 65.51,
+   "liquido": 65.51,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e3027a642f1f162097f65154665ec436",
+  "linha": 519,
+  "antes": {
+   "bruto": 563,
+   "liquido": 563,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5b5fe53c98c7ef9db16384b8de4f6424",
+  "linha": 520,
+  "antes": {
+   "bruto": 838.35,
+   "liquido": 838.35,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "52b81ea03b43507441a09cc0cbae2637",
+  "linha": 521,
+  "antes": {
+   "bruto": 239.2,
+   "liquido": 239.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0213abe491e73662b8cb4b3ec82a9377",
+  "linha": 522,
+  "antes": {
+   "bruto": 3109.6,
+   "liquido": 3109.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c3a3e0a7d241d28a9c7b82807258cc6e",
+  "linha": 523,
+  "antes": {
+   "bruto": 446.85,
+   "liquido": 446.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f5a4861a2b68ecadf2e06be8965352a8",
+  "linha": 524,
+  "antes": {
+   "bruto": 16.55,
+   "liquido": 16.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "72cf70e153722d934b010972a6c89e09",
+  "linha": 525,
+  "antes": {
+   "bruto": 879.51,
+   "liquido": 879.51,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a8456d750f5038c9aadfd463addc4260",
+  "linha": 526,
+  "antes": {
+   "bruto": 89.7,
+   "liquido": 89.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e5364930ead472f973ba575a9114097b",
+  "linha": 527,
+  "antes": {
+   "bruto": 1631.7,
+   "liquido": 1631.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9f00af06cbbea1aafdb400062a7c2d72",
+  "linha": 528,
+  "antes": {
+   "bruto": 2440.32,
+   "liquido": 2440.32,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4349e653b4bc25802c3b6e2123f4b561",
+  "linha": 529,
+  "antes": {
+   "bruto": 239.2,
+   "liquido": 239.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a521856e6ac299aad4bc3d9251f5d417",
+  "linha": 530,
+  "antes": {
+   "bruto": 1078.04,
+   "liquido": 1078.04,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "32bfb9878a3b2f7ba7b6b6fb9bd17951",
+  "linha": 531,
+  "antes": {
+   "bruto": 836.4,
+   "liquido": 836.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3508e811bf824a7732502eb60ce35852",
+  "linha": 532,
+  "antes": {
+   "bruto": 362.2,
+   "liquido": 362.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b04a770718499b76a74811b68c194b9b",
+  "linha": 533,
+  "antes": {
+   "bruto": 706.82,
+   "liquido": 706.82,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9d36a35cad0b8a318e50c618c97e52c9",
+  "linha": 534,
+  "antes": {
+   "bruto": 44.85,
+   "liquido": 44.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d303dcbd80cf2f167abc8dffb35a50df",
+  "linha": 535,
+  "antes": {
+   "bruto": 574.27,
+   "liquido": 574.27,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "103f8cdcbc55500f607ab531b5818916",
+  "linha": 536,
+  "antes": {
+   "bruto": 239.2,
+   "liquido": 239.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d93874c95714c4050db05d0b5e236496",
+  "linha": 537,
+  "antes": {
+   "bruto": 822.25,
+   "liquido": 822.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a48024b89c233f59c805066004afd126",
+  "linha": 538,
+  "antes": {
+   "bruto": 119.6,
+   "liquido": 119.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3d3c3e6a1e9eb81cd3a31ba734bdef70",
+  "linha": 539,
+  "antes": {
+   "bruto": 63.87,
+   "liquido": 63.87,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e57b287a0fa5c3abfb815d13d5f3c556",
+  "linha": 540,
+  "antes": {
+   "bruto": 7071.12,
+   "liquido": 7071.12,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0c27f59f8456d1fccc725f92ab2164f4",
+  "linha": 541,
+  "antes": {
+   "bruto": 1710,
+   "liquido": 1710,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "60b97477b903fddd173c2c9ed26144f2",
+  "linha": 542,
+  "antes": {
+   "bruto": 697,
+   "liquido": 697,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0948b36da6660fa70fe4e4337c46e652",
+  "linha": 543,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "897df98681bd7b2835fb23c953a732bc",
+  "linha": 544,
+  "antes": {
+   "bruto": 29.23,
+   "liquido": 29.23,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "936f764e78038a2d4abf2723b75b8332",
+  "linha": 545,
+  "antes": {
+   "bruto": 5504,
+   "liquido": 5504,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a2172a9ff26a6a26cdd073b91efdb86d",
+  "linha": 546,
+  "antes": {
+   "bruto": 0,
+   "liquido": 1000,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4dfe8611865ea88faf0cbda6f1b9e795",
+  "linha": 547,
+  "antes": {
+   "bruto": 167.28,
+   "liquido": 167.28,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9a3987728fd98044d7230fe417a93cbd",
+  "linha": 548,
+  "antes": {
+   "bruto": 55.76,
+   "liquido": 55.76,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "49b6c631bba367728931fcb69bfa925d",
+  "linha": 549,
+  "antes": {
+   "bruto": 27.67,
+   "liquido": 27.67,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9d46f0e800eeaee241497d42b530cec0",
+  "linha": 550,
+  "antes": {
+   "bruto": 159.68,
+   "liquido": 159.68,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "29e41c377017218d7a48a48eacaea760",
+  "linha": 551,
+  "antes": {
+   "bruto": 397.29,
+   "liquido": 397.29,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ed370d51237e5a04350552de092da859",
+  "linha": 552,
+  "antes": {
+   "bruto": 20.48,
+   "liquido": 20.48,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "814a934c9b9546d2f02b898954c3ae6d",
+  "linha": 553,
+  "antes": {
+   "bruto": 223.04,
+   "liquido": 223.04,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ecda75be6aa981954da880d5a64331b0",
+  "linha": 554,
+  "antes": {
+   "bruto": 79.94,
+   "liquido": 79.94,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "894e0244628f8558f28fdac9bfd955d5",
+  "linha": 555,
+  "antes": {
+   "bruto": 1652.23,
+   "liquido": 1652.23,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "585bf5b9dbb412ca995a88d8a22b3def",
+  "linha": 556,
+  "antes": {
+   "bruto": 235.13,
+   "liquido": 235.13,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e64cc0c97a9f0068a9348707ce8bc97a",
+  "linha": 557,
+  "antes": {
+   "bruto": 557.6,
+   "liquido": 557.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "764659b526839d92e93b3eccd22b692a",
+  "linha": 558,
+  "antes": {
+   "bruto": 10.78,
+   "liquido": 10.78,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "84145328d7589246ece6f3782a729b28",
+  "linha": 559,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2d7003617c012de2b14251328bec9f25",
+  "linha": 560,
+  "antes": {
+   "bruto": 66.2,
+   "liquido": 66.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9a71f410d3289dddd51e4a33acc2989d",
+  "linha": 561,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5d3b781ba9a5f39992e4b54e6da63f8c",
+  "linha": 562,
+  "antes": {
+   "bruto": 49,
+   "liquido": 49,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a016d911ab714cb2fb7d0f4478b7025d",
+  "linha": 563,
+  "antes": {
+   "bruto": 1451.39,
+   "liquido": 1451.39,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8baa83bd2071caf9b31d87dc60c2472a",
+  "linha": 564,
+  "antes": {
+   "bruto": 900.32,
+   "liquido": 900.32,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ba4e5bef40d8a25f0447e12fec736f92",
+  "linha": 565,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4f452f2a1ef198a4d672c78485581da8",
+  "linha": 566,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "323278fc6fe23f9b958a9553b1e9c827",
+  "linha": 567,
+  "antes": {
+   "bruto": 125.46,
+   "liquido": 125.46,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7bdf437fa8b64f44c7f148514844ffa8",
+  "linha": 568,
+  "antes": {
+   "bruto": 85.16,
+   "liquido": 85.16,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9cede95b8da4fbbaf68e75e84491ea29",
+  "linha": 569,
+  "antes": {
+   "bruto": 463.45,
+   "liquido": 463.45,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f112c0edb849757d98f244061962798a",
+  "linha": 570,
+  "antes": {
+   "bruto": 82,
+   "liquido": 82,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0968ef7cac0dabca3870aaabbd0cfad1",
+  "linha": 571,
+  "antes": {
+   "bruto": 53.22,
+   "liquido": 53.22,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "39553b210705e924902ed6eb95cb320a",
+  "linha": 572,
+  "antes": {
+   "bruto": 97.58,
+   "liquido": 97.58,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "cccccfd86433071aa5c310bef548c022",
+  "linha": 573,
+  "antes": {
+   "bruto": 55.76,
+   "liquido": 55.76,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c417fe024caf2b48b5701b82070b34b9",
+  "linha": 574,
+  "antes": {
+   "bruto": 135.51,
+   "liquido": 135.51,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "85d3a9d728fdb909f0b2b290d37b7d88",
+  "linha": 575,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1502780dbd2269031d9b73afd1bc0ae5",
+  "linha": 576,
+  "antes": {
+   "bruto": 333.81,
+   "liquido": 333.81,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "97fb7ce81f72ee9b56595b03ef0ae2e1",
+  "linha": 577,
+  "antes": {
+   "bruto": 1903.65,
+   "liquido": 1903.65,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f547704dc3ab6ccdcf763e28beecd109",
+  "linha": 578,
+  "antes": {
+   "bruto": 4505.29,
+   "liquido": 4505.29,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "66e286edd711576d3b13e51f97f918d5",
+  "linha": 579,
+  "antes": {
+   "bruto": 258.18,
+   "liquido": 258.18,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "858aab5393574157daf0e1af7662eac7",
+  "linha": 580,
+  "antes": {
+   "bruto": 1677.71,
+   "liquido": 1677.71,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "427eeb8921a13e7e88d6bf2162c49cd0",
+  "linha": 581,
+  "antes": {
+   "bruto": 584.54,
+   "liquido": 584.54,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1387ecb575c9668970b74a384feee1c1",
+  "linha": 582,
+  "antes": {
+   "bruto": 1158.15,
+   "liquido": 1158.15,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "eca7e6cf3f54d8c0b8204de93dc839d7",
+  "linha": 583,
+  "antes": {
+   "bruto": 829.43,
+   "liquido": 829.43,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "bf86663c3634c88e2ccf9f0375218474",
+  "linha": 584,
+  "antes": {
+   "bruto": 423,
+   "liquido": 423,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "281ad23db21bb0fcefc976ccf38acabf",
+  "linha": 585,
+  "antes": {
+   "bruto": 508.3,
+   "liquido": 508.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b2efc76ad706b68fe7745477a5f5bf49",
+  "linha": 586,
+  "antes": {
+   "bruto": 2007.36,
+   "liquido": 2007.36,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f075deb74219cab44640b44ef71d486c",
+  "linha": 587,
+  "antes": {
+   "bruto": 386.05,
+   "liquido": 386.05,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a8d2545f3072c88da9c8d2681f71a231",
+  "linha": 588,
+  "antes": {
+   "bruto": 220.6,
+   "liquido": 220.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "41a684e613aa95e58e8881de6d608049",
+  "linha": 589,
+  "antes": {
+   "bruto": 435.25,
+   "liquido": 435.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2c23b6650cf58226cf7414867764fcae",
+  "linha": 590,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8f315702b9f3ea3f20e9d1fc104a1d1f",
+  "linha": 591,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1eac04cf4319ff23855348f85f0529e4",
+  "linha": 592,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "bb24d1b523b325d2d97a37f4c7bd1c0f",
+  "linha": 593,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "588227dfbc8720338573c7982f206009",
+  "linha": 594,
+  "antes": {
+   "bruto": 832.53,
+   "liquido": 832.53,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8aed1235aad8d630c5cf3535f3fe969e",
+  "linha": 595,
+  "antes": {
+   "bruto": 981.58,
+   "liquido": 981.58,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "78cab6ebfceed6820926743bcc658e62",
+  "linha": 596,
+  "antes": {
+   "bruto": 292.4,
+   "liquido": 292.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7363ac724047eaba4b2de065f171ec82",
+  "linha": 597,
+  "antes": {
+   "bruto": 728.05,
+   "liquido": 728.05,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8743590ad9c54710a71d607e433b64c6",
+  "linha": 598,
+  "antes": {
+   "bruto": 560.56,
+   "liquido": 560.56,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4fd5a48560371e00ba47ff9ca7ad0c68",
+  "linha": 599,
+  "antes": {
+   "bruto": 79.84,
+   "liquido": 79.84,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8982a86daf53cb6068c64990608b11a9",
+  "linha": 600,
+  "antes": {
+   "bruto": 687.7,
+   "liquido": 687.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "72e558da4c6796c150586ab3cd9c4285",
+  "linha": 601,
+  "antes": {
+   "bruto": 4027.5,
+   "liquido": 4027.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1d37cb8155199ce91a3687dc7832c532",
+  "linha": 602,
+  "antes": {
+   "bruto": 1244.84,
+   "liquido": 1244.84,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "64d18a843521f08c3be0d6a4b6aea1a9",
+  "linha": 603,
+  "antes": {
+   "bruto": 194.04,
+   "liquido": 194.04,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ae06cf9cbd5f27797016e031658989f7",
+  "linha": 604,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "962ad4bf4282e7a84edd06894f3d5438",
+  "linha": 605,
+  "antes": {
+   "bruto": 21.38,
+   "liquido": 21.38,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7a3ef686723282015de5b5e20b4a43f1",
+  "linha": 606,
+  "antes": {
+   "bruto": 468.85,
+   "liquido": 468.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ae6af3b0bcfcff0bc47322c0a37547f4",
+  "linha": 607,
+  "antes": {
+   "bruto": 99.3,
+   "liquido": 99.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c508f9083c801d5b6fbc982339599c27",
+  "linha": 608,
+  "antes": {
+   "bruto": 468.85,
+   "liquido": 468.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5fa4f6433d0a3306208238da7797e20b",
+  "linha": 609,
+  "antes": {
+   "bruto": 85.5,
+   "liquido": 85.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "10738e70d81958c0e6444309d6523ab8",
+  "linha": 610,
+  "antes": {
+   "bruto": 557.6,
+   "liquido": 557.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c4c87bd816245d0f1f998a5cbc226721",
+  "linha": 611,
+  "antes": {
+   "bruto": 64.77,
+   "liquido": 64.77,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "112f8c36a33cd813d9debc160253f029",
+  "linha": 612,
+  "antes": {
+   "bruto": 876.15,
+   "liquido": 876.15,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "240727795b77ff2229280029c68e8b61",
+  "linha": 613,
+  "antes": {
+   "bruto": 132.4,
+   "liquido": 132.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0769139235f84f76040a35d78107d0fc",
+  "linha": 614,
+  "antes": {
+   "bruto": 1279.65,
+   "liquido": 1279.65,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4f5fbf89f658883cacc5facf80b708a7",
+  "linha": 615,
+  "antes": {
+   "bruto": 1016.6,
+   "liquido": 1016.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4808022d3cefd3215c5ae44dd57e5187",
+  "linha": 616,
+  "antes": {
+   "bruto": 121.38,
+   "liquido": 121.38,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d8980d2591eba0efa9d0cccb13cf0972",
+  "linha": 617,
+  "antes": {
+   "bruto": 99.3,
+   "liquido": 99.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "47048111d82a03b727c832e673673ea6",
+  "linha": 618,
+  "antes": {
+   "bruto": 14.95,
+   "liquido": 14.95,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e024186694625bfcbbda64b93020beaa",
+  "linha": 619,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c19b41ebd28f92560f5c8c826aaa4389",
+  "linha": 620,
+  "antes": {
+   "bruto": 1315.92,
+   "liquido": 1315.92,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "dba1cc1c23ebb528d6ad4c852ad32b64",
+  "linha": 621,
+  "antes": {
+   "bruto": 320676.15,
+   "liquido": 320676.15,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "452ee30f320161450960537cf1594cb1",
+  "linha": 622,
+  "antes": {
+   "bruto": 104.55,
+   "liquido": 104.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d6920a2d656749635b5cdcf15dadf4d1",
+  "linha": 623,
+  "antes": {
+   "bruto": 1515.05,
+   "liquido": 1515.05,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "12d5f2bcbd0cefad63af4a76d7f2dae9",
+  "linha": 624,
+  "antes": {
+   "bruto": 877.42,
+   "liquido": 877.42,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5afa214f38acc42a1a5a377bc15650d1",
+  "linha": 625,
+  "antes": {
+   "bruto": 151.58,
+   "liquido": 151.58,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "51f2908501d0ec728ff96e5edd7544ba",
+  "linha": 626,
+  "antes": {
+   "bruto": 88.29,
+   "liquido": 88.29,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9512d433f168a6eb0804e5b543cdb5fe",
+  "linha": 627,
+  "antes": {
+   "bruto": 2288.73,
+   "liquido": 2288.73,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ebc8d37eca84c66f4c0579f4253f9590",
+  "linha": 628,
+  "antes": {
+   "bruto": 33.63,
+   "liquido": 33.63,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "546988880104067db81665f63481eca1",
+  "linha": 629,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ccedc03371ef0864ceadc99472dd9b00",
+  "linha": 630,
+  "antes": {
+   "bruto": 3843.84,
+   "liquido": 3843.84,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3ed3db78fa3465c4d6fe88f2ee44e113",
+  "linha": 631,
+  "antes": {
+   "bruto": 104.32,
+   "liquido": 104.32,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "55907590ea78bf1f72441c3236dfb4b5",
+  "linha": 632,
+  "antes": {
+   "bruto": 3965.89,
+   "liquido": 3965.89,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4d1e0abf61a2e18d7fd3ef261a7f90ae",
+  "linha": 633,
+  "antes": {
+   "bruto": 1489.05,
+   "liquido": 1489.05,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "138e91892dde440624abd41fdb37741f",
+  "linha": 634,
+  "antes": {
+   "bruto": 77.21,
+   "liquido": 77.21,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3ab58cbbea1557ff111d5de3a73c1a15",
+  "linha": 635,
+  "antes": {
+   "bruto": 338.07,
+   "liquido": 338.07,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9d6bc6e07c35162faefc92ae2a074287",
+  "linha": 636,
+  "antes": {
+   "bruto": 242.66,
+   "liquido": 242.66,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5071c7c3b92bf98fb2e50e8e987ae091",
+  "linha": 637,
+  "antes": {
+   "bruto": 190.14,
+   "liquido": 190.14,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "598d24a7b65d4f2a964ddf91344645a3",
+  "linha": 638,
+  "antes": {
+   "bruto": 162.19,
+   "liquido": 162.19,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "964d897c105d416b16a02ebb57792aee",
+  "linha": 639,
+  "antes": {
+   "bruto": 1428.53,
+   "liquido": 1428.53,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "32be717a4efc5e1f8c54b5a5a27296a7",
+  "linha": 640,
+  "antes": {
+   "bruto": 1495,
+   "liquido": 1495,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4f76f2758b1e666d5589c7df4327c7f0",
+  "linha": 641,
+  "antes": {
+   "bruto": 1469.09,
+   "liquido": 1469.09,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "312330b0d164b011e1dfe8c897eb5b69",
+  "linha": 642,
+  "antes": {
+   "bruto": 354.83,
+   "liquido": 354.83,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "85bde7847eca496f6ecda453171406b8",
+  "linha": 643,
+  "antes": {
+   "bruto": 513,
+   "liquido": 513,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "65601548187c5228fc6004ad9f8e047d",
+  "linha": 644,
+  "antes": {
+   "bruto": 426.08,
+   "liquido": 426.08,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b299eaa87a2bd3d8a25168d98301cbc6",
+  "linha": 645,
+  "antes": {
+   "bruto": 177.86,
+   "liquido": 177.86,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "edb6bc16201a7168bb26dd45496225b7",
+  "linha": 646,
+  "antes": {
+   "bruto": 82.73,
+   "liquido": 82.73,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "1d45f9dd9966de3d6ac5716b9f7a7455",
+  "linha": 647,
+  "antes": {
+   "bruto": 1664.24,
+   "liquido": 1664.24,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c6aa8db232c4d1ab796de245a713a466",
+  "linha": 648,
+  "antes": {
+   "bruto": 31.94,
+   "liquido": 31.94,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a0be9dd2308bb3491a70e27dd5a54d10",
+  "linha": 649,
+  "antes": {
+   "bruto": 139.53,
+   "liquido": 139.53,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7a94c4d4fffe1eee52b51bb6cd5a88ad",
+  "linha": 650,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7dfe2daef081604d61457288b615aa89",
+  "linha": 651,
+  "antes": {
+   "bruto": 500.9,
+   "liquido": 500.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f8a36de2b9e39587114dbeb98c41797e",
+  "linha": 652,
+  "antes": {
+   "bruto": 393.95,
+   "liquido": 393.95,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7d07cb6b44fb75c9b25562bcfb205a70",
+  "linha": 653,
+  "antes": {
+   "bruto": 3165.45,
+   "liquido": 3165.45,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a79b9029e7ea2f7dbec12793baf53712",
+  "linha": 654,
+  "antes": {
+   "bruto": 110.3,
+   "liquido": 110.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4d669d9a11b96cb96393a735c30677dd",
+  "linha": 655,
+  "antes": {
+   "bruto": 425.8,
+   "liquido": 425.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9fd7215a71459337322b52d45510d0c5",
+  "linha": 656,
+  "antes": {
+   "bruto": 127.74,
+   "liquido": 127.74,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "3fc2ff2403b80d6113c6362ffcb3bf67",
+  "linha": 657,
+  "antes": {
+   "bruto": 356.46,
+   "liquido": 356.46,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9597d4f444954baa017e00af1e51404a",
+  "linha": 658,
+  "antes": {
+   "bruto": 85.16,
+   "liquido": 85.16,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e75a5acabe1055d5020466eb30e40824",
+  "linha": 659,
+  "antes": {
+   "bruto": 121,
+   "liquido": 121,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "25a913771d281e20d18ea9f7cb699cb9",
+  "linha": 660,
+  "antes": {
+   "bruto": 355.74,
+   "liquido": 355.74,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d3ef50ed277bc1877fa2f3461f0007ca",
+  "linha": 661,
+  "antes": {
+   "bruto": 280075.1,
+   "liquido": 280075.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "6f58d8ab4b3c894d6800a158505e8538",
+  "linha": 662,
+  "antes": {
+   "bruto": 95.81,
+   "liquido": 95.81,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "bc1e03767138c5480b5a5adfbbd5ef5f",
+  "linha": 663,
+  "antes": {
+   "bruto": 510.96,
+   "liquido": 510.96,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5a71877fd167b37e304cba46f4db3c39",
+  "linha": 664,
+  "antes": {
+   "bruto": 117.11,
+   "liquido": 117.11,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "afee09014dfd72a2ac8cc6e1cf820d1c",
+  "linha": 665,
+  "antes": {
+   "bruto": 1184.9,
+   "liquido": 1184.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5769995f5cd1e87a35ff2616fdb400fe",
+  "linha": 666,
+  "antes": {
+   "bruto": 819.67,
+   "liquido": 819.67,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d9574be54d6bee5f91fbe401e05d188a",
+  "linha": 667,
+  "antes": {
+   "bruto": 5548.12,
+   "liquido": 5548.12,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b681ad58983f8a6f4ce64977d369a27b",
+  "linha": 668,
+  "antes": {
+   "bruto": 17331.77,
+   "liquido": 17331.77,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "9defc320532d4c35371e672aa4ee1396",
+  "linha": 669,
+  "antes": {
+   "bruto": 99.3,
+   "liquido": 99.3,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "664437f3b5981fbabf24ca51e82fe436",
+  "linha": 670,
+  "antes": {
+   "bruto": 418.2,
+   "liquido": 418.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c0c69dcd5df93f5378160e1b49bf2f8d",
+  "linha": 671,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "eef2ba7414d5ed3540b017063f804add",
+  "linha": 672,
+  "antes": {
+   "bruto": 81.04,
+   "liquido": 81.04,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f9f0000b601d81a3e508cb9beae503ca",
+  "linha": 673,
+  "antes": {
+   "bruto": 2184.6,
+   "liquido": 2184.6,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0c708b3d696c121e7644393209235860",
+  "linha": 674,
+  "antes": {
+   "bruto": 2057,
+   "liquido": 2057,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8d200fc05d9267f7c820d97e5f732f67",
+  "linha": 675,
+  "antes": {
+   "bruto": 752.75,
+   "liquido": 752.75,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "902e766c772ae08634e031d51ab56923",
+  "linha": 676,
+  "antes": {
+   "bruto": 182.39,
+   "liquido": 182.39,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a4d59efee3ccdcc5e81a414576d58650",
+  "linha": 677,
+  "antes": {
+   "bruto": 1787.4,
+   "liquido": 1787.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "aaebdc509aa007231f95299186b83c51",
+  "linha": 678,
+  "antes": {
+   "bruto": 179.4,
+   "liquido": 179.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4790ee41286dffa0b9ff13117596295f",
+  "linha": 679,
+  "antes": {
+   "bruto": 0,
+   "liquido": 5100,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "71e424e3a27c24db04289c5834292b0e",
+  "linha": 680,
+  "antes": {
+   "bruto": 42.58,
+   "liquido": 42.58,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d2a99df9f529f064b722ee0b947853a2",
+  "linha": 681,
+  "antes": {
+   "bruto": 769.5,
+   "liquido": 769.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "420621fb38bd761ddaed5ccd4cc61fcb",
+  "linha": 682,
+  "antes": {
+   "bruto": 106.88,
+   "liquido": 106.88,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "97383cf6dc7a636fc614c726895d2aef",
+  "linha": 683,
+  "antes": {
+   "bruto": 276.45,
+   "liquido": 276.45,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "cd15c14acd0e08b5d65a6225abe7fd26",
+  "linha": 684,
+  "antes": {
+   "bruto": 97.58,
+   "liquido": 97.58,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "d8d29d071c46320a17bdfacc67d74701",
+  "linha": 685,
+  "antes": {
+   "bruto": 6500.67,
+   "liquido": 6500.67,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "779661eca64473a8bf15626667490fb8",
+  "linha": 686,
+  "antes": {
+   "bruto": 4931.54,
+   "liquido": 4931.54,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7e7df436c826e1fc69dbc6843b47898d",
+  "linha": 687,
+  "antes": {
+   "bruto": 1378.36,
+   "liquido": 1378.36,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e8c8254f604e22c03ffe36b3e1b2eb19",
+  "linha": 688,
+  "antes": {
+   "bruto": 5689.91,
+   "liquido": 5689.91,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "768f4f6f8e858e06b9590991604f0428",
+  "linha": 689,
+  "antes": {
+   "bruto": 468.38,
+   "liquido": 468.38,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "fadb57be2e09a39b9929646a1127db3c",
+  "linha": 690,
+  "antes": {
+   "bruto": 44.85,
+   "liquido": 44.85,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e3a60b2e6cc89938ba4bfe31c51c8804",
+  "linha": 691,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5111622254c3de7a6a2394f0443d917a",
+  "linha": 692,
+  "antes": {
+   "bruto": 1136.2,
+   "liquido": 1136.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "88b8e4e3a64454dfe4fcfa50fc3d92ee",
+  "linha": 693,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4c1b13c1d3ddd9096ec04498e17e4d40",
+  "linha": 694,
+  "antes": {
+   "bruto": 596.12,
+   "liquido": 596.12,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a5c53437050d4a5405d36ce86b594b1c",
+  "linha": 695,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "77f1e31e19c9bc2558928c127d21b317",
+  "linha": 696,
+  "antes": {
+   "bruto": 441.2,
+   "liquido": 441.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5cb3fae21e905218094c037d44f06ebf",
+  "linha": 697,
+  "antes": {
+   "bruto": 8820.5,
+   "liquido": 8820.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "78d2a1d95f831aa612c3d3fff68b6a67",
+  "linha": 698,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "166f805ce43809d3b2c6c2e009e68daf",
+  "linha": 699,
+  "antes": {
+   "bruto": 32.62,
+   "liquido": 32.62,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "225df21bd2f971ac7b12e00caa2cf805",
+  "linha": 700,
+  "antes": {
+   "bruto": 183.26,
+   "liquido": 183.26,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4ba2aef7949b875da62009490e3e5258",
+  "linha": 701,
+  "antes": {
+   "bruto": 871.25,
+   "liquido": 871.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b2b498d0117b47548f7e8a140d87d79f",
+  "linha": 702,
+  "antes": {
+   "bruto": 1186.03,
+   "liquido": 4312.82,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "755005cfb07365d01d96f23ece1209d3",
+  "linha": 703,
+  "antes": {
+   "bruto": 102.41,
+   "liquido": 102.41,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a604a6d939cb6c9597c61770549c2a57",
+  "linha": 704,
+  "antes": {
+   "bruto": 248.25,
+   "liquido": 248.25,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c505295adf95ea26865e6032d8517856",
+  "linha": 705,
+  "antes": {
+   "bruto": 219.17,
+   "liquido": 219.17,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "02c3d43be8c6010839b18b311825747c",
+  "linha": 706,
+  "antes": {
+   "bruto": 231.7,
+   "liquido": 231.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ab2290a4b13e89edb3a95ab12fa76b11",
+  "linha": 707,
+  "antes": {
+   "bruto": 111.52,
+   "liquido": 111.52,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "a67f634cea0431c3d312481d6bfedcac",
+  "linha": 708,
+  "antes": {
+   "bruto": 2125.02,
+   "liquido": 2125.02,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4b386621693f2af77f7a803460d47b53",
+  "linha": 709,
+  "antes": {
+   "bruto": 193.03,
+   "liquido": 193.03,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2eb2d07e4e3a807a714786a672ab4f85",
+  "linha": 710,
+  "antes": {
+   "bruto": 5000,
+   "liquido": 5000,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "29c4f7971afa4ae46aaca20725070bb6",
+  "linha": 711,
+  "antes": {
+   "bruto": 976.45,
+   "liquido": 976.45,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "8adc7e24da8543aa6aae7222b95607c7",
+  "linha": 712,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "e6a51663752df75d476215e469f3faf2",
+  "linha": 713,
+  "antes": {
+   "bruto": 1875.1,
+   "liquido": 1875.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "5a2d3692e5198bc5a16fae2ee2d37de9",
+  "linha": 714,
+  "antes": {
+   "bruto": 655.18,
+   "liquido": 655.18,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "fda50921fe1966bb788145852124152d",
+  "linha": 715,
+  "antes": {
+   "bruto": 179.4,
+   "liquido": 179.4,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2b368f5396dc079f277493f8b84b698e",
+  "linha": 716,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ddd015f93f4a84666a4e3e9e4fe8b003",
+  "linha": 717,
+  "antes": {
+   "bruto": 427.5,
+   "liquido": 427.5,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ab5fbb9ba69a2b51a3628e43e461d599",
+  "linha": 718,
+  "antes": {
+   "bruto": 916.54,
+   "liquido": 916.54,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2dae95f8312550644ff1d2ae26e3c52c",
+  "linha": 719,
+  "antes": {
+   "bruto": 0,
+   "liquido": 0,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "b47e99290af5830176858b492ad799cc",
+  "linha": 720,
+  "antes": {
+   "bruto": 441.2,
+   "liquido": 441.2,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "f37f21334575c03d0f2fa50d24aee75a",
+  "linha": 721,
+  "antes": {
+   "bruto": 127.74,
+   "liquido": 127.74,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "4b4bef4823da584b3d52c8943a6cc3d6",
+  "linha": 722,
+  "antes": {
+   "bruto": 55.15,
+   "liquido": 55.15,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "7166c713fabc8950e4d47512ddf9c201",
+  "linha": 723,
+  "antes": {
+   "bruto": 606.65,
+   "liquido": 606.65,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "0f0621e107917da6d2d1e3120b3b3e5e",
+  "linha": 724,
+  "antes": {
+   "bruto": 370.55,
+   "liquido": 370.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "892cd8959b348f5d30628773655affed",
+  "linha": 725,
+  "antes": {
+   "bruto": 144.23,
+   "liquido": 144.23,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "2cd9384a2e22ae4eb0d0889229295ad8",
+  "linha": 726,
+  "antes": {
+   "bruto": 395.8,
+   "liquido": 395.8,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "01fa5be5ad6793e0c6de30aa158b4cd4",
+  "linha": 727,
+  "antes": {
+   "bruto": 16.55,
+   "liquido": 16.55,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "648836b5e1fdcf592c9396a25e3739e5",
+  "linha": 728,
+  "antes": {
+   "bruto": 2139.7,
+   "liquido": 2139.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "729cf164f793ec9972af21989e1e18de",
+  "linha": 729,
+  "antes": {
+   "bruto": 33.1,
+   "liquido": 33.1,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "185d2b3f9b29c05ee128c31d24def550",
+  "linha": 730,
+  "antes": {
+   "bruto": 85.52,
+   "liquido": 85.52,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c601f88f9a578c799292de784440e629",
+  "linha": 731,
+  "antes": {
+   "bruto": 539.62,
+   "liquido": 539.62,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "c7595ee19eb31ab68412a617a1be6001",
+  "linha": 732,
+  "antes": {
+   "bruto": 297.9,
+   "liquido": 297.9,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "ac6d4ee0f278d9c153dc3f493cbaa171",
+  "linha": 733,
+  "antes": {
+   "bruto": 2691,
+   "liquido": 2691,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "aeaad0c428140a18d43263302e128382",
+  "linha": 734,
+  "antes": {
+   "bruto": 3671.95,
+   "liquido": 3671.95,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ },
+ {
+  "id": "120b729da7b5eee7ab883bc6a14b4dd0",
+  "linha": 735,
+  "antes": {
+   "bruto": 5638.7,
+   "liquido": 6138.7,
+   "liquidoMensal": 0
+  },
+  "desfecho": "recalculada"
+ }
+]
